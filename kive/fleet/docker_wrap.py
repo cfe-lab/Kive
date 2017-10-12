@@ -23,9 +23,9 @@ Then grant access to one or more users on one or more images like this:
 See man sudoers for all the gory details, including digest specs.
 """
 from argparse import ArgumentParser
-import copy
+import errno
 import os
-from subprocess import check_call, Popen, PIPE, CalledProcessError
+from subprocess import check_call, Popen, PIPE, CalledProcessError, check_output, STDOUT
 import tarfile
 
 
@@ -78,7 +78,6 @@ def parse_args():
         'export',
         help='Export files from a container to a tar stream on stdout')
     export_parser.set_defaults(handler=handle_export)
-    # TODO: add --overwrite option.
     export_parser.add_argument('image', help='Docker image hash or name')
     export_parser.add_argument('session', help='Session name for volume and container')
 
@@ -86,25 +85,25 @@ def parse_args():
 
 
 def handle_launch(args):
+    # Import
+    print('Inputs:')
+    for input_file in args.inputs:
+        print('  ' + input_file)
+    print('\nSession:')
+    import_args = create_subcommand('import', args)
+    importer = Popen(import_args, stdin=PIPE)
     try:
-        # Import
-        print('Inputs:')
+        tar_file = tarfile.open(fileobj=importer.stdin, mode='w|')
         for input_file in args.inputs:
-            print(input_file)
-        print('\nSession:')
-        import_args = create_subcommand('import', args)
-        importer = Popen(import_args, stdin=PIPE)
-        try:
-            tar_file = tarfile.open(fileobj=importer.stdin, mode='w|')
-            for input_file in args.inputs:
-                tar_file.add(input_file, arcname=os.path.basename(input_file))
-            tar_file.close()
-        finally:
-            importer.stdin.close()
-            importer.wait()
-            if importer.returncode:
-                raise CalledProcessError(importer.returncode, import_args)
+            tar_file.add(input_file, arcname=os.path.basename(input_file))
+        tar_file.close()
+    finally:
+        importer.stdin.close()
+        importer.wait()
+        if importer.returncode:
+            raise CalledProcessError(importer.returncode, import_args)
 
+    try:
         # Run
         run_args = create_subcommand('run', args)
         run_args.append('--')
@@ -127,15 +126,14 @@ def exclude_root(tarinfos):
     print('\nOutputs:')
     for tarinfo in tarinfos:
         if tarinfo.name != '.':
-            assert tarinfo.name.startswith('./'), tarinfo.name
-            print(tarinfo.name[2:])
+            print('  ' + os.path.normpath(tarinfo.name))
             yield tarinfo
 
 
 def create_subcommand(subcommand, args):
     new_args = [__file__, subcommand, args.image, args.session]
     if args.sudo:
-        new_args.insert(0, 'sudo')
+        new_args[:0] = ['sudo', '-i']
     return new_args
 
 
@@ -146,17 +144,32 @@ def expand_session(name):
 
 def handle_import(args):
     session = expand_session(args.session)
-    check_call(['docker', 'volume', 'create', '--name', session])
-    check_call(['docker',
-                'run',
-                '--name', session,
-                '-v', session + ':/data',
-                args.image,
-                'mkdir',
-                '/data/input',
-                '/data/output'])
+    try:
+        # Shouldn't find the docker volume.
+        check_output(['docker', 'volume', 'inspect', session], stderr=STDOUT)
 
-    check_call(['docker', 'cp', '-', session + ':/data/input'])
+        # Complain if we found it.
+        raise OSError(errno.EEXIST,
+                      'Docker volume {} already exists.'.format(session))
+    except CalledProcessError:
+        pass
+    check_call(['docker', 'volume', 'create', '--name', session])
+    is_container_created = False
+    try:
+        check_call(['docker',
+                    'run',
+                    '--name', session,
+                    '-v', session + ':/data',
+                    args.image,
+                    'mkdir',
+                    '/data/input',
+                    '/data/output'])
+        is_container_created = True
+
+        check_call(['docker', 'cp', '-', session + ':/data/input'])
+    except BaseException:
+        clean_up(session, is_container_created)
+        raise
 
 
 def handle_run(args):
@@ -171,7 +184,12 @@ def handle_run(args):
 def handle_export(args):
     session = expand_session(args.session)
     check_call(['docker', 'cp', session + ':/data/output/.', '-'])
-    check_call(['docker', 'rm', session])
+    clean_up(session)
+
+
+def clean_up(session, is_container_created=True):
+    if is_container_created:
+        check_call(['docker', 'rm', session])
     check_call(['docker', 'volume', 'rm', session])
 
 
