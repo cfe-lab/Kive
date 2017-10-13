@@ -27,6 +27,7 @@ import errno
 import os
 from subprocess import check_call, Popen, PIPE, CalledProcessError, check_output, STDOUT
 import tarfile
+from traceback import print_exc
 
 
 def parse_args():
@@ -38,17 +39,23 @@ def parse_args():
     launch_parser = subparsers.add_parser(
         'launch',
         help='Coordinate the import, run, and export commands.'
-        ' Example: docker_wrap.py --inputs a.txt b.txt -- my_img sess1 ~ cmd arg1')
+        ' Example: docker_wrap.py my_img --inputs a.txt b.txt --'
+        ' sess1 /out/path cmd arg1')
     launch_parser.set_defaults(handler=handle_launch)
     launch_parser.add_argument('--sudo',
                                action='store_true',
                                help='Launch subcommands under sudo')
-    launch_parser.add_argument(
-        '--inputs',
-        '-i',
-        nargs='*',
-        default=tuple(),
-        help='List of input files to copy')
+    launch_parser.add_argument('--inputs',
+                               '-i',
+                               nargs='*',
+                               metavar='INPUT[{}PATH]'.format(os.pathsep),
+                               default=tuple(),
+                               help='list of input files and paths inside the'
+                                    ' container, path defaults to file name')
+    launch_parser.add_argument('--quiet',
+                               '-q',
+                               action='store_true',
+                               help="Don't list inputs and outputs")
     launch_parser.add_argument('image', help='Docker image hash or name')
     launch_parser.add_argument('session',
                                help='Session name for volume and container')
@@ -85,18 +92,17 @@ def parse_args():
 
 
 def handle_launch(args):
+    if not args.quiet:
+        print('Session: ' + expand_session(args.session))
+
     # Import
-    print('Inputs:')
-    for input_file in args.inputs:
-        print('  ' + input_file)
-    print('\nSession:')
     import_args = create_subcommand('import', args)
     importer = Popen(import_args, stdin=PIPE)
     try:
-        tar_file = tarfile.open(fileobj=importer.stdin, mode='w|')
-        for input_file in args.inputs:
-            tar_file.add(input_file, arcname=os.path.basename(input_file))
-        tar_file.close()
+        send_inputs(args.inputs, importer.stdin, args.quiet)
+    except IOError:
+        importer.terminate()
+        print_exc()
     finally:
         importer.stdin.close()
         importer.wait()
@@ -105,6 +111,8 @@ def handle_launch(args):
 
     try:
         # Run
+        if not args.quiet:
+            print('\nLaunching.')
         run_args = create_subcommand('run', args)
         run_args.append('--')
         for command_arg in args.command:
@@ -115,18 +123,37 @@ def handle_launch(args):
         export_args = create_subcommand('export', args)
         exporter = Popen(export_args, stdout=PIPE)
         tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
-        tar_file.extractall(args.output_path, members=exclude_root(tar_file))
+        tar_file.extractall(args.output_path,
+                            members=exclude_root(tar_file, args.quiet))
         exporter.wait()
         if exporter.returncode:
             raise CalledProcessError(exporter.returncode, export_args)
-    print('\nDone.')
+    if not args.quiet:
+        print('\nDone.')
 
 
-def exclude_root(tarinfos):
-    print('\nOutputs:')
+def send_inputs(inputs, f, is_quiet):
+    with tarfile.open(fileobj=f, mode='w|') as tar_file:
+        if not is_quiet:
+            print('Inputs:')
+        for input_file in inputs:
+            paths = input_file.split(os.pathsep)
+            host_path = paths[0]
+            container_path = (paths[1]
+                              if len(paths) > 1
+                              else os.path.basename(host_path))
+            if not is_quiet:
+                print('  ' + container_path)
+            tar_file.add(host_path, arcname=container_path)
+
+
+def exclude_root(tarinfos, is_quiet):
+    if not is_quiet:
+        print('\nOutputs:')
     for tarinfo in tarinfos:
         if tarinfo.name != '.':
-            print('  ' + os.path.normpath(tarinfo.name))
+            if not is_quiet:
+                print('  ' + os.path.normpath(tarinfo.name))
             yield tarinfo
 
 
@@ -153,7 +180,7 @@ def handle_import(args):
                       'Docker volume {} already exists.'.format(session))
     except CalledProcessError:
         pass
-    check_call(['docker', 'volume', 'create', '--name', session])
+    check_output(['docker', 'volume', 'create', '--name', session])
     is_container_created = False
     try:
         check_call(['docker',
@@ -189,8 +216,8 @@ def handle_export(args):
 
 def clean_up(session, is_container_created=True):
     if is_container_created:
-        check_call(['docker', 'rm', session])
-    check_call(['docker', 'volume', 'rm', session])
+        check_output(['docker', 'rm', session])
+    check_output(['docker', 'volume', 'rm', session])
 
 
 def main():
