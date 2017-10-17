@@ -13,8 +13,8 @@ a command alias like this with the image name you want:
 
     Cmnd_Alias DOCKER_<IMAGE> = \
         /path/to/docker_wrap.py import <image> *, \
-        /usr/local/bin/docker_wrap.py run <image> *, \
-        /usr/local/bin/docker_wrap.py export <image> *
+        /path/to/docker_wrap.py run <image> *, \
+        /path/to/docker_wrap.py export <image> *
 
 Then grant access to one or more users on one or more images like this:
 
@@ -160,7 +160,7 @@ def exclude_root(tarinfos, is_quiet):
 def create_subcommand(subcommand, args):
     new_args = [__file__, subcommand, args.image, args.session]
     if args.sudo:
-        new_args[:0] = ['sudo', '-i']
+        new_args[:0] = ['sudo']
     return new_args
 
 
@@ -225,4 +225,5 @@ def main():
     args.handler(args)
 
 
-main()
+if __name__ == '__main__':
+    main()
