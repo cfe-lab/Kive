@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 import errno
 import os
 from subprocess import check_call, Popen, PIPE, CalledProcessError, check_output, STDOUT
+import sys
 import tarfile
 from traceback import print_exc
 
@@ -56,6 +57,10 @@ def parse_args():
                                '-q',
                                action='store_true',
                                help="Don't list inputs and outputs")
+    launch_parser.add_argument('--script',
+                               '-s',
+                               default=__file__,
+                               help='script file for subcommands')
     launch_parser.add_argument('image', help='Docker image hash or name')
     launch_parser.add_argument('session',
                                help='Session name for volume and container')
@@ -113,6 +118,7 @@ def handle_launch(args):
         # Run
         if not args.quiet:
             print('\nLaunching.')
+            sys.stdout.flush()
         run_args = create_subcommand('run', args)
         run_args.append('--')
         for command_arg in args.command:
@@ -158,7 +164,7 @@ def exclude_root(tarinfos, is_quiet):
 
 
 def create_subcommand(subcommand, args):
-    new_args = [__file__, subcommand, args.image, args.session]
+    new_args = [args.script, subcommand, args.image, args.session]
     if args.sudo:
         new_args[:0] = ['sudo']
     return new_args
