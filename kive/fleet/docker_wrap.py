@@ -90,7 +90,7 @@ def handle_launch(args):
         if os.path.basename(__file__) == expected_script:
             args.script = __file__
         else:
-            args.script = check_output(['which', expected_script])
+            args.script = check_output(['which', expected_script]).strip()
     if not args.quiet:
         print('Session: ' + expand_session(args.session))
 
