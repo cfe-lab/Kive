@@ -12,9 +12,9 @@ To grant access to this command, edit the sudoers file with visudo, and create
 a command alias like this with the image name you want:
 
     Cmnd_Alias DOCKER_<IMAGE> = \
-        /path/to/docker_wrap.py import <image> *, \
-        /path/to/docker_wrap.py run <image> *, \
-        /path/to/docker_wrap.py export <image> *
+        /path/to/docker_wrap.py <image> --read *, \
+        /path/to/docker_wrap.py <image> --run *, \
+        /path/to/docker_wrap.py <image> --write *
 
 Then grant access to one or more users on one or more images like this:
 
@@ -34,74 +34,68 @@ from traceback import print_exc
 def parse_args():
     parser = ArgumentParser(
         description='Launch a docker image with inputs and outputs',
-        epilog='See the source code for details on configuring sudoers.')
-    subparsers = parser.add_subparsers()
-
-    launch_parser = subparsers.add_parser(
-        'launch',
-        help='Coordinate the import, run, and export commands.'
-        ' Example: docker_wrap.py my_img --inputs a.txt b.txt --'
-        ' sess1 /out/path cmd arg1')
-    launch_parser.set_defaults(handler=handle_launch)
-    launch_parser.add_argument('--sudo',
-                               action='store_true',
-                               help='Launch subcommands under sudo')
-    launch_parser.add_argument('--inputs',
-                               '-i',
-                               nargs='*',
-                               metavar='INPUT[{}PATH]'.format(os.pathsep),
-                               default=tuple(),
-                               help='list of input files and paths inside the'
-                                    ' container, path defaults to file name')
-    launch_parser.add_argument('--quiet',
-                               '-q',
-                               action='store_true',
-                               help="Don't list inputs and outputs")
-    launch_parser.add_argument('--script',
-                               '-s',
-                               default=__file__,
-                               help='script file for subcommands')
-    launch_parser.add_argument('image', help='Docker image hash or name')
-    launch_parser.add_argument('session',
-                               help='Session name for volume and container')
-    launch_parser.add_argument('output_path',
-                               help='Folder to copy /data/output files into')
-    launch_parser.add_argument('command',
-                               nargs='*',
-                               help='Command and args for main process')
-
-    import_parser = subparsers.add_parser(
-        'import',
-        help='Import files from tar stream on stdin to a container')
-    import_parser.set_defaults(handler=handle_import)
-    import_parser.add_argument('image', help='Docker image hash or name')
-    import_parser.add_argument('session', help='Session name for volume and container')
-
-    run_parser = subparsers.add_parser('run',
-                                       help='Run main container process')
-    run_parser.set_defaults(handler=handle_run)
-    run_parser.add_argument('image', help='Docker image hash or name')
-    run_parser.add_argument('session', help='Session name for volume and container')
-    run_parser.add_argument('command',
-                            nargs='*',
-                            help='Command and args for main process')
-
-    export_parser = subparsers.add_parser(
-        'export',
-        help='Export files from a container to a tar stream on stdout')
-    export_parser.set_defaults(handler=handle_export)
-    export_parser.add_argument('image', help='Docker image hash or name')
-    export_parser.add_argument('session', help='Session name for volume and container')
+        epilog='See the source code for details on configuring sudoers.'
+        ' Example: docker_wrap.py my_image --inputs a.txt b.txt'
+        ' --output /out/path -- session1 command arg1 arg2')
+    parser.add_argument('--sudo',
+                        action='store_true',
+                        help='Launch subcommands under sudo')
+    parser.add_argument('--inputs',
+                        '-i',
+                        nargs='*',
+                        metavar='INPUT[{}PATH]'.format(os.pathsep),
+                        default=tuple(),
+                        help='list of input files to copy to /data/input,'
+                             ' may append paths inside the container after'
+                             ' a separator, but paths default to file names')
+    parser.add_argument('--output',
+                        '-o',
+                        default='.',
+                        help='folder to copy /data/output files into')
+    parser.add_argument('--quiet',
+                        '-q',
+                        action='store_true',
+                        help='hide list of inputs and outputs')
+    parser.add_argument('--script',
+                        '-s',
+                        help='script file for read, run, and write subcommands')
+    parser.add_argument('image', help='Docker image hash or name')
+    parser.add_argument('session',
+                        help='session name for volume and container')
+    parser.add_argument('command',
+                        nargs='*',
+                        help='command and args to run in the container')
+    subcommands = parser.add_argument_group(
+        'subcommand flags',
+        'These request special subprocesses, usually run under the root user.'
+        ' Regular users can ignore them.')
+    subcommands.add_argument(
+        '--read',
+        action='store_true',
+        help='read input files from a tar stream on stdin to a container')
+    subcommands.add_argument('--run',
+                             action='store_true',
+                             help='run main container process')
+    subcommands.add_argument(
+        '--write',
+        action='store_true',
+        help='write output files from a container to a tar stream on stdout')
 
     return parser.parse_args()
 
 
 def handle_launch(args):
+    if args.script is None:
+        expected_script = 'docker_wrap.py'
+        if os.path.basename(__file__) == expected_script:
+            args.script = __file__
+        else:
+            args.script = check_output(['which', expected_script])
     if not args.quiet:
         print('Session: ' + expand_session(args.session))
 
     # Import
-    import_args = create_subcommand('import', args)
+    import_args = create_subcommand('--read', args)
     importer = Popen(import_args, stdin=PIPE)
     try:
         send_inputs(args.inputs, importer.stdin, args.quiet)
@@ -119,17 +113,17 @@ def handle_launch(args):
         if not args.quiet:
             print('\nLaunching.')
             sys.stdout.flush()
-        run_args = create_subcommand('run', args)
+        run_args = create_subcommand('--run', args)
         run_args.append('--')
         for command_arg in args.command:
             run_args.append(command_arg)
         check_call(run_args)
     finally:
         # Export
-        export_args = create_subcommand('export', args)
+        export_args = create_subcommand('--write', args)
         exporter = Popen(export_args, stdout=PIPE)
         tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
-        tar_file.extractall(args.output_path,
+        tar_file.extractall(args.output,
                             members=exclude_root(tar_file, args.quiet))
         exporter.wait()
         if exporter.returncode:
@@ -164,7 +158,7 @@ def exclude_root(tarinfos, is_quiet):
 
 
 def create_subcommand(subcommand, args):
-    new_args = [args.script, subcommand, args.image, args.session]
+    new_args = [args.script, args.image, subcommand, args.session]
     if args.sudo:
         new_args[:0] = ['sudo']
     return new_args
@@ -175,7 +169,7 @@ def expand_session(name):
     return user_name + '_' + name
 
 
-def handle_import(args):
+def handle_read(args):
     session = expand_session(args.session)
     try:
         # Shouldn't find the docker volume.
@@ -186,22 +180,19 @@ def handle_import(args):
                       'Docker volume {} already exists.'.format(session))
     except CalledProcessError:
         pass
-    check_output(['docker', 'volume', 'create', '--name', session])
-    is_container_created = False
     try:
         check_call(['docker',
                     'run',
                     '--name', session,
                     '-v', session + ':/data',
+                    '--entrypoint', 'mkdir',
                     args.image,
-                    'mkdir',
                     '/data/input',
                     '/data/output'])
-        is_container_created = True
 
         check_call(['docker', 'cp', '-', session + ':/data/input'])
     except BaseException:
-        clean_up(session, is_container_created)
+        clean_up(session)
         raise
 
 
@@ -214,21 +205,29 @@ def handle_run(args):
     check_call(docker_args)
 
 
-def handle_export(args):
+def handle_write(args):
     session = expand_session(args.session)
     check_call(['docker', 'cp', session + ':/data/output/.', '-'])
     clean_up(session)
 
 
-def clean_up(session, is_container_created=True):
-    if is_container_created:
+def clean_up(session):
+    try:
         check_output(['docker', 'rm', session])
-    check_output(['docker', 'volume', 'rm', session])
+    finally:
+        check_output(['docker', 'volume', 'rm', session])
 
 
 def main():
     args = parse_args()
-    args.handler(args)
+    if args.read:
+        handle_read(args)
+    elif args.run:
+        handle_run(args)
+    elif args.write:
+        handle_write(args)
+    else:
+        handle_launch(args)
 
 
 if __name__ == '__main__':
