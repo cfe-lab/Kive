@@ -12,9 +12,9 @@ To grant access to this command, edit the sudoers file with visudo, and create
 a command alias like this with the image name you want:
 
     Cmnd_Alias DOCKER_<IMAGE> = \
-        /path/to/docker_wrap.py <image> --read *, \
-        /path/to/docker_wrap.py <image> --run *, \
-        /path/to/docker_wrap.py <image> --write *
+        /path/to/docker_wrap.py --read <image> *, \
+        /path/to/docker_wrap.py --run <image> *, \
+        /path/to/docker_wrap.py --write <image> *
 
 Then grant access to one or more users on one or more images like this:
 
@@ -45,13 +45,21 @@ def parse_args():
                         nargs='*',
                         metavar='INPUT[{}PATH]'.format(os.pathsep),
                         default=tuple(),
-                        help='list of input files to copy to /data/input,'
-                             ' may append paths inside the container after'
+                        help='list of input files to copy into the container,'
+                             ' may append paths under /mnt/input after'
                              ' a separator, but paths default to file names')
     parser.add_argument('--output',
                         '-o',
                         default='.',
-                        help='folder to copy /data/output files into')
+                        help='folder to copy all /mnt/output files to')
+    parser.add_argument('--bin_files',
+                        '-b',
+                        nargs='*',
+                        metavar='BIN_FILE[{}PATH]'.format(os.pathsep),
+                        default=tuple(),
+                        help='list of binary files to copy into the container,'
+                             ' may append paths under /mnt/bin after'
+                             ' a separator, but paths default to file names')
     parser.add_argument('--quiet',
                         '-q',
                         action='store_true',
@@ -98,7 +106,7 @@ def handle_launch(args):
     import_args = create_subcommand('--read', args)
     importer = Popen(import_args, stdin=PIPE)
     try:
-        send_inputs(args.inputs, importer.stdin, args.quiet)
+        send_inputs(args, importer.stdin)
     except IOError:
         importer.terminate()
         print_exc()
@@ -132,19 +140,33 @@ def handle_launch(args):
         print('\nDone.')
 
 
-def send_inputs(inputs, f, is_quiet):
+def send_inputs(args, f):
     with tarfile.open(fileobj=f, mode='w|') as tar_file:
-        if not is_quiet:
+        if not args.quiet and args.bin_files:
+            print('Bin files:')
+        for bin_file in args.bin_files:
+            paths = bin_file.split(os.pathsep)
+            host_path = paths[0]
+            container_path = (paths[1]
+                              if len(paths) > 1
+                              else os.path.basename(host_path))
+            if not args.quiet:
+                print('  ' + container_path)
+            tar_file.add(host_path,
+                         arcname=os.path.join('bin', container_path))
+
+        if not args.quiet:
             print('Inputs:')
-        for input_file in inputs:
+        for input_file in args.inputs:
             paths = input_file.split(os.pathsep)
             host_path = paths[0]
             container_path = (paths[1]
                               if len(paths) > 1
                               else os.path.basename(host_path))
-            if not is_quiet:
+            if not args.quiet:
                 print('  ' + container_path)
-            tar_file.add(host_path, arcname=container_path)
+            tar_file.add(host_path,
+                         arcname=os.path.join('input', container_path))
 
 
 def exclude_root(tarinfos, is_quiet):
@@ -158,7 +180,7 @@ def exclude_root(tarinfos, is_quiet):
 
 
 def create_subcommand(subcommand, args):
-    new_args = [args.script, args.image, subcommand, args.session]
+    new_args = [args.script, subcommand, args.image, args.session]
     if args.sudo:
         new_args[:0] = ['sudo']
     return new_args
@@ -184,13 +206,14 @@ def handle_read(args):
         check_call(['docker',
                     'run',
                     '--name', session,
-                    '-v', session + ':/data',
+                    '-v', session + ':/mnt',
                     '--entrypoint', 'mkdir',
                     args.image,
-                    '/data/input',
-                    '/data/output'])
+                    '/mnt/bin',
+                    '/mnt/input',
+                    '/mnt/output'])
 
-        check_call(['docker', 'cp', '-', session + ':/data/input'])
+        check_call(['docker', 'cp', '-', session + ':/mnt'])
     except BaseException:
         clean_up(session)
         raise
@@ -200,14 +223,14 @@ def handle_run(args):
     docker_args = ['docker',
                    'run',
                    '--rm',
-                   '-v', expand_session(args.session) + ':/data',
+                   '-v', expand_session(args.session) + ':/mnt',
                    args.image] + args.command
     check_call(docker_args)
 
 
 def handle_write(args):
     session = expand_session(args.session)
-    check_call(['docker', 'cp', session + ':/data/output/.', '-'])
+    check_call(['docker', 'cp', session + ':/mnt/output/.', '-'])
     clean_up(session)
 
 
