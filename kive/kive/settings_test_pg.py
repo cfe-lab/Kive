@@ -2,12 +2,10 @@
 # while still using PostgreSQL for thoroughness.
 # Use it by running ./manage.py test --settings=kive.settings_test_pg
 
-import os
 from settings import *  # @UnusedWildImport
 
 # Avoid overwriting developer data files
-MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')  
-HOST_MEDIA_ROOT = None if HOST_MEDIA_ROOT is None else os.path.join(HOST_MEDIA_ROOT, 'Testing')
+MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')
 
 
 # Disable logging to console so test output isn't polluted.

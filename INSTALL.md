@@ -400,6 +400,17 @@ c) the 'sinfo' command should show partitions compatible with the above requirem
 
 [munge-issue]: https://github.com/dun/munge/issues/31#issuecomment-127726497
 
+Installing Docker
+-----------------
+Follow the instructions for [CentOS][docker-centos] or [Ubuntu][docker-ubuntu].
+Then grant some level of `sudo` permission to the user that will run Kive fleet.
+See the `docker_wrap.py` file for detailed instructions on editing the `sudoers`
+file to allow access to docker.
+
+[docker-centos]: https://docs.docker.com/engine/installation/linux/docker-ce/centos/
+[docker-ubuntu]: https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/
+
+
 Installing scandir
 ------------------
 The scandir library is an efficient scanner of the filesystem, Kive uses this when looking for

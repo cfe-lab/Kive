@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # some simple  tests for the dockerlib module
-from unittest import skipIf
+from unittest import skipIf, skip
 
 import os.path as osp
 import subprocess as sp
@@ -36,6 +36,7 @@ class DockerLibTests(DummyDockerLibTests):
     def get_docker_handler_class(self):
         return dockerlib.DockerHandler
 
+    @skip("This requires sudo permission. Enable test when we allow new images.")
     def test_load_image01(self):
         """Load a docker image from file"""
         image_name = osp.join(TEST_DIR, "small-alpine.bz2")

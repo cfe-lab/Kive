@@ -106,10 +106,7 @@ def handle_launch(args):
     import_args = create_subcommand('--read', args)
     importer = Popen(import_args, stdin=PIPE)
     try:
-        send_inputs(args, importer.stdin)
-    except IOError:
-        importer.terminate()
-        print_exc()
+        send_folders(args, importer)
     finally:
         importer.stdin.close()
         importer.wait()
@@ -140,33 +137,31 @@ def handle_launch(args):
         print('\nDone.')
 
 
-def send_inputs(args, f):
-    with tarfile.open(fileobj=f, mode='w|') as tar_file:
-        if not args.quiet and args.bin_files:
-            print('Bin files:')
-        for bin_file in args.bin_files:
-            paths = bin_file.split(os.pathsep)
-            host_path = paths[0]
-            container_path = (paths[1]
-                              if len(paths) > 1
-                              else os.path.basename(host_path))
-            if not args.quiet:
-                print('  ' + container_path)
-            tar_file.add(host_path,
-                         arcname=os.path.join('bin', container_path))
+def send_folders(args, importer):
+    with tarfile.open(fileobj=importer.stdin, mode='w|') as tar_file:
+        try:
+            if args.bin_files:
+                send_folder(args.bin_files, 'bin', tar_file, args.quiet)
 
-        if not args.quiet:
-            print('Inputs:')
-        for input_file in args.inputs:
-            paths = input_file.split(os.pathsep)
-            host_path = paths[0]
-            container_path = (paths[1]
-                              if len(paths) > 1
-                              else os.path.basename(host_path))
-            if not args.quiet:
-                print('  ' + container_path)
-            tar_file.add(host_path,
-                         arcname=os.path.join('input', container_path))
+            send_folder(args.inputs, 'input', tar_file, args.quiet)
+        except IOError:
+            importer.terminate()
+            print_exc()
+
+
+def send_folder(file_requests, folder, tar_file, is_quiet):
+    if not is_quiet:
+        print('{} files:'.format(folder.capitalize()))
+    for file_request in file_requests:
+        paths = file_request.split(os.pathsep)
+        host_path = paths[0]
+        container_path = (paths[1]
+                          if len(paths) > 1
+                          else os.path.basename(host_path))
+        if not is_quiet:
+            print('  ' + container_path)
+        tar_file.add(host_path,
+                     arcname=os.path.join(folder, container_path))
 
 
 def exclude_root(tarinfos, is_quiet):

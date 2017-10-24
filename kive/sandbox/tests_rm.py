@@ -1,3 +1,5 @@
+from unittest import skip, skipIf
+
 from django.test import TestCase, skipIfDBFeature
 from django.utils import timezone
 from django.contrib.auth.models import User
@@ -16,7 +18,7 @@ from method.models import Method
 from fleet.workers import Manager
 from archive.models import Run
 from fleet.slurmlib import DummySlurmScheduler
-from fleet.dockerlib import DummyDockerHandler
+from fleet.dockerlib import DummyDockerHandler, DockerHandler
 import file_access_utils
 
 
@@ -121,7 +123,9 @@ class ExecuteResultTestsRM(TestCase):
         self.assertEqual(check.start_time.date(), check.end_time.date())
         self.assertEqual(check.is_fail(), False)
 
-    def DO_NOT_RUN_test_execute_pipeline_dataset(self):
+    @skip(reason="Fails because Method.submit_code has been removed for docker"
+                 " support. Needs to be fixed or removed.")
+    def test_execute_pipeline_dataset(self):
         """
         Test the integrity of a Dataset output by a PipelineStep in
         the middle of a Pipeline.
@@ -546,6 +550,7 @@ class RawTests(SandboxRMTestCase):
     def setUp(self):
         super(RawTests, self).setUp()
 
+        self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
         self.pipeline_raw = tools.make_first_pipeline(
             "raw noop", "a pipeline to do nothing to raw data",
             self.user_bob)
@@ -585,6 +590,24 @@ class RawTests(SandboxRMTestCase):
                                         docker_handler_class=DummyDockerHandler).get_last_run()
         run2 = Run.objects.get(pk=run2.pk)
         self.assertTrue(run2.is_successful())
+
+    @skipIf(not settings.RUN_DOCKER_TESTS, "Docker tests disabled.")
+    def test_execute_pipeline_raw_with_docker(self):
+        """Execute a raw Pipeline."""
+        self.maxDiff = None
+        run = Manager.execute_pipeline(self.user_bob,
+                                       self.pipeline_raw,
+                                       [self.dataset_raw],
+                                       docker_handler_class=DockerHandler).get_last_run()
+        run.refresh_from_db()
+        stderr_path = os.path.join(run.sandbox_path,
+                                   "step1",
+                                   "logs",
+                                   "step1_stderr_slurmID0_node0.txt")
+        with open(stderr_path, 'rU') as f:
+            stderr_text = f.read()
+        self.assertEqual("", stderr_text)
+        self.assertTrue(run.is_successful())
 
     def tearDown(self):
         super(RawTests, self).tearDown()

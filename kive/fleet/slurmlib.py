@@ -1066,24 +1066,28 @@ class DummyWorkerProc(DummyJobState):
 
     def __init__(self, jdct):
         DummyJobState.__init__(self, jdct["prio_level"], jdct["job_name"])
+        for name in ('stdoutfile', 'stderrfile'):
+            jdct[name] = jdct[name].replace('%J', '0').replace('%N', '0')
         self._jdct = jdct
         self.popen = None
+        self._launch_ok = False
 
     def do_run(self):
         """Invoke the code described in the _jdct"""
         self.set_runstate(BaseSlurmScheduler.RUNNING)
         j = self._jdct
         self._launch_ok = False
-        ofiles_ok = True
         try:
             stdout = open(j["stdoutfile"], "w")
             stderr = open(j["stderrfile"], "w")
-        except:
-            ofiles_ok = False
-        if ofiles_ok:
-            self.popen = startit(j["workingdir"], j["driver_name"],
-                                 j["driver_arglst"], stdout, stderr)
+            self.popen = startit(j["workingdir"],
+                                 j["driver_name"],
+                                 j["driver_arglst"],
+                                 stdout,
+                                 stderr)
             self._launch_ok = True
+        except IOError:
+            pass
 
     def check_ready_state(self, findct):
         """ Return a 2 tuple of Boolean:
@@ -1319,10 +1323,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         if not isinstance(prio_level, int):
             raise RuntimeError('prio_level must be an integer')
         prio_level = min(max(prio_level, cls.MIN_PRIO), cls.MAX_PRIO)
-        # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
-        if not os.path.isfile(full_path):
-            raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
         if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
 

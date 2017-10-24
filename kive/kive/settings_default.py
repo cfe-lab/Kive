@@ -394,15 +394,6 @@ DOCK_BZIP2_COMMAND = "/bin/bzip2"
 DOCK_IMAGE_DIRECTORY = os.path.join(MEDIA_ROOT, 'DockerImages')
 
 
-# Absolute filesystem path to the directory that will hold user-uploaded files
-# on the host file system of a system running docker.
-# In most cases, this can be set to None.
-# When running kive from within a docker image, however, kive will launch a sibling
-# docker image to run the methods. This sibling container needs to know the original
-# MEDIA_ROOT and will get it from HOST_MEDIA_ROOT.
-HOST_MEDIA_ROOT = None
-
-
 # The name of the docker image to use when non other is provided. This file must
 # exist when a dockerlib.DockerHandler  is initialised with docker_is_alive()
 DOCK_DEFAULT_DOCKER_IMAGE = "comp-base-01.tar.bz2"

@@ -1849,7 +1849,9 @@ class Sandbox:
         curr_RS = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
-        arglst = input_paths + step_execute_info.output_paths
+        dependencies = curr_RS.pipelinestep.transformation.definite.dependencies
+        dependency_paths = [os.path.join(dep.path, dep.get_filename())
+                            for dep in dependencies.all()]
         # Driver name
         driver = curr_RS.pipelinestep.transformation.definite.driver
         driver_filename = driver.coderesource.filename
@@ -1866,31 +1868,17 @@ class Sandbox:
         )
         logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_RS.pk)
         # Collect information we need for the wrapper script
-        host_rundir = rundir = step_execute_info.step_run_dir
-        preamble = settings.SANDBOX_DRIVER_PREAMBLE if settings.SANDBOX_DRIVER_PREAMBLE is not None else ""
-        host_media_root = settings.HOST_MEDIA_ROOT or ""
-        if host_media_root:
-            # if HOST_MEDIA_ROOT is defined, then we have to replace the host_rundir
-            host_rundir = host_rundir.replace(settings.MEDIA_ROOT, host_media_root, 1)
-            if host_rundir == rundir:
-                raise RuntimeError('wonky string replace')
-        # Create the wrapper file and make sure its executable, then generate the file's contents from
-        # the docker_handler_class and write it to the file. Finally, submit the wrapper to slurm.
-        wrapped_driver_fd, wrapped_driver_path = tempfile.mkstemp(dir=rundir, prefix=driver_filename)
-        os.fchmod(wrapped_driver_fd, stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+        host_rundir = step_execute_info.step_run_dir
         # NOTE: currently, we always launch a driver with the default image_id
-        launch_str = docker_handler_class.generate_launchstring(host_rundir, rundir,
-                                                                preamble,
+        launch_args = docker_handler_class.generate_launch_args(host_rundir,
+                                                                input_paths,
+                                                                step_execute_info.output_paths,
                                                                 driver_filename,
-                                                                arglst,
-                                                                image_id=None)
-        logger.debug("LAUNCH STRING {}".format(launch_str))
-        with os.fdopen(wrapped_driver_fd, "wb") as f:
-            f.write(launch_str)
+                                                                dependency_paths)
         job_handle = slurm_sched_class.submit_job(
-            rundir,
-            wrapped_driver_path,
-            [],
+            host_rundir,
+            launch_args[0],
+            launch_args[1:],
             self.uid,
             self.gid,
             self.run.priority,
@@ -1902,10 +1890,6 @@ class Sandbox:
             mem=curr_RS.pipelinestep.transformation.definite.memory
         )
 
-        # Stick the path to the job handle so it can be disposed of later.
-        job_handle.wrapped_driver_path = wrapped_driver_path
-        logger.debug("Submitted task with pk=%d; Slurm job ID=%s, wrapper name=%s",
-                     curr_RS.pk, job_handle.job_id, wrapped_driver_path)
         return job_handle
 
     @staticmethod

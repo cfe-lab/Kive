@@ -1,7 +1,6 @@
 # a low level interface to docker via the 'docker' command via Popen
 
 import os
-import re
 import os.path as osp
 import tempfile
 import subprocess as sp
@@ -61,38 +60,25 @@ class BaseDockerHandler(object):
         raise NotImplementedError
 
     @classmethod
-    def generate_launchstring(cls, host_rundir, docker_rundir, preamble_cmd,
-                              cmd, arglst, image_id=None):
-        """Return a bash script in string form that can be used to launch a docker
-        container that runs a particular command.
-        host_rundir and docker_rundir: (strings) names of directories that the running
-        container will mount: the host_rundir will be mounted under docker_rundir within
-        the container. In addition, the working directory will be set to docker_rundir within
-        the container (i.e. before the command cmd is launched in the container).
-        preamble_cmd: (string) a command to execute before actual command.
-        cmd (string) : the path of the command (within the docker_rundir) to run.
-        arglst: (list of strings): the arguments to the command. These will be absolute
-        paths.
+    def generate_launch_args(cls,
+                             host_step_dir,
+                             input_file_paths,
+                             output_file_paths,
+                             driver_name,
+                             dependency_paths,
+                             image_id=None):
+        """ Generate the launch command for a method.
 
-        image_id (string): the id of the image to launch. If this is None, the default
-        image is launched. This default image is determined when DockerHandler is
-        initialised (if applicable -- the DummyDockerHandler has no image)"""
-        # NOTE: do not use a sudo command to change uid and group, because this requires
-        # kive to be in the sudoers group...
-        # cmd_lst = ["cd", docker_rundir, ";",
-        #           SUDO_COMMAND, "-E",
-        #           cmd]
-        # Wrap the driver in a script.
-        driver_template = """\
-#! /usr/bin/env bash
-cd {}
-{}
-{} {}
-"""
-        return driver_template.format(re.escape(docker_rundir),
-                                      re.escape(preamble_cmd),
-                                      re.escape(os.path.join(docker_rundir, cmd)),
-                                      " ".join([re.escape(x) for x in arglst]))
+        :param host_step_dir: step folder under sandbox folder on host computer
+        :param input_file_paths: list of input file paths on host computer
+        :param output_file_paths: list of output file paths on host computer
+        :param driver_name: file name of driver script that will be saved in
+            the sandbox folder
+        :param dependency_paths: relative paths of dependency files that will
+            be saved under the sandbox folder
+        :param image_id: docker image id, or None for default
+        """
+        raise NotImplementedError
 
 
 class DummyDockerHandler(BaseDockerHandler):
@@ -115,10 +101,36 @@ class DummyDockerHandler(BaseDockerHandler):
     def docker_images(repotag_name=None):
         return []
 
+    @classmethod
+    def generate_launch_args(cls,
+                             host_step_dir,
+                             input_file_paths,
+                             output_file_paths,
+                             driver_name,
+                             dependency_paths,
+                             image_id=None):
+        """ Generate the launch command for a method.
+
+        This version just launches it on the host computer.
+        :param host_step_dir: step folder under sandbox folder on host computer
+        :param input_file_paths: list of input file paths on host computer
+        :param output_file_paths: list of output file paths on host computer
+        :param driver_name: file name of driver script that will be saved in
+            the sandbox folder
+        :param dependency_paths: relative paths of dependency files that will
+            be saved under the sandbox folder
+        :param image_id: docker image id, or None for default
+        """
+        return ([os.path.join(host_step_dir, driver_name)] +
+                input_file_paths +
+                output_file_paths)
+
 
 class DockerHandler(BaseDockerHandler):
 
     _is_alive = False
+    _def_dct = None
+    docker_wrap_path = None
 
     @staticmethod
     def _run_shell_command(cmd_lst):
@@ -126,6 +138,7 @@ class DockerHandler(BaseDockerHandler):
         Call a shell command provided in cmd_lst
         """
         logger.debug(" ".join(cmd_lst))
+        out_str = None
         stderr_fd, stderr_path = tempfile.mkstemp()
         try:
             with os.fdopen(stderr_fd, "w") as f:
@@ -197,7 +210,7 @@ class DockerHandler(BaseDockerHandler):
         """
         for cmd_lst in [[DOCKER_COMMAND, '-v'],
                         [BZIP2_COMMAND, '-h'],
-                        [DOCKER_COMMAND, 'version']]:
+                        ['sudo', DOCKER_COMMAND, 'version']]:
             DockerHandler._run_shell_command(cmd_lst)
             logger.debug("%s passed.", " ".join(cmd_lst))
 
@@ -233,7 +246,7 @@ class DockerHandler(BaseDockerHandler):
         """
         fmt_str = """table {{.Repository}}:{{.Tag}}|{{.ID}}|\
         {{.CreatedAt}}|{{.CreatedSince}}|{{.Digest}}|{{.Size}}"""
-        cmd_lst = [DOCKER_COMMAND, "images", "--format", fmt_str]
+        cmd_lst = ['sudo', DOCKER_COMMAND, "images", "--format", fmt_str]
         if repotag_name is not None:
             cmd_lst.append(repotag_name)
         return DockerHandler._run_shell_command_to_dict(cmd_lst, splitchar="|")
@@ -249,7 +262,9 @@ class DockerHandler(BaseDockerHandler):
     def docker_is_alive(cls):
         if not cls._is_alive:
             cls.check_is_alive()
-            # print("CHECKO A!", is_alive)
+            # Find docker_wrap.py on path, to match permissions in sudoers.
+            cls.docker_wrap_path = sp.check_output(['which', 'docker_wrap.py']).strip()
+
             # make sure the default image is loaded. MUST set the cls boolean before we do this
             cls._is_alive = True
             try:
@@ -270,30 +285,61 @@ class DockerHandler(BaseDockerHandler):
         """Return a string with some pertinent information about the docker configuration."""
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before docker_ident")
-        return DockerHandler._run_shell_command([DOCKER_COMMAND, "version"])
+        return DockerHandler._run_shell_command(['sudo', DOCKER_COMMAND, "version"])
 
     @classmethod
-    def generate_launchstring(cls, host_rundir, docker_rundir, preamble_cmd,
-                              cmd, arglst, image_id=None):
+    def generate_launch_args(cls,
+                             host_step_dir,
+                             input_file_paths,
+                             output_file_paths,
+                             driver_name,
+                             dependency_paths,
+                             image_id=None):
+        """ Generate the launch command for the docker wrapper.
+
+        :param host_step_dir: step folder under sandbox folder on host computer
+        :param input_file_paths: list of input file paths on host computer
+        :param output_file_paths: list of output file paths on host computer
+        :param driver_name: file name of driver script that will be saved in
+            the sandbox folder
+        :param dependency_paths: relative paths of dependency files that will
+            be saved under the sandbox folder
+        :param image_id: docker image id, or None for default
+        """
         if not cls._is_alive:
-            raise RuntimeError("Must call docker_is_alive before generate_launchstring")
+            raise RuntimeError("Must call docker_is_alive before generate_launch_args")
         image_id = cls._def_dct[cls.DOCKER_IMG_IMAGE_ID] if image_id is None else image_id
-        # The docker_rundir is the name of the sandbox that kive thinks it wants to run the
-        # code in. The arguments in arglst have this name prepended to them.
-        # we want to run the code in the docker container under a standardised directory =>
-        # we replace the argument pathnames.
-        actual_docker_rundir = "/data"
-        actual_arglst = [oldarg.replace(docker_rundir, actual_docker_rundir, 1) for oldarg in arglst]
-        dockercmd_lst = [DOCKER_COMMAND, "run",
-                         "-v", "/var/run/docker.sock:/var/run/docker.sock",
-                         "-v", "%s:%s" % (host_rundir, actual_docker_rundir),
-                         "-w", actual_docker_rundir,
-                         image_id, re.escape(os.path.join(actual_docker_rundir, cmd))]
-        driver_template = """\
-#! /usr/bin/env bash
-{}
-{} {}
-"""
-        return driver_template.format(re.escape(preamble_cmd),
-                                      " ".join(dockercmd_lst),
-                                      " ".join([re.escape(x) for x in actual_arglst]))
+        # we want to run the code in the docker container under a standardised directory,
+        # so we convert the argument path names.
+        docker_input_path = "/mnt/input"
+        docker_output_path = "/mnt/output"
+        host_input_path = os.path.join(host_step_dir, 'input_data')
+        host_output_path = os.path.join(host_step_dir, 'output_data')
+        in_args = [os.path.join(docker_input_path,
+                                os.path.relpath(file_path, host_input_path))
+                   for file_path in input_file_paths]
+        out_args = [os.path.join(docker_output_path,
+                                 os.path.relpath(file_path, host_output_path))
+                    for file_path in output_file_paths]
+        step_name = os.path.basename(host_step_dir)
+        sandbox_path = os.path.dirname(host_step_dir)
+        sandbox_name = os.path.basename(sandbox_path)
+        session_id = sandbox_name + '.' + step_name
+        bin_files = [driver_name] + dependency_paths
+        bin_files = [os.path.join(host_step_dir, file_path) + ':' + file_path
+                     for file_path in bin_files]
+        args = [cls.docker_wrap_path,
+                image_id,
+                "--sudo",
+                "--bin_files"]
+        args.extend(bin_files)
+        args.append("--inputs")
+        args.extend(input_file_paths)
+        args.append("--output")
+        args.append(host_output_path)
+        args.append("--")
+        args.append(session_id)
+        args.append(os.path.join("/mnt/bin", driver_name))
+        args.extend(in_args)
+        args.extend(out_args)
+        return args
