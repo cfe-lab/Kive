@@ -1323,7 +1323,10 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         if not isinstance(prio_level, int):
             raise RuntimeError('prio_level must be an integer')
         prio_level = min(max(prio_level, cls.MIN_PRIO), cls.MAX_PRIO)
+        # make sure the job script exists and is executable
         full_path = os.path.join(workingdir, driver_name)
+        if not os.path.isfile(full_path):
+            raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
         if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
 

@@ -1,10 +1,12 @@
 # a low level interface to docker via the 'docker' command via Popen
 
+import logging
 import os
 import os.path as osp
+from pipes import quote
+import stat
 import tempfile
 import subprocess as sp
-import logging
 
 from fleet.slurmlib import multi_check_output
 from django.conf import settings
@@ -121,9 +123,27 @@ class DummyDockerHandler(BaseDockerHandler):
             be saved under the sandbox folder
         :param image_id: docker image id, or None for default
         """
-        return ([os.path.join(host_step_dir, driver_name)] +
-                input_file_paths +
-                output_file_paths)
+        wrapper_template = """\
+        #! /usr/bin/env bash
+        cd {}
+        {} {}
+        """
+        wrapper = wrapper_template.format(
+            quote(host_step_dir),
+            quote(os.path.join(host_step_dir, driver_name)),
+            " ".join(quote(name)
+                     for name in input_file_paths + output_file_paths))
+        with tempfile.NamedTemporaryFile('w',
+                                         prefix=driver_name,
+                                         suffix='.sh',
+                                         dir=host_step_dir,
+                                         delete=False) as wrapper_file:
+            wrapper_file.write(wrapper)
+            mode = os.fstat(wrapper_file.fileno()).st_mode
+            mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH  # execute bits
+            os.fchmod(wrapper_file.fileno(), stat.S_IMODE(mode))
+
+        return [wrapper_file.name]
 
 
 class DockerHandler(BaseDockerHandler):
