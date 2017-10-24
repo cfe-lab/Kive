@@ -40,7 +40,7 @@ NUM_JOBS = 5
 TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/slurm_test_files/slurmrundir")
 
 
-def _submit_Njob(n, prio, afteroklst=None, afteranylst=None):
+def _submit_job_n(n, prio, afteroklst=None, afteranylst=None):
     user_id = os.getuid()
     group_id = os.getgid()
     wdir = osp.join(TEST_DIR, "job%02d" % n)
@@ -62,7 +62,7 @@ def _submit_Njob(n, prio, afteroklst=None, afteranylst=None):
 
 def submit_all(prio):
     """ Submit all jobs with a certain priority."""
-    return [_submit_Njob(i, prio) for i in range(1, NUM_JOBS+1)]
+    return [_submit_job_n(i, prio) for i in range(1, NUM_JOBS + 1)]
 
 
 def get_accounting_info(jhandles=None):
@@ -96,8 +96,6 @@ class SlurmTests(TestCase):
         is_alive = SlurmScheduler.slurm_is_alive()
         if not is_alive:
             raise RuntimeError("slurm is not alive")
-        idstr = SlurmScheduler.slurm_ident()
-        # print "Slurm is alive and idents as '%s'" % idstr
 
     def tearDown(self):
         SlurmScheduler.shutdown()
@@ -147,7 +145,7 @@ class SlurmTests(TestCase):
         """ Submitting this job should succeed."""
         if lverb:
             print "--test_submit_job01"
-        jhandle = _submit_Njob(1, PRIO_MEDIUM)
+        jhandle = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "submitted job", jhandle
 
@@ -206,15 +204,15 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_submit_job04"
-        jhandle = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jhandle = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "successfully launched job %s, now waiting for its failure..." % jhandle
         time.sleep(2)
-        NTRY, i = 20, 0
+        num_tries, i = 20, 0
         curstate = jhandle.get_state()
         if lverb:
             print "gotstate", curstate
-        while (i < NTRY) and (curstate != SlurmScheduler.FAILED):
+        while (i < num_tries) and (curstate != SlurmScheduler.FAILED):
             if lverb:
                 print i, "curstate...", curstate
             time.sleep(5)
@@ -310,24 +308,24 @@ class SlurmTests(TestCase):
         Both jobs should succeed."""
         if lverb:
             print "--test_dep_jobs01_okay"
-        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
-        NTRY, i = 40, 0
+        num_tries, i = 40, 0
         curstate = get_accounting_info(my_handles)
-        while i < NTRY and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
+        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(5)
             curstate = get_accounting_info(my_handles)
             i += 1
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job01: failed to run successfully"
         assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job02: failed to run successfully"
@@ -339,24 +337,24 @@ class SlurmTests(TestCase):
         Both jobs should succeed."""
         if lverb:
             print "--test_dep_jobs01_any"
-        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01])
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
-        NTRY, i = 40, 0
+        num_tries, i = 40, 0
         curstate = get_accounting_info(my_handles)
-        while i < NTRY and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
+        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(5)
             curstate = get_accounting_info(my_handles)
             i += 1
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
             print "FINAL STATE", [curstate[jid][ACC_STATE] for jid in jobidlst]
@@ -371,22 +369,23 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_ok"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
-        not_failed, NTRY, i = True, 40, 0
-        while (i < NTRY) and not_failed:
+        not_failed, num_tries, i = True, 40, 0
+        curstate = None
+        while (i < num_tries) and not_failed:
             time.sleep(2)
             curstate = get_accounting_info(joblst)
             if lverb:
                 print "step %02d:" % i, curstate[jobid_01.job_id][ACC_STATE], curstate[jobid_02.job_id][ACC_STATE]
             not_failed = curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED
             i += 1
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
             print "job01 state:", curstate[jobid_01.job_id]
@@ -402,37 +401,38 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_any"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01])
         if lverb:
             print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
         jidlst = [jh.job_id for jh in joblst]
         if lverb:
             print "waiting for job 01 to fail"
-        not_failed, NTRY, i = True, 40, 0
-        while (i < NTRY) and not_failed:
+        not_failed, num_tries, i = True, 40, 0
+        curstate = None
+        while (i < num_tries) and not_failed:
             time.sleep(2)
             curstate = get_accounting_info(joblst)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
             not_failed = curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED
             i += 1
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         # wait for jobid_02 to start running
         if lverb:
             print "OK, waiting for job 02 to run"
-        is_running, NTRY, i = curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, 40, 0
-        while (i < NTRY) and not is_running:
+        is_running, num_tries, i = curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, 40, 0
+        while (i < num_tries) and not is_running:
             time.sleep(2)
             curstate = get_accounting_info(joblst)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
             is_running = curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("failed: job 02 did not complete")
         if lverb:
             print "job01 state:", curstate[jobid_01.job_id]
@@ -452,19 +452,20 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs01_multi"
-        jobid_01 = _submit_Njob(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM)
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM)
         if lverb:
             print "second job that will succeed", jobid_02
-        jobid_03 = _submit_Njob(1, PRIO_MEDIUM, [jobid_02], [jobid_01])
+        jobid_03 = _submit_job_n(1, PRIO_MEDIUM, [jobid_02], [jobid_01])
         if lverb:
             print "third job that should run", jobid_02
         joblst = [jobid_01, jobid_02, jobid_03]
         jobidlst = [j.job_id for j in joblst]
-        still_running, NTRY, i = True, 40, 0
-        while (i < NTRY) and still_running:
+        still_running, num_tries, i = True, 40, 0
+        curstate = None
+        while (i < num_tries) and still_running:
             time.sleep(2)
             curstate = get_accounting_info(joblst)
             if lverb:
@@ -472,7 +473,7 @@ class SlurmTests(TestCase):
             still_running = (curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED) or\
                             (curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED)
             i += 1
-        if i == NTRY:
+        if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         state_01 = curstate[jobid_01.job_id][ACC_STATE]
         state_02 = curstate[jobid_02.job_id][ACC_STATE]
@@ -490,12 +491,12 @@ class SlurmTests(TestCase):
         """Submit a job, then cancel it"""
         if lverb:
             print "--test_cancel_jobs01"
-        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "submitted job", jobid_01
             print "wait for running status..."
-        NTRY, i, curstate = 40, 0, jobid_01.get_state()
-        while i < NTRY and curstate not in SlurmScheduler.RUNNING_STATES:
+        num_tries, i, curstate = 40, 0, jobid_01.get_state()
+        while i < num_tries and curstate not in SlurmScheduler.RUNNING_STATES:
             if lverb:
                 print "step %02d:" % i, curstate
             time.sleep(2)
@@ -508,7 +509,7 @@ class SlurmTests(TestCase):
         if lverb:
             print "wait for cancelled status...."
         i, curstate = 0, jobid_01.get_state()
-        while i < NTRY and curstate in SlurmScheduler.RUNNING_STATES:
+        while i < num_tries and curstate in SlurmScheduler.RUNNING_STATES:
             if lverb:
                 print "step %02d:" % i, curstate
             time.sleep(5)
@@ -524,17 +525,17 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_cancel_jobs02"
-        jobid_01 = _submit_Njob(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "started 01:", jobid_01
         time.sleep(2)
-        jobid_02 = _submit_Njob(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
         if lverb:
             print "started 02 (dependent on 01):", jobid_02
         joblst = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in joblst]
-        are_ready, i, NTRY = False, 0, 40
-        while i < NTRY and not are_ready:
+        are_ready, i, num_tries = False, 0, 40
+        while i < num_tries and not are_ready:
             time.sleep(2)
             i += 1
             curstate = get_accounting_info(joblst)
@@ -548,7 +549,7 @@ class SlurmTests(TestCase):
         check_tuple = (SlurmScheduler.CANCELLED, SlurmScheduler.CANCELLED)
         curstate = get_accounting_info(joblst)
         are_cancelled, i = False, 0
-        while i < NTRY and not are_cancelled:
+        while i < num_tries and not are_cancelled:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(2)
@@ -569,11 +570,12 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_get_state_01"
-        jhandle = _submit_Njob(1, PRIO_MEDIUM)
+        jhandle = _submit_job_n(1, PRIO_MEDIUM)
         if lverb:
             print "submitted job", jhandle
-        i, NTRY, has_finished = 0, 20, False
-        while (i < NTRY) and not has_finished:
+        i, num_tries, has_finished = 0, 20, False
+        curstate = None
+        while (i < num_tries) and not has_finished:
             curstate = jhandle.get_state()
             if lverb:
                 print "step %02d:" % i, curstate
@@ -664,7 +666,7 @@ class SlurmTests(TestCase):
             print "submitting low_prio jobs..."
         jobhandles = submit_all(low_prio)
         job01 = jobhandles[0]
-        job02 = _submit_Njob(1, PRIO_MEDIUM, [job01])
+        job02 = _submit_job_n(1, PRIO_MEDIUM, [job01])
         jobhandles.append(job02)
         jidlst = [jh.job_id for jh in jobhandles]
         time.sleep(1)
@@ -716,14 +718,15 @@ class SlurmTests(TestCase):
             print "submitting low_prio jobs..."
         jh_lst = submit_all(low_prio)
         time.sleep(1)
-        jobid_01 = _submit_Njob(1, hi_prio)
+        jobid_01 = _submit_job_n(1, hi_prio)
         if lverb:
             print "submitted a high prio job", jobid_01
         jh_lst.append(jobid_01)
-        is_done, i, NTRY = False, 0, 40
-        while (i < NTRY) and not is_done:
+        is_done, i, num_tries = False, 0, 40
+        job_state_dct = None
+        while (i < num_tries) and not is_done:
             if lverb:
-                print "step %d/%d" % (i, NTRY)
+                print "step %d/%d" % (i, num_tries)
             job_state_dct = get_accounting_info(jh_lst)
             for j_state in sorted(job_state_dct.values(), key=lambda a: a[ACC_JOB_ID]):
                 # has_finished = (j_state["ST"] == 'CD'  or j_state["ST"] == 'UKN')
@@ -738,7 +741,7 @@ class SlurmTests(TestCase):
             for j_state in sorted(job_state_dct.values(), key=lambda a: a[ACC_JOB_ID]):
                 print "FINAL: %5s  %s" % (j_state[ACC_JOB_ID], j_state[ACC_STATE])
             print
-        assert i < NTRY, "failed to wait for completed jobs!"
+        assert i < num_tries, "failed to wait for completed jobs!"
         if lverb:
             print "--test_squeue_jobs01 SUCCESS"
 
