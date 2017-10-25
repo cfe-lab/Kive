@@ -407,6 +407,14 @@ Then grant some level of `sudo` permission to the user that will run Kive fleet.
 See the `docker_wrap.py` file for detailed instructions on editing the `sudoers`
 file to allow access to docker.
 
+The Kive fleet user will also need access to a command alias like this in `sudoers`:
+
+    Cmnd_Alias DOCKER_BUILD = \
+        /path/to/docker version, \
+        /path/to/docker images, \
+        /path/to/docker images *, \
+        /path/to/docker_build.py *
+
 [docker-centos]: https://docs.docker.com/engine/installation/linux/docker-ce/centos/
 [docker-ubuntu]: https://docs.docker.com/engine/installation/linux/docker-ce/ubuntu/
 
