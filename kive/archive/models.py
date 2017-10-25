@@ -2926,14 +2926,6 @@ class ExecLog(stopwatch.models.Stopwatch):
         return True
 
 
-class SafeContext:
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args):
-        pass
-
-
 class MethodOutput(models.Model):
     """
     Logged output of the execution of a method.
@@ -3049,7 +3041,7 @@ class MethodOutput(models.Model):
                            max_storage=settings.LOGFILE_MAX_STORAGE,
                            target_size=settings.LOGFILE_TARGET_STORAGE):
         # get batches of max 5 files at a time when we have to purge
-        BATCH_SIZE = 5
+        batch_size = 5
         while True:
             time_to_stop = (yield None)
             cls.logger.debug('hello from idle_logfile_purge')
@@ -3059,7 +3051,7 @@ class MethodOutput(models.Model):
             for ff in exclude_set:
                 cls.logger.debug("--%s", ff)
             # recalculate the total file size, while allowing for interruptions
-            # the resulting total file size will be in cls.filepurger._totsize once
+            # the resulting total file size will be in cls.filepurger.total_size once
             # we have finished the file system scanning
             checker = cls.filepurger.regenerator(exclude_set)
             try:
@@ -3070,11 +3062,11 @@ class MethodOutput(models.Model):
                 pass
             cls.logger.debug('finished regenerating file cache')
             cls.logger.debug("\n".join(["%s: %s" % itm for itm in cls.filepurger.get_scaninfo().items()]))
-            if time.time() < time_to_stop and cls.filepurger._totsize > max_storage:
+            if time.time() < time_to_stop and cls.filepurger.total_size > max_storage:
                 cls.logger.info("Purge cycle started, total size = %d > max_storage=%d",
-                                cls.filepurger._totsize, max_storage)
+                                cls.filepurger.total_size, max_storage)
                 tot_size_deleted = 0
-                for ftup in cls.filepurger.next_to_purge(BATCH_SIZE, exclude_set,
+                for ftup in cls.filepurger.next_to_purge(batch_size, exclude_set,
                                                          target_size,
                                                          dodelete=True):
                     if ftup is None:
@@ -3086,7 +3078,9 @@ class MethodOutput(models.Model):
                         tot_size_deleted += fsize
                         relpath = os.path.relpath(abspath, settings.MEDIA_ROOT)
                         cls.logger.debug("Looking for file '%s' in db" % relpath)
+                        # noinspection PyUnresolvedReferences
                         err_qset = MethodOutput.objects.filter(error_log=relpath)
+                        # noinspection PyUnresolvedReferences
                         out_qset = MethodOutput.objects.filter(output_log=relpath)
                         qs = err_qset | out_qset
                         methodoutput = qs.first()
@@ -3096,15 +3090,14 @@ class MethodOutput(models.Model):
                             # moved in the mean-time (#481)
                             cls.logger.debug("Deleting file '%s'" % abspath)
                             try:
-                                with SafeContext():
-                                    filedate = os.path.getmtime(abspath)
-                                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
-                                    if file_age > timedelta(hours=1):
-                                        cls.logger.warn('No MethodOutput matches file %r, deleting it.',
-                                                        relpath)
-                                        os.remove(abspath)
+                                filedate = os.path.getmtime(abspath)
+                                file_age = datetime.now() - datetime.fromtimestamp(filedate)
+                                if file_age > timedelta(hours=1):
+                                    cls.logger.warn('No MethodOutput matches file %r, deleting it.',
+                                                    relpath)
+                                    os.remove(abspath)
                             except OSError:
-                                cls.warn("Failed to remove file %r", relpath)
+                                cls.logger.warn("Failed to remove file %r", relpath, exc_info=True)
                         else:
                             cls.logger.debug("Found a methodoutput id=%d, deleting '%s'" % (methodoutput.id, relpath))
                             if methodoutput.error_log == relpath:
@@ -3117,5 +3110,7 @@ class MethodOutput(models.Model):
                 # -- report purging progress
                 cls.logger.info("Purge cycle completed, deleted size %d", tot_size_deleted)
             else:
-                cls.logger.info("Purge cycle skipped, total size = %d < max_storage=%d",
-                                cls.filepurger._totsize, max_storage)
+                cls.logger.debug(
+                    "Purge cycle skipped, total size = %d < max_storage=%d",
+                    cls.filepurger.total_size,
+                    max_storage)

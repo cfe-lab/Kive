@@ -48,6 +48,7 @@ TEST-*
 .sass-cache/
 
 # Specific generated JS files
+*.bundle.js
 kive/librarian/librarian.tests.js
 kive/pipeline/pipeline.tests.js
 kive/pipeline/tests.js

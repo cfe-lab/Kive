@@ -1340,7 +1340,7 @@ class Dataset(metadata.models.AccessControl):
             for ff in exclude_set:
                 cls.logger.debug('--%s', ff)
             # recalculate the total file size, while allowing for interruptions
-            # the resulting total file size will be in cls.filepurger._totsize once
+            # the resulting total file size will be in cls.filepurger.total_size once
             # we have finished the file system scanning
             cls.logger.debug('rescan of datasets files')
             checker = cls.filepurger.regenerator(exclude_set)
@@ -1352,9 +1352,9 @@ class Dataset(metadata.models.AccessControl):
                 pass
             cls.logger.debug('finished regenerating dataset file cache')
             cls.logger.debug("\n".join(["%s: %s" % itm for itm in cls.filepurger.get_scaninfo().items()]))
-            if time.time() < time_to_stop and cls.filepurger._totsize > max_storage:
+            if time.time() < time_to_stop and cls.filepurger.total_size > max_storage:
                 cls.logger.info("Purge cycle started, total size = %d > max_storage=%d",
-                                cls.filepurger._totsize, max_storage)
+                                cls.filepurger.total_size, max_storage)
                 tot_size_deleted = 0
                 for ftup in cls.filepurger.next_to_purge(BATCH_SIZE, exclude_set,
                                                          target_size,

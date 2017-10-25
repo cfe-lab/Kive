@@ -142,7 +142,7 @@ class FilePurger:
 
     def _empty_cache(self):
         self._num_scanned_files = 0
-        self._totsize = 0
+        self.total_size = 0
         self.file_lst, self.key_lst = [], []
         self.fname_dct = {}
         self.mima_sz = [0, 0, 0]
@@ -152,7 +152,7 @@ class FilePurger:
         """Return some information about the cache scan in a form suitable
         for human consumption. These results are intended to be used in logging."""
         return {"num_scanned": self._num_scanned_files,
-                "totsize": "%d MB" % (self._totsize / 1048576),
+                "totsize": "%d MB" % (self.total_size / 1048576),
                 "min_size": "%d bytes" % self.mima_sz[0],
                 "max_size": "%d bytes" % self.mima_sz[1],
                 "min_time": str(datetime.fromtimestamp(self.mima_ti[0])),
@@ -165,7 +165,7 @@ class FilePurger:
         if fclass is None:
             raise RuntimeError("None fclass added!")
         self._num_scanned_files += 1
-        self._totsize += fclass._size
+        self.total_size += fclass._size
         # see if the min,max range is modded by this new element
         # if so, we have to recalculate the score
         recalc = False
@@ -342,7 +342,7 @@ class FilePurger:
             yield True
 
     def _pop(self):
-        """Remove the fileclass with the largest score, update the self._totsize
+        """Remove the fileclass with the largest score, update the self.total_size
         and return the fileclass.
         Return None if the data structure is empty
         """
@@ -352,7 +352,7 @@ class FilePurger:
         ret_class = self.file_lst.pop()
         fname = ret_class._fname
         del self.fname_dct[fname]
-        self._totsize -= ret_class._size
+        self.total_size -= ret_class._size
         return ret_class
 
     @consumer
@@ -387,7 +387,7 @@ class FilePurger:
         num_done = 0
         if dodelete:
             # pop elements
-            do_more = self._totsize > upper_size_limit
+            do_more = self.total_size > upper_size_limit
             while do_more:
                 fc = self._pop()
                 if fc is None:
@@ -395,7 +395,7 @@ class FilePurger:
                 elif fc._fname not in exclude_set:
                     yield fc
                     num_done += 1
-                    do_more = (num_done < maxnum) and (self._totsize > upper_size_limit)
+                    do_more = (num_done < maxnum) and (self.total_size > upper_size_limit)
         else:
             # walk through the list from the back without changing it
             # ignore the upper_size_limit in this case, as the size of the files remains unchanged
