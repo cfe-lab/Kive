@@ -207,7 +207,7 @@ Dave,40
         count_column = CompoundDatatypeMember()
         compound_datatype = mock_structure.compounddatatype
         compound_datatype.members.get.return_value = count_column
-        compound_datatype.summarize_CSV.return_value = {
+        compound_datatype.summarize_csv.return_value = {
             u'num_rows': expected_bad_row * 2,
             u'header': ['name', 'count'],
             u'failing_cells': {(expected_bad_row,

@@ -1,13 +1,11 @@
 from django.db import transaction
-from django.core.files import File
 
 from rest_framework import serializers
 
-from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision
+from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision, DockerImage
 from transformation.models import XputStructure
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
-import portal.models
 
 
 class CodeResourceSerializer(AccessControlSerializer,
@@ -54,6 +52,9 @@ class CRRevisionNumberGetter(object):
     This is defined as per
     http://www.django-rest-framework.org/api-guide/serializers/#specifying-read-only-fields
     """
+    def __init__(self):
+        self.coderesource = None
+
     def set_context(self, rev_num_field):
         self.coderesource = CodeResource.objects.get(
             name=rev_num_field.parent.initial_data["coderesource"]
@@ -101,7 +102,7 @@ class CodeResourceRevisionSerializer(AccessControlSerializer,
             "MD5_checksum"
         )
         # revision_DateTime, removal_plan, absolute_url, and display_name are already read_only.
-        read_only_fields = ("MD5_checksum")
+        read_only_fields = ("MD5_checksum", )
         extra_kwargs = {
             "content_file": {"use_url": False},
         }
@@ -165,6 +166,9 @@ class MethodRevisionNumberGetter(object):
     This is completely analogous to CRRevisionNumberGetter, and if that breaks
     due to changes in the internals of DRF, this probably will too.
     """
+    def __init__(self):
+        self.methodfamily = None
+
     def set_context(self, rev_num_field):
         self.methodfamily = MethodFamily.objects.get(
             name=rev_num_field.parent.initial_data["family"]
@@ -282,3 +286,23 @@ class MethodSerializer(AccessControlSerializer,
             method.dependencies.create(**dep_data)
 
         return method
+
+
+class DockerImageSerializer(AccessControlSerializer,
+                            serializers.ModelSerializer):
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='dockerimage-removal-plan')
+
+    class Meta:
+        model = DockerImage
+        fields = (
+            "name",
+            "tag",
+            "git",
+            "description",
+            "url",
+            "absolute_url",
+            "user",
+            "users_allowed",
+            "groups_allowed",
+            "removal_plan")

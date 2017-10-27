@@ -9,31 +9,24 @@ from __future__ import unicode_literals
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
+from django.http import Http404
 from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
-from django.conf import settings
 from django.core.urlresolvers import reverse
-from django.core.files import File
 
 import re
 import csv
-import os
 import math
-import tempfile
-import shutil
 from datetime import datetime
 import json
 import itertools
-import time
 
-from file_access_utils import set_up_directory, configure_sandbox_permissions
 from constants import datatypes, CDTs, maxlengths, groups, users
 
 import logging
 from portal.views import admin_check
 from archive.exceptions import SandboxActiveException, RunNotFinished
-from fleet.slurmlib import SlurmScheduler
 
 LOGGER = logging.getLogger(__name__)  # Module level logger.
 
@@ -42,7 +35,7 @@ LOGGER = logging.getLogger(__name__)  # Module level logger.
 deletion_order = [
     "ExecRecords", "Datasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
     "MethodFamilies", "CompoundDatatypes", "Datatypes",
-    "CodeResourceRevisions", "CodeResources"
+    "CodeResourceRevisions", "CodeResources", "DockerImages"
 ]
 
 
@@ -136,26 +129,26 @@ def everyone_group():
     return Group.objects.get(pk=groups.EVERYONE_PK)
 
 
-def get_builtin_types(datatypes):
+def get_builtin_types(source_datatypes):
     """
-    Retrieves the built-in types of all datatypes passed as input.
+    Retrieves the built-in types of all source_datatypes passed as input.
 
     Returns a set (to remove duplicates) with all of the built-in
     types represented in the inputs.
 
     INPUTS
-    datatypes           iterable of Datatypes
+    source_datatypes    iterable of Datatypes
 
     OUTPUT
-    builtins            set of built-in Datatypes represented by datatypes
+    builtins            set of built-in Datatypes represented by source_datatypes
 
     ASSUMPTIONS
-    All Datatypes in datatypes are clean and complete.
+    All Datatypes in source_datatypes are clean and complete.
     """
-    return set([datatype.get_builtin_type() for datatype in datatypes])
+    return set([datatype.get_builtin_type() for datatype in source_datatypes])
 
 
-def summarize_CSV(columns, data_csv):
+def summarize_csv(columns, data_csv):
     """
     SYNOPSIS
     Inspect a CSV file, whose columns are expected to contain instances
@@ -225,7 +218,7 @@ def who_cannot_access(user, users_allowed, groups_allowed, acs):
     NOTE: This routine returns subsets of users_allowed and groups_allowed only.
     E.g. if these are empty sets, then empty sets will be returned as well.
     """
-    allowed_users = set([user]) | set(users_allowed)
+    allowed_users = {user} | set(users_allowed)
     allowed_groups = set(groups_allowed)
     all_defined_users = frozenset(User.objects.all())
     all_defined_groups = frozenset(Group.objects.all())
@@ -233,7 +226,7 @@ def who_cannot_access(user, users_allowed, groups_allowed, acs):
     ok_group = all_defined_groups
     for ac in acs:
         has_everyone = ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists()
-        cur_user = all_defined_users if has_everyone else set([ac.user]) | (set(ac.users_allowed.all()))
+        cur_user = all_defined_users if has_everyone else {ac.user} | (set(ac.users_allowed.all()))
         cur_group = all_defined_groups if has_everyone else set(ac.groups_allowed.all())
         ok_user &= cur_user
         ok_group &= cur_group
@@ -242,40 +235,6 @@ def who_cannot_access(user, users_allowed, groups_allowed, acs):
         return set(), set()
     else:
         return allowed_users - ok_user, allowed_groups - ok_group
-
-
-# NOTE: this code is critically important, but has been replaced with the above routine.
-# keeping this code here for comparison purposes in case we run into permission issues
-def OLDwho_cannot_access(user, users_allowed, groups_allowed, acs):
-    """
-    Tells which of the specified users and groups cannot access all of the AccessControl objects specified.
-
-    user: a User
-    users_allowed: an iterable of Users
-    groups_allowed: an iterable of Groups
-    acs: a list of AccessControl instances.
-    """
-    all_users_allowed = set([user]).union(set(users_allowed))
-
-    if acs[0].groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
-        ac_users_allowed = set(User.objects.all())
-        ac_groups_allowed = set(Group.objects.all())
-    else:
-        ac_users_allowed = set([acs[0].user]).union(set(acs[0].users_allowed.all()))
-        ac_groups_allowed = set(acs[0].groups_allowed.all())
-
-    for ac in acs[1:]:
-        if not ac.groups_allowed.filter(pk=groups.EVERYONE_PK).exists():
-            ac_users_allowed.intersection_update(set([ac.user]).union(set(ac.users_allowed.all())))
-            ac_groups_allowed.intersection_update(ac.groups_allowed.all())
-
-    # Special case: everyone is allowed access to all of the elements of acs.
-    if everyone_group() in ac_groups_allowed:
-        return set(), set()
-
-    users_difference = all_users_allowed.difference(ac_users_allowed)
-    groups_difference = set(groups_allowed).difference(ac_groups_allowed)
-    return users_difference, groups_difference
 
 
 class KiveUser(User):
@@ -335,6 +294,18 @@ class AccessControl(models.Model):
                 return True
 
         return False
+
+    @classmethod
+    def check_accessible(cls, pk, user):
+        # noinspection PyUnresolvedReferences
+        try:
+            # noinspection PyUnresolvedReferences
+            record = cls.objects.get(pk=pk)
+            if record.can_be_accessed(user):
+                return record
+        except cls.DoesNotExist:
+            pass
+        raise Http404("PK {} is not accessible".format(pk))
 
     def extra_users_groups(self, acs):
         """
@@ -957,7 +928,7 @@ class Datatype(AccessControl):
         with open(self.prototype.dataset_file.path) as f:
             reader = csv.reader(f)
             next(reader)  # skip header - we already know it's good from cleaning the prototype
-            summary = summarize_CSV([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader)
+            summary = summarize_csv([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader)
 
         try:
             failing_cells = summary["failing_cells"].keys()
@@ -1452,7 +1423,7 @@ class CompoundDatatype(AccessControl):
                                        .format(self)))
             member_dts.append(member.datatype)
 
-    def is_restriction(self, other_CDT):
+    def is_restriction(self, other_cdt):
         """
         True if this CDT is a column-wise restriction of its parameter.
 
@@ -1463,13 +1434,13 @@ class CompoundDatatype(AccessControl):
 
         Note that this induces a partial order on CDTs.
 
-        PRE: this CDT and other_CDT are clean.
+        PRE: this CDT and other_cdt are clean.
         """
-        if self == other_CDT:
+        if self == other_cdt:
             return True
 
         # Make sure they have the same number of columns.
-        if self.members.count() != other_CDT.members.count():
+        if self.members.count() != other_cdt.members.count():
             return False
 
         # Since they have the same number of columns at this point,
@@ -1478,32 +1449,32 @@ class CompoundDatatype(AccessControl):
         # CDT's members and look for the matching one.
         for member in self.members.all().order_by("column_idx"):
             try:
-                counterpart = other_CDT.members.get(column_idx=member.column_idx, column_name=member.column_name)
+                counterpart = other_cdt.members.get(column_idx=member.column_idx, column_name=member.column_name)
                 if not member.datatype.is_restriction(counterpart.datatype):
                     return False
             except CompoundDatatypeMember.DoesNotExist:
                 return False
         return True
 
-    def is_identical(self, other_CDT):
+    def is_identical(self, other_cdt):
         """
         True if this CDT is identical with its parameter; False otherwise.
 
         This is trivially true if they are the same CDT; otherwise
         the column names and column types must be exactly the same.
 
-        PRE: this CDT and other_CDT are clean.
+        PRE: this CDT and other_cdt are clean.
         """
         my_col_names = [m.column_name for m in self.members.order_by("column_idx")]
-        other_col_names = [m.column_name for m in other_CDT.members.order_by("column_idx")]
-        return my_col_names == other_col_names and self.is_restriction(other_CDT) and other_CDT.is_restriction(self)
+        other_col_names = [m.column_name for m in other_cdt.members.order_by("column_idx")]
+        return my_col_names == other_col_names and self.is_restriction(other_cdt) and other_cdt.is_restriction(self)
 
     def _check_header(self, header):
         """
         SYNOPSIS
         Verify that a list of field names (which we presumably read from
         a file) matches the anticipated header for this
-        CompoundDatatype. This is a helper function for summarize_CSV.
+        CompoundDatatype. This is a helper function for summarize_csv.
 
         INPUTS
         header  list of fields forming a header, to check against this
@@ -1539,7 +1510,7 @@ class CompoundDatatype(AccessControl):
 
         return summary
 
-    def summarize_CSV(self, file_to_check, summary_path, content_check_log=None):
+    def summarize_csv(self, file_to_check):
         """
         SYNOPSIS
         Give metadata on the CSV: number of rows, and any deviations
@@ -1551,7 +1522,7 @@ class CompoundDatatype(AccessControl):
                             CustomConstraints, checking a CSV file will require
                             running a verification method. summary_path is the
                             work directory where we will do that
-        content_check_log   summarize_CSV is called as part of a content check
+        content_check_log   summarize_csv is called as part of a content check
                             on a Dataset; this is the log of that check
 
         OUTPUT
@@ -1595,7 +1566,7 @@ class CompoundDatatype(AccessControl):
             return summary
 
         # Check the constraints using the module helper.
-        summary.update(summarize_CSV(self.members.order_by("column_idx"), data_csv))
+        summary.update(summarize_csv(self.members.order_by("column_idx"), data_csv))
         return summary
 
     def check_constraints(self, row):
@@ -1618,7 +1589,9 @@ class CompoundDatatype(AccessControl):
             err = check.check_basic_constraints(value)
             return ['Failed check \'%s\'' % e if not isinstance(e, (str, unicode)) else e for e in err]
 
-        return [_check_constr(chk, val) for chk, val in map(None, self.members.order_by("column_idx"), row)]
+        # noinspection PyTypeChecker
+        return [_check_constr(chk, val)
+                for chk, val in map(None, self.members.order_by("column_idx"), row)]
 
     @property
     def num_conforming_datasets(self):

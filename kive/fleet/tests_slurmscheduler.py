@@ -185,8 +185,11 @@ class SlurmBadRunTests(BaseTestCases.SlurmExecutionTestCase, BadRunTestsBase):
         BaseTestCases.SlurmExecutionTestCase.tearDown(self)
         BadRunTestsBase.tearDown(self)
 
-    def test_method_fails(self, slurm_sched_class=SlurmScheduler):
-        super(SlurmBadRunTests, self).test_method_fails(slurm_sched_class)
+    def test_method_fails(self,
+                          slurm_sched_class=SlurmScheduler,
+                          docker_handler_class=DummyDockerHandler):
+        super(SlurmBadRunTests, self).test_method_fails(slurm_sched_class,
+                                                        docker_handler_class)
 
 
 class MockSlurmScheduler(DummySlurmScheduler):

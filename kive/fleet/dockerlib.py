@@ -124,10 +124,10 @@ class DummyDockerHandler(BaseDockerHandler):
         :param image_id: docker image id, or None for default
         """
         wrapper_template = """\
-        #! /usr/bin/env bash
-        cd {}
-        {} {}
-        """
+#! /usr/bin/env bash
+cd {}
+{} {}
+"""
         wrapper = wrapper_template.format(
             quote(host_step_dir),
             quote(os.path.join(host_step_dir, driver_name)),

@@ -212,7 +212,9 @@ var permissions = (function() {
             permissions_table.buildCells($tr, row);
             $rows.push($tr);
         });
-        permissions_table.$tbody.append($rows);
+        if (this.$tbody !== undefined) {
+            permissions_table.$tbody.append($rows);
+        }
     };
     
     my.PermissionsTable.prototype.buildHeaders = function($tr) {

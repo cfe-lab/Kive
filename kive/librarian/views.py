@@ -28,7 +28,7 @@ import librarian.models
 LOGGER = logging.getLogger(__name__)
 
 
-def _build_download_response(source_file):
+def build_download_response(source_file):
     file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
     mimetype = mimetypes.guess_type(source_file.name)[0]
     response = HttpResponse(file_chunker, content_type=mimetype)
@@ -69,7 +69,7 @@ def dataset_download(request, dataset_id):
         raise Http404("ID {} cannot be accessed (file access)".format(dataset_id))
     else:
         with data_handle:
-            return _build_download_response(data_handle)
+            return build_download_response(data_handle)
 
 
 @login_required

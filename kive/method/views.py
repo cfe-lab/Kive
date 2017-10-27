@@ -13,12 +13,12 @@ import logging
 import itertools
 
 from metadata.models import CompoundDatatype
-from method.models import CodeResource, Method, MethodDependency,\
-    MethodFamily, CodeResourceRevision
+from method.models import CodeResource, Method, MethodDependency, \
+    MethodFamily, CodeResourceRevision, DockerImage
 from method.forms import CodeResourcePrototypeForm, CodeResourceRevisionForm, \
     CodeResourceDetailsForm, CodeResourceRevisionDetailsForm, \
     MethodFamilyForm, MethodForm, MethodReviseForm, MethodDependencyForm, \
-    MethodDetailsForm, TransformationXputForm, XputStructureForm
+    MethodDetailsForm, TransformationXputForm, XputStructureForm, DockerImageForm
 from portal.views import developer_check, admin_check
 
 
@@ -1067,4 +1067,76 @@ def method_revise(request, id):
             'parent': parent_method
         }
     )
+    return HttpResponse(t.render(c, request))
+
+
+@login_required
+@user_passes_test(developer_check)
+def docker_images(request):
+    """
+    Display a list of all MethodFamily objects in database.
+    """
+    t = loader.get_template("method/docker_images.html")
+    c = {
+        "is_user_admin": admin_check(request.user)
+    }
+    return HttpResponse(t.render(c, request))
+
+
+@login_required
+@user_passes_test(developer_check)
+def docker_image_add(request):
+    if request.method != 'POST':
+        image_form = DockerImageForm()
+    else:
+        image = DockerImage(user=request.user)
+        image_form = DockerImageForm(request.POST, instance=image)
+
+        try:
+            image_form.save()
+            image.grant_from_json(image_form.cleaned_data["permissions"])
+
+            return HttpResponseRedirect('/docker_images')
+        except ValueError:
+            # All forms have the appropriate errors attached.
+            pass
+
+    t = loader.get_template('method/docker_image_add.html')
+    c = {
+        'image_form': image_form,
+    }
+    return HttpResponse(t.render(c, request))
+
+
+@login_required
+@user_passes_test(developer_check)
+def docker_image_view(request, image_id):
+    image = DockerImage.check_accessible(image_id, request.user)
+
+    addable_users, addable_groups = image.other_users_groups()
+
+    image_form = DockerImageForm(
+        request.POST if request.method == 'POST' else None,
+        addable_users=addable_users,
+        addable_groups=addable_groups,
+        instance=image)
+    for field in ('name', 'tag', 'git'):
+        image_form.fields[field].disabled = True
+
+    if request.method == 'POST':
+        try:
+            image_form.save()
+            image.grant_from_json(image_form.cleaned_data["permissions"])
+            return HttpResponseRedirect('/docker_images')
+        except ValueError:
+            # Form has errors attached.
+            pass
+
+    t = loader.get_template("method/docker_image_view.html")
+    c = {
+        "docker_image": image,
+        "docker_image_form": image_form,
+        "is_owner": image.user == request.user,
+        "is_admin": admin_check(request.user)
+    }
     return HttpResponse(t.render(c, request))

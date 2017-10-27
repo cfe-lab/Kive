@@ -170,7 +170,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
     )
 
     class Meta:
-        unique_together = (("coderesource", "revision_number"))
+        unique_together = ("coderesource", "revision_number")
         ordering = ["coderesource__name", "-revision_number"]
 
     @property
@@ -392,7 +392,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
     )
 
     class Meta:
-        unique_together = (("family", "revision_number"))
+        unique_together = ("family", "revision_number")
         ordering = ["family__name", "-revision_number"]
 
     def __init__(self, *args, **kwargs):
@@ -498,6 +498,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     dataset_name=parent_input.dataset_name,
                     dataset_idx=parent_input.dataset_idx)
                 if not parent_input.is_raw():
+                    # noinspection PyUnresolvedReferences
                     transformation.models.XputStructure.objects.create(
                         transf_xput=new_input,
                         compounddatatype=parent_input.get_cdt(),
@@ -509,6 +510,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
                     dataset_name=parent_output.dataset_name,
                     dataset_idx=parent_output.dataset_idx)
                 if not parent_output.is_raw():
+                    # noinspection PyUnresolvedReferences
                     transformation.models.XputStructure.objects.create(
                         transf_xput=new_output,
                         compounddatatype=parent_output.get_cdt(),
@@ -707,6 +709,50 @@ class MethodFamily(transformation.models.TransformationFamily):
         for meth in self.members.all():
             if meth not in removal_plan["Methods"]:
                 update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
+
+        return removal_plan
+
+
+@python_2_unicode_compatible
+class DockerImage(metadata.models.AccessControl):
+    name = models.CharField('Name',
+                            help_text='Docker image name',
+                            max_length=200)  # Approximate limit in Docker.
+    tag = models.CharField('Tag',
+                           help_text='Docker image tag',
+                           max_length=128)  # Limit in Docker.
+    git = models.CharField('Git URL',
+                           help_text='URL of Git repository',
+                           max_length=2000)
+    description = models.CharField('Description',
+                                   help_text='What is this image used for?',
+                                   blank=True,
+                                   max_length=2000)
+    created = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this docker image was added to Kive.")
+
+    class Meta:
+        ordering = ('name', 'tag')
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def absolute_url(self):
+        return reverse("docker_image_view", kwargs={"image_id": self.pk})
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["DockerImages"]
+
+        removal_plan["DockerImages"].add(self)
 
         return removal_plan
 

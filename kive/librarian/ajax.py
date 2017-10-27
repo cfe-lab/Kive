@@ -11,7 +11,7 @@ from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from librarian.views import _build_download_response
+from librarian.views import build_download_response
 from librarian.serializers import DatasetSerializer, ExternalFileDirectorySerializer,\
     ExternalFileDirectoryListFilesSerializer
 
@@ -171,7 +171,7 @@ class DatasetViewSet(RemovableModelViewSet,
         if data_handle is None:
             return Response(None, status=status.HTTP_404_NOT_FOUND)
         with data_handle as dh:
-            return _build_download_response(dh)
+            return build_download_response(dh)
 
 
 class InputDatasetViewSet(DatasetViewSet):

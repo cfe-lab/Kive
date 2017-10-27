@@ -7,11 +7,11 @@ from rest_framework.exceptions import APIException
 
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin, \
     StandardPagination, SearchableModelMixin
-from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource
+from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource, DockerImage
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
-    CodeResourceSerializer, CodeResourceRevisionSerializer
+    CodeResourceSerializer, CodeResourceRevisionSerializer, DockerImageSerializer
 from metadata.models import AccessControl
-from archive.views import _build_download_response
+from archive.views import build_download_response
 from portal.views import admin_check
 
 
@@ -55,7 +55,7 @@ class CodeResourceViewSet(CleanCreateModelMixin,
         revisions = AccessControl.filter_by_user(
             request.user,
             is_admin=is_admin,
-            queryset=self.get_object().revisions.all())
+            queryset=CodeResourceRevision.objects.filter(coderesource_id=pk))
 
         return Response(
             CodeResourceRevisionSerializer(revisions, many=True, context={"request": request}).data
@@ -120,16 +120,16 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         """
         Download the file pointed to by this CodeResourceRevision.
         """
-        accessible_CRRs = CodeResourceRevision.filter_by_user(request.user)
-        CRR = self.get_object()
-
-        if not accessible_CRRs.filter(pk=CRR.pk).exists():
+        accessible_revisions = CodeResourceRevision.filter_by_user(request.user)
+        if not accessible_revisions.filter(pk=pk).exists():
             return Response(None, status=status.HTTP_404_NOT_FOUND)
-        elif not CRR.content_file:
+
+        revision = self.get_object()
+        if not revision.content_file:
             return Response({"errors": "This CodeResourceRevision has no content file."},
                             status=status.HTTP_403_FORBIDDEN)
 
-        return _build_download_response(CRR.content_file)
+        return build_download_response(revision.content_file)
 
     def filter_queryset(self, queryset):
         queryset = super(CodeResourceRevisionViewSet, self).filter_queryset(queryset)
@@ -195,7 +195,7 @@ class MethodFamilyViewSet(CleanCreateModelMixin,
         member_methods = AccessControl.filter_by_user(
             request.user,
             is_admin=is_admin,
-            queryset=self.get_object().members.all())
+            queryset=Method.objects.filter(methodfamily_id=pk))
 
         member_serializer = MethodSerializer(
             member_methods, many=True, context={"request": request})
@@ -253,6 +253,66 @@ class MethodViewSet(CleanCreateModelMixin, RemovableModelViewSet,
             return queryset.filter(revision_name__icontains=value)
         if key == 'description':
             return queryset.filter(revision_desc__icontains=value)
+        if key == "user":
+            return queryset.filter(user__username__icontains=value)
+
+        raise APIException('Unknown filter key: {}'.format(key))
+
+
+class DockerImageViewSet(CleanCreateModelMixin,
+                         RemovableModelViewSet,
+                         SearchableModelMixin):
+    """Docker images are isolated file systems that can run one or more methods.
+
+    Query parameters:
+
+    * is_granted - true For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=smart&filters[n][val]=match - name, tag, git, or
+        description contains the value (case insensitive)
+    * filters[n][key]=name&filters[n][val]=match - name contains the value (case
+        insensitive)
+    * filters[n][key]=tag&filters[n][val]=match - tag contains the value (case
+        insensitive)
+    * filters[n][key]=git&filters[n][val]=match - git contains the value (case
+        insensitive)
+    * filters[n][key]=description&filters[n][val]=match - description contains
+        the value (case insensitive)
+    * filters[n][key]=user&filters[n][val]=match - username of creator contains the value (case
+        insensitive)
+    """
+    queryset = DockerImage.objects.all()
+    serializer_class = DockerImageSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
+
+    def filter_queryset(self, queryset):
+        queryset = super(DockerImageViewSet, self).filter_queryset(queryset)
+        return self.apply_filters(queryset)
+
+    @staticmethod
+    def _add_filter(queryset, key, value):
+        """
+        Filter the specified queryset by the specified key and value.
+        """
+        if key == 'smart':
+            return queryset.filter(Q(name__icontains=value) |
+                                   Q(tag__icontains=value) |
+                                   Q(git__icontains=value) |
+                                   Q(description__icontains=value))
+        if key == 'name':
+            return queryset.filter(name__icontains=value)
+        if key == 'tag':
+            return queryset.filter(tag__icontains=value)
+        if key == 'git':
+            return queryset.filter(git__icontains=value)
+        if key == 'description':
+            return queryset.filter(description__icontains=value)
         if key == "user":
             return queryset.filter(user__username__icontains=value)
 

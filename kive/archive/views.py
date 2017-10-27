@@ -9,7 +9,7 @@ from django.http import Http404
 
 from archive.models import MethodOutput
 from librarian.models import Dataset
-from librarian.views import _build_download_response, _build_raw_viewer
+from librarian.views import build_download_response, _build_raw_viewer
 
 LOGGER = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def stdout_download(request, methodoutput_id):
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_download_response(methodoutput.output_log)
+    return build_download_response(methodoutput.output_log)
 
 
 @login_required
@@ -59,7 +59,7 @@ def stderr_download(request, methodoutput_id):
     except Dataset.DoesNotExist:
         raise Http404("Method output {} cannot be accessed".format(methodoutput_id))
 
-    return _build_download_response(methodoutput.error_log)
+    return build_download_response(methodoutput.error_log)
 
 
 @login_required

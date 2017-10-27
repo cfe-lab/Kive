@@ -5,7 +5,8 @@ from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
 from librarian.ajax import DatasetViewSet, InputDatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
-from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet
+from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet, \
+    DockerImageViewSet
 from pipeline.ajax import PipelineFamilyViewSet, PipelineViewSet
 from portal.ajax import UserViewSet
 from portal.forms import LoginForm
@@ -26,6 +27,7 @@ router = KiveRouter()
 router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
+router.register(r'dockerimages', DockerImageViewSet)
 router.register(r'inputdatasets', InputDatasetViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'externalfiledirectories', ExternalFileDirectoryViewSet)
@@ -75,6 +77,10 @@ urlpatterns = [
     url(r'^resource_revisions/(?P<id>\d+)/$', method.views.resource_revisions, name='resource_revisions'),
     url(r'^resource_revision_add/(?P<id>\d+)/$', method.views.resource_revision_add, name='resource_revision_add'),
     url(r'^resource_revision_view/(?P<id>\d+)/$', method.views.resource_revision_view, name='resource_revision_view'),
+
+    url(r'^docker_images$', method.views.docker_images, name='docker_images'),
+    url(r'^docker_image_add$', method.views.docker_image_add, name='docker_image_add'),
+    url(r'^docker_image_view/(?P<image_id>\d+)/$', method.views.docker_image_view, name='docker_image_view'),
 
     url(r'^method_families$', method.views.method_families, name='method_families'),
     url(r'^method_new$', method.views.method_new, name='method_new'),

@@ -123,7 +123,7 @@ class Dataset(metadata.models.AccessControl):
 
     PRE: the actual file that the Dataset represents (whether
     it still exists or not) is/was coherent (e.g. checked using
-    CDT.summarize_CSV()).
+    CDT.summarize_csv()).
     """
     UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
 
@@ -974,7 +974,7 @@ class Dataset(metadata.models.AccessControl):
         try:
             with file_access_utils.FileReadHandler(file_path=file_path_to_check,
                                                    file_handle=file_handle, access_mode="rb") as f:
-                csv_summary = my_CDT.summarize_CSV(f, summary_path, ccl)
+                csv_summary = my_CDT.summarize_csv(f)
         except metadata.models.VerificationMethodError:
             self.logger.error("ContentCheckLog for file %s failed because the verification method failed",
                               file_path_to_check)
@@ -1542,7 +1542,7 @@ class DatasetStructure(models.Model):
 
     PRECONDITION
     Any Dataset that represents a CSV file has to have confirmed using
-    summarize_CSV() that the CSV file is coherent.
+    summarize_csv() that the CSV file is coherent.
     """
     # Note: previously we were tracking the exact TransformationOutput
     # this came from (both for its Run and its RunStep) but this is

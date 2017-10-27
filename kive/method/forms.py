@@ -1,13 +1,13 @@
 """
 Generate an HTML form to create a new Datatype object
 """
-
+from django.forms import ModelForm
 from django.http import Http404
 from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 
-from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily
+from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily, DockerImage
 from metadata.models import CompoundDatatype
 from metadata.forms import AccessControlForm, PermissionsField
 
@@ -335,4 +335,25 @@ class MethodFamilyForm (forms.ModelForm):
         addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
         addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
         super(MethodFamilyForm, self).__init__(data, *args, **kwargs)
+        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
+
+
+class DockerImageForm(ModelForm):
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        help_text="Which users and groups are allowed access to this image?",
+        required=False)
+
+    class Meta:
+        model = DockerImage
+        fields = ['name',
+                  'git',
+                  'tag',
+                  'description',
+                  'permissions']
+
+    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
+        addable_users = addable_users if addable_users is not None else get_user_model().objects.all()
+        addable_groups = addable_groups if addable_groups is not None else Group.objects.all()
+        super(DockerImageForm, self).__init__(data, *args, **kwargs)
         self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
