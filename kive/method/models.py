@@ -10,7 +10,9 @@ from __future__ import unicode_literals
 import os
 import stat
 import hashlib
+from inspect import getsourcefile
 import logging
+from subprocess import check_output, STDOUT
 
 from django.db import models, transaction
 from django.db.models import Max
@@ -25,6 +27,7 @@ import transformation.models
 import file_access_utils
 from constants import maxlengths
 import method.signals
+from fleet import docker_build
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
 
 
@@ -63,7 +66,7 @@ class CodeResource(metadata.models.AccessControl):
         """
         The URL for the page that displays all revisions of this CodeResource.
         """
-        return reverse("resource_revisions", kwargs={"id": self.pk})
+        return reverse("resource_revisions", kwargs={"pk": self.pk})
 
     @property
     def num_revisions(self):
@@ -191,14 +194,14 @@ class CodeResourceRevision(metadata.models.AccessControl):
         A page that allows user to add a revision of the CodeResource
         with this CodeResourceRevision as its parent.
         """
-        return reverse("resource_revision_add", kwargs={"id": self.pk})
+        return reverse("resource_revision_add", kwargs={"pk": self.pk})
 
     @property
     def view_url(self):
         """
         A page that displays this CodeResourceRevision.
         """
-        return reverse("resource_revision_view", kwargs={"id": self.pk})
+        return reverse("resource_revision_view", kwargs={"pk": self.pk})
 
     def __init__(self, *args, **kwargs):
         super(self.__class__, self).__init__(*args, **kwargs)
@@ -728,6 +731,9 @@ class DockerImage(metadata.models.AccessControl):
                                    help_text='What is this image used for?',
                                    blank=True,
                                    max_length=2000)
+    hash = models.CharField('Hash',
+                            help_text='Hash of contents',
+                            max_length=71)
     created = models.DateTimeField(
         auto_now_add=True,
         help_text="When this docker image was added to Kive.")
@@ -741,6 +747,19 @@ class DockerImage(metadata.models.AccessControl):
     @property
     def absolute_url(self):
         return reverse("docker_image_view", kwargs={"image_id": self.pk})
+
+    def build(self):
+        """ Build a docker image, and record the hash. Does not save. """
+        result = check_output(['sudo',
+                               getsourcefile(docker_build),
+                               '--id',
+                               self.name,
+                               self.git,
+                               self.tag],
+                              stderr=STDOUT)
+        self.hash = result.splitlines()[-1]
+        if not self.hash.startswith('sha256:'):
+            raise RuntimeError('Expected sha256 hash on last line:\n' + result)
 
     @transaction.atomic
     def remove(self):

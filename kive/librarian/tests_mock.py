@@ -10,10 +10,10 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django_mock_queries.query import MockSet
+from django_mock_queries.mocks import mocked_relations
 import mock
 from mock import PropertyMock, Mock, patch
 
-from kive.mock_setup import mocked_relations
 from constants import datatypes, runcomponentstates, users
 from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file

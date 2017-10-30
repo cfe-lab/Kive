@@ -21,7 +21,9 @@
 
 <h2>Add a new docker image</h2>
 
-{{ image_form.non_field_errors }}
+<pre>
+    {{ image_form.non_field_errors }}
+</pre>
 
 <!-- Form for inserting new DockerImage -->
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}

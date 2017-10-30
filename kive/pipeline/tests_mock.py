@@ -1,12 +1,12 @@
 from contextlib import contextmanager
+from mock import PropertyMock, call
 import re
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-from mock import PropertyMock, call
+from django_mock_queries.mocks import mocked_relations
 
 from constants import datatypes
-from kive.mock_setup import mocked_relations
 from metadata.models import CompoundDatatype, CompoundDatatypeMember, Datatype
 from method.models import Method
 from pipeline.models import Pipeline, PipelineFamily, PipelineStep,\

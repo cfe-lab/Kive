@@ -74,9 +74,9 @@ urlpatterns = [
 
     url(r'^resources$', method.views.resources, name='resources'),
     url(r'^resource_add$', method.views.resource_add, name='resource_add'),
-    url(r'^resource_revisions/(?P<id>\d+)/$', method.views.resource_revisions, name='resource_revisions'),
-    url(r'^resource_revision_add/(?P<id>\d+)/$', method.views.resource_revision_add, name='resource_revision_add'),
-    url(r'^resource_revision_view/(?P<id>\d+)/$', method.views.resource_revision_view, name='resource_revision_view'),
+    url(r'^resource_revisions/(?P<pk>\d+)/$', method.views.resource_revisions, name='resource_revisions'),
+    url(r'^resource_revision_add/(?P<pk>\d+)/$', method.views.resource_revision_add, name='resource_revision_add'),
+    url(r'^resource_revision_view/(?P<pk>\d+)/$', method.views.resource_revision_view, name='resource_revision_view'),
 
     url(r'^docker_images$', method.views.docker_images, name='docker_images'),
     url(r'^docker_image_add$', method.views.docker_image_add, name='docker_image_add'),

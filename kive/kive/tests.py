@@ -20,9 +20,9 @@ from django.utils.timezone import now
 from mock import patch
 
 from rest_framework.test import APIRequestFactory, force_authenticate
+from django_mock_queries.mocks import mocked_relations
 
 from constants import users
-from kive.mock_setup import mocked_relations
 from metadata.models import kive_user, KiveUser
 
 

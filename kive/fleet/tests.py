@@ -1,13 +1,12 @@
+from datetime import datetime
+from mock import Mock
 from unittest import TestCase
 
-from datetime import datetime
-
 from django.contrib.auth.models import User
-from mock import Mock
+from django_mock_queries.mocks import mocked_relations
 
 from archive.models import Run
 from fleet.workers import Manager, ActiveRunsException
-from kive.mock_setup import mocked_relations
 
 
 class ManagerMockTest(TestCase):

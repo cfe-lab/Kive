@@ -1,16 +1,16 @@
 """
 method.views
 """
+from datetime import datetime
+import itertools
+import logging
+from subprocess import CalledProcessError
 
 from django.db import transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
-
-from datetime import datetime
-import logging
-import itertools
 
 from metadata.models import CompoundDatatype
 from method.models import CodeResource, Method, MethodDependency, \
@@ -41,21 +41,11 @@ def resources(request):
 
 @login_required
 @user_passes_test(developer_check)
-def resource_revisions(request, id):
+def resource_revisions(request, pk):
     """
     Display a list of all revisions of a specific Code Resource in database.
     """
-    four_oh_four = False
-    try:
-        coderesource = CodeResource.objects.get(pk=id)
-        if not coderesource.can_be_accessed(request.user):
-            four_oh_four = True
-    except ObjectDoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        # Redirect back to the resources page.
-        raise Http404("ID {} cannot be accessed".format(id))
+    coderesource = CodeResource.check_accessible(pk, request.user)
 
     addable_users, addable_groups = coderesource.other_users_groups()
 
@@ -233,7 +223,7 @@ def resource_add(request):
 
 @login_required
 @user_passes_test(developer_check)
-def resource_revision_add(request, id):
+def resource_revision_add(request, pk):
     """
     Add a code resource revision.  The form will initially be populated with values of the last
     revision to this code resource.
@@ -241,20 +231,7 @@ def resource_revision_add(request, id):
     t = loader.get_template('method/resource_revision_add.html')
     c = {}
     creating_user = request.user
-
-    # Use POST information (id) to retrieve the CRv being revised.
-    four_oh_four = False
-    try:
-        parent_revision = CodeResourceRevision.objects.get(pk=id)
-        if not parent_revision.can_be_accessed(creating_user):
-            four_oh_four = True
-    except ObjectDoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        # Redirect back to the resources page.
-        raise Http404("ID {} cannot be accessed".format(id))
-
+    parent_revision = CodeResourceRevision.check_accessible(pk, creating_user)
     coderesource = parent_revision.coderesource
 
     if request.method == 'POST':
@@ -306,18 +283,8 @@ def resource_revision_add(request, id):
 
 @login_required
 @user_passes_test(developer_check)
-def resource_revision_view(request, id):
-    four_oh_four = False
-    try:
-        revision = CodeResourceRevision.objects.get(pk=id)
-        if not revision.can_be_accessed(request.user):
-            four_oh_four = True
-    except CodeResourceRevision.DoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        raise Http404("ID {} is not accessible".format(id))
-
+def resource_revision_view(request, pk):
+    revision = CodeResourceRevision.check_accessible(pk, request.user)
     addable_users, addable_groups = revision.other_users_groups()
 
     if request.method == 'POST':
@@ -540,6 +507,7 @@ If you know what you are doing, you can override this requirement here."""
         output_forms.append((tx_form, xs_form))
 
     return family_form, method_form, dep_forms, input_forms, output_forms, query_dict
+
 
 SHEBANG_YES = 1
 SHEBANG_NO = 2
@@ -1093,10 +1061,14 @@ def docker_image_add(request):
         image_form = DockerImageForm(request.POST, instance=image)
 
         try:
-            image_form.save()
-            image.grant_from_json(image_form.cleaned_data["permissions"])
+            if image_form.is_valid():
+                image.build()
+                image_form.save()
+                image.grant_from_json(image_form.cleaned_data["permissions"])
 
-            return HttpResponseRedirect('/docker_images')
+                return HttpResponseRedirect('/docker_images')
+        except CalledProcessError as ex:
+            image_form.add_error(None, ex.output)
         except ValueError:
             # All forms have the appropriate errors attached.
             pass

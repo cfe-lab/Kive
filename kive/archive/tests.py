@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
 from django_mock_queries.query import MockSet
+from django_mock_queries.mocks import mocked_relations
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
@@ -29,7 +30,6 @@ from librarian.models import ExecRecord, Dataset, DatasetStructure
 from kive.tests import BaseTestCases, install_fixture_files, remove_fixture_files
 from method.models import Method, MethodFamily, CodeResource
 from pipeline.models import Pipeline, PipelineStep, PipelineFamily
-from kive.mock_setup import mocked_relations
 
 from fleet.workers import Manager
 import kive.testing_utils as tools

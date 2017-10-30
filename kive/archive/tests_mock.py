@@ -3,9 +3,9 @@ from mock import Mock, patch
 from django.test import TestCase
 from django.utils import timezone
 
-from kive.mock_setup import mocked_relations
 from django.contrib.auth.models import User
 from django_mock_queries.query import MockSet
+from django_mock_queries.mocks import mocked_relations
 
 from archive.models import Run, RunState, RunStep, RunOutputCable,\
     RunComponentState, ExecLog, RunInput, MethodOutput

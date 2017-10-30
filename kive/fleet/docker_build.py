@@ -17,10 +17,14 @@ Then grant access to one or more users like this:
     <user1>, <user2> ALL = NOPASSWD: DOCKER_BUILD
 
 See man sudoers for all the gory details, including digest specs.
+The path to docker_build.py can be a symbolic link to this file, if you want
+it to be on the system path.
 """
 
 from argparse import ArgumentParser
+import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
+from tempfile import NamedTemporaryFile
 from urllib2 import URLError, Request
 
 
@@ -32,6 +36,9 @@ def parse_args(argv=None):
         help='HTTP address of Git repository'
              ' (e.g., https://github.com/gliderlabs/docker-alpine.git)')
     parser.add_argument('tag', help='tag to use in Git and Docker')
+    parser.add_argument('--id',
+                        action='store_true',
+                        help='Display full image id on last line of output.')
     return parser.parse_args(argv)
 
 
@@ -52,12 +59,31 @@ def main(argv=None):
         raise RuntimeError('Docker image {} already exists.'.format(docker_tag))
     except CalledProcessError:
         pass
-    # sudo docker image inspect --format '{{.Id}}' hello:v1.0
+
     build_args = ['docker',
                   'build',
                   '-t', docker_tag,
                   args.git + '#tags/' + args.tag]
-    check_call(build_args)
+    if not args.id:
+        id_file_name = None
+    else:
+        with NamedTemporaryFile(prefix='docker_image_id',
+                                suffix='.txt',
+                                delete=False) as f:
+            id_file_name = f.name
+        build_args.extend(('--iidfile', id_file_name))
+
+    try:
+        check_call(build_args)
+        if args.id:
+            with open(id_file_name, 'rU') as f:
+                print(f.read())
+    finally:
+        if id_file_name is not None:
+            try:
+                os.remove(id_file_name)
+            except OSError:
+                pass
 
 
 if __name__ == '__main__':

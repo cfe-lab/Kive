@@ -8,8 +8,8 @@ from django.test import TestCase
 
 from constants import users, groups
 from django_mock_queries.query import MockSet
+from django_mock_queries.mocks import mocked_relations, PatcherChain
 
-from kive.mock_setup import mocked_relations, PatcherChain
 from kive.tests import ViewMockTestCase
 from metadata.models import CompoundDatatype, KiveUser, kive_user
 from method.models import Method, MethodFamily, CodeResourceRevision,\
@@ -18,6 +18,9 @@ from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation, TransformationXput
 from django.contrib.auth.models import User, Group
 from pipeline.models import Pipeline
+
+# noinspection PyUnresolvedReferences
+from kive.mock_setup import convert_to_pks
 
 
 @mocked_relations(Method, Transformation, TransformationXput, TransformationInput, TransformationOutput)
@@ -230,8 +233,10 @@ class MethodMockTests(TestCase):
 
     def create_parent(self):
         parent = Method()
-        parent.inputs = MockSet(name='parent.inputs', cls=TransformationInput)
-        parent.outputs = MockSet(name='parent.outputs', cls=TransformationOutput)
+        parent.inputs = MockSet(name='parent.inputs',
+                                model=TransformationInput)
+        parent.outputs = MockSet(name='parent.outputs',
+                                 model=TransformationOutput)
         for i in range(2):
             inp = parent.inputs.create(dataset_idx=i + 1)
             inp.transformationinput = inp
@@ -566,12 +571,12 @@ class MethodUpdateMockTests(TestCase):
         self.family = MethodFamily()
         self.old_method = self.family.members.create(family=self.family,
                                                      revision_number=1,
-                                                     pk=101)
+                                                     id=101)
         self.old_method.method = self.old_method
 
         self.new_method = self.family.members.create(family=self.family,
                                                      revision_number=2,
-                                                     pk=102)
+                                                     id=102)
         self.new_method.method = self.new_method
 
     def test_find_update_not_found(self):
@@ -586,7 +591,7 @@ class MethodUpdateMockTests(TestCase):
 
     @mocked_relations(Pipeline)
     def test_find_update_not_found_from_transformation(self):
-        transformation = Transformation(pk=self.new_method.pk)
+        transformation = Transformation(id=self.new_method.id)
         transformation.method = self.new_method
         update = transformation.find_update()
 
@@ -670,13 +675,13 @@ class CodeResourceViewMockTests(ViewMockTestCase):
 
     def test_resource_revisions_404(self):
         response = self.client.get(reverse('resource_revisions',
-                                           kwargs=dict(id='1000')))
+                                           kwargs=dict(pk='1000')))
 
         self.assertEqual(404, response.status_code)
 
     def test_resource_revisions(self):
         response = self.client.get(reverse('resource_revisions',
-                                           kwargs=dict(id='99')))
+                                           kwargs=dict(pk='99')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.code_resource, response.context['coderesource'])
@@ -684,7 +689,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
     def test_resource_revisions_not_accessible(self):
         other_id = self.other_code_resource.pk
         response = self.client.get(reverse('resource_revisions',
-                                           kwargs=dict(id=other_id)))
+                                           kwargs=dict(pk=other_id)))
 
         self.assertEqual(404, response.status_code)
 
@@ -692,7 +697,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
         self.other_code_resource.groups_allowed.add(self.dev_group)
         other_id = self.other_code_resource.pk
         response = self.client.get(reverse('resource_revisions',
-                                           kwargs=dict(id=other_id)))
+                                           kwargs=dict(pk=other_id)))
 
         self.assertEqual(200, response.status_code)
         self.assertNotIn('revisions', response.context)
@@ -702,7 +707,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
         self.other_code_resource_revision.groups_allowed.add(self.dev_group)
         other_id = self.other_code_resource.pk
         response = self.client.get(reverse('resource_revisions',
-                                           kwargs=dict(id=other_id)))
+                                           kwargs=dict(pk=other_id)))
 
         self.assertEqual(200, response.status_code)
         self.assertIn('revisions', response.context)
@@ -726,7 +731,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
 
     def test_resource_revision_add(self):
         response = self.client.get(reverse('resource_revision_add',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         self.assertIn('revision_form', response.context)
@@ -735,7 +740,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
         filename = "added1.txt"
         upload_file = SimpleUploadedFile(filename, "Hello, World!")
         response = self.client.post(
-            reverse('resource_revision_add', kwargs=dict(id='199')),
+            reverse('resource_revision_add', kwargs=dict(pk='199')),
             data=dict(content_file=upload_file))
 
         self.assertEqual(302, response.status_code)
@@ -743,7 +748,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
 
     def test_resource_revision_view(self):
         response = self.client.get(reverse('resource_revision_view',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.code_resource_revision, response.context['revision'])
