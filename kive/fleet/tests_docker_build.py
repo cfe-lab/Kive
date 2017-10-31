@@ -46,7 +46,7 @@ class DockerBuildTest(TestCase):
         mock_check_output.assert_not_called()
         mock_check_call.assert_not_called()
 
-    def test(self, mock_check_output, mock_check_call):
+    def test_image_exists(self, mock_check_output, mock_check_call):
         args = ['my-image', 'http://my-host/my-project.git', 'v1.0']
         expected_inspect = ['docker', 'image', 'inspect', 'my-image:v1.0']
 

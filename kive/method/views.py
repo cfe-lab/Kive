@@ -7,9 +7,9 @@ import logging
 from subprocess import CalledProcessError
 
 from django.db import transaction
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
+from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http import HttpResponse, HttpResponseRedirect, Http404
+from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 
 from metadata.models import CompoundDatatype
@@ -345,22 +345,11 @@ def method_families(request):
 
 @login_required
 @user_passes_test(developer_check)
-def methods(request, id):
+def methods(request, pk):
     """
     Display a list of all Methods within a given MethodFamily.
     """
-    four_oh_four = False
-    try:
-        family = MethodFamily.objects.get(pk=id)
-        if not family.can_be_accessed(request.user) and not admin_check(request.user):
-            four_oh_four = True
-    except ObjectDoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        # Redirect back to the resources page.
-        raise Http404("ID {} cannot be accessed".format(id))
-
+    family = MethodFamily.check_accessible(pk, request.user)
     addable_users, addable_groups = family.other_users_groups()
 
     if request.method == 'POST':
@@ -693,21 +682,11 @@ def _method_forms_check_valid(family_form, method_form, dep_forms,
 
 @login_required
 @user_passes_test(developer_check)
-def method_view(request, id):
+def method_view(request, pk):
     """
     View a Method or edit its metadata/permissions.
     """
-    four_oh_four = False
-    try:
-        method = Method.objects.get(pk=id)
-        if not method.can_be_accessed(request.user):
-            four_oh_four = True
-    except Method.DoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        raise Http404("ID {} is not accessible".format(id))
-
+    method = Method.check_accessible(pk, request.user)
     addable_users, addable_groups = method.other_users_groups()
     addable_users, addable_groups = method.family.intersect_permissions(addable_users, addable_groups)
     if method.revision_parent is not None:
@@ -776,26 +755,15 @@ def method_new(request):
 
 @login_required
 @user_passes_test(developer_check)
-def method_add(request, id):
+def method_add(request, pk):
     """
     Generate/validate/process forms for adding a Method to an existing MethodFamily.
 
     Allows for an arbitrary number of input and output forms.
 
-    [id] : primary key of the MethodFamily that this Method is being added to.
+    [pk] : primary key of the MethodFamily that this Method is being added to.
     """
-    creating_user = request.user
-
-    four_oh_four = False
-    try:
-        this_family = MethodFamily.objects.get(pk=id)
-        if not this_family.can_be_accessed(creating_user):
-            four_oh_four = True
-    except MethodFamily.DoesNotExist:
-        four_oh_four = True
-    if four_oh_four:
-        raise Http404("ID {} is inaccessible".format(id))
-
+    this_family = MethodFamily.check_accessible(pk, request.user)
     return _method_creation_helper(request, method_family=this_family)
 
 
@@ -886,13 +854,11 @@ def _method_creation_helper(request, method_family=None):
              'header': header
              }
         return HttpResponse(t.render(c, request))
-    # ---should not fall off the end of this routine
-    raise RuntimeError("error in METHOD")
 
 
 @login_required
 @user_passes_test(developer_check)
-def method_revise(request, id):
+def method_revise(request, pk):
     """
     Add a revision of an existing Method.  revision_parent is defined by the
     previous version.
@@ -902,17 +868,7 @@ def method_revise(request, id):
     creating_user = request.user
 
     # Retrieve the most recent member of this Method's family.
-    four_oh_four = False
-    try:
-        parent_method = Method.objects.get(pk=id)
-        if not parent_method.can_be_accessed(creating_user):
-            four_oh_four = True
-    except Method.DoesNotExist:
-        four_oh_four = True
-
-    if four_oh_four:
-        raise Http404("ID {} is inaccessible".format(id))
-
+    parent_method = Method.check_accessible(pk, creating_user)
     family = parent_method.family
 
     # Retrieve the most recent revision of the corresponding CR.

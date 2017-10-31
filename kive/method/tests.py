@@ -27,9 +27,9 @@ from kive.tests import BaseTestCases, install_fixture_files
 import librarian.models
 from metadata.models import CompoundDatatype, Datatype, everyone_group, kive_user
 import metadata.tests
-from method.ajax import MethodViewSet, MethodFamilyViewSet
+from method.ajax import MethodViewSet, MethodFamilyViewSet, DockerImageViewSet
 from method.models import CodeResource, CodeResourceRevision, \
-    Method, MethodFamily, MethodDependency
+    Method, MethodFamily, MethodDependency, DockerImage
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import kive.testing_utils as tools
 from fleet.workers import Manager
@@ -1205,6 +1205,7 @@ class CodeResourceRevisionSerializerTests(TestCase):
         install_fixture_files("removal")
         # This user is defined in the removal fixture.
         self.remover = User.objects.get(username="RemOver")
+        # noinspection PyTypeChecker
         crr_test_setup(self)
 
     def tearDown(self):
@@ -1221,7 +1222,6 @@ class CodeResourceRevisionSerializerTests(TestCase):
                 data=self.crr_data,
                 context={"request": self.duck_request}
             )
-            foo = crr_s.is_valid()
             self.assertTrue(crr_s.is_valid())
 
     def test_create(self):
@@ -1266,6 +1266,7 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         self.download_path = reverse("coderesourcerevision-download", kwargs={"pk": self.noop_crr.pk})
         self.download_view, _, _ = resolve(self.download_path)
 
+        # noinspection PyTypeChecker
         crr_test_setup(self)
 
     def tearDown(self):
@@ -1435,6 +1436,7 @@ class MethodSerializerTests(TestCase):
 
     def setUp(self):
         install_fixture_files("removal")
+        # noinspection PyTypeChecker
         method_test_setup(self)
 
     def tearDown(self):
@@ -1499,6 +1501,7 @@ class MethodApiTests(BaseTestCases.ApiTestCase):
         self.detail_view, _, _ = resolve(self.detail_path)
         self.removal_view, _, _ = resolve(self.removal_path)
 
+        # noinspection PyTypeChecker
         method_test_setup(self)
 
     def test_removal(self):
@@ -1617,6 +1620,126 @@ class MethodApiMockTests(BaseTestCases.ApiTestCase):
         """
         Test the API list view.
         """
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
+                          response.data)
+
+
+class DockerImageApiMockTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        self.mock_viewset(DockerImageViewSet)
+        super(DockerImageApiMockTests, self).setUp()
+
+        self.list_path = reverse("dockerimage-list")
+        self.detail_pk = 43
+        self.detail_path = reverse("dockerimage-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("dockerimage-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.list_view, _, _ = resolve(self.list_path)
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        DockerImage.objects.add(DockerImage(pk=42,
+                                            user=self.kive_kive_user,
+                                            name='github/alex/hello',
+                                            description='angling'),
+                                DockerImage(pk=43,
+                                            user=self.kive_kive_user,
+                                            name='github/bob/hello',
+                                            description='boxing',
+                                            git='http://server1.com/hello.git',
+                                            tag='v1.0'),
+                                DockerImage(pk=44,
+                                            user=self.kive_kive_user,
+                                            name='github/cindy/hello',
+                                            description='carving bob',
+                                            git='http://server2.com/hello.git',
+                                            tag='v2.0'))
+
+    def test_list(self):
+        """
+        Test the API list view.
+        """
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+        self.assertEquals(response.data[2]['name'], 'github/cindy/hello')
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['name'], 'github/bob/hello')
+
+    def test_removal_plan(self):
+        request = self.factory.get(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.removal_view(request, pk=self.detail_pk)
+        self.assertEquals(response.data['DockerImages'], 1)
+
+    def test_filter_description(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=description&filters[0][val]=boxing")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'github/bob/hello')
+
+    def test_filter_smart(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=smart&filters[0][val]=bob")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 2)
+        self.assertEquals(response.data[0]['name'], 'github/bob/hello')
+        self.assertEquals(response.data[1]['description'], 'carving bob')
+
+    def test_filter_name(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=name&filters[0][val]=bob")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['name'], 'github/bob/hello')
+
+    def test_filter_tag(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=tag&filters[0][val]=1.0")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['tag'], 'v1.0')
+
+    def test_filter_git(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=git&filters[0][val]=server1")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 1)
+        self.assertEquals(response.data[0]['git'], 'http://server1.com/hello.git')
+
+    def test_filter_user(self):
+        request = self.factory.get(
+            self.list_path + "?filters[0][key]=user&filters[0][val]=kive")
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request, pk=None)
+
+        self.assertEquals(len(response.data), 3)
+
+    def test_filter_unknown(self):
         request = self.factory.get(
             self.list_path + "?filters[0][key]=bogus&filters[0][val]=kive")
         force_authenticate(request, user=self.kive_user)

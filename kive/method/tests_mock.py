@@ -12,8 +12,8 @@ from django_mock_queries.mocks import mocked_relations, PatcherChain
 
 from kive.tests import ViewMockTestCase
 from metadata.models import CompoundDatatype, KiveUser, kive_user
-from method.models import Method, MethodFamily, CodeResourceRevision,\
-    CodeResource, MethodDependency
+from method.models import Method, MethodFamily, CodeResourceRevision, \
+    CodeResource, MethodDependency, DockerImage
 from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation, TransformationXput
 from django.contrib.auth.models import User, Group
@@ -309,9 +309,10 @@ class MethodMockTests(TestCase):
                                   max_row=max_row)
         parent = self.create_parent()
 
-        def get_structure(self):
-            if self.dataset_idx == 1:
+        def get_structure(xput_self):
+            if xput_self.dataset_idx == 1:
                 return structure
+            # noinspection PyUnresolvedReferences
             raise XputStructure.DoesNotExist
 
         TransformationXput.structure = property(get_structure)
@@ -325,6 +326,7 @@ class MethodMockTests(TestCase):
                          {inp.dataset_idx for inp in foo.inputs})
         self.assertEqual(expected_outputs,
                          {out.dataset_idx for out in foo.outputs})
+        # noinspection PyUnresolvedReferences
         create_args = XputStructure.objects.create.call_args_list  # @UndefinedVariable
         self.assertEqual(2, len(create_args))
         _args, kwargs = create_args[0]
@@ -447,7 +449,7 @@ class MethodDependencyMockTests(TestCase):
         self.method = Method(driver=driver, family=MethodFamily())
         self.dependency = self.add_dependency('helper.py')
 
-    def add_dependency(self, filename, path=''):
+    def add_dependency(self, filename):
         helper = CodeResourceRevision(
             coderesource=CodeResource(filename=filename))
         dependency = self.method.dependencies.create(requirement=helper)
@@ -805,20 +807,20 @@ class MethodViewMockTests(ViewMockTestCase):
 
     def test_methods_404(self):
         response = self.client.get(reverse('methods',
-                                           kwargs=dict(id='1000')))
+                                           kwargs=dict(pk='1000')))
 
         self.assertEqual(404, response.status_code)
 
     def test_methods(self):
         response = self.client.get(reverse('methods',
-                                           kwargs=dict(id='99')))
+                                           kwargs=dict(pk='99')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.method_family, response.context['family'])
 
     def test_method_view(self):
         response = self.client.get(reverse('method_view',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.method, response.context['method'])
@@ -831,7 +833,7 @@ class MethodViewMockTests(ViewMockTestCase):
 
     def test_method_revise(self):
         response = self.client.get(reverse('method_revise',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.method_family, response.context['family'])
@@ -849,7 +851,7 @@ class MethodViewMockTests(ViewMockTestCase):
         self.driver.coderesource.revisions.add(revision1, revision2)
 
         response = self.client.get(reverse('method_revise',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         revisions = response.context['method_form']['driver_revisions']
@@ -870,10 +872,99 @@ class MethodViewMockTests(ViewMockTestCase):
         self.driver.coderesource.revisions.add(revision1, revision2)
 
         response = self.client.get(reverse('method_revise',
-                                           kwargs=dict(id='199')))
+                                           kwargs=dict(pk='199')))
 
         self.assertEqual(200, response.status_code)
         revisions = response.context['method_form']['driver_revisions']
         self.assertEqual([('101', '1: alpha'),
                           ('102', '2: beta')],
                          revisions.field.widget.choices)
+
+
+class DockerImageViewMockTests(ViewMockTestCase):
+    def setUp(self):
+        super(DockerImageViewMockTests, self).setUp()
+        patcher = mocked_relations(KiveUser,
+                                   DockerImage,
+                                   User,
+                                   Group)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+        self.client = self.create_client()
+        self.dev_group = Group(pk=groups.DEVELOPERS_PK)
+        self.everyone = Group(pk=groups.EVERYONE_PK)
+        Group.objects.add(self.dev_group, self.everyone)
+        self.user = kive_user()
+        self.user.groups.add(self.dev_group)
+        self.other_user = User(pk=5)
+
+        self.docker_image = DockerImage(pk='99',
+                                        name='git/joe/hello',
+                                        tag='v1',
+                                        git='http://server1.com/joe/hello.git',
+                                        user=self.user)
+        DockerImage.objects.add(self.docker_image)
+
+        KiveUser.objects.add(KiveUser(pk=users.KIVE_USER_PK))
+
+    def test_docker_images(self):
+        response = self.client.get(reverse('docker_images'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertFalse(response.context['is_user_admin'])
+
+    def test_docker_images_admin(self):
+        self.user.is_staff = True
+
+        response = self.client.get(reverse('docker_images'))
+
+        self.assertEqual(200, response.status_code)
+        self.assertTrue(response.context['is_user_admin'])
+
+    def test_docker_image_view(self):
+        response = self.client.get(reverse('docker_image_view',
+                                           kwargs=dict(image_id='99')))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(self.docker_image, response.context['docker_image'])
+
+    def test_docker_image_update(self):
+        new_description = 'new description'
+        response = self.client.post(reverse('docker_image_view',
+                                            kwargs=dict(image_id='99')),
+                                    data=dict(description=new_description))
+
+        self.assertEqual(302, response.status_code)
+        self.assertEqual(new_description, self.docker_image.description)
+
+    # noinspection PyUnusedLocal
+    @patch('method.models.check_output')
+    def test_docker_image_add(self, mock_check_output):
+        new_description = 'new description'
+        expected_name = 'git/alex/howdy'
+        response = self.client.post(
+            reverse('docker_image_add'),
+            data=dict(name=expected_name,
+                      tag='v9',
+                      git='http://server1.com/alex/howdy.git',
+                      description=new_description))
+
+        self.assertEqual(302, response.status_code)
+
+    def test_docker_image_update_too_long(self):
+        new_description = 'X' * 2001
+        response = self.client.post(reverse('docker_image_view',
+                                            kwargs=dict(image_id='99')),
+                                    data=dict(description=new_description))
+
+        self.assertEqual(200, response.status_code)
+        self.assertEqual(
+            {'description': ['Ensure this value has at most 2000 characters'
+                             ' (it has 2001).']},
+            response.context['docker_image_form'].errors)
+
+    def test_docker_image_new(self):
+        response = self.client.get(reverse('docker_image_add'))
+
+        self.assertEqual(200, response.status_code)

@@ -84,10 +84,10 @@ urlpatterns = [
 
     url(r'^method_families$', method.views.method_families, name='method_families'),
     url(r'^method_new$', method.views.method_new, name='method_new'),
-    url(r'^methods/(?P<id>\d+)/$', method.views.methods, name='methods'),
-    url(r'^method_add/(?P<id>\d+)/$', method.views.method_add, name='method_add'),
-    url(r'^method_view/(?P<id>\d+)/$', method.views.method_view, name='method_view'),
-    url(r'^method_revise/(?P<id>\d+)/$', method.views.method_revise, name='method_revise'),
+    url(r'^methods/(?P<pk>\d+)/$', method.views.methods, name='methods'),
+    url(r'^method_add/(?P<pk>\d+)/$', method.views.method_add, name='method_add'),
+    url(r'^method_view/(?P<pk>\d+)/$', method.views.method_view, name='method_view'),
+    url(r'^method_revise/(?P<pk>\d+)/$', method.views.method_revise, name='method_revise'),
 
     url(r'^pipeline_families$', pipeline.views.pipeline_families, name='pipeline_families'),
     url(r'^pipeline_new$', pipeline.views.pipeline_new, name='pipeline_new'),

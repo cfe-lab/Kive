@@ -425,11 +425,11 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
     @property
     def absolute_url(self):
-        return reverse("method_revise", kwargs={"id": self.pk})
+        return reverse("method_revise", kwargs={"pk": self.pk})
 
     @property
     def view_url(self):
-        return reverse("method_view", kwargs={"id": self.pk})
+        return reverse("method_view", kwargs={"pk": self.pk})
 
     def is_method(self):
         return True
@@ -682,7 +682,7 @@ class MethodFamily(transformation.models.TransformationFamily):
         """
         Gives the URL that lists all Methods under this family.
         """
-        return reverse("methods", kwargs={"id": self.pk})
+        return reverse("methods", kwargs={"pk": self.pk})
 
     def max_revision(self):
         """
@@ -732,7 +732,7 @@ class DockerImage(metadata.models.AccessControl):
                                    blank=True,
                                    max_length=2000)
     hash = models.CharField('Hash',
-                            help_text='Hash of contents',
+                            help_text='Hash of contents in docker',
                             max_length=71)
     created = models.DateTimeField(
         auto_now_add=True,
