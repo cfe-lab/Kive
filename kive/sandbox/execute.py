@@ -3,7 +3,6 @@
 from collections import defaultdict
 import logging
 import os
-import stat
 import random
 import tempfile
 import time
@@ -201,7 +200,9 @@ class Sandbox:
             self.logger.debug("Dataset {} is not in the Sandbox".format(dataset))
             return None
 
-        return (location if location and file_access_utils.file_exists(location) else None)
+        return (location
+                if location and file_access_utils.file_exists(location)
+                else None)
 
     def update_cable_maps(self, runcable, output_dataset, output_path):
         """Update maps after cable execution.
@@ -1711,27 +1712,29 @@ class Sandbox:
         it should not have been run previously.  This should not be a RunStep representing a Pipeline.
         """
         # Break out the execution info.
-        curr_ER = None
-        preexisting_ER = step_execute_dict["execrecord_pk"] is not None
+        curr_exec_rec = None
+        preexisting_exec_rec = step_execute_dict["execrecord_pk"] is not None
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
         step_run_dir = step_execute_dict["step_run_dir"]
 
         recovering_record = None
         if step_execute_dict["recovering_record_pk"] is not None:
+            # noinspection PyUnresolvedReferences
             recovering_record = RunComponent.objects.get(
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
 
-        curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])  # already start()ed
-        assert not curr_RS.pipelinestep.is_subpipeline()
-        method = curr_RS.pipelinestep.transformation.definite
+        # already start()ed
+        curr_runstep = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
+        assert not curr_runstep.pipelinestep.is_subpipeline()
+        method = curr_runstep.pipelinestep.transformation.definite
 
         try:
             recover = recovering_record is not None
-            invoking_record = recovering_record or curr_RS
+            invoking_record = recovering_record or curr_runstep
 
             if recover:
-                curr_RS.begin_recovery(save=True)
+                curr_runstep.begin_recovery(save=True)
 
             ####
             # Gather inputs: finish all input cables -- we want them written to the sandbox now, which is never
@@ -1743,23 +1746,23 @@ class Sandbox:
                 if recover:
                     curr_execute_dict["recovering_record_pk"] = recovering_record.pk
 
-                curr_RSIC = Sandbox.finish_cable(curr_execute_dict)
-                completed_cable_pks.append(curr_RSIC.pk)
+                curr_cable = Sandbox.finish_cable(curr_execute_dict)
+                completed_cable_pks.append(curr_cable.pk)
 
                 # Cable failed, return incomplete RunStep.
-                curr_RSIC.refresh_from_db()
-                if not curr_RSIC.is_successful():
-                    logger.error("PipelineStepInputCable %s %s.", curr_RSIC, curr_RSIC.get_state_name())
+                curr_cable.refresh_from_db()
+                if not curr_cable.is_successful():
+                    logger.error("PipelineStepInputCable %s %s.", curr_cable, curr_cable.get_state_name())
 
                     # Cancel the other RunSICs for this step.
-                    for rsic in curr_RS.RSICs.exclude(pk__in=completed_cable_pks):
+                    for rsic in curr_runstep.RSICs.exclude(pk__in=completed_cable_pks):
                         rsic.cancel_pending(save=True)
 
                     # Update state variables.
-                    curr_RS.refresh_from_db()
-                    curr_RS.cancel_running(save=True)  # Transition: Running->Cancelled
-                    curr_RS.complete_clean()
-                    return curr_RS
+                    curr_runstep.refresh_from_db()
+                    curr_runstep.cancel_running(save=True)  # Transition: Running->Cancelled
+                    curr_runstep.complete_clean()
+                    return curr_runstep
 
                 # Cable succeeded.
                 input_paths.append(curr_execute_dict["output_path"])
@@ -1767,16 +1770,16 @@ class Sandbox:
             # Check again to see if the ExecRecord was completed while this task
             # waited on the queue.  If this isn't a recovery, we can just stop.
             if recover:
-                assert preexisting_ER
-                curr_ER = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
+                assert preexisting_exec_rec
+                curr_exec_rec = ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"])
             else:
-                curr_RS.reused = False
-                curr_RS.save()
+                curr_runstep.reused = False
+                curr_runstep.save()
 
-            pipelinestep = curr_RS.pipelinestep
+            pipelinestep = curr_runstep.pipelinestep
 
             # Run code, creating ExecLog and MethodOutput.
-            curr_log = ExecLog.create(curr_RS, invoking_record)
+            curr_log = ExecLog.create(curr_runstep, invoking_record)
 
             # Check the integrity of the code before we run.
             if not pipelinestep.transformation.definite.check_md5():  # this checks the driver and dependencies
@@ -1790,12 +1793,12 @@ class Sandbox:
                 curr_log.stop(save=True, clean=False)
 
                 # Update state variables:
-                curr_RS.finish_failure(save=True)
-                curr_RS.complete_clean()
+                curr_runstep.finish_failure(save=True)
+                curr_runstep.complete_clean()
 
                 logger.debug("Quarantining any other RunComponents using the same ExecRecord")
-                if preexisting_ER:
-                    curr_ER.quarantine_runcomponents()  # this is transaction'd
+                if preexisting_exec_rec:
+                    curr_exec_rec.quarantine_runcomponents()  # this is transaction'd
 
             # Install the code.
             try:
@@ -1807,19 +1810,19 @@ class Sandbox:
                 curr_log.methodoutput.install_failed = True
                 curr_log.methodoutput.save()
                 curr_log.stop(save=True, clean=False)
-                curr_RS.finish_failure(save=True)
-                curr_RS.complete_clean()
+                curr_runstep.finish_failure(save=True)
+                curr_runstep.complete_clean()
 
         except KeyboardInterrupt:
-            curr_RS.cancel_running(save=True)
+            curr_runstep.cancel_running(save=True)
             raise StopExecution(
                 "Execution of step {} (method {}) was stopped during setup.".format(
-                    curr_RS,
+                    curr_runstep,
                     method
                 )
             )
 
-        return curr_RS
+        return curr_runstep
 
     def submit_step_execution(self, step_execute_info, after_okay,
                               slurm_sched_class,
@@ -1846,10 +1849,10 @@ class Sandbox:
         """
         # From here on the code is assumed not to be corrupted, and all the required files
         # have been placed in their right places.
-        curr_RS = step_execute_info.runstep
+        curr_run_step = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
-        method = curr_RS.pipelinestep.transformation.definite
+        method = curr_run_step.pipelinestep.transformation.definite
         dependencies = method.dependencies
         dependency_paths = [os.path.join(dep.path, dep.get_filename())
                             for dep in dependencies.all()]
@@ -1859,17 +1862,17 @@ class Sandbox:
         docker_image = method.docker_image or DockerImage.get_default()
         image_name = docker_image.full_name
 
-        coordinates = curr_RS.get_coordinates()
+        coordinates = curr_run_step.get_coordinates()
         if len(coordinates) == 1:
             coord_str = coordinates[0]
         else:
             coord_str = "({})".format(",".join(str(x) for x in coordinates))
         job_name = "r{}s{}driver[{}]".format(
-            curr_RS.top_level_run.pk,
+            curr_run_step.top_level_run.pk,
             coord_str,
             driver_filename
         )
-        logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_RS.pk)
+        logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_run_step.pk)
         # Collect information we need for the wrapper script
         host_rundir = step_execute_info.step_run_dir
         launch_args = docker_handler_class.generate_launch_args(host_rundir,
@@ -1903,16 +1906,19 @@ class Sandbox:
         This is intended to run as a Slurm task, so it's coded as a static method.
         """
         # Break out step_execute_dict.
-        curr_RS = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
-        curr_log = curr_RS.log
-        curr_ER = (None if step_execute_dict["execrecord_pk"] is None
-                   else ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"]))
-        pipelinestep = curr_RS.pipelinestep
+        curr_run_step = RunStep.objects.get(pk=step_execute_dict["runstep_pk"])
+        curr_log = curr_run_step.log
+        curr_exec_rec = (
+            None
+            if step_execute_dict["execrecord_pk"] is None
+            else ExecRecord.objects.get(pk=step_execute_dict["execrecord_pk"]))
+        pipelinestep = curr_run_step.pipelinestep
         output_paths = step_execute_dict["output_paths"]
         user = User.objects.get(pk=step_execute_dict["user_pk"])
 
         recovering_record = None
         if step_execute_dict["recovering_record_pk"] is not None:
+            # noinspection PyUnresolvedReferences
             recovering_record = RunComponent.objects.get(
                 pk=step_execute_dict["recovering_record_pk"]
             ).definite
@@ -1921,8 +1927,9 @@ class Sandbox:
         cable_info_dicts = step_execute_dict["cable_info_dicts"]
         inputs_after_cable = []
         for curr_execute_dict in cable_info_dicts:
-            curr_RSIC = RunSIC.objects.get(pk=curr_execute_dict["cable_record_pk"])
-            inputs_after_cable.append(curr_RSIC.execrecord.execrecordouts.first().dataset)
+            # noinspection PyUnresolvedReferences
+            curr_cable = RunSIC.objects.get(pk=curr_execute_dict["cable_record_pk"])
+            inputs_after_cable.append(curr_cable.execrecord.execrecordouts.first().dataset)
 
         bad_execution = False
         bad_output_found = False
@@ -1941,7 +1948,7 @@ class Sandbox:
                         logger.debug("ExecLog.is_successful() == %s", not bad_execution)
 
                         # if not recover:
-                        if curr_ER is not None:
+                        if curr_exec_rec is not None:
                             if not recover:
                                 logger.debug("Filling in pre-existing ExecRecord with PipelineStep outputs")
                             else:
@@ -1951,10 +1958,10 @@ class Sandbox:
 
                         for i, curr_output in enumerate(pipelinestep.outputs):
                             output_path = output_paths[i]
-                            output_CDT = curr_output.get_cdt()
-                            dataset_name = curr_RS.output_name(curr_output)
-                            dataset_desc = curr_RS.output_description(curr_output)
-                            make_dataset = curr_RS.keeps_output(curr_output)
+                            output_type = curr_output.get_cdt()
+                            dataset_name = curr_run_step.output_name(curr_output)
+                            dataset_desc = curr_run_step.output_description(curr_output)
+                            make_dataset = curr_run_step.keeps_output(curr_output)
 
                             # Check that the file exists, as we did for cables.
                             start_time = timezone.now()
@@ -1975,8 +1982,8 @@ class Sandbox:
                                 end_time = timezone.now()
                                 bad_output_found = True
 
-                                if curr_ER is not None:
-                                    output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                                if curr_exec_rec is not None:
+                                    output_dataset = curr_exec_rec.get_execrecordout(curr_output).dataset
                                     if md5s[i] is None:
                                         output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                     else:
@@ -1984,18 +1991,18 @@ class Sandbox:
 
                                 elif md5s[i] is None:
                                     output_dataset = Dataset.create_empty(
-                                        cdt=output_CDT,
-                                        file_source=curr_RS
+                                        cdt=output_type,
+                                        file_source=curr_run_step
                                     )
                                     output_dataset.mark_missing(start_time, end_time, curr_log, user)
                                 else:
                                     output_dataset = Dataset.create_dataset(
                                         output_path,
-                                        cdt=output_CDT,
+                                        cdt=output_type,
                                         keep_file=make_dataset,
                                         name=dataset_name,
                                         description=dataset_desc,
-                                        file_source=curr_RS,
+                                        file_source=curr_run_step,
                                         check=False,
                                         precomputed_md5=md5s[i]
                                     )
@@ -2004,17 +2011,17 @@ class Sandbox:
                             else:
                                 # If necessary, create new Dataset for output, and create the Dataset
                                 # if it's to be retained.
-                                if curr_ER is not None:
-                                    output_ERO = curr_ER.get_execrecordout(curr_output)
+                                if curr_exec_rec is not None:
+                                    output_ero = curr_exec_rec.get_execrecordout(curr_output)
                                     if not make_dataset:
-                                        output_dataset = output_ERO.dataset
+                                        output_dataset = output_ero.dataset
                                     else:
                                         # Wrap in a transaction to prevent
                                         # concurrent authoring of Datasets to
                                         # an existing Dataset.
                                         with transaction.atomic():
                                             output_dataset = Dataset.objects.select_for_update().filter(
-                                                pk=output_ERO.dataset.pk).first()
+                                                pk=output_ero.dataset.pk).first()
                                             if not output_dataset.has_data():
                                                 check = output_dataset.check_integrity(
                                                     output_path,
@@ -2030,11 +2037,11 @@ class Sandbox:
                                 else:
                                     output_dataset = Dataset.create_dataset(
                                         output_path,
-                                        cdt=output_CDT,
+                                        cdt=output_type,
                                         keep_file=make_dataset,
                                         name=dataset_name,
                                         description=dataset_desc,
-                                        file_source=curr_RS,
+                                        file_source=curr_run_step,
                                         check=False,
                                         precomputed_md5=md5s[i]
                                     )
@@ -2044,10 +2051,10 @@ class Sandbox:
                             output_datasets.append(output_dataset)
 
                         # Create ExecRecord if there isn't already one.
-                        if curr_ER is None:
+                        if curr_exec_rec is None:
                             # Make new ExecRecord, linking it to the ExecLog
                             logger.debug("Creating fresh ExecRecord")
-                            curr_ER = ExecRecord.create(
+                            curr_exec_rec = ExecRecord.create(
                                 curr_log,
                                 pipelinestep,
                                 inputs_after_cable,
@@ -2056,7 +2063,7 @@ class Sandbox:
 
                         # Link ExecRecord to RunStep (it may already have been linked; that's fine).
                         # It's possible that reused may be either True or False (e.g. this is a recovery).
-                        curr_RS.link_execrecord(curr_ER, curr_RS.reused)
+                        curr_run_step.link_execrecord(curr_exec_rec, curr_run_step.reused)
 
                     succeeded_yet = True
                 except (OperationalError, InternalError):
@@ -2071,7 +2078,7 @@ class Sandbox:
             # checks on the outputs.
             for i, curr_output in enumerate(pipelinestep.outputs):
                 output_path = output_paths[i]
-                output_dataset = curr_ER.get_execrecordout(curr_output).dataset
+                output_dataset = curr_exec_rec.get_execrecordout(curr_output).dataset
                 check = None
 
                 if bad_execution:
@@ -2080,7 +2087,7 @@ class Sandbox:
                     logger.debug("Bad output found; no check on %s was done", output_path)
 
                 # Recovering or filling in old ER? Yes.
-                elif curr_ER is not None:
+                elif curr_exec_rec is not None:
                     # Perform integrity check.
                     logger.debug("Dataset has been computed before, checking integrity of %s",
                                  output_dataset)
@@ -2127,27 +2134,27 @@ class Sandbox:
                 elif check:
                     logger.debug("%s passed for %s", check.__class__.__name__, output_path)
 
-            curr_ER.complete_clean()
+            curr_exec_rec.complete_clean()
 
-            # End.  Return curr_RS.  Update the state.
+            # End.  Return curr_run_step.  Update the state.
             if not bad_output_found and not bad_execution:
-                curr_RS.finish_successfully(save=True)
+                curr_run_step.finish_successfully(save=True)
             else:
-                curr_RS.finish_failure(save=True)
+                curr_run_step.finish_failure(save=True)
                 logger.debug("Quarantining any other RunComponents using the same ExecRecord")
-                curr_ER.quarantine_runcomponents()  # this is transaction'd
+                curr_exec_rec.quarantine_runcomponents()  # this is transaction'd
 
-            curr_RS.complete_clean()
-            return curr_RS
+            curr_run_step.complete_clean()
+            return curr_run_step
 
         except KeyboardInterrupt:
             # Execution was stopped somewhere outside of run_code (that would
             # have been caught above).
-            curr_RS.cancel_running(save=True)
+            curr_run_step.cancel_running(save=True)
             raise StopExecution(
                 "Execution of step {} (method {}) was stopped during bookkeeping.".format(
-                    curr_RS,
-                    curr_RS.pipelinestep.transformation.definite
+                    curr_run_step,
+                    curr_run_step.pipelinestep.transformation.definite
                 )
             )
 
