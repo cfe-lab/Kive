@@ -983,27 +983,6 @@ class DockerImageViewMockTests(ViewMockTestCase):
 
 @mocked_relations(DockerImage, Method, PipelineStep, Pipeline)
 class DockerImageMockTests(TestCase):
-    def test_get_default(self):
-        default = DockerImage(name=DockerImage.DEFAULT_IMAGE_NAME,
-                              tag=DockerImage.DEFAULT_IMAGE_TAG)
-        other = DockerImage(name="joe",
-                            tag="v1.0")
-        DockerImage.objects.add(default, other)
-
-        result = DockerImage.get_default()
-
-        self.assertIs(default, result)
-
-    def test_get_default_not_found(self):
-        other = DockerImage(name="joe",
-                            tag="v1.0")
-        DockerImage.objects.add(other)
-
-        with self.assertRaisesRegexp(
-                DockerImage.DoesNotExist,
-                "Docker image 'kive-default:default' not found."):
-            DockerImage.get_default()
-
     def test_build_removal_plan_for_unused_image(self):
         image = DockerImage.objects.create(id=99, name='doomed')
         DockerImage.objects.create(id=100, name='untouched')
@@ -1029,12 +1008,3 @@ class DockerImageMockTests(TestCase):
         plan = image.build_removal_plan()
 
         self.assertEqual(expected_plan, plan)
-
-    def test_build_removal_plan_for_default_image(self):
-        image = DockerImage.objects.create(id=99,
-                                           name=DockerImage.DEFAULT_IMAGE_NAME,
-                                           tag=DockerImage.DEFAULT_IMAGE_TAG)
-
-        with self.assertRaisesRegexp(ValueError,
-                                     'Default docker image cannot be removed.'):
-            image.build_removal_plan()

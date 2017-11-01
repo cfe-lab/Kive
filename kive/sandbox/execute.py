@@ -1859,8 +1859,9 @@ class Sandbox:
         # Driver name
         driver = method.driver
         driver_filename = driver.coderesource.filename
-        docker_image = method.docker_image or DockerImage.get_default()
-        image_name = docker_image.full_name
+        docker_image = method.docker_image
+        image_name = (docker_image and docker_image.full_name or
+                      DockerImage.DEFAULT_IMAGE)
 
         coordinates = curr_run_step.get_coordinates()
         if len(coordinates) == 1:
