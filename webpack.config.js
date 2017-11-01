@@ -15,7 +15,8 @@ module.exports = {
     },
 
     // Enable sourcemaps for debugging webpack's output.
-    devtool: "inline-source-map",
+    // Suggested: eval-source-map when debugging, nosources-source-map in production
+    devtool: "nosources-source-map",
 
     plugins: [
         new webpack.DefinePlugin({

@@ -1,4 +1,5 @@
-import 'jquery';
+(window as any).$ = (window as any).jQuery = $;
+import '@portal/noxss.js';
 
 export class RestApi {
 

@@ -195,7 +195,7 @@ class MethodFamilyViewSet(CleanCreateModelMixin,
         member_methods = AccessControl.filter_by_user(
             request.user,
             is_admin=is_admin,
-            queryset=Method.objects.filter(methodfamily_id=pk))
+            queryset=Method.objects.filter(family_id=pk))
 
         member_serializer = MethodSerializer(
             member_methods, many=True, context={"request": request})

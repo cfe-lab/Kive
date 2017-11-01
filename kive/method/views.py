@@ -573,6 +573,7 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
                 revision_desc=method_form.cleaned_data['revision_desc'],
                 revision_parent=parent_method,
                 driver=coderesource_revision,
+                docker_image=method_form.cleaned_data['docker_image'],
                 reusable=method_form.cleaned_data['reusable'],
                 user=creating_user,
                 threads=method_form.cleaned_data["threads"],
@@ -919,6 +920,7 @@ def method_revise(request, pk):
             initial={
                 "revision_desc": parent_method.revision_desc,
                 "driver_revisions": parent_revision.pk,
+                "docker_image": parent_method.docker_image_id,
                 "reusable": parent_method.reusable,
                 "threads": parent_method.threads,
                 "memory": parent_method.memory,

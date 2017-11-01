@@ -20,7 +20,7 @@ from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
 from librarian.models import Dataset, ExecRecord
 import pipeline.models
-from method.models import Method
+from method.models import Method, DockerImage
 from datachecking.models import IntegrityCheckLog
 from fleet.exceptions import StopExecution
 from file_access_utils import copy_and_confirm, FileCreationError
@@ -1849,12 +1849,15 @@ class Sandbox:
         curr_RS = step_execute_info.runstep
 
         input_paths = [x.output_path for x in step_execute_info.cable_info_list]
-        dependencies = curr_RS.pipelinestep.transformation.definite.dependencies
+        method = curr_RS.pipelinestep.transformation.definite
+        dependencies = method.dependencies
         dependency_paths = [os.path.join(dep.path, dep.get_filename())
                             for dep in dependencies.all()]
         # Driver name
-        driver = curr_RS.pipelinestep.transformation.definite.driver
+        driver = method.driver
         driver_filename = driver.coderesource.filename
+        docker_image = method.docker_image or DockerImage.get_default()
+        image_name = docker_image.full_name
 
         coordinates = curr_RS.get_coordinates()
         if len(coordinates) == 1:
@@ -1869,12 +1872,12 @@ class Sandbox:
         logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_RS.pk)
         # Collect information we need for the wrapper script
         host_rundir = step_execute_info.step_run_dir
-        # NOTE: currently, we always launch a driver with the default image_id
         launch_args = docker_handler_class.generate_launch_args(host_rundir,
                                                                 input_paths,
                                                                 step_execute_info.output_paths,
                                                                 driver_filename,
-                                                                dependency_paths)
+                                                                dependency_paths,
+                                                                image_id=image_name)
         job_handle = slurm_sched_class.submit_job(
             host_rundir,
             launch_args[0],
@@ -1887,7 +1890,7 @@ class Sandbox:
             step_execute_info.driver_stderr_path(),
             after_okay=after_okay,
             job_name=job_name,
-            mem=curr_RS.pipelinestep.transformation.definite.memory
+            mem=method.memory
         )
 
         return job_handle

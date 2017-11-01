@@ -68,7 +68,7 @@ class BaseDockerHandler(object):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id=None):
+                             image_id):
         """ Generate the launch command for a method.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -78,7 +78,7 @@ class BaseDockerHandler(object):
             the sandbox folder
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
-        :param image_id: docker image id, or None for default
+        :param image_id: docker image id
         """
         raise NotImplementedError
 
@@ -110,7 +110,7 @@ class DummyDockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id=None):
+                             image_id):
         """ Generate the launch command for a method.
 
         This version just launches it on the host computer.
@@ -121,7 +121,7 @@ class DummyDockerHandler(BaseDockerHandler):
             the sandbox folder
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
-        :param image_id: docker image id, or None for default
+        :param image_id: docker image id
         """
         wrapper_template = """\
 #! /usr/bin/env bash
@@ -149,7 +149,6 @@ cd {}
 class DockerHandler(BaseDockerHandler):
 
     _is_alive = False
-    _def_dct = None
     docker_wrap_path = None
 
     @staticmethod
@@ -285,19 +284,7 @@ class DockerHandler(BaseDockerHandler):
             # Find docker_wrap.py on path, to match permissions in sudoers.
             cls.docker_wrap_path = sp.check_output(['which', 'docker_wrap.py']).strip()
 
-            # make sure the default image is loaded. MUST set the cls boolean before we do this
             cls._is_alive = True
-            try:
-                cls._def_dct = cls._get_image_info(DEFAULT_IMAGE_NAME)
-            except RuntimeError:
-                loaded = cls._load_image_from_file(DEFAULT_IM_FILE)
-                loaded_tag = loaded[BaseDockerHandler.DOCKER_IMG_REPO_TAG]
-                sp.check_call([DOCKER_COMMAND,
-                               'tag',
-                               loaded_tag,
-                               DEFAULT_IMAGE_NAME])
-                cls._def_dct = cls._get_image_info(DEFAULT_IMAGE_NAME)
-            # print("CHECKO B!", is_alive)
         return True
 
     @classmethod
@@ -314,7 +301,7 @@ class DockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id=None):
+                             image_id):
         """ Generate the launch command for the docker wrapper.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -324,11 +311,10 @@ class DockerHandler(BaseDockerHandler):
             the sandbox folder
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
-        :param image_id: docker image id, or None for default
+        :param image_id: docker image id
         """
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before generate_launch_args")
-        image_id = cls._def_dct[cls.DOCKER_IMG_IMAGE_ID] if image_id is None else image_id
         # we want to run the code in the docker container under a standardised directory,
         # so we convert the argument path names.
         docker_input_path = "/mnt/input"

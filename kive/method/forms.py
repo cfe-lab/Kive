@@ -206,6 +206,11 @@ class MethodReviseForm(AccessControlForm):
         widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
     )
 
+    docker_image = forms.ModelChoiceField(
+        DockerImage.objects.all(),
+        label="Docker Image",
+        help_text="Method will run in this image")
+
     revision_name = forms.CharField(
         label="Name",
         help_text="A short name for this new method",

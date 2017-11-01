@@ -160,6 +160,8 @@ function submitPipelineAjax(family_pk, form_data, $error) {
             if (json) {
                 if (json.non_field_errors) {
                     submitError(json.non_field_errors, $error);
+                } else if (json.detail) {
+                    submitError(json.detail, $error);
                 } else {
                     buildErrors("", json, errors);
                     submitError(errors, $error);
@@ -177,7 +179,8 @@ function submitPipelineFamilyAjax(family_form_data, $error) {
         () => {},
         function(xhr, status, error) {
             let json = xhr.responseJSON;
-            let serverErrors = json && json.non_field_errors || [];
+            let serverErrors = json &&
+                (json.non_field_errors || json.detail) || [];
             if (serverErrors.length === 0) {
                 serverErrors = xhr.status + " - " + error;
             }

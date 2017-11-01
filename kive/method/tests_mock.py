@@ -12,6 +12,7 @@ from django_mock_queries.mocks import mocked_relations, PatcherChain
 
 from kive.tests import ViewMockTestCase
 from metadata.models import CompoundDatatype, KiveUser, kive_user
+from method.forms import MethodForm
 from method.models import Method, MethodFamily, CodeResourceRevision, \
     CodeResource, MethodDependency, DockerImage
 from transformation.models import TransformationInput, TransformationOutput,\
@@ -765,10 +766,20 @@ class MethodViewMockTests(ViewMockTestCase):
                                    CodeResource,
                                    CodeResourceRevision,
                                    CompoundDatatype,
+                                   DockerImage,
                                    User,
                                    Group)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+        docker_image_field = MethodForm.base_fields['docker_image']
+        # noinspection PyUnresolvedReferences
+        patcher = patch.object(docker_image_field,
+                               '_queryset',
+                               DockerImage.objects)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        DockerImage.objects._prefetch_related_lookups = False
 
         self.client = self.create_client()
         self.dev_group = Group(pk=groups.DEVELOPERS_PK)
@@ -968,3 +979,27 @@ class DockerImageViewMockTests(ViewMockTestCase):
         response = self.client.get(reverse('docker_image_add'))
 
         self.assertEqual(200, response.status_code)
+
+
+@mocked_relations(DockerImage)
+class DockerImageMockTests(TestCase):
+    def test_get_default(self):
+        default = DockerImage(name=DockerImage.DEFAULT_IMAGE_NAME,
+                              tag=DockerImage.DEFAULT_IMAGE_TAG)
+        other = DockerImage(name="joe",
+                            tag="v1.0")
+        DockerImage.objects.add(default, other)
+
+        result = DockerImage.get_default()
+
+        self.assertIs(default, result)
+
+    def test_get_default_not_found(self):
+        other = DockerImage(name="joe",
+                            tag="v1.0")
+        DockerImage.objects.add(other)
+
+        with self.assertRaisesRegexp(
+                DockerImage.DoesNotExist,
+                "Docker image 'kive-default:default' not found."):
+            DockerImage.get_default()

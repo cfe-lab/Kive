@@ -336,6 +336,84 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
 
 @python_2_unicode_compatible
+class DockerImage(metadata.models.AccessControl):
+    DEFAULT_IMAGE_NAME = 'kive-default'
+    DEFAULT_IMAGE_TAG = 'default'
+
+    name = models.CharField('Name',
+                            help_text='Docker image name',
+                            max_length=200)  # Approximate limit in Docker.
+    tag = models.CharField('Tag',
+                           help_text='Docker image tag',
+                           max_length=128)  # Limit in Docker.
+    git = models.CharField('Git URL',
+                           help_text='URL of Git repository',
+                           max_length=2000)
+    description = models.CharField('Description',
+                                   help_text='What is this image used for?',
+                                   blank=True,
+                                   max_length=2000)
+    hash = models.CharField('Hash',
+                            help_text='Hash of contents in docker',
+                            max_length=71)
+    created = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this docker image was added to Kive.")
+
+    class Meta:
+        ordering = ('name', '-tag')
+
+    def __str__(self):
+        return self.full_name
+
+    @property
+    def absolute_url(self):
+        return reverse("docker_image_view", kwargs={"image_id": self.pk})
+
+    @property
+    def full_name(self):
+        return self.name + ':' + self.tag
+
+    def build(self):
+        """ Build a docker image, and record the hash. Does not save. """
+        result = check_output(['sudo',
+                               getsourcefile(docker_build),
+                               '--id',
+                               self.name,
+                               self.git,
+                               self.tag],
+                              stderr=STDOUT)
+        self.hash = result.splitlines()[-1]
+        if not self.hash.startswith('sha256:'):
+            raise RuntimeError('Expected sha256 hash on last line:\n' + result)
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["DockerImages"]
+
+        removal_plan["DockerImages"].add(self)
+
+        return removal_plan
+
+    @classmethod
+    def get_default(cls):
+        try:
+            return cls.objects.get(name=cls.DEFAULT_IMAGE_NAME,
+                                   tag=cls.DEFAULT_IMAGE_TAG)
+        except DockerImage.DoesNotExist as ex:
+            ex.args = ("Docker image '{}:{}' not found.".format(
+                cls.DEFAULT_IMAGE_NAME,
+                cls.DEFAULT_IMAGE_TAG),)
+            raise
+
+
+@python_2_unicode_compatible
 class Method(transformation.models.Transformation):
     """
     Methods are atomic transformations.
@@ -366,6 +444,12 @@ class Method(transformation.models.Transformation):
         blank=True
     )
 
+    docker_image = models.ForeignKey(
+        DockerImage,
+        related_name="methods",
+        help_text="The method will run inside this docker image.",
+        null=True,
+        blank=True)
     # Code resource revisions are executable if they link to Method
     driver = models.ForeignKey(CodeResourceRevision, related_name="methods")
     reusable = models.PositiveSmallIntegerField(
@@ -712,66 +796,6 @@ class MethodFamily(transformation.models.TransformationFamily):
         for meth in self.members.all():
             if meth not in removal_plan["Methods"]:
                 update_removal_plan(removal_plan, meth.build_removal_plan(removal_plan))
-
-        return removal_plan
-
-
-@python_2_unicode_compatible
-class DockerImage(metadata.models.AccessControl):
-    name = models.CharField('Name',
-                            help_text='Docker image name',
-                            max_length=200)  # Approximate limit in Docker.
-    tag = models.CharField('Tag',
-                           help_text='Docker image tag',
-                           max_length=128)  # Limit in Docker.
-    git = models.CharField('Git URL',
-                           help_text='URL of Git repository',
-                           max_length=2000)
-    description = models.CharField('Description',
-                                   help_text='What is this image used for?',
-                                   blank=True,
-                                   max_length=2000)
-    hash = models.CharField('Hash',
-                            help_text='Hash of contents in docker',
-                            max_length=71)
-    created = models.DateTimeField(
-        auto_now_add=True,
-        help_text="When this docker image was added to Kive.")
-
-    class Meta:
-        ordering = ('name', 'tag')
-
-    def __str__(self):
-        return self.name
-
-    @property
-    def absolute_url(self):
-        return reverse("docker_image_view", kwargs={"image_id": self.pk})
-
-    def build(self):
-        """ Build a docker image, and record the hash. Does not save. """
-        result = check_output(['sudo',
-                               getsourcefile(docker_build),
-                               '--id',
-                               self.name,
-                               self.git,
-                               self.tag],
-                              stderr=STDOUT)
-        self.hash = result.splitlines()[-1]
-        if not self.hash.startswith('sha256:'):
-            raise RuntimeError('Expected sha256 hash on last line:\n' + result)
-
-    @transaction.atomic
-    def remove(self):
-        removal_plan = self.build_removal_plan()
-        remove_helper(removal_plan)
-
-    @transaction.atomic
-    def build_removal_plan(self, removal_accumulator=None):
-        removal_plan = removal_accumulator or empty_removal_plan()
-        assert self not in removal_plan["DockerImages"]
-
-        removal_plan["DockerImages"].add(self)
 
         return removal_plan
 

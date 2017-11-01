@@ -88,6 +88,17 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
      </tr>
      {% endif %}
     <tr>
+        <th>{{ method_form.docker_image.label }}</th>
+        <td colspan="3">
+            {{ method_form.docker_image }}
+            <div class="helptext">{{ method_form.docker_image.help_text }}</div>
+            <br/>
+            <div class="errortext">{{ method_form.docker_image.errors }}</div>
+        </td>
+        <th></th>
+        <td></td>
+    </tr>
+    <tr>
         <th>{{ method_form.reusable.label }}</th>
         <td colspan="3">
             {{ method_form.reusable }}
