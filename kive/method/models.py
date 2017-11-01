@@ -394,11 +394,17 @@ class DockerImage(metadata.models.AccessControl):
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
+        if (self.name == self.DEFAULT_IMAGE_NAME and
+                self.tag == self.DEFAULT_IMAGE_TAG):
+            raise ValueError('Default docker image cannot be removed.')
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["DockerImages"]
 
         removal_plan["DockerImages"].add(self)
 
+        for method_affected in self.methods.all():
+            if method_affected not in removal_plan["Methods"]:
+                update_removal_plan(removal_plan, method_affected.build_removal_plan(removal_plan))
         return removal_plan
 
     @classmethod

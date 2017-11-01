@@ -3,7 +3,6 @@ import { buildPipelineSubmit } from "@pipeline/io/pipeline_submit";
 import { RawNode, MethodNode, OutputNode, Connector } from "@canvas/drydock_objects";
 import * as imagediff from 'imagediff';
 
-(window as any).document.cookie = 'csrftoken=csrfdummytoken';
 (window as any).$ = (window as any).jQuery = $;
 require("@portal/noxss.js");
 

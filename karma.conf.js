@@ -5,6 +5,11 @@ module.exports = function(config) {
         basePath: 'kive',
         browsers: ['Chrome', 'ChromeHeadless'],
         browserConsoleLogOptions: { level: "error" }, // chrome log level
+        customHeaders: [{
+            match: '.*',
+            name: 'Set-Cookie',
+            value: 'csrftoken=csrfdummytoken'
+        }],
         frameworks: ['jasmine-ajax', 'jasmine-jquery', 'jasmine'],
         files: [ 'tests.ts' ],
         logLevel: config.LOG_INFO, // karma log level

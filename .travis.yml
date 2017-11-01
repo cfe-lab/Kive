@@ -9,6 +9,8 @@ install:
     - pip install -r requirements-dev.txt
     - curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
     - sudo apt-get install -y nodejs
+    - nodejs --version
+    - npm --version
     - npm install
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py

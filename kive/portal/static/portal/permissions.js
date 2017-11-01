@@ -475,9 +475,10 @@ var permissions = (function() {
                             }
                         );
                     }
-                }).fail(function (request) {
-                    window.alert('Failed to build removal plan: ' +
-                            request.statusText);
+                }).fail(function (jqxhr) {
+                    var json = jqxhr.responseJSON,
+                        detail = json && json.detail || jqxhr.statusText;
+                    window.alert('Failed to build removal plan: ' + detail);
                 });
     }
 

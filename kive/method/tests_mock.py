@@ -11,14 +11,14 @@ from django_mock_queries.query import MockSet
 from django_mock_queries.mocks import mocked_relations, PatcherChain
 
 from kive.tests import ViewMockTestCase
-from metadata.models import CompoundDatatype, KiveUser, kive_user
+from metadata.models import CompoundDatatype, KiveUser, kive_user, empty_removal_plan
 from method.forms import MethodForm
 from method.models import Method, MethodFamily, CodeResourceRevision, \
     CodeResource, MethodDependency, DockerImage
 from transformation.models import TransformationInput, TransformationOutput,\
     XputStructure, Transformation, TransformationXput
 from django.contrib.auth.models import User, Group
-from pipeline.models import Pipeline
+from pipeline.models import Pipeline, PipelineStep, PipelineFamily
 
 # noinspection PyUnresolvedReferences
 from kive.mock_setup import convert_to_pks
@@ -981,7 +981,7 @@ class DockerImageViewMockTests(ViewMockTestCase):
         self.assertEqual(200, response.status_code)
 
 
-@mocked_relations(DockerImage)
+@mocked_relations(DockerImage, Method, PipelineStep, Pipeline)
 class DockerImageMockTests(TestCase):
     def test_get_default(self):
         default = DockerImage(name=DockerImage.DEFAULT_IMAGE_NAME,
@@ -1003,3 +1003,38 @@ class DockerImageMockTests(TestCase):
                 DockerImage.DoesNotExist,
                 "Docker image 'kive-default:default' not found."):
             DockerImage.get_default()
+
+    def test_build_removal_plan_for_unused_image(self):
+        image = DockerImage.objects.create(id=99, name='doomed')
+        DockerImage.objects.create(id=100, name='untouched')
+        expected_plan = empty_removal_plan()
+        expected_plan['DockerImages'].add(image)
+
+        plan = image.build_removal_plan()
+
+        self.assertEqual(expected_plan, plan)
+
+    def test_build_removal_plan_for_used_image(self):
+        image = DockerImage(id=99, name='doomed')
+        method = image.methods.create(transformation_ptr_id=100)
+        step = method.pipelinesteps.create(id=101)
+        step.pipeline = Pipeline(transformation_ptr_id=102)
+        step.pipeline.family = PipelineFamily()
+
+        expected_plan = empty_removal_plan()
+        expected_plan['DockerImages'].add(image)
+        expected_plan['Methods'].add(method)
+        expected_plan['Pipelines'].add(step.pipeline)
+
+        plan = image.build_removal_plan()
+
+        self.assertEqual(expected_plan, plan)
+
+    def test_build_removal_plan_for_default_image(self):
+        image = DockerImage.objects.create(id=99,
+                                           name=DockerImage.DEFAULT_IMAGE_NAME,
+                                           tag=DockerImage.DEFAULT_IMAGE_TAG)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     'Default docker image cannot be removed.'):
+            image.build_removal_plan()

@@ -173,8 +173,11 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
 
     @detail_route(methods=['get'], suffix='Removal Plan')
     def removal_plan(self, request, pk=None):
-        removal_plan = self.get_object().build_removal_plan()
-        return Response(summarize_redaction_plan(removal_plan))
+        try:
+            removal_plan = self.get_object().build_removal_plan()
+            return Response(summarize_redaction_plan(removal_plan))
+        except ValueError as ex:
+            raise APIException(ex.message)
 
     def perform_destroy(self, instance):
         try:
