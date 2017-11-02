@@ -73,14 +73,15 @@ class _RunDataset(object):
     def set_dataset(self, dataset, request):
         """Set some values when we are referring to a Dataset."""
         self.id = dataset.id
-        self.filename, self.size = dataset.get_basename_and_formatted_size()
-        self.date = dataset.date_created
         self.url = reverse('dataset-detail',
                            kwargs={'pk': dataset.id},
                            request=request)
-        self.redaction_plan = reverse('dataset-redaction-plan',
-                                      kwargs={'pk': dataset.id},
-                                      request=request)
+        if dataset.has_data():
+            self.filename, self.size = dataset.get_basename_and_formatted_size()
+            self.date = dataset.date_created
+            self.redaction_plan = reverse('dataset-redaction-plan',
+                                          kwargs={'pk': dataset.id},
+                                          request=request)
 
     def set_redacted(self):
         self.size = self.date = 'redacted'
@@ -189,8 +190,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                                      name=input_name,
                                      display='{}: {}'.format(i+1, input_name),
                                      type='dataset')
-            if has_data:
-                input_data.set_dataset(input.dataset, request)
+            input_data.set_dataset(input.dataset, request)
             input_data.finalise_state()
             inputs.append(input_data)
 

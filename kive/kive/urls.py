@@ -2,7 +2,7 @@ from django.conf.urls import url, include
 import django.contrib.auth.views
 
 from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
-from librarian.ajax import DatasetViewSet, InputDatasetViewSet, ExternalFileDirectoryViewSet
+from librarian.ajax import DatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
 from method.ajax import MethodViewSet, MethodFamilyViewSet, CodeResourceViewSet, CodeResourceRevisionViewSet, \
@@ -28,7 +28,6 @@ router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 router.register(r'dockerimages', DockerImageViewSet)
-router.register(r'inputdatasets', InputDatasetViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'externalfiledirectories', ExternalFileDirectoryViewSet)
 router.register(r'datatypes', DatatypeViewSet)

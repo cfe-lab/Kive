@@ -94,8 +94,15 @@ class Command(BaseCommand):
             print("Slow queries ({:.2f}s for slow and {:.2f}s for all):".format(
                 total_slow_time,
                 total_time))
+            max_display = 2000
+            tail_size = 200
             for query in slow_queries:
-                print(query)
+                display = str(query)
+                if len(display) > max_display:
+                    display = (display[:max_display-tail_size] +
+                               '...' +
+                               display[-tail_size:])
+                print(display)
 
         table_counts = Counter()
         table_times = Counter()
@@ -164,10 +171,12 @@ class Command(BaseCommand):
 
     def test_ajax(self):
         factory = APIRequestFactory()
-        path = reverse('run-status')
+        path = '/api/datasets/'
         view, _, _ = resolve(path)
         request = factory.get(
-            path + '?is_granted=true&page_size=25')
+            path + '?is_granted=true&filters%5B0%5D%5Bkey%5D=uploaded'
+                   '&filters%5B1%5D%5Bkey%5D=cdt&filters%5B1%5D%5Bval%5D=31'
+                   '&page_size=8&page=1')
         force_authenticate(request, user=kive_user())
         response = view(request).render()
         data = response.render().data

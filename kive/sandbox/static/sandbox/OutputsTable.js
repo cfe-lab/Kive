@@ -20,7 +20,7 @@
         });
         this.registerColumn("", function($td, output) {
             var href;
-            if (output.id !== null) {
+            if (output.id !== null && output.filename !== null) {
                 href = '../../' + output.type + '_download/' + output.id + "?run_id=" + run_id + "&view_results";
                 $td.append($('<a>Download</a>').attr('href', href));
             }

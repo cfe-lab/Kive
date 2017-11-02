@@ -172,19 +172,3 @@ class DatasetViewSet(RemovableModelViewSet,
             return Response(None, status=status.HTTP_404_NOT_FOUND)
         with data_handle as dh:
             return build_download_response(dh)
-
-
-class InputDatasetViewSet(DatasetViewSet):
-    """ This class is identical to DatasetViewset, apart from the fact that
-    it has an additional filter based on the Dataset.has_data() method.
-    This view is called from the web client via api (/api/inputdatasets ) from
-    choose_inputs.js for selection of pipeline inputs.
-    This ensures that only those files that actually exist on the file system can
-    be selected as pipeline inputs.
-    NOTE: The disadvantage of this approach is that a list of id's is created, which
-    can potentially be large.
-    """
-    def filter_queryset(self, queryset):
-        qs = super(InputDatasetViewSet, self).filter_queryset(queryset)
-        qids = [o.id for o in qs if o.has_data()]
-        return qs.filter(id__in=qids)
