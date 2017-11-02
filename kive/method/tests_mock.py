@@ -767,6 +767,9 @@ class MethodViewMockTests(ViewMockTestCase):
                                    CodeResourceRevision,
                                    CompoundDatatype,
                                    DockerImage,
+                                   Transformation,
+                                   TransformationInput,
+                                   TransformationOutput,
                                    User,
                                    Group)
         patcher.start()
@@ -779,7 +782,16 @@ class MethodViewMockTests(ViewMockTestCase):
                                DockerImage.objects)
         patcher.start()
         self.addCleanup(patcher.stop)
+
+        # noinspection PyUnresolvedReferences
+        patcher = patch.object(MethodFamily,
+                               '_default_manager',
+                               MethodFamily.objects)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
         DockerImage.objects._prefetch_related_lookups = False
+        DockerImage.objects.add(DockerImage(pk='20'))
 
         self.client = self.create_client()
         self.dev_group = Group(pk=groups.DEVELOPERS_PK)
@@ -841,6 +853,34 @@ class MethodViewMockTests(ViewMockTestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(None, response.context['family'])
+
+    # noinspection PyUnresolvedReferences
+    @patch.object(TransformationXput, 'clean', lambda xput: None)
+    def test_method_new_post(self):
+        response = self.client.post(
+            reverse('method_new'),
+            data=dict(name='foo',
+                      memory='100',
+                      threads='1',
+                      docker_image='20',
+                      reusable='1',
+                      dataset_name_in_0='in_csv',
+                      compounddatatype_in_0='__raw__',
+                      min_row_in_0='',
+                      max_row_in_0='',
+                      dataset_name_out_0='out_csv',
+                      compounddatatype_out_0='__raw__',
+                      min_row_out_0='',
+                      max_row_out_0=''))
+
+        expected_status = 302
+        if response.status_code != expected_status:
+            for key in response.context.keys():
+                if key.endswith('_form'):
+                    form = response.context[key]
+                    self.assertEqual({}, form.errors)
+        self.assertEqual(expected_status, response.status_code)
+        self.assertEqual('/methods/None', response.url)
 
     def test_method_revise(self):
         response = self.client.get(reverse('method_revise',
