@@ -1857,11 +1857,15 @@ class Sandbox:
         dependency_paths = [os.path.join(dep.path, dep.get_filename())
                             for dep in dependencies.all()]
         # Driver name
-        driver = method.driver
-        driver_filename = driver.coderesource.filename
         docker_image = method.docker_image
-        image_name = (docker_image and docker_image.full_name or
-                      DockerImage.DEFAULT_IMAGE)
+        image_id = (docker_image and docker_image.hash or
+                    DockerImage.DEFAULT_IMAGE)
+        driver = method.driver
+        if driver is None:
+            driver_name = docker_image.full_name
+            driver_filename = None
+        else:
+            driver_name = driver_filename = driver.coderesource.filename
 
         coordinates = curr_run_step.get_coordinates()
         if len(coordinates) == 1:
@@ -1871,8 +1875,7 @@ class Sandbox:
         job_name = "r{}s{}driver[{}]".format(
             curr_run_step.top_level_run.pk,
             coord_str,
-            driver_filename
-        )
+            driver_name)
         logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_run_step.pk)
         # Collect information we need for the wrapper script
         host_rundir = step_execute_info.step_run_dir
@@ -1881,7 +1884,7 @@ class Sandbox:
                                                                 step_execute_info.output_paths,
                                                                 driver_filename,
                                                                 dependency_paths,
-                                                                image_id=image_name)
+                                                                image_id=image_id)
         job_handle = slurm_sched_class.submit_job(
             host_rundir,
             launch_args[0],

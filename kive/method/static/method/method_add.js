@@ -231,6 +231,8 @@ $(function(){ // wait for page to finish loading before executing jQuery code
 
     // set default MethodFamily name to name of CodeResource
     $coderesource.on("change", function () {
-        $("#id_revision_name").val($(this).children("option:selected").text());
+        var $selected = $(this).children("option:selected"),
+            revisionName = $selected.val() == "" ? "" : $selected.text();
+        $("#id_revision_name").val(revisionName);
     });
 });

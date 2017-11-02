@@ -442,7 +442,10 @@ class Method(transformation.models.Transformation):
         null=True,
         blank=True)
     # Code resource revisions are executable if they link to Method
-    driver = models.ForeignKey(CodeResourceRevision, related_name="methods")
+    driver = models.ForeignKey(CodeResourceRevision,
+                               related_name="methods",
+                               blank=True,
+                               null=True)
     reusable = models.PositiveSmallIntegerField(
         choices=REUSABLE_CHOICES,
         default=DETERMINISTIC,
@@ -545,7 +548,8 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         # Check that permissions are coherent.
         self.validate_restrict_access([self.family])
-        self.validate_restrict_access([self.driver])
+        if self.driver:
+            self.validate_restrict_access([self.driver])
 
     def complete_clean(self):
         """Check coherence and completeness of this Method.
@@ -599,7 +603,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         Checks the MD5 of the driver and its dependencies against their stored values.
         """
-        if not self.driver.check_md5():
+        if self.driver is not None and not self.driver.check_md5():
             return False
 
         for dep in self.dependencies.all():
@@ -612,10 +616,12 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         """
         Return all file paths associated with this Method, with the driver coming first.
         """
-        file_paths = [os.path.normpath(self.driver.coderesource.filename)]
+        file_paths = []
+        if self.driver:
+            file_paths.append(os.path.normpath(self.driver.coderesource.filename))
         file_paths.extend(
-            [os.path.normpath(os.path.join(dep.path, dep.get_filename())) for dep in self.dependencies.all()]
-        )
+            os.path.normpath(os.path.join(dep.path, dep.get_filename()))
+            for dep in self.dependencies.all())
         return file_paths
 
     def install(self, install_path):
@@ -627,19 +633,20 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
         PRE: install_path exists and has all the sufficient permissions for us
         to write our files into.
         """
-        base_name = self.driver.coderesource.filename
-        self.logger.debug("Writing code to {}".format(install_path))
+        if self.driver is not None:
+            base_name = self.driver.coderesource.filename
+            self.logger.debug("Writing code to {}".format(install_path))
 
-        destination_path = os.path.join(install_path, base_name)
-        # This may raise an exception; we will propagate it up.
-        file_access_utils.copy_and_confirm(self.driver.content_file.path, destination_path)
+            destination_path = os.path.join(install_path, base_name)
+            # This may raise an exception; we will propagate it up.
+            file_access_utils.copy_and_confirm(self.driver.content_file.path, destination_path)
 
-        # Make sure this is written with read, write, and execute
-        # permission.
-        os.chmod(destination_path, stat.S_IRWXU)
-        # This will tailor the permissions further if we are running
-        # sandboxes with another user account via SSH.
-        file_access_utils.configure_sandbox_permissions(destination_path)
+            # Make sure this is written with read, write, and execute
+            # permission.
+            os.chmod(destination_path, stat.S_IRWXU)
+            # This will tailor the permissions further if we are running
+            # sandboxes with another user account via SSH.
+            file_access_utils.configure_sandbox_permissions(destination_path)
 
         for dep in self.dependencies.all():
             # Create any necessary sub-directory.  This directory may already exist due

@@ -395,8 +395,12 @@ class PipelineSerializer(AccessControlSerializer,
                     # CR has been updated
                     updated_driver = CodeResourceRevision.objects.get(pk=new_driver_pk)
 
-                revision_name = updated_driver.revision_name
-                revision_description = updated_driver.revision_desc
+                if updated_driver is None:
+                    revision_name = old_method.docker_image.full_name
+                    revision_description = old_method.docker_image.description
+                else:
+                    revision_name = updated_driver.revision_name
+                    revision_description = updated_driver.revision_desc
 
                 resource_map = {}
                 if new_dependency_ids:

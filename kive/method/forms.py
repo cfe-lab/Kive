@@ -203,8 +203,9 @@ class MethodReviseForm(AccessControlForm):
     # This is populated by the calling view.
     driver_revisions = forms.IntegerField(
         label='Revisions',
-        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')])
-    )
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]),
+        help_text='Select a revision of the driver script.',
+        required=False)
 
     docker_image = forms.ModelChoiceField(
         DockerImage.objects.all(),
@@ -254,8 +255,8 @@ class MethodForm(MethodReviseForm):
     coderesource = forms.ChoiceField(
         choices=[('', '--- CodeResource ---')],
         label="Code resource",
-        help_text="The code resource for which this method is a set of instructions.",
-        required=True)
+        help_text="Driver script for the method",
+        required=False)
 
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(MethodForm, self).__init__(data, *args, **kwargs)

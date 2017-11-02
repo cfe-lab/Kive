@@ -452,10 +452,9 @@ def create_method_forms(request_post, user, family=None):
     # to false if it is absent.
     has_override = (request_post.get("confirm_shebang", 'off') == 'on')
     # NOTE: for shebang_val, we must differentiate between yes, no and undefined
-    shebang_val = _get_shebang_code(method_form)
-    has_shebang = (shebang_val == SHEBANG_YES)
-    show_shebang_field = query_dict["SHOW_SHEBANG_FIELD"] = (shebang_val == SHEBANG_NO)
-    query_dict["SHEBANG_OK"] = (has_shebang or has_override)
+    missing_shebang = _get_shebang_code(method_form) == SHEBANG_NO
+    show_shebang_field = query_dict["SHOW_SHEBANG_FIELD"] = missing_shebang
+    query_dict["SHEBANG_OK"] = (not missing_shebang or has_override)
 
     etxt = """The code resource should be executable, which means that the file usually starts
 with a shebang: '#!'. The currently selected code resource does not.
@@ -547,10 +546,10 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
 
     # Retrieve the CodeResource revision as driver.
     try:
-        coderesource_revision = CodeResourceRevision.objects.get(pk=method_form.cleaned_data['driver_revisions'])
-    except (KeyError, ValueError, CodeResourceRevision.DoesNotExist) as e:
-        method_form.add_error("driver_revisions", e)
-        return None
+        coderesource_revision = CodeResourceRevision.objects.get(
+            pk=method_form.cleaned_data['driver_revisions'])
+    except CodeResourceRevision.DoesNotExist:
+        coderesource_revision = None
 
     new_method = None
     try:
@@ -689,10 +688,21 @@ def method_view(request, pk):
     """
     method = Method.check_accessible(pk, request.user)
     addable_users, addable_groups = method.other_users_groups()
-    addable_users, addable_groups = method.family.intersect_permissions(addable_users, addable_groups)
+    addable_users, addable_groups = method.family.intersect_permissions(
+        addable_users,
+        addable_groups)
     if method.revision_parent is not None:
-        addable_users, addable_groups = method.revision_parent.intersect_permissions(addable_users, addable_groups)
-    addable_users, addable_groups = method.driver.intersect_permissions(addable_users, addable_groups)
+        addable_users, addable_groups = (
+            method.revision_parent.intersect_permissions(addable_users,
+                                                         addable_groups))
+    if method.driver is not None:
+        addable_users, addable_groups = method.driver.intersect_permissions(
+            addable_users,
+            addable_groups)
+    if method.docker_image is not None:
+        addable_users, addable_groups = (
+            method.docker_image.intersect_permissions(addable_users,
+                                                      addable_groups))
     for dep in method.dependencies.all():
         addable_users, addable_groups = dep.requirement.intersect_permissions(addable_users, addable_groups)
     for xput in itertools.chain(method.inputs.all(), method.outputs.all()):
@@ -874,11 +884,15 @@ def method_revise(request, pk):
 
     # Retrieve the most recent revision of the corresponding CR.
     parent_revision = parent_method.driver
-    this_code_resource = parent_revision.coderesource
-    # Filter the available revisions by user.
-    all_revisions = CodeResourceRevision.filter_by_user(
-        creating_user,
-        queryset=this_code_resource.revisions.all()).order_by('-revision_DateTime')
+    if not parent_revision:
+        this_code_resource = None
+        all_revisions = []
+    else:
+        this_code_resource = parent_revision.coderesource
+        # Filter the available revisions by user.
+        all_revisions = CodeResourceRevision.filter_by_user(
+            creating_user,
+            queryset=this_code_resource.revisions.all()).order_by('-revision_DateTime')
 
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
@@ -919,7 +933,7 @@ def method_revise(request, pk):
         method_revise_form = MethodReviseForm(
             initial={
                 "revision_desc": parent_method.revision_desc,
-                "driver_revisions": parent_revision.pk,
+                "driver_revisions": parent_revision and parent_revision.pk,
                 "docker_image": parent_method.docker_image_id,
                 "reusable": parent_method.reusable,
                 "threads": parent_method.threads,

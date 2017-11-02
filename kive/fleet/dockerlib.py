@@ -75,7 +75,7 @@ class BaseDockerHandler(object):
         :param input_file_paths: list of input file paths on host computer
         :param output_file_paths: list of output file paths on host computer
         :param driver_name: file name of driver script that will be saved in
-            the sandbox folder
+            the sandbox folder, or None to use the image's entry point.
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
@@ -118,11 +118,13 @@ class DummyDockerHandler(BaseDockerHandler):
         :param input_file_paths: list of input file paths on host computer
         :param output_file_paths: list of output file paths on host computer
         :param driver_name: file name of driver script that will be saved in
-            the sandbox folder
+            the sandbox folder, or None to use the image's entry point.
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
         """
+        if driver_name is None:
+            raise NotImplementedError()
         wrapper_template = """\
 #! /usr/bin/env bash
 cd {}
@@ -308,7 +310,7 @@ class DockerHandler(BaseDockerHandler):
         :param input_file_paths: list of input file paths on host computer
         :param output_file_paths: list of output file paths on host computer
         :param driver_name: file name of driver script that will be saved in
-            the sandbox folder
+            the sandbox folder, or None to use the image's entry point.
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
@@ -331,7 +333,8 @@ class DockerHandler(BaseDockerHandler):
         sandbox_path = os.path.dirname(host_step_dir)
         sandbox_name = os.path.basename(sandbox_path)
         session_id = sandbox_name + '.' + step_name
-        bin_files = [driver_name] + dependency_paths
+        bin_files = [] if driver_name is None else [driver_name]
+        bin_files += dependency_paths
         bin_files = [os.path.join(host_step_dir, file_path) + ':' + file_path
                      for file_path in bin_files]
         args = [cls.docker_wrap_path,
@@ -345,7 +348,8 @@ class DockerHandler(BaseDockerHandler):
         args.append(host_output_path)
         args.append("--")
         args.append(session_id)
-        args.append(os.path.join("/mnt/bin", driver_name))
+        if driver_name is not None:
+            args.append(os.path.join("/mnt/bin", driver_name))
         args.extend(in_args)
         args.extend(out_args)
         return args
