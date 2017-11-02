@@ -784,8 +784,8 @@ class RunOutputsSerializerMockTests(TestCase):
 
     def test_inputs(self):
         run = Run(id=1234, pipeline=Pipeline())
-        run.inputs = MockSet(RunInput(index=1, dataset=Dataset()),
-                             RunInput(index=2, dataset=Dataset()))
+        run.inputs = MockSet(RunInput(index=1, dataset=Dataset(id=99)),
+                             RunInput(index=2, dataset=Dataset(id=100)))
         run.pipeline.inputs = MockSet(TransformationInput(dataset_idx=1,
                                                           dataset_name='foo'),
                                       TransformationInput(dataset_idx=2))
@@ -793,7 +793,7 @@ class RunOutputsSerializerMockTests(TestCase):
                          'input_summary': [{'is_ok': True,
                                             'errors': [],
                                             'name': 'foo',
-                                            'url': None,
+                                            'url': '/api/datasets/99/',
                                             'is_invalid': False,
                                             'display': '1: foo',
                                             'redaction_plan': None,
@@ -801,12 +801,12 @@ class RunOutputsSerializerMockTests(TestCase):
                                             'date': 'removed',
                                             'filename': None,
                                             'type': 'dataset',
-                                            'id': None,
+                                            'id': 99,
                                             'size': 'removed'},
                                            {'is_ok': True,
                                             'errors': [],
                                             'name': '',
-                                            'url': None,
+                                            'url': '/api/datasets/100/',
                                             'is_invalid': False,
                                             'display': '2: ',
                                             'redaction_plan': None,
@@ -814,12 +814,13 @@ class RunOutputsSerializerMockTests(TestCase):
                                             'date': 'removed',
                                             'filename': None,
                                             'type': 'dataset',
-                                            'id': None,
+                                            'id': 100,
                                             'size': 'removed'}],
                          'id': 1234}
 
         data = RunOutputsSerializer(run).data
 
+        self.maxDiff = None
         self.assertEqual(expected_data['input_summary'], data['input_summary'])
         self.assertEqual(expected_data, data)
 
