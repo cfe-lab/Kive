@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+from argparse import ArgumentParser, FileType
 
 from requests.adapters import HTTPAdapter
 
@@ -17,6 +18,23 @@ from kiveapi.pipeline import PipelineFamily, Pipeline
 from itertools import count, chain
 from constants import maxlengths
 
+DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
+
+
+def parse_args():
+    parser = ArgumentParser(description='Upload a pipeline from a JSON file.')
+    parser.add_argument('--docker_default',
+                        '-d',
+                        help='full name of docker image to use as default')
+    parser.add_argument('config_file',
+                        type=FileType(),
+                        nargs='?',
+                        default=DEFAULT_CONFIG_FILE)
+    args = parser.parse_args()
+    with args.config_file as f:
+        args.config = json.load(f)
+    return args
+
 
 class PipelineStepRequest(object):
     def __init__(self, json_config):
@@ -24,6 +42,7 @@ class PipelineStepRequest(object):
         self.name = self.driver = self.dependencies = None
         self.code_resource = self.code_resource_revision = None
         self.method_family = self.method = self.old_method = None
+        self.docker_image_name = None
 
     def get_code_resource_revision(self, kive, revision_id):
         response = kive.get('/api/coderesourcerevisions/{}'.format(revision_id))
@@ -51,8 +70,11 @@ class PipelineStepRequest(object):
         return False
 
     def get_display(self):
-        suffix = '' if self.method is None else ' (existing method)'
-        return self.driver.get_display() + suffix
+        display = self.driver and self.driver.get_display()
+        display = display or ('docker:' + self.docker_image_name)
+        if self.method is not None:
+            display += ' (existing method)'
+        return display
 
     def load(self, kive, old_step):
         response = kive.get('/api/methodfamilies/{}'.format(
@@ -355,7 +377,7 @@ def find_dependencies(kive, folder, revision_config):
         yield new_dependency
 
 
-def load_steps(kive, folder, pipeline_family, groups):
+def load_steps(kive, folder, pipeline_family, groups, docker_default):
     with open(os.path.join(folder, 'pipeline.json'), 'rU') as pipeline_file:
         pipeline_config = json.load(pipeline_file)
     try:
@@ -363,13 +385,24 @@ def load_steps(kive, folder, pipeline_family, groups):
         old_pipeline = kive.get_pipeline(old_pipeline_id)
     except AttributeError:
         old_pipeline = None
+    docker_images = {img['full_name']: img['url']
+                     for img in kive.get('/api/dockerimages/').json()}
     steps = []
     for step_config in pipeline_config['steps']:
         step = PipelineStepRequest(step_config)
         step.users_allowed = []
         step.groups_allowed = groups
         transformation = step_config['transformation']
-        step.driver = CodeResourceRequest(kive, folder, transformation['driver'])
+        driver = transformation['driver']
+        step.driver = driver and CodeResourceRequest(kive, folder, driver)
+        step.docker_image_name = (transformation['docker_image'] or
+                                  docker_default)
+        if step.docker_image_name is None:
+            raise ValueError('This pipeline requires --docker_default option.')
+        step.docker_image = docker_images.get(step.docker_image_name)
+        if step.docker_image is None:
+            raise KeyError('Docker image {} not found.'.format(
+                step.docker_image_name))
         step.name = step_config['name']
         step.dependencies = list(
             find_dependencies(kive, folder, transformation))
@@ -400,7 +433,8 @@ def load_steps(kive, folder, pipeline_family, groups):
 
 def create_code_resources(steps, revision_name):
     for step in steps:
-        step.driver.upload(revision_name)
+        if step.driver is not None:
+            step.driver.upload(revision_name)
         for dependency in step.dependencies:
             dependency['requirement'].upload(revision_name)
 
@@ -454,10 +488,12 @@ def create_methods(kive, steps, revision_name):
                                              path=dependency['path'],
                                              filename=dependency['filename']))
                     dependency_paths.add(dependency_path)
+            driver_id = step.driver and step.driver.code_resource_revision['id']
             response = kive.post('/api/methods/',
                                  json=dict(revision_name=revision_name,
                                            family=step.method_family['name'],
-                                           driver=step.driver.code_resource_revision['id'],
+                                           driver=driver_id,
+                                           docker_image=step.docker_image,
                                            reusable=transformation['reusable'],
                                            threads=transformation['threads'],
                                            memory=transformation['memory'],
@@ -473,8 +509,8 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
         logging.WARN)
-    with open(os.path.expanduser("~/.dump_pipeline.config"), 'rU') as f:
-        config = json.load(f)
+    args = parse_args()
+    config = args.config
 
     kive = KiveAPI(config['server'])
     kive.mount('https://', HTTPAdapter(max_retries=20))
@@ -486,7 +522,11 @@ def main():
     groups = groups.split(',')
 
     CompoundDatatypeRequest.load_existing(kive)
-    steps, pipeline_config = load_steps(kive, folder, pipeline_family, groups)
+    steps, pipeline_config = load_steps(kive,
+                                        folder,
+                                        pipeline_family,
+                                        groups,
+                                        args.docker_default)
     load_pipeline(pipeline_config)
     print('Uploading {!r} to {} for {}.'.format(folder, pipeline_family, groups))
     for i, step in enumerate(steps, start=1):
@@ -510,6 +550,7 @@ def main():
         pipeline_family = create_pipeline_family(kive, pipeline_family, groups)
     create_pipeline(kive, pipeline_family, revision_name, pipeline_config, steps)
     print('Done.')
+
 
 if __name__ == '__main__':
     main()

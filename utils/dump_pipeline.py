@@ -2,7 +2,7 @@
 # Run the script once, and it will create a configuration file in your home
 # folder. Edit that file to point at the server you want to dump from,
 # then run the script again. It will ask you which pipeline you want to dump.
-
+from argparse import ArgumentParser
 from collections import Counter
 from datetime import datetime, timedelta
 import errno
@@ -17,8 +17,31 @@ from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
 
-CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
+DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
 UNSET = '***'
+
+
+def parse_args():
+    parser = ArgumentParser(description='Dump a pipeline into a JSON file.')
+    parser.add_argument('config_file', nargs='?', default=DEFAULT_CONFIG_FILE)
+    args = parser.parse_args()
+    try:
+        with open(args.config_file, 'rU') as f:
+            config = json.load(f)
+    except IOError as e:
+        if e.errno != errno.ENOENT:
+            raise
+        with open(args.config_file, 'w') as f:
+            config = dict(username=UNSET,
+                          password=UNSET,
+                          server='http://localhost:8000')
+            json.dump(config, f, indent=4)
+
+    if config['username'] == UNSET:
+        parser.error('Configure {} or choose a different file.'.format(
+            args.config_file))
+    args.config = config
+    return args
 
 
 def recent_pipelines(all_pipelines):
@@ -32,22 +55,10 @@ def main():
     logging.basicConfig(level=logging.INFO)
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
         logging.WARN)
-    print 'Starting.'
+    args = parse_args()
+    config = args.config
+    print('Starting.')
 
-    try:
-        with open(CONFIG_FILE, 'rU') as f:
-            config = json.load(f)
-    except IOError as e:
-        if e.errno != errno.ENOENT:
-            raise
-        with open(CONFIG_FILE, 'w') as f:
-            config = dict(username=UNSET,
-                          password=UNSET,
-                          server='http://localhost:8000')
-            json.dump(config, f, indent=4)
-
-    if config['username'] == UNSET:
-        exit('Set up your configuration in ' + CONFIG_FILE)
     kive = KiveAPI(config['server'])
     kive.mount('https://', HTTPAdapter(max_retries=20))
     kive.login(config['username'], config['password'])
@@ -89,6 +100,10 @@ def main():
         code_resource_revisions[revision['id']] = CodeResourceRevision(
             revision,
             code_resources)
+    code_resource_revisions[None] = None
+    docker_images = {img['url']: img['full_name']
+                     for img in kive.get('/api/dockerimages/').json()}
+    docker_images[None] = None
     methods = {}  # {id: method}
     for method in kive.get('/api/methods/').json():
         for dep in method['dependencies']:
@@ -99,7 +114,8 @@ def main():
             key=lambda x: (x['path'],
                            x['filename'],
                            x['requirement']['coderesource']['filename']))
-        dump = {'driver': code_resource_revisions[method['driver']]}
+        dump = {'driver': code_resource_revisions[method['driver']],
+                'docker_image': docker_images[method['docker_image']]}
         for field in ('groups_allowed',
                       'users_allowed',
                       'reusable',
@@ -157,7 +173,9 @@ def main():
             replace_structure(output_item, compound_datatypes)
         del step['transformation_family']
         step['transformation'] = methods[step['transformation']]
-        used_revisions.add(step['transformation']['driver'])
+        driver = step['transformation']['driver']
+        if driver is not None:
+            used_revisions.add(driver)
         used_revisions.update(map(itemgetter('requirement'),
                                   step['transformation']['dependencies']))
     dump['steps'] = pipeline['steps']
@@ -218,5 +236,6 @@ def replace_structure(item, compound_datatypes):
     if structure:
         columns = compound_datatypes[structure['compounddatatype']]
         structure['compounddatatype'] = columns
+
 
 main()

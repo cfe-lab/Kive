@@ -813,8 +813,8 @@ def _method_creation_helper(request, method_family=None):
                  'input_forms': input_form_tuples,
                  'output_forms': output_form_tuples,
                  'family': method_family,
-                 'header': header
-                 }
+                 'header': header,
+                 'docker_default': DockerImage.DEFAULT_IMAGE}
             return HttpResponse(t.render(c, request))
         else:
             # We are happy with the input, now attempt to build the Method and
@@ -835,8 +835,8 @@ def _method_creation_helper(request, method_family=None):
                      'input_forms': input_form_tuples,
                      'output_forms': output_form_tuples,
                      'family': method_family,
-                     'header': header + ": ERROR"
-                     }
+                     'header': header + ": ERROR",
+                     'docker_default': DockerImage.DEFAULT_IMAGE}
                 return HttpResponse(t.render(c, request))
             else:
                 # Success!
@@ -862,8 +862,8 @@ def _method_creation_helper(request, method_family=None):
              'input_forms': input_form_tuples,
              'output_forms': output_form_tuples,
              'family': method_family,
-             'header': header
-             }
+             'header': header,
+             'docker_default': DockerImage.DEFAULT_IMAGE}
         return HttpResponse(t.render(c, request))
 
 
@@ -911,7 +911,8 @@ def method_revise(request, pk):
                     'output_forms': output_form_tuples,
                     'family': family,
                     'family_form': family_form,
-                    'parent': parent_method
+                    'parent': parent_method,
+                    'docker_default': DockerImage.DEFAULT_IMAGE
                 })
             return HttpResponse(t.render(c, request))
 
@@ -1004,7 +1005,8 @@ def method_revise(request, pk):
             'output_forms': output_form_tuples,
             'family': family,
             'family_form': family_form,
-            'parent': parent_method
+            'parent': parent_method,
+            'docker_default': DockerImage.DEFAULT_IMAGE
         }
     )
     return HttpResponse(t.render(c, request))

@@ -195,6 +195,10 @@ class MethodSerializer(AccessControlSerializer,
 
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
+    docker_image = serializers.HyperlinkedRelatedField(
+        view_name='dockerimage-detail',
+        lookup_field='pk',
+        queryset=DockerImage.objects.all())
 
     # This is as in CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
@@ -222,6 +226,7 @@ class MethodSerializer(AccessControlSerializer,
             "family_id",
             "family",
             "driver",
+            "docker_image",
             "reusable",
             "threads",
             "memory",
@@ -245,6 +250,9 @@ class MethodSerializer(AccessControlSerializer,
     
             driver_field = self.fields["driver"]
             driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
+
+            docker_field = self.fields["docker_image"]
+            docker_field.queryset = DockerImage.filter_by_user(curr_user)
 
     # Due to nesting of inputs and outputs, we need to customize the create method.
     def create(self, validated_data):
@@ -302,6 +310,7 @@ class DockerImageSerializer(AccessControlSerializer,
             "description",
             "url",
             "absolute_url",
+            "full_name",
             "user",
             "users_allowed",
             "groups_allowed",

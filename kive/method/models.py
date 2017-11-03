@@ -343,7 +343,7 @@ class DockerImage(metadata.models.AccessControl):
                             help_text='Docker image name',
                             max_length=200)  # Approximate limit in Docker.
     tag = models.CharField('Tag',
-                           help_text='Docker image tag',
+                           help_text='Docker image tag and Git tag',
                            max_length=128)  # Limit in Docker.
     git = models.CharField('Git URL',
                            help_text='URL of Git repository',

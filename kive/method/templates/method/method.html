@@ -39,6 +39,11 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
 {% endif %}
 </h2>
 
+<p>If the docker image has a default entry point, leave the code resource
+    blank. Old methods with no docker image will use the docker
+    image <code>{{ docker_default }}</code>. (It doesn't have to be loaded in
+    Kive.)</p>
+
 <form action="" method="post" enctype="multipart/form-data">{% csrf_token %}
 
 <!--
