@@ -1374,6 +1374,13 @@ def method_test_setup(case):
         crr_s.is_valid()
         case.crr = crr_s.save()
 
+    case.docker_image = DockerImage.objects.create(name='foo',
+                                                   tag='v1.0',
+                                                   git='http://server/x/y.git',
+                                                   user=kive_user())
+    case.docker_image_url = reverse('dockerimage-detail',
+                                    kwargs=dict(pk=case.docker_image.pk))
+
     # We need a MethodFamily to add the Method to.
     case.dtf_mf = MethodFamily(
         name="Deserialization Test Family Methods",
@@ -1392,6 +1399,7 @@ def method_test_setup(case):
         "users_allowed": [case.innocent_bystander.username],
         "groups_allowed": [everyone_group().name],
         "driver": case.crr.pk,
+        "docker_image": case.docker_image_url,
         "inputs": [
             {
                 "dataset_name": "ignored_input",
