@@ -383,17 +383,15 @@ SLURM_COMMAND_RETRY_SLEEP_SECS = 10
 # Fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds).
 NODE_FAIL_TIME_OUT_SECS = 5*60
 
-
-# Attempt to run the system tests that use Docker
+# Attempt to run the system tests that use Docker.
 RUN_DOCKER_TESTS = False
 
 DOCK_DOCKER_COMMAND = "/usr/bin/docker"
 DOCK_BZIP2_COMMAND = "/bin/bzip2"
 
-# the directory that contains the bz2 files of the docker images
+# The directory that contains the bz2 files of the docker images.
 DOCK_IMAGE_DIRECTORY = os.path.join(MEDIA_ROOT, 'DockerImages')
 
-
 # The name of the docker image to use when non other is provided. This file must
-# exist when a dockerlib.DockerHandler  is initialised with docker_is_alive()
+# exist when a dockerlib.DockerHandler is initialised with docker_is_alive().
 DOCK_DEFAULT_DOCKER_IMAGE = "comp-base-01.tar.bz2"

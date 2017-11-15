@@ -29,6 +29,7 @@ from subprocess import check_call, Popen, PIPE, CalledProcessError, check_output
 import sys
 import tarfile
 from traceback import print_exc
+import signal
 
 
 def parse_args():
@@ -92,6 +93,31 @@ def parse_args():
     return parser.parse_args()
 
 
+def write_helper(args):
+    """
+    Helper routine for handle_launch that performs the final write subcommand.
+    """
+    exporter = None
+    try:
+        export_args = create_subcommand('--write', args)
+        exporter = Popen(export_args, stdout=PIPE)
+        tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
+        tar_file.extractall(args.output,
+                            members=exclude_root(tar_file, args.quiet))
+        exporter.wait()
+        if exporter.returncode:
+            raise CalledProcessError(exporter.returncode, export_args)
+    except KeyboardInterrupt:
+        # We force this to proceed.
+        pass
+    finally:
+        if exporter is not None:
+            exporter.stdout.close()
+            exporter.wait()
+            if exporter.returncode:
+                raise CalledProcessError(exporter.returncode, export_args)
+
+
 def handle_launch(args):
     if args.script is None:
         expected_script = 'docker_wrap.py'
@@ -104,15 +130,21 @@ def handle_launch(args):
 
     # Import
     import_args = create_subcommand('--read', args)
-    importer = Popen(import_args, stdin=PIPE)
+    importer = None
     try:
+        importer = Popen(import_args, stdin=PIPE)
         send_folders(args, importer)
+    except KeyboardInterrupt:
+        if importer is not None:
+            importer.send_signal(signal.SIGINT)  # handle_read will perform cleanup
     finally:
-        importer.stdin.close()
-        importer.wait()
-        if importer.returncode:
-            raise CalledProcessError(importer.returncode, import_args)
+        if importer is not None:
+            importer.stdin.close()
+            importer.wait()
+            if importer.returncode:
+                raise CalledProcessError(importer.returncode, import_args)
 
+    runner = None
     try:
         # Run
         if not args.quiet:
@@ -122,17 +154,16 @@ def handle_launch(args):
         run_args.append('--')
         for command_arg in args.command:
             run_args.append(command_arg)
-        check_call(run_args)
+        runner = Popen(run_args)
+        runner.wait()
+        if runner.returncode:
+            raise CalledProcessError(runner.returncode, run_args)
+    except KeyboardInterrupt:
+        if runner is not None:
+            runner.send_signal(signal.SIGINT)
     finally:
         # Export
-        export_args = create_subcommand('--write', args)
-        exporter = Popen(export_args, stdout=PIPE)
-        tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
-        tar_file.extractall(args.output,
-                            members=exclude_root(tar_file, args.quiet))
-        exporter.wait()
-        if exporter.returncode:
-            raise CalledProcessError(exporter.returncode, export_args)
+        write_helper(args)
     if not args.quiet:
         print('\nDone.')
 
@@ -197,18 +228,48 @@ def handle_read(args):
                       'Docker volume {} already exists.'.format(session))
     except CalledProcessError:
         pass
-    try:
-        check_call(['docker',
-                    'run',
-                    '--name', session,
-                    '-v', session + ':/mnt',
-                    '--entrypoint', 'mkdir',
-                    args.image,
-                    '/mnt/bin',
-                    '/mnt/input',
-                    '/mnt/output'])
 
-        check_call(['docker', 'cp', '-', session + ':/mnt'])
+    docker_run = None
+    docker_cp = None
+    try:
+        docker_run = Popen(
+            [
+                'docker',
+                 'run',
+                 '--name', session,
+                 '-v', session + ':/mnt',
+                 '--entrypoint', 'mkdir',
+                 args.image,
+                 '/mnt/bin',
+                 '/mnt/input',
+                 '/mnt/output'
+            ]
+        )
+        docker_run.wait()
+
+        docker_cp = Popen(
+            [
+                'docker',
+                 'run',
+                 '--name', session,
+                 '-v', session + ':/mnt',
+                 '--entrypoint', 'mkdir',
+                 args.image,
+                 '/mnt/bin',
+                 '/mnt/input',
+                 '/mnt/output'
+            ]
+        )
+        docker_cp.wait()
+    except KeyboardInterrupt:
+        if docker_run is not None and docker_run.poll() is None:
+            docker_run.send_signal(signal.SIGINT)
+
+        if docker_cp is not None and docker_cp.poll() is None:
+            docker_cp.send_signal(signal.SIGINT)
+
+        clean_up(session)
+        raise
     except BaseException:
         clean_up(session)
         raise
