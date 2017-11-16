@@ -107,11 +107,9 @@ def write_helper(args):
         exporter.wait()
         if exporter.returncode:
             raise CalledProcessError(exporter.returncode, export_args)
-    except KeyboardInterrupt:
-        # We force this to proceed.
-        pass
     finally:
-        if exporter is not None:
+        if exporter is not None and exporter.poll() is None:
+            # We finish the job regardless.
             exporter.stdout.close()
             exporter.wait()
             if exporter.returncode:
@@ -137,6 +135,7 @@ def handle_launch(args):
     except KeyboardInterrupt:
         if importer is not None:
             importer.send_signal(signal.SIGINT)  # handle_read will perform cleanup
+        raise
     finally:
         if importer is not None:
             importer.stdin.close()
@@ -161,6 +160,7 @@ def handle_launch(args):
     except KeyboardInterrupt:
         if runner is not None:
             runner.send_signal(signal.SIGINT)
+            runner.wait()
     finally:
         # Export
         write_helper(args)
@@ -232,35 +232,38 @@ def handle_read(args):
     docker_run = None
     docker_cp = None
     try:
-        docker_run = Popen(
-            [
-                'docker',
-                 'run',
-                 '--name', session,
-                 '-v', session + ':/mnt',
-                 '--entrypoint', 'mkdir',
-                 args.image,
-                 '/mnt/bin',
-                 '/mnt/input',
-                 '/mnt/output'
-            ]
-        )
+        docker_run_args = [
+            'docker',
+             'run',
+             '--name', session,
+             '-v', session + ':/mnt',
+             '--entrypoint', 'mkdir',
+             args.image,
+             '/mnt/bin',
+             '/mnt/input',
+             '/mnt/output'
+        ]
+        docker_run = Popen(docker_run_args)
         docker_run.wait()
+        if docker_run.returncode:
+            raise CalledProcessError(docker_run.returncode, docker_run_args)
 
-        docker_cp = Popen(
-            [
-                'docker',
-                 'run',
-                 '--name', session,
-                 '-v', session + ':/mnt',
-                 '--entrypoint', 'mkdir',
-                 args.image,
-                 '/mnt/bin',
-                 '/mnt/input',
-                 '/mnt/output'
-            ]
-        )
+        docker_cp_args = [
+            'docker',
+             'run',
+             '--name', session,
+             '-v', session + ':/mnt',
+             '--entrypoint', 'mkdir',
+             args.image,
+             '/mnt/bin',
+             '/mnt/input',
+             '/mnt/output'
+        ]
+        docker_cp = Popen(docker_cp_args)
         docker_cp.wait()
+        if docker_cp.returncode:
+            raise CalledProcessError(docker_cp.returncode, docker_cp_args)
+
     except KeyboardInterrupt:
         if docker_run is not None and docker_run.poll() is None:
             docker_run.send_signal(signal.SIGINT)
@@ -281,13 +284,35 @@ def handle_run(args):
                    '--rm',
                    '-v', expand_session(args.session) + ':/mnt',
                    args.image] + args.command
-    check_call(docker_args)
+
+    try:
+        docker_run = Popen(docker_args)
+        docker_run.wait()
+
+        if docker_run.returncode:
+            raise CalledProcessError(docker_run.returncode, docker_args)
+    except KeyboardInterrupt:
+        docker_run.send_signal(signal.SIGINT)
+        docker_run.wait()  # if we get another KeyboardInterrupt in here, well, we can only do so much
+        raise
 
 
 def handle_write(args):
     session = expand_session(args.session)
-    check_call(['docker', 'cp', session + ':/mnt/output/.', '-'])
-    clean_up(session)
+    docker_cp = None
+    try:
+        docker_cp_args = ['docker', 'cp', session + ':/mnt/output/.', '-']
+        docker_cp = Popen(docker_cp_args)
+        docker_cp.wait()
+        if docker_cp.returncode:
+            raise CalledProcessError(docker_cp.returncode, docker_cp_args)
+    except KeyboardInterrupt:
+        # We make sure the task has been properly killed before cleanup.
+        if docker_cp is not None and docker_cp.poll() is None:
+            docker_cp.send_signal(signal.SIGINT)
+            docker_cp.wait()
+    finally:
+        clean_up(session)
 
 
 def clean_up(session):
