@@ -339,9 +339,13 @@ class DockerHandler(BaseDockerHandler):
                      for file_path in bin_files]
         args = [cls.docker_wrap_path,
                 image_id,
-                "--sudo",
-                "--bin_files"]
-        args.extend(bin_files)
+                "--sudo"]
+        if bin_files:
+            args.append("--bin_files")
+            args.extend(bin_files)
+            args.append("--workdir")
+            args.append("/mnt/bin")
+
         args.append("--inputs")
         args.extend(input_file_paths)
         args.append("--output")

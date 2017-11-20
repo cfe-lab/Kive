@@ -101,8 +101,13 @@ def main():
             revision,
             code_resources)
     code_resource_revisions[None] = None
-    docker_images = {img['url']: img['full_name']
-                     for img in kive.get('/api/dockerimages/').json()}
+    api_end_points = kive.get('/api/').json()
+    if 'dockerimages' in api_end_points:
+        docker_images = {img['url']: img['full_name']
+                         for img in kive.get('/api/dockerimages/').json()}
+    else:
+        # Old server doesn't have docker image support.
+        docker_images = {}
     docker_images[None] = None
     methods = {}  # {id: method}
     for method in kive.get('/api/methods/').json():
@@ -115,7 +120,7 @@ def main():
                            x['filename'],
                            x['requirement']['coderesource']['filename']))
         dump = {'driver': code_resource_revisions[method['driver']],
-                'docker_image': docker_images[method['docker_image']]}
+                'docker_image': docker_images[method.get('docker_image')]}
         for field in ('groups_allowed',
                       'users_allowed',
                       'reusable',
