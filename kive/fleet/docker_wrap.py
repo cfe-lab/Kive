@@ -25,7 +25,7 @@ See man sudoers for all the gory details, including digest specs.
 from argparse import ArgumentParser
 import errno
 import os
-from subprocess import check_call, Popen, PIPE, CalledProcessError, check_output, STDOUT
+from subprocess import Popen, PIPE, CalledProcessError, check_output, STDOUT, check_call
 import sys
 import tarfile
 from traceback import print_exc
@@ -93,6 +93,18 @@ def parse_args():
     return parser.parse_args()
 
 
+def stop_container(container):
+    """
+    Helper that invokes `docker stop`.
+
+    This does not use `sudo`, it depends on the calling function to have superuser privileges
+    if necessary.
+    """
+    stop_args = ["docker", "stop", container]
+    stop_stdout = check_output(stop_args, stderr=STDOUT)
+    print "Output of `{}`: {}".format(" ".join(stop_args), stop_stdout)
+
+
 def write_helper(args):
     """
     Helper routine for handle_launch that performs the final write subcommand.
@@ -133,8 +145,9 @@ def handle_launch(args):
         importer = Popen(import_args, stdin=PIPE)
         send_folders(args, importer)
     except KeyboardInterrupt:
+        print("KeyboardInterrupt received by launch script.  Waiting for the `read` subcommand to finish....")
         if importer is not None:
-            importer.send_signal(signal.SIGINT)  # handle_read will perform cleanup
+            importer.send_signal(signal.SIGINT)  # handle_read will stop the container and perform cleanup
         raise
     finally:
         if importer is not None:
@@ -159,8 +172,11 @@ def handle_launch(args):
             raise CalledProcessError(runner.returncode, run_args)
     except KeyboardInterrupt:
         if runner is not None:
-            runner.send_signal(signal.SIGINT)
+            # print("KeyboardInterrupt received by launch script.  Sending SIGINT to the `run` subcommand....")
+            print("KeyboardInterrupt received by launch script.  Waiting for the `run` subcommand to finish....")
+            # runner.send_signal(signal.SIGINT)  # handle_run will stop the container, write_helper cleans up
             runner.wait()
+        raise
     finally:
         # Export
         write_helper(args)
@@ -229,7 +245,9 @@ def handle_read(args):
     except CalledProcessError:
         pass
 
-    docker_run = None
+    # This container is not immediately removed so as to function as a placeholder that prevents
+    # the volume from being reaped.
+    docker_placeholder = None
     docker_cp = None
     try:
         docker_run_args = [
@@ -243,30 +261,21 @@ def handle_read(args):
              '/mnt/input',
              '/mnt/output'
         ]
-        docker_run = Popen(docker_run_args)
-        docker_run.wait()
-        if docker_run.returncode:
-            raise CalledProcessError(docker_run.returncode, docker_run_args)
+        docker_placeholder = Popen(docker_run_args)
+        docker_placeholder.wait()
+        if docker_placeholder.returncode:
+            raise CalledProcessError(docker_placeholder.returncode, docker_run_args)
 
-        docker_cp_args = [
-            'docker',
-             'run',
-             '--name', session,
-             '-v', session + ':/mnt',
-             '--entrypoint', 'mkdir',
-             args.image,
-             '/mnt/bin',
-             '/mnt/input',
-             '/mnt/output'
-        ]
+        docker_cp_args = ['docker', 'cp', '-', session + ':/mnt']
         docker_cp = Popen(docker_cp_args)
         docker_cp.wait()
         if docker_cp.returncode:
             raise CalledProcessError(docker_cp.returncode, docker_cp_args)
 
     except KeyboardInterrupt:
-        if docker_run is not None and docker_run.poll() is None:
-            docker_run.send_signal(signal.SIGINT)
+        if docker_placeholder is not None and docker_placeholder.poll() is None:
+            print("KeyboardInterrupt received -- calling `docker stop` on the placeholder container....")
+            stop_container(session)
 
         if docker_cp is not None and docker_cp.poll() is None:
             docker_cp.send_signal(signal.SIGINT)
@@ -279,21 +288,24 @@ def handle_read(args):
 
 
 def handle_run(args):
+    main_session = expand_session(args.session)
+    docker_run_session = "docker_run_{}".format(main_session)
     docker_args = ['docker',
                    'run',
+                   '--name', docker_run_session,
                    '--rm',
-                   '-v', expand_session(args.session) + ':/mnt',
+                   '-v', main_session + ':/mnt',
                    args.image] + args.command
 
     try:
         docker_run = Popen(docker_args)
         docker_run.wait()
-
         if docker_run.returncode:
             raise CalledProcessError(docker_run.returncode, docker_args)
     except KeyboardInterrupt:
-        docker_run.send_signal(signal.SIGINT)
-        docker_run.wait()  # if we get another KeyboardInterrupt in here, well, we can only do so much
+        print("KeyboardInterrupt received -- calling `docker stop` on the run job....")
+        stop_container(docker_run_session)
+        # If we get another KeyboardInterrupt in here, well, we can only do so much.
         raise
 
 
@@ -317,6 +329,8 @@ def handle_write(args):
 
 def clean_up(session):
     try:
+        foo = check_output(['docker', 'inspect', session], stderr=STDOUT)  # FIXME
+        print "FOOOOOOO Output of docker inspect: {}".format(foo)  # FIXME
         check_output(['docker', 'rm', session])
     finally:
         check_output(['docker', 'volume', 'rm', session])
