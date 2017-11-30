@@ -2,7 +2,6 @@
 
 import logging
 import os
-import os.path as osp
 from pipes import quote
 import stat
 import tempfile
@@ -17,11 +16,6 @@ logger = logging.getLogger("fleet.dockerlib")
 
 DOCKER_COMMAND = settings.DOCK_DOCKER_COMMAND
 BZIP2_COMMAND = settings.DOCK_BZIP2_COMMAND
-
-DEFAULT_IM_FILE = osp.join(settings.DOCK_IMAGE_DIRECTORY,
-                           settings.DOCK_DEFAULT_DOCKER_IMAGE)
-DEFAULT_IMAGE_NAME = 'kive-default'
-
 
 # CHECK_OUTPUT = sp.check_output
 CHECK_OUTPUT = multi_check_output
