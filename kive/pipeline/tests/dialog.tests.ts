@@ -794,8 +794,8 @@ describe("InputDialog fixture", function() {
         // gets position relative to the document
         let dlg_pos = dlg.jqueryRef.offset();
 
-        expect(dlg_pos.left).toBe(-33);
-        expect(dlg_pos.top).toBe(92);
+        expect(dlg_pos.left).toBeCloseTo(-33, 1);
+        expect(dlg_pos.top).toBeCloseTo(92, 1);
     });
 
     it('should show a CDTNode preview when a CDT is selected', function(done) {
@@ -910,8 +910,8 @@ describe("OutputDialog fixture", function() {
         // gets position relative to the document
         let dlg_pos = dlg.jqueryRef.offset();
 
-        expect(dlg_pos.left).toBe(-33);
-        expect(dlg_pos.top).toBe(92);
+        expect(dlg_pos.left).toBeCloseTo(-33, 1);
+        expect(dlg_pos.top).toBeCloseTo(92, 1);
     });
 
     it('should show an OutputNode preview', function(done) {

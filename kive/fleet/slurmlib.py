@@ -486,31 +486,32 @@ class SlurmScheduler(BaseSlurmScheduler):
                 pass
 
     @classmethod
-    def slurm_is_alive(cls):
+    def slurm_is_alive(cls, skip_extras=False):
         """Return True if the slurm configuration is adequate for Kive's purposes.
         We have two requirements:
-        a) slurm control daemon can be reached (fur submitting jobs).
-           This is tested by running 'squeue' and checking for exceptions.
-        b) There are three partitions of differing priorities that we can use.
+        a) There are three partitions of differing priorities that we can use.
            This is checked by running 'sinfo' and checking its state.
+        b) slurm control daemon can be reached (for submitting jobs).
+           This is tested by running 'squeue' and checking for exceptions.
         c) slurm accounting is configured properly.
            This is tested by running 'sacct' and checking for exceptions.
         """
-        is_alive = True
+        # noinspection PyBroadException
         try:
-            cls._do_squeue()
-        except (sp.CalledProcessError, OSError):
-            logger.exception("_do_squeue")
+            is_alive = cls._partitions_are_ok()
+        except Exception:
             is_alive = False
-        logger.info("squeue passed: %s" % is_alive)
+            logger.exception("partitions_are_ok")
+        logger.info("sinfo (checking partitions) passed: %s" % is_alive)
+        if skip_extras:
+            return is_alive
         if is_alive:
-            # noinspection PyBroadException
             try:
-                is_alive = cls._partitions_are_ok()
-            except Exception:
+                cls._do_squeue()
+            except (sp.CalledProcessError, OSError):
+                logger.exception("_do_squeue")
                 is_alive = False
-                logger.exception("partitions_are_ok")
-            logger.info("sinfo (checking partitions) passed: %s" % is_alive)
+            logger.info("squeue passed: %s" % is_alive)
         if is_alive:
             # noinspection PyBroadException
             try:
@@ -1291,7 +1292,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         cls.mproc.start()
 
     @classmethod
-    def slurm_is_alive(cls):
+    def slurm_is_alive(cls, skip_extras=False):
         """Return True if the slurm configuration is adequate for Kive's purposes."""
         if cls.mproc is None:
             cls._init_masterproc()

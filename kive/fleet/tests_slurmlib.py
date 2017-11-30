@@ -11,7 +11,7 @@ import datetime
 # can't yet use pytest -- sniff
 # import pytest
 import unittest
-
+from unittest import skipIf
 
 import fleet.slurmlib as slurmlib
 from django.conf import settings
@@ -22,14 +22,14 @@ from django.test import TestCase
 # we select the DummySlurmScheduler by default, so that the automatic tests
 # can run without slurm
 # SlurmScheduler = slurmlib.SlurmScheduler
-SlurmScheduler = slurmlib.DummySlurmScheduler
+# SlurmScheduler = slurmlib.DummySlurmScheduler
 
 
 ACC_STATE = slurmlib.BaseSlurmScheduler.ACC_STATE
 ACC_JOB_ID = slurmlib.BaseSlurmScheduler.ACC_JOB_ID
 ACC_PRIONUM = slurmlib.BaseSlurmScheduler.ACC_PRIONUM
 
-PRIO_LOW = SlurmScheduler.MIN_PRIO
+PRIO_LOW = slurmlib.BaseSlurmScheduler.MIN_PRIO
 PRIO_MEDIUM = PRIO_LOW + 1
 PRIO_HIGH = PRIO_MEDIUM + 1
 
@@ -40,12 +40,12 @@ NUM_JOBS = 5
 TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/slurm_test_files/slurmrundir")
 
 
-def _submit_job_n(n, prio, afteroklst=None, afteranylst=None):
+def _submit_job_n(n, prio, afteroklst=None, afteranylst=None, sched_cls=None):
     user_id = os.getuid()
     group_id = os.getgid()
     wdir = osp.join(TEST_DIR, "job%02d" % n)
     jobname = "sleep%02d.sh" % n
-    return SlurmScheduler.submit_job(
+    return sched_cls.submit_job(
         wdir,
         jobname,
         [],
@@ -60,20 +60,21 @@ def _submit_job_n(n, prio, afteroklst=None, afteranylst=None):
     )
 
 
-def submit_all(prio):
+def submit_all(prio, sched_cls=None):
     """ Submit all jobs with a certain priority."""
-    return [_submit_job_n(i, prio) for i in range(1, NUM_JOBS + 1)]
+    return [_submit_job_n(i, prio, sched_cls=sched_cls)
+            for i in range(1, NUM_JOBS + 1)]
 
 
-def get_accounting_info(jhandles=None):
-    curstates = SlurmScheduler.get_accounting_info(job_handle_iter=jhandles)
+def get_accounting_info(jhandles=None, sched_cls=None):
+    curstates = sched_cls.get_accounting_info(job_handle_iter=jhandles)
     if jhandles is not None and len(jhandles) > 0:
         # check we have entries for all requested jhandles
         jidset = set([jh.job_id for jh in jhandles])
         gotset = set(curstates.keys())
         assert gotset == jidset, "Did not get results from all submitted jobs"
 
-    cls = SlurmScheduler
+    cls = sched_cls
     for jid, dct in curstates.iteritems():
         # makes sure all required fields are defined
         assert cls.ACC_SET == set(dct.keys()), "inconsistent key set"
@@ -90,15 +91,19 @@ def get_accounting_info(jhandles=None):
     return curstates
 
 
-class SlurmTests(TestCase):
+class SlurmDummyTests(TestCase):
     def setUp(self):
         self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
-        is_alive = SlurmScheduler.slurm_is_alive()
+        self.sched_cls = self.get_slurm_scheduler_class()
+        is_alive = self.sched_cls.slurm_is_alive(skip_extras=True)
         if not is_alive:
             raise RuntimeError("slurm is not alive")
 
+    def get_slurm_scheduler_class(self):
+        return slurmlib.DummySlurmScheduler
+
     def tearDown(self):
-        SlurmScheduler.shutdown()
+        self.sched_cls.shutdown()
 
     def test_callit01(self, lverb=False):
         """ Should return 0 """
@@ -133,19 +138,19 @@ class SlurmTests(TestCase):
 
     def test_is_alive(self):
         """test_is_alive() should return True"""
-        is_alive = SlurmScheduler.slurm_is_alive()
+        is_alive = self.sched_cls.slurm_is_alive()
         assert is_alive, "Calling is_alive fails"
 
     def test_slurm_ident(self):
         """slurm_ident must return a string"""
-        idstr = SlurmScheduler.slurm_ident()
+        idstr = self.sched_cls.slurm_ident()
         assert isinstance(idstr, str), "slurm ident must be a string"
 
     def test_submit_job01(self, lverb=False):
         """ Submitting this job should succeed."""
         if lverb:
             print "--test_submit_job01"
-        jhandle = _submit_job_n(1, PRIO_MEDIUM)
+        jhandle = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "submitted job", jhandle
 
@@ -161,7 +166,7 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % m
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(
+            self.sched_cls.submit_job(
                 wdir,
                 jobname,
                 [],
@@ -185,7 +190,7 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(RuntimeError):
-            SlurmScheduler.submit_job(
+            self.sched_cls.submit_job(
                 wdir,
                 jobname,
                 [],
@@ -204,7 +209,7 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_submit_job04"
-        jhandle = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jhandle = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "successfully launched job %s, now waiting for its failure..." % jhandle
         time.sleep(2)
@@ -212,13 +217,13 @@ class SlurmTests(TestCase):
         curstate = jhandle.get_state()
         if lverb:
             print "gotstate", curstate
-        while (i < num_tries) and (curstate != SlurmScheduler.FAILED):
+        while (i < num_tries) and (curstate != self.sched_cls.FAILED):
             if lverb:
                 print i, "curstate...", curstate
             time.sleep(5)
             curstate = jhandle.get_state()
             i += 1
-        assert curstate == SlurmScheduler.FAILED, "failed to get a 'FAILED' state.."
+        assert curstate == self.sched_cls.FAILED, "failed to get a 'FAILED' state.."
         if lverb:
             print "---test_submit_job04: Success, got an expected FAILED status"
 
@@ -234,7 +239,7 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(
+            self.sched_cls.submit_job(
                 wdir,
                 jobname,
                 [],
@@ -261,7 +266,7 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(
+            self.sched_cls.submit_job(
                 wdir,
                 jobname,
                 [],
@@ -288,7 +293,7 @@ class SlurmTests(TestCase):
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         with self.assertRaises(sp.CalledProcessError):
-            SlurmScheduler.submit_job(
+            self.sched_cls.submit_job(
                 wdir,
                 jobname,
                 [],
@@ -308,27 +313,27 @@ class SlurmTests(TestCase):
         Both jobs should succeed."""
         if lverb:
             print "--test_dep_jobs01_okay"
-        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
         num_tries, i = 40, 0
-        curstate = get_accounting_info(my_handles)
-        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
+        curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
+        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(5)
-            curstate = get_accounting_info(my_handles)
+            curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
-        assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job01: failed to run successfully"
-        assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job02: failed to run successfully"
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job01: failed to run successfully"
+        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job02: failed to run successfully"
         if lverb:
             print "--test_dep_jobs01_okay SUCCESS"
 
@@ -337,29 +342,29 @@ class SlurmTests(TestCase):
         Both jobs should succeed."""
         if lverb:
             print "--test_dep_jobs01_any"
-        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "first job", jobid_01
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "dependent job", jobid_02
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
         num_tries, i = 40, 0
-        curstate = get_accounting_info(my_handles)
-        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED:
+        curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
+        while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(5)
-            curstate = get_accounting_info(my_handles)
+            curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
             print "FINAL STATE", [curstate[jid][ACC_STATE] for jid in jobidlst]
-        assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job01: failed to run successfully"
-        assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, "job02: failed to run successfully"
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job01: failed to run successfully"
+        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job02: failed to run successfully"
         if lverb:
             print "--test_dep_jobs01_any SUCCESS"
 
@@ -369,10 +374,10 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_ok"
-        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
@@ -380,18 +385,18 @@ class SlurmTests(TestCase):
         curstate = None
         while (i < num_tries) and not_failed:
             time.sleep(2)
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
                 print "step %02d:" % i, curstate[jobid_01.job_id][ACC_STATE], curstate[jobid_02.job_id][ACC_STATE]
-            not_failed = curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED
+            not_failed = curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
             print "job01 state:", curstate[jobid_01.job_id]
             print "job02 state:", curstate[jobid_02.job_id]
-        assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.FAILED, "unexpected state 01"
-        assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.CANCELLED, "unexpected state 02"
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.FAILED, "unexpected state 01"
+        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 02"
         if lverb:
             print "--test_dep_jobs02_ok SUCCESS"
 
@@ -401,10 +406,10 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs02_any"
-        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "dependent job:", jobid_02
         joblst = [jobid_01, jobid_02]
@@ -415,31 +420,31 @@ class SlurmTests(TestCase):
         curstate = None
         while (i < num_tries) and not_failed:
             time.sleep(2)
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
-            not_failed = curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED
+            not_failed = curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         # wait for jobid_02 to start running
         if lverb:
             print "OK, waiting for job 02 to run"
-        is_running, num_tries, i = curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED, 40, 0
+        is_running, num_tries, i = curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, 40, 0
         while (i < num_tries) and not is_running:
             time.sleep(2)
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
-            is_running = curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED
+            is_running = curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED
         if i == num_tries:
             raise RuntimeError("failed: job 02 did not complete")
         if lverb:
             print "job01 state:", curstate[jobid_01.job_id]
             print "job02 state:", curstate[jobid_02.job_id]
         state_02 = curstate[jobid_02.job_id][ACC_STATE]
-        ok_state_02 = state_02 == SlurmScheduler.RUNNING or state_02 == SlurmScheduler.COMPLETED
-        assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.FAILED, "unexpected state 01"
+        ok_state_02 = state_02 == self.sched_cls.RUNNING or state_02 == self.sched_cls.COMPLETED
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.FAILED, "unexpected state 01"
         assert ok_state_02, "unexpected state 02"
         if lverb:
             print "--test_dep_jobs02_any SUCCESS"
@@ -452,13 +457,13 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_dep_jobs01_multi"
-        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "first job that will fail:", jobid_01
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM)
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "second job that will succeed", jobid_02
-        jobid_03 = _submit_job_n(1, PRIO_MEDIUM, [jobid_02], [jobid_01])
+        jobid_03 = _submit_job_n(1, PRIO_MEDIUM, [jobid_02], [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "third job that should run", jobid_02
         joblst = [jobid_01, jobid_02, jobid_03]
@@ -467,11 +472,11 @@ class SlurmTests(TestCase):
         curstate = None
         while (i < num_tries) and still_running:
             time.sleep(2)
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
-            still_running = (curstate[jobid_01.job_id][ACC_STATE] != SlurmScheduler.FAILED) or\
-                            (curstate[jobid_02.job_id][ACC_STATE] != SlurmScheduler.COMPLETED)
+            still_running = (curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED) or\
+                            (curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED)
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
@@ -480,9 +485,9 @@ class SlurmTests(TestCase):
         state_03 = curstate[jobid_03.job_id][ACC_STATE]
         if lverb:
             print "state after loop:", [curstate[jid][ACC_STATE] for jid in jobidlst]
-        assert state_01 == SlurmScheduler.FAILED, "unexpected state 01"
-        assert state_02 == SlurmScheduler.COMPLETED, "unexpected state 02"
-        ok_state_03 = state_03 in SlurmScheduler.RUNNING_STATES
+        assert state_01 == self.sched_cls.FAILED, "unexpected state 01"
+        assert state_02 == self.sched_cls.COMPLETED, "unexpected state 02"
+        ok_state_03 = state_03 in self.sched_cls.RUNNING_STATES
         assert ok_state_03, "unexpected state 03"
         if lverb:
             print "--test_dep_jobs01_multi SUCCESS"
@@ -491,31 +496,31 @@ class SlurmTests(TestCase):
         """Submit a job, then cancel it"""
         if lverb:
             print "--test_cancel_jobs01"
-        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "submitted job", jobid_01
             print "wait for running status..."
         num_tries, i, curstate = 40, 0, jobid_01.get_state()
-        while i < num_tries and curstate not in SlurmScheduler.RUNNING_STATES:
+        while i < num_tries and curstate not in self.sched_cls.RUNNING_STATES:
             if lverb:
                 print "step %02d:" % i, curstate
             time.sleep(2)
             i += 1
             curstate = jobid_01.get_state()
-        assert curstate in SlurmScheduler.RUNNING_STATES, "Job is not running, cannot test cancelling it"
+        assert curstate in self.sched_cls.RUNNING_STATES, "Job is not running, cannot test cancelling it"
         if lverb:
             print "job is running, now cancelling job 01..."
-        SlurmScheduler.job_cancel(jobid_01)
+        self.sched_cls.job_cancel(jobid_01)
         if lverb:
             print "wait for cancelled status...."
         i, curstate = 0, jobid_01.get_state()
-        while i < num_tries and curstate in SlurmScheduler.RUNNING_STATES:
+        while i < num_tries and curstate in self.sched_cls.RUNNING_STATES:
             if lverb:
                 print "step %02d:" % i, curstate
             time.sleep(5)
             i += 1
             curstate = jobid_01.get_state()
-        assert curstate == SlurmScheduler.CANCELLED, "job is not cancelled"
+        assert curstate == self.sched_cls.CANCELLED, "job is not cancelled"
         if lverb:
             print "--test_cancel_jobs01 SUCCESS"
 
@@ -525,11 +530,11 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "---test_cancel_jobs02"
-        jobid_01 = _submit_job_n(1, PRIO_MEDIUM)
+        jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "started 01:", jobid_01
         time.sleep(2)
-        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01])
+        jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
             print "started 02 (dependent on 01):", jobid_02
         joblst = [jobid_01, jobid_02]
@@ -538,28 +543,28 @@ class SlurmTests(TestCase):
         while i < num_tries and not are_ready:
             time.sleep(2)
             i += 1
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
-            are_ready = curstate[jobid_01.job_id][ACC_STATE] in SlurmScheduler.RUNNING_STATES
+            are_ready = curstate[jobid_01.job_id][ACC_STATE] in self.sched_cls.RUNNING_STATES
         assert are_ready, "failed to submit the two jobs..."
         if lverb:
             print "OK, two jobs submitted, now cancelling job 01"
-        SlurmScheduler.job_cancel(jobid_01)
-        check_tuple = (SlurmScheduler.CANCELLED, SlurmScheduler.CANCELLED)
-        curstate = get_accounting_info(joblst)
+        self.sched_cls.job_cancel(jobid_01)
+        check_tuple = (self.sched_cls.CANCELLED, self.sched_cls.CANCELLED)
+        curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
         are_cancelled, i = False, 0
         while i < num_tries and not are_cancelled:
             if lverb:
                 print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
             time.sleep(2)
             i += 1
-            curstate = get_accounting_info(joblst)
+            curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             are_cancelled = tuple([curstate[jid][ACC_STATE] for jid in jobidlst]) == check_tuple
         if lverb:
             print "final states", [curstate[jid][ACC_STATE] for jid in jobidlst]
-        assert curstate[jobid_01.job_id][ACC_STATE] == SlurmScheduler.CANCELLED, "unexpected state 01"
-        assert curstate[jobid_02.job_id][ACC_STATE] == SlurmScheduler.CANCELLED, "unexpected state 02"
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 01"
+        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 02"
         if lverb:
             print "---test_cancel_jobs02 SUCCESS"
 
@@ -570,7 +575,7 @@ class SlurmTests(TestCase):
         """
         if lverb:
             print "--test_get_state_01"
-        jhandle = _submit_job_n(1, PRIO_MEDIUM)
+        jhandle = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
             print "submitted job", jhandle
         i, num_tries, has_finished = 0, 20, False
@@ -579,10 +584,10 @@ class SlurmTests(TestCase):
             curstate = jhandle.get_state()
             if lverb:
                 print "step %02d:" % i, curstate
-            has_finished = (curstate in SlurmScheduler.STOPPED_SET)
+            has_finished = (curstate in self.sched_cls.STOPPED_SET)
             time.sleep(5)
             i += 1
-        assert curstate == SlurmScheduler.COMPLETED, "unexpected final state"
+        assert curstate == self.sched_cls.COMPLETED, "unexpected final state"
         if lverb:
             print "--test_get_state_01 SUCCESS"
 
@@ -594,28 +599,28 @@ class SlurmTests(TestCase):
             print "--test_set_priority_01"
         # first, submit a number of high prio jobs in order to fill the queue
         # we can only change the priority of a job if it is not yet running
-        low_prio = SlurmScheduler.MIN_PRIO
+        low_prio = self.sched_cls.MIN_PRIO
         high_prio = low_prio + 1
         for i in xrange(4):
-            submit_all(high_prio)
+            submit_all(high_prio, sched_cls=self.sched_cls)
         if lverb:
             print "submitting low_prio jobs..."
-        jobhandles = submit_all(low_prio)
+        jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         jobidlst = [jh.job_id for jh in jobhandles]
         if lverb:
             print "job_ids", jobidlst
         time.sleep(2)
-        cs = get_accounting_info(jobhandles)
+        cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
         priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
         if lverb:
             print "state+priority after submission", priolst
-        SlurmScheduler.set_job_priority(jobhandles, high_prio)
+        self.sched_cls.set_job_priority(jobhandles, high_prio)
         test_passed = False
-        while cs[jobidlst[0]][ACC_STATE] != SlurmScheduler.PENDING and not test_passed:
+        while cs[jobidlst[0]][ACC_STATE] != self.sched_cls.PENDING and not test_passed:
             if lverb:
                 print "waiting"
             time.sleep(2)
-            cs = get_accounting_info(jobhandles)
+            cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
             test_passed = all([prio == high_prio for state, prio in priolst])
         if lverb:
@@ -624,7 +629,7 @@ class SlurmTests(TestCase):
         if lverb:
             print "Test passed"
         if lverb:
-            cs = get_accounting_info(jobhandles)
+            cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
             print "final states:", priolst
 
@@ -632,20 +637,20 @@ class SlurmTests(TestCase):
         """Set an illegal job priority type (str instead of int).
         This should raise an exception."""
         low_prio = PRIO_LOW
-        jobhandles = submit_all(low_prio)
+        jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         with self.assertRaises(RuntimeError):
-            SlurmScheduler.set_job_priority(jobhandles, 'HI_PRIO')
+            self.sched_cls.set_job_priority(jobhandles, 'HI_PRIO')
 
     def test_set_priority_03(self):
         """Set an job priority that is higher than MAX_PRIO.
         This should simply set the actual priority to MAX_PRIO"""
         low_prio = PRIO_LOW
-        jobhandles = submit_all(low_prio)
+        jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         jidlst = [jh.job_id for jh in jobhandles]
         time.sleep(1)
         high_prio = PRIO_HIGH
-        SlurmScheduler.set_job_priority(jobhandles, high_prio+10)
-        cs = get_accounting_info(jobhandles)
+        self.sched_cls.set_job_priority(jobhandles, high_prio+10)
+        cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
         priolst = [cs[jid][ACC_PRIONUM] for jid in jidlst]
         assert all([p == high_prio for p in priolst]), "Failed to set high priority"
 
@@ -664,19 +669,19 @@ class SlurmTests(TestCase):
         low_prio = PRIO_LOW
         if lverb:
             print "submitting low_prio jobs..."
-        jobhandles = submit_all(low_prio)
+        jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         job01 = jobhandles[0]
-        job02 = _submit_job_n(1, PRIO_MEDIUM, [job01])
+        job02 = _submit_job_n(1, PRIO_MEDIUM, [job01], sched_cls=self.sched_cls)
         jobhandles.append(job02)
         jidlst = [jh.job_id for jh in jobhandles]
         time.sleep(1)
         i, numtests, is_finished = 0, 40, False
         while i < numtests and not is_finished:
-            cs = get_accounting_info(jobhandles)
+            cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             if lverb:
                 print i, [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jidlst]
             time.sleep(2)
-            is_finished = cs[job02.job_id][ACC_STATE] == SlurmScheduler.COMPLETED
+            is_finished = cs[job02.job_id][ACC_STATE] == self.sched_cls.COMPLETED
             i += 1
         # --
         assert i < numtests, "job02 failed to complete in 40 iterations"
@@ -716,7 +721,7 @@ class SlurmTests(TestCase):
         hi_prio = PRIO_HIGH
         if lverb:
             print "submitting low_prio jobs..."
-        jh_lst = submit_all(low_prio)
+        jh_lst = submit_all(low_prio, sched_cls=self.sched_cls)
         time.sleep(1)
         jobid_01 = _submit_job_n(1, hi_prio)
         if lverb:
@@ -727,13 +732,13 @@ class SlurmTests(TestCase):
         while (i < num_tries) and not is_done:
             if lverb:
                 print "step %d/%d" % (i, num_tries)
-            job_state_dct = get_accounting_info(jh_lst)
+            job_state_dct = get_accounting_info(jh_lst, sched_cls=self.sched_cls)
             for j_state in sorted(job_state_dct.values(), key=lambda a: a[ACC_JOB_ID]):
                 # has_finished = (j_state["ST"] == 'CD'  or j_state["ST"] == 'UKN')
                 if lverb:
                     print "%02d: %5s  %s" % (i, j_state[ACC_JOB_ID], j_state[ACC_STATE])
                     print
-                is_done = job_state_dct[jobid_01.job_id][ACC_STATE] == SlurmScheduler.COMPLETED
+                is_done = job_state_dct[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED
                 time.sleep(5)
                 i += 1
         if lverb:
@@ -744,6 +749,12 @@ class SlurmTests(TestCase):
         assert i < num_tries, "failed to wait for completed jobs!"
         if lverb:
             print "--test_squeue_jobs01 SUCCESS"
+
+
+@skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests disabled.")
+class SlurmTests(SlurmDummyTests):
+    def get_slurm_scheduler_class(self):
+        return slurmlib.SlurmScheduler
 
 
 if __name__ == "__main__":

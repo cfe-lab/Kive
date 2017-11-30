@@ -12,15 +12,24 @@ To grant access to this command, edit the sudoers file with visudo, and create
 a command alias like this with the image name you want:
 
     Cmnd_Alias DOCKER_<IMAGE> = \
-        /path/to/docker_wrap.py --read <image> *, \
-        /path/to/docker_wrap.py --run <image> *, \
-        /path/to/docker_wrap.py --write <image> *
+        /path/to/docker_wrap.py --read <image>\:<tag> *, \
+        /path/to/docker_wrap.py --run <image>\:<tag> *, \
+        /path/to/docker_wrap.py --write <image>\:<tag> *
 
 Then grant access to one or more users on one or more images like this:
 
     <user1>, <user2> ALL = NOPASSWD: DOCKER_<IMAGE1>, DOCKER_<IMAGE2>
 
-See man sudoers for all the gory details, including digest specs.
+The user that runs the kive fleet should probably be allowed to run all docker
+images, so create a command alias like this:
+
+    Cmnd_Alias DOCKER_ALL = \
+        /path/to/docker_wrap.py --read *, \
+        /path/to/docker_wrap.py --run *, \
+        /path/to/docker_wrap.py --write *
+
+See man sudoers for all the gory details, including digest specs. See the
+docker_build.py script for details on building docker images.
 """
 from argparse import ArgumentParser
 import errno
@@ -61,6 +70,9 @@ def parse_args():
                         help='list of binary files to copy into the container,'
                              ' may append paths under /mnt/bin after'
                              ' a separator, but paths default to file names')
+    parser.add_argument('--workdir',
+                        '-w',
+                        help='working directory inside the container')
     parser.add_argument('--quiet',
                         '-q',
                         action='store_true',
@@ -185,7 +197,9 @@ def handle_launch(args):
 
 
 def send_folders(args, importer):
-    with tarfile.open(fileobj=importer.stdin, mode='w|') as tar_file:
+    with tarfile.open(fileobj=importer.stdin,
+                      mode='w|',
+                      dereference=True) as tar_file:
         try:
             if args.bin_files:
                 send_folder(args.bin_files, 'bin', tar_file, args.quiet)
@@ -222,9 +236,16 @@ def exclude_root(tarinfos, is_quiet):
 
 
 def create_subcommand(subcommand, args):
-    new_args = [args.script, subcommand, args.image, args.session]
+    new_args = []
     if args.sudo:
-        new_args[:0] = ['sudo']
+        new_args.append('sudo')
+    new_args.append(args.script)
+    new_args.append(subcommand)
+    new_args.append(args.image)
+    if args.workdir:
+        new_args.append('--workdir')
+        new_args.append(args.workdir)
+    new_args.append(args.session)
     return new_args
 
 
@@ -294,8 +315,13 @@ def handle_run(args):
                    'run',
                    '--name', docker_run_session,
                    '--rm',
-                   '-v', main_session + ':/mnt',
-                   args.image] + args.command
+                   '-v', main_session + ':/mnt']
+    if args.workdir:
+        docker_args.append('--workdir')
+        docker_args.append(args.workdir)
+    docker_args.append(args.image)
+    docker_args.extend(args.command)
+    check_call(docker_args)
 
     try:
         docker_run = Popen(docker_args)

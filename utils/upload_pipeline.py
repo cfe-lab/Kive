@@ -19,6 +19,7 @@ from itertools import count, chain
 from constants import maxlengths
 
 DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
+DEFAULT_MEMORY = 6000
 
 
 def parse_args():
@@ -42,7 +43,7 @@ class PipelineStepRequest(object):
         self.name = self.driver = self.dependencies = None
         self.code_resource = self.code_resource_revision = None
         self.method_family = self.method = self.old_method = None
-        self.docker_image_name = None
+        self.docker_image_name = self.docker_image = None
 
     def get_code_resource_revision(self, kive, revision_id):
         response = kive.get('/api/coderesourcerevisions/{}'.format(revision_id))
@@ -87,6 +88,7 @@ class PipelineStepRequest(object):
             kive,
             self.old_method['driver'])
         has_changes = self.driver.check_for_changes(self.old_method['driver'])
+        has_changes |= self.docker_image != self.old_method.get('docker_image')
         response = kive.get('/api/coderesources/')
         code_resource_filenames = {r['name']: r['filename']
                                    for r in response.json()}
@@ -186,15 +188,18 @@ class CodeResourceRequest(object):
                               groups_allowed=code_resource_config['groups_allowed']))
                 self.code_resource = response.json()
         if self.code_resource_revision is None:
-            with open(self.path, 'rb') as f:
-                response = self.kive.post(
-                    '/api/coderesourcerevisions/',
-                    dict(coderesource=self.code_resource['name'],
-                         revision_name=revision_name,
-                         users_allowed=self.config['users_allowed'],
-                         groups_allowed=self.config['groups_allowed']),
-                    files=dict(content_file=f)
-                )
+            try:
+                with open(self.path, 'rb') as f:
+                    response = self.kive.post(
+                        '/api/coderesourcerevisions/',
+                        dict(coderesource=self.code_resource['name'],
+                             revision_name=revision_name,
+                             users_allowed=self.config['users_allowed'],
+                             groups_allowed=self.config['groups_allowed']),
+                        files=dict(content_file=f))
+            except Exception:
+                print('Upload failed: {}'.format(self.path))
+                raise
 
             self.code_resource_revision = response.json()
         CodeResourceRequest.existing[self.name] = self.code_resource_revision
@@ -235,7 +240,10 @@ class CompoundDatatypeRequest(object):
             is_blankable = type_name[-1] == '?'
             if is_blankable:
                 type_name = type_name[:-1]
-            datatype_id = CompoundDatatypeRequest.datatypes[type_name]
+            datatype_id = CompoundDatatypeRequest.datatypes.get(type_name)
+            if datatype_id is None:
+                raise KeyError('Datatype {!r} not found.'.format(
+                    str(type_name)))
             self.members.append(dict(datatype=datatype_id,
                                      column_name=name,
                                      column_idx=i,
@@ -385,8 +393,14 @@ def load_steps(kive, folder, pipeline_family, groups, docker_default):
         old_pipeline = kive.get_pipeline(old_pipeline_id)
     except AttributeError:
         old_pipeline = None
-    docker_images = {img['full_name']: img['url']
-                     for img in kive.get('/api/dockerimages/').json()}
+    api_end_points = kive.get('/api/').json()
+    has_docker = 'dockerimages' in api_end_points
+    if has_docker:
+        docker_images = {img['full_name']: img['url']
+                         for img in kive.get('/api/dockerimages/').json()}
+    else:
+        # Old server doesn't have docker image support.
+        docker_images = {}
     steps = []
     for step_config in pipeline_config['steps']:
         step = PipelineStepRequest(step_config)
@@ -395,14 +409,17 @@ def load_steps(kive, folder, pipeline_family, groups, docker_default):
         transformation = step_config['transformation']
         driver = transformation['driver']
         step.driver = driver and CodeResourceRequest(kive, folder, driver)
-        step.docker_image_name = (transformation['docker_image'] or
-                                  docker_default)
-        if step.docker_image_name is None:
-            raise ValueError('This pipeline requires --docker_default option.')
-        step.docker_image = docker_images.get(step.docker_image_name)
-        if step.docker_image is None:
-            raise KeyError('Docker image {} not found.'.format(
-                step.docker_image_name))
+        if not has_docker:
+            step.docker_image_name = step.docker_image = None
+        else:
+            step.docker_image_name = (transformation.get('docker_image') or
+                                      docker_default)
+            if step.docker_image_name is None:
+                raise ValueError('This pipeline requires --docker_default option.')
+            step.docker_image = docker_images.get(step.docker_image_name)
+            if step.docker_image is None:
+                raise KeyError('Docker image {} not found.'.format(
+                    step.docker_image_name))
         step.name = step_config['name']
         step.dependencies = list(
             find_dependencies(kive, folder, transformation))
@@ -489,19 +506,20 @@ def create_methods(kive, steps, revision_name):
                                              filename=dependency['filename']))
                     dependency_paths.add(dependency_path)
             driver_id = step.driver and step.driver.code_resource_revision['id']
-            response = kive.post('/api/methods/',
-                                 json=dict(revision_name=revision_name,
-                                           family=step.method_family['name'],
-                                           driver=driver_id,
-                                           docker_image=step.docker_image,
-                                           reusable=transformation['reusable'],
-                                           threads=transformation['threads'],
-                                           memory=transformation['memory'],
-                                           inputs=inputs,
-                                           outputs=outputs,
-                                           dependencies=dependencies,
-                                           users_allowed=step.users_allowed,
-                                           groups_allowed=step.groups_allowed))
+            response = kive.post(
+                '/api/methods/',
+                json=dict(revision_name=revision_name,
+                          family=step.method_family['name'],
+                          driver=driver_id,
+                          docker_image=step.docker_image,
+                          reusable=transformation['reusable'],
+                          threads=transformation['threads'],
+                          memory=transformation.get('memory', DEFAULT_MEMORY),
+                          inputs=inputs,
+                          outputs=outputs,
+                          dependencies=dependencies,
+                          users_allowed=step.users_allowed,
+                          groups_allowed=step.groups_allowed))
             step.method = response.json()
 
 
