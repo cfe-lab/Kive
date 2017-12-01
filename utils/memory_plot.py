@@ -1,15 +1,15 @@
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
 from collections import Counter
 from csv import DictReader
 from datetime import datetime
 from itertools import groupby
-import math
 
 from matplotlib import pyplot as plt
 
 
 def parse_args():
-    parser = ArgumentParser(description='Plot memory usage over time.')
+    parser = ArgumentParser(description='Plot memory usage over time.',
+                            formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--file',
                         '-f',
                         default='memory_watch.log',
@@ -62,14 +62,21 @@ def main():
                              key=lambda s: ((1 if s.startswith('head')
                                              else 2),
                                             s))
+        start_date = args.start and parse_date(args.start)
+        end_date = args.end and parse_date(args.end)
         free = []
         times = []
         for i, row in enumerate(reader):
+            row_time = parse_date(row['time'])
+            if start_date and row_time < start_date:
+                continue
+            if end_date and row_time > end_date:
+                break
             row_totals = Counter()
             for column in free_columns:
                 if row[column]:
                     row_totals[column[:-7]] += float(row[column])
-            times.append(parse_date(row['time']))
+            times.append(row_time)
             free.append([row_totals[name] if name in row_totals else None
                          for name in free_labels])
     fig, ax = plt.subplots()
@@ -92,22 +99,16 @@ def main():
         line.set_linewidth(line_num + 1)
         line_num += 1
     ax.legend(free_labels,
-              loc='best',
-              ncol=4)
-    xlim = list(ax.get_xlim())
-    if args.start is not None:
-        xlim[0] = parse_date(args.start)
-    if args.end is not None:
-        xlim[1] = parse_date(args.end)
-    ax.set_xlim(xlim)
+              loc='upper left',
+              bbox_to_anchor=(1.04, 1),
+              borderaxespad=0.)
     ylim = list(ax.get_ylim())
     ylim[0] = 0
-    if args.mem is None:
-        ylim[1] *= 1 + 0.1 * (math.ceil(len(free_labels)*0.25))
-    else:
+    if args.mem is not None:
         ylim[1] = args.mem
     ax.set_ylim(ylim)
     fig.autofmt_xdate()
+    fig.subplots_adjust(right=.75)
     plt.savefig(args.plot)
 
 
