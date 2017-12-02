@@ -31,7 +31,7 @@ images, so create a command alias like this:
 See man sudoers for all the gory details, including digest specs. See the
 docker_build.py script for details on building docker images.
 """
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 import errno
 import os
 from subprocess import Popen, PIPE, CalledProcessError, check_output, STDOUT, check_call
@@ -42,22 +42,37 @@ import signal
 import time
 import re
 import logging
+import logging.config
 
 
-logger = logging.getLogger("docker_wrap")
-logger.setLevel(logging.DEBUG)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.DEBUG)
-formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-console_handler.setFormatter(formatter)
-logger.addHandler(console_handler)
-
-# This is the session name template that we'll use for the actual running of the code.
-# The braces will be replaced with the session name of the placeholder session.
-docker_run_session_template = "docker_run_{}"
-
-# This is the number of seconds that we wait for a container to appear (in order to kill it) before we give up.
-time_limit = 10
+logging_config = {
+    "version": 1,
+    'formatters': {
+        'pipe_delimited': {
+            'format': "%(asctime)s | %(levelname)s | %(message)s"
+        }
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'pipe_delimited'
+        }
+    },
+    'root': {
+        # This is the default logger.
+        'handlers': ['console'],
+        'level': 'DEBUG'
+    },
+    'loggers': {
+        "docker_wrap": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False
+        }
+    }
+}
+logger = None
 
 
 def parse_args():
@@ -65,7 +80,9 @@ def parse_args():
         description='Launch a docker image with inputs and outputs',
         epilog='See the source code for details on configuring sudoers.'
         ' Example: docker_wrap.py my_image --inputs a.txt b.txt'
-        ' --output /out/path -- session1 command arg1 arg2')
+        ' --output /out/path -- session1 command arg1 arg2',
+        formatter_class=ArgumentDefaultsHelpFormatter
+    )
     parser.add_argument('--sudo',
                         action='store_true',
                         help='Launch subcommands under sudo')
@@ -95,7 +112,11 @@ def parse_args():
     parser.add_argument('--quiet',
                         '-q',
                         action='store_true',
-                        help='hide list of inputs and outputs')
+                        help='hide list of inputs and outputs and suppress some logging')
+    parser.add_argument('--verbose',
+                        '-v',
+                        action='store_true',
+                        help='make logging more verbose (overrides --quiet)')
     parser.add_argument('--script',
                         '-s',
                         help='script file for read, run, and write subcommands')
@@ -108,6 +129,11 @@ def parse_args():
         "--is_running",
         action="store_true",
         help="Instructs the write subcommand that the run command is running (only used by --write)"
+    )
+    parser.add_argument(
+        "--time_limit",
+        default=10,
+        help="Time to wait on a container to appear in order to kill it (only for --write)"
     )
     parser.add_argument('image', help='Docker image hash or name')
     parser.add_argument('session',
@@ -422,7 +448,7 @@ def handle_write(args):
 
         if container_to_stop is not None:
             container_stopped = False
-            for i in range(time_limit):
+            for i in range(args.time_limit):
                 if check_container_exists(container_to_stop, show_all=True):
                     logger.info("Stopping container %s....", container_to_stop)
                     stop_container(container_to_stop, stdout=PIPE, stderr=PIPE)  # suppress output
@@ -432,7 +458,8 @@ def handle_write(args):
                     logger.info("Container %s not found yet.  Waiting 1 second....", container_to_stop)
                     time.sleep(1)
             if not container_stopped:
-                logger.info("Container %s did not appear after %d seconds.  Moving on.", container_to_stop, time_limit)
+                logger.info("Container %s did not appear after %d seconds.  Moving on.",
+                            container_to_stop, args.time_limit)
 
         # If args.is_reading is True, it does raise the possibility that the `docker cp` was still running;
         # this will wait for that to finish.
@@ -461,6 +488,15 @@ def clean_up(session):
 
 def main():
     args = parse_args()
+
+    # Configure the logging.
+    if args.quiet:
+        logging_config["loggers"]["docker_wrap"]["level"] = "WARNING"
+    if args.verbose:
+        logging_config["loggers"]["docker_wrap"]["level"] = "DEBUG"
+    logging.config.dictConfig(logging_config)
+    logger = logging.getLogger("docker_wrap")
+
     if args.read:
         handle_read(args)
     elif args.run:
