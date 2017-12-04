@@ -116,20 +116,10 @@ def parse_args():
                         '-s',
                         help='script file for read, run, and write subcommands')
     parser.add_argument(
-        "--is_reading",
-        action="store_true",
-        help="Instructs the write subcommand that the read command is running (only used by --write)"
-    )
-    parser.add_argument(
-        "--is_running",
-        action="store_true",
-        help="Instructs the write subcommand that the run command is running (only used by --write)"
-    )
-    parser.add_argument(
         "--time_limit",
+        type=int,
         default=10,
-        help="Time to wait on a container to appear in order to kill it (only for --write)"
-    )
+        help="seconds to wait on a container after an interrupt signal")
     parser.add_argument('image', help='Docker image hash or name')
     parser.add_argument('session',
                         help='session name for volume and container')
@@ -151,6 +141,14 @@ def parse_args():
         '--write',
         action='store_true',
         help='write output files from a container to a tar stream on stdout')
+    subcommands.add_argument(
+        "--is_reading",
+        action="store_true",
+        help="tells the write subcommand that the read command is running (only used by --write)")
+    subcommands.add_argument(
+        "--is_running",
+        action="store_true",
+        help="tells the write subcommand that the run command is running (only used by --write)")
 
     args = parser.parse_args()
     if args.is_reading or args.is_running:
@@ -167,7 +165,7 @@ def stop_container(container, stdout=None, stderr=None):
     This does not use `sudo`, it depends on the calling function to have superuser privileges
     if necessary.
     """
-    stop_args = ["docker", "stop", container]
+    stop_args = ["docker", "stop", "--time", "0", container]
     try:
         check_call(stop_args, stdout=stdout, stderr=stderr)
     except CalledProcessError:  # the container has already been removed
@@ -324,6 +322,9 @@ def create_subcommand(subcommand, args, is_reading=False, is_running=False):
         new_args.append('sudo')
     new_args.append(args.script)
     new_args.append(subcommand)
+    if subcommand == '--write':
+        new_args.append('--time_limit')
+        new_args.append(str(args.time_limit))
     if args.workdir:
         new_args.append('--workdir')
         new_args.append(args.workdir)
@@ -415,7 +416,6 @@ def handle_run(args):
         docker_args.append(args.workdir)
     docker_args.append(args.image)
     docker_args.extend(args.command)
-    check_call(docker_args)
 
     docker_run = None
     try:
