@@ -197,21 +197,17 @@ def write_helper(args, is_reading=False, is_running=False):
     """
     Helper routine for handle_launch that performs the write subcommand.
     """
-    exporter = None
-    try:
-        export_args = create_subcommand('--write', args, is_reading=is_reading, is_running=is_running)
-        exporter = Popen(export_args, stdout=PIPE)
-        tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
-        tar_file.extractall(args.output,
-                            members=exclude_root(tar_file, args.quiet))
-        exporter.wait()
-    finally:
-        if exporter is not None:
-            if exporter.poll() is None:
-                # We finish the job regardless.
-                exporter.wait()
-            if exporter.returncode:
-                raise CalledProcessError(exporter.returncode, export_args)
+    export_args = create_subcommand('--write',
+                                    args,
+                                    is_reading=is_reading,
+                                    is_running=is_running)
+    exporter = Popen(export_args, stdout=PIPE)
+    tar_file = tarfile.open(fileobj=exporter.stdout, mode='r|')
+    tar_file.extractall(args.output,
+                        members=exclude_root(tar_file, args.quiet))
+    exporter.wait()
+    if exporter.returncode:
+        raise CalledProcessError(exporter.returncode, export_args)
 
 
 def handle_launch(args):
@@ -366,14 +362,14 @@ def handle_read(args):
     try:
         docker_run_args = [
             'docker',
-             'run',
-             '--name', rw_session,
-             '-v', rw_session + ':/mnt',
-             '--entrypoint', 'mkdir',
-             args.image,
-             '/mnt/bin',
-             '/mnt/input',
-             '/mnt/output'
+            'run',
+            '--name', rw_session,
+            '-v', rw_session + ':/mnt',
+            '--entrypoint', 'mkdir',
+            args.image,
+            '/mnt/bin',
+            '/mnt/input',
+            '/mnt/output'
         ]
         docker_rw = Popen(docker_run_args)
         docker_rw.wait()
