@@ -44,8 +44,7 @@ import re
 import logging
 import logging.config
 
-
-logging_config = {
+logging.config.dictConfig({
     "version": 1,
     'formatters': {
         'pipe_delimited': {
@@ -71,8 +70,8 @@ logging_config = {
             "propagate": False
         }
     }
-}
-logger = None
+})
+logger = logging.getLogger("docker_wrap")
 
 
 def parse_args():
@@ -113,10 +112,6 @@ def parse_args():
                         '-q',
                         action='store_true',
                         help='hide list of inputs and outputs and suppress some logging')
-    parser.add_argument('--verbose',
-                        '-v',
-                        action='store_true',
-                        help='make logging more verbose (overrides --quiet)')
     parser.add_argument('--script',
                         '-s',
                         help='script file for read, run, and write subcommands')
@@ -323,7 +318,7 @@ def exclude_root(tarinfos, is_quiet):
 
 def create_subcommand(subcommand, args, is_reading=False, is_running=False):
     if is_reading or is_running:
-        assert subcommand == "--write"
+        assert subcommand == "--write", subcommand
     new_args = []
     if args.sudo:
         new_args.append('sudo')
@@ -332,6 +327,8 @@ def create_subcommand(subcommand, args, is_reading=False, is_running=False):
     if args.workdir:
         new_args.append('--workdir')
         new_args.append(args.workdir)
+    if args.quiet:
+        new_args.append('--quiet')
     if is_reading:
         new_args.append("--is_reading")
     if is_running:
@@ -491,11 +488,7 @@ def main():
 
     # Configure the logging.
     if args.quiet:
-        logging_config["loggers"]["docker_wrap"]["level"] = "WARNING"
-    if args.verbose:
-        logging_config["loggers"]["docker_wrap"]["level"] = "DEBUG"
-    logging.config.dictConfig(logging_config)
-    logger = logging.getLogger("docker_wrap")
+        logger.setLevel(logging.WARN)
 
     if args.read:
         handle_read(args)
