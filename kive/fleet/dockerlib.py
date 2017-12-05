@@ -333,7 +333,8 @@ class DockerHandler(BaseDockerHandler):
                      for file_path in bin_files]
         args = [cls.docker_wrap_path,
                 image_id,
-                "--sudo"]
+                "--sudo",
+                "--quiet"]
         if bin_files:
             args.append("--bin_files")
             args.extend(bin_files)

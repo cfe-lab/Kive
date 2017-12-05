@@ -108,11 +108,18 @@
 
 {{ pipeline_form.errors }}
 
-    <h3>Diagram</h3>
+<h3>Diagram</h3>
 
-    <div>
-        <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
-    </div>
-    <script src="/static/portal/pipeline_view.bundle.js"></script>
+<div>
+    <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
+</div>
+
+<table>
+    <tr><th>Steps</th></tr>
+    {% for step in pipeline.steps.all %}
+    <tr><td><a href="{{step.transformation.definite.view_url}}">{{ step }}</a></td></tr>
+    {% endfor %}
+</table>
+<script src="/static/portal/pipeline_view.bundle.js"></script>
 
 {% endblock %}
