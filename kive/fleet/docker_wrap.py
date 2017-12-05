@@ -223,25 +223,21 @@ def handle_launch(args):
         print("Run session: " + run_session)
 
     # Import
-    import_args = create_subcommand('--read', args)
-    importer = None
     try:
+        import_args = create_subcommand('--read', args)
         importer = Popen(import_args, stdin=PIPE)
-        send_folders(args, importer)
-    except KeyboardInterrupt:
-        logger.warning("KeyboardInterrupt received by launch script.  Calling the `write` subcommand to clean up....")
-        importer.stdin.close()  # this ends any `docker cp` command that's waiting for input
+        try:
+            send_folders(args, importer)
+        finally:
+            importer.stdin.close()
+        importer.wait()
+        if importer.returncode:
+            raise CalledProcessError(importer.returncode, import_args)
+    except BaseException:
         write_helper(args, is_reading=True)
         raise
-    finally:
-        if importer is not None:
-            importer.stdin.close()
-            importer.wait()
-            if importer.returncode:
-                raise CalledProcessError(importer.returncode, import_args)
 
-    runner = None
-    cleaned_after_interrupt = False
+    is_running = True
     try:
         # Run
         if not args.quiet:
@@ -251,21 +247,11 @@ def handle_launch(args):
         run_args.append('--')
         for command_arg in args.command:
             run_args.append(command_arg)
-        runner = Popen(run_args)
-        runner.wait()
-        if runner.returncode:
-            raise CalledProcessError(runner.returncode, run_args)
-    except KeyboardInterrupt:
-        logger.warning("KeyboardInterrupt received by launch script.  Calling the `write` subcommand to clean up....")
-        write_helper(args, is_running=True)
-        cleaned_after_interrupt = True
-        if runner is not None:
-            runner.wait()
-        raise
+        check_call(run_args)
+        is_running = False
     finally:
         # Export
-        if not cleaned_after_interrupt:
-            write_helper(args)
+        write_helper(args, is_running=is_running)
 
     if not args.quiet:
         print('\nDone.')
@@ -353,51 +339,27 @@ def handle_read(args):
         raise OSError(errno.EEXIST,
                       'Docker volume {} already exists.'.format(rw_session))
     except CalledProcessError:
+        # Didn't find the docker volume: we're happy.
         pass
 
-    # This container is not immediately removed so as to function as a placeholder that prevents
-    # the volume from being reaped.
-    docker_rw = None
-    docker_cp = None
-    try:
-        docker_run_args = [
-            'docker',
-            'run',
-            '--name', rw_session,
-            '-v', rw_session + ':/mnt',
-            '--entrypoint', 'mkdir',
-            args.image,
-            '/mnt/bin',
-            '/mnt/input',
-            '/mnt/output'
-        ]
-        docker_rw = Popen(docker_run_args)
-        docker_rw.wait()
-        if docker_rw.returncode:
-            raise CalledProcessError(docker_rw.returncode, docker_run_args)
+    # This container is not removed, because we'll use `docker cp` to copy
+    # files in and out of this session's local volume. You can't copy directly
+    # to a volume, though, only to a container with the volume mounted.
+    docker_run_args = [
+        'docker',
+        'run',
+        '--name', rw_session,
+        '-v', rw_session + ':/mnt',
+        '--entrypoint', 'mkdir',
+        args.image,
+        '/mnt/bin',
+        '/mnt/input',
+        '/mnt/output'
+    ]
+    check_call(docker_run_args)
 
-        # If rw_session has been removed, this will fail and raise CalledProcessError.
-        # If it hasn't been removed, then `docker cp` locks the container anyway, so
-        # we don't have to worry about it being removed during execution.
-        docker_cp_args = ['docker', 'cp', '-', rw_session + ':/mnt']
-        docker_cp = Popen(docker_cp_args)
-        docker_cp.wait()
-
-    except KeyboardInterrupt:
-        if docker_rw is not None and docker_rw.poll() is None:
-            logger.warning("KeyboardInterrupt received -- calling `docker stop` on the read/write container....")
-            stop_container(rw_session)
-
-        if docker_cp is not None and docker_cp.poll() is None:
-            docker_cp.send_signal(signal.SIGINT)
-            docker_cp.wait()
-
-        clean_up(rw_session)
-        raise
-
-    except BaseException:
-        clean_up(rw_session)
-        raise
+    docker_cp_args = ['docker', 'cp', '-', rw_session + ':/mnt']
+    check_call(docker_cp_args)
 
 
 def handle_run(args):
@@ -413,63 +375,48 @@ def handle_run(args):
     docker_args.append(args.image)
     docker_args.extend(args.command)
 
-    docker_run = None
-    try:
-        docker_run = Popen(docker_args)
-        docker_run.wait()
-        if docker_run.returncode:
-            raise CalledProcessError(docker_run.returncode, docker_args)
-    except KeyboardInterrupt:
-        if docker_run is not None:
-            logger.warning("KeyboardInterrupt received -- calling `docker stop` on the run job....")
-            stop_container(docker_run_session)
-        # If we get another KeyboardInterrupt in here, well, we can only do so much.
-        raise
+    check_call(docker_args)
 
 
 def handle_write(args):
     rw_session, run_session = expand_session(args.session)
-    docker_cp = None
+    # Stop the containers if necessary before doing the copy.
+    container_to_stop = None
+    # We already know at most one of args.is_reading and args.is_running is True.
+    if args.is_reading:
+        container_to_stop = rw_session
+    elif args.is_running:
+        container_to_stop = run_session
+
+    if container_to_stop is not None:
+        container_stopped = False
+        for i in range(args.time_limit):
+            if check_container_exists(container_to_stop, show_all=True):
+                logger.info("Stopping container %s....", container_to_stop)
+                stop_container(container_to_stop, stdout=PIPE, stderr=PIPE)  # suppress output
+                container_stopped = True
+                break
+            else:
+                logger.info("Container %s not found yet.  Waiting 1 second....", container_to_stop)
+                time.sleep(1)
+        if not container_stopped:
+            logger.info("Container %s did not appear after %d seconds.  Moving on.",
+                        container_to_stop, args.time_limit)
+
+    # If args.is_reading is True, it does raise the possibility that the `docker cp` was still running;
+    # this will wait for that to finish.
+    docker_cp_args = ['docker', 'cp', rw_session + ':/mnt/output/.', '-']
+    docker_cp = Popen(docker_cp_args)
     try:
-        # Stop the containers if necessary before doing the copy.
-        container_to_stop = None
-        # We already know at most one of args.is_reading and args.is_running is True.
-        if args.is_reading:
-            container_to_stop = rw_session
-        elif args.is_running:
-            container_to_stop = run_session
-
-        if container_to_stop is not None:
-            container_stopped = False
-            for i in range(args.time_limit):
-                if check_container_exists(container_to_stop, show_all=True):
-                    logger.info("Stopping container %s....", container_to_stop)
-                    stop_container(container_to_stop, stdout=PIPE, stderr=PIPE)  # suppress output
-                    container_stopped = True
-                    break
-                else:
-                    logger.info("Container %s not found yet.  Waiting 1 second....", container_to_stop)
-                    time.sleep(1)
-            if not container_stopped:
-                logger.info("Container %s did not appear after %d seconds.  Moving on.",
-                            container_to_stop, args.time_limit)
-
-        # If args.is_reading is True, it does raise the possibility that the `docker cp` was still running;
-        # this will wait for that to finish.
-        docker_cp_args = ['docker', 'cp', rw_session + ':/mnt/output/.', '-']
-        docker_cp = Popen(docker_cp_args)
         docker_cp.wait()
-    except KeyboardInterrupt:
-        # Quoth Don:
-        # "If a user sends two Ctrl-C signals, I have no sympathy for them."
-        # So, we don't bother checking the containers again, as a first pass through should have stopped
-        # the containers on a first Ctrl-C.
-        # We make sure the task has been properly killed before cleanup.
-        if docker_cp is not None and docker_cp.poll() is None:
+    finally:
+        if docker_cp.poll() is None:
+            # We got interrupted.
             docker_cp.send_signal(signal.SIGINT)
             docker_cp.wait()
-    finally:
         clean_up(rw_session)
+        if docker_cp.returncode:
+            raise CalledProcessError(docker_cp.returncode, docker_cp_args)
 
 
 def clean_up(session):
