@@ -456,34 +456,29 @@ class SlurmScheduler(BaseSlurmScheduler):
     @classmethod
     def job_cancel(cls, jobhandle):
         """Cancel a given job given its jobhandle.
-        Raise an exception if an error occurs, otherwise return nothing.
+
+        Log a warning if an error occurs, return nothing.
         """
-        cmd_lst = ["scancel", "{}".format(jobhandle.job_id)]
-        stderr_fd, stderr_path = tempfile.mkstemp()
+        accounting_info = cls.get_accounting_info([jobhandle])
+        if accounting_info:
+            job_info = accounting_info.get(jobhandle.job_id)
+            if job_info and job_info['end_time']:
+                # Already finished, nothing to cancel.
+                return
+
+        logger.info('Cancelling Slurm job id %s.', jobhandle.job_id)
+        cmd_lst = ["scancel",
+                   "-sint",  # Send interrupt instead of kill to allow cleanup.
+                   "-f",  # Also send signal to child processes.
+                   "{}".format(jobhandle.job_id)]
         try:
-            with os.fdopen(stderr_fd, "w") as f:
-                multi_check_output(cmd_lst, stderr=f)
-        except OSError:
-            status_report = "failed to execute '%s'" % " ".join(cmd_lst)
-            logger.warning(status_report, exc_info=True)
-            raise
-        except sp.CalledProcessError as e:
-            status_report = "scancel returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
-            try:
-                with open(stderr_path, "r") as f:
-                    stderr_str = "stderr:\n{}".format(f.read())
-            except IOError as e:
-                stderr_str = "The stderr log for the scancel call appears to have been lost!"
-
-            logger.error(status_report, e.returncode, cmd_lst, e.output, stderr_str, exc_info=True)
-            raise
-
-        finally:
-            # Clean up the stderr log file.
-            try:
-                os.remove(stderr_path)
-            except OSError:
-                pass
+            sp.check_output(cmd_lst, stderr=sp.STDOUT)
+        except sp.CalledProcessError as ex:
+            logger.warn('scancel failed for job id %s',
+                        jobhandle.job_id,
+                        exc_info=True)
+            for line in ex.output.splitlines(False):
+                logger.info(line)
 
     @classmethod
     def slurm_is_alive(cls, skip_extras=False):
