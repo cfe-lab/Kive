@@ -91,24 +91,24 @@ class Command(BaseCommand):
         logger.info('Done.')
 
     def find_runs(self, pipeline_ids, run_count):
-        launched_input_ids = defaultdict(set)  # {family_id: set(input id tuples)}
+        launched_input_ids = defaultdict(set)  # {family_id: {input_id}}
         for pipeline_id in pipeline_ids:
             # We run into trouble when two versions of a pipeline run at the
             # same time and try to restore the same dataset at the same time.
             pipeline = Pipeline.objects.get(id=pipeline_id)
             family_input_ids = launched_input_ids[pipeline.family_id]
-            pipeline_input_ids = set()
+            pipeline_run_count = 0
             for run in Run.objects.filter(pipeline_id=pipeline_id,
                                           _runstate_id=runstates.SUCCESSFUL_PK).order_by('?'):
-                input_ids = tuple(run_input.dataset_id
-                                  for run_input in run.inputs.order_by('index'))
-                if input_ids not in family_input_ids:
+                input_ids = {run_input.dataset_id
+                             for run_input in run.inputs.order_by('index')}
+                if not input_ids & family_input_ids:
                     yield run
-                    family_input_ids.add(input_ids)
-                    pipeline_input_ids.add(input_ids)
-                if len(pipeline_input_ids) >= run_count:
+                    family_input_ids |= input_ids
+                    pipeline_run_count += 1
+                if pipeline_run_count >= run_count:
                     break
-            if len(pipeline_input_ids) < run_count:
+            if pipeline_run_count < run_count:
                 logger.warn('Only found %d runs for pipeline %s.',
-                            len(pipeline_input_ids),
+                            pipeline_run_count,
                             pipeline)
