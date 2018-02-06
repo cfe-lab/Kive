@@ -94,9 +94,11 @@ Development
 To upload a pipeline to Kive, read the [developer documentation].
 
 To work on Kive itself, read about [installation], [contributing], and
-look at the [model classes].
+look at the [model classes]. To look after a Kive server, follow the
+[admin guide].
 
 [developer documentation]: http://cfe-lab.github.io/Kive/dev_docs
 [installation]: https://github.com/cfe-lab/Kive/blob/master/INSTALL.md
 [contributing]: https://github.com/cfe-lab/Kive/blob/master/CONTRIBUTING.md
 [model classes]: http://cfe-lab.github.io/Kive/models/README
+[admin guide]: http://cfe-lab.github.io/Kive/admin
