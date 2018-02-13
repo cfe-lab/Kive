@@ -3,6 +3,7 @@ import re
 import tempfile
 import itertools
 import copy
+from datetime import datetime
 
 from mock import patch
 
@@ -18,6 +19,7 @@ from rest_framework import status
 from archive.models import Run, ExecLog
 from archive.serializers import RunSerializer, RunBatchSerializer, grplst2str, usrlst2str
 from archive.exceptions import SandboxActiveException, RunNotFinished
+from constants import runstates
 from file_access_utils import create_sandbox_base_path
 from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
@@ -294,20 +296,23 @@ class GarbageCollectionTest(TestCase):
             dir=create_sandbox_base_path())
 
     def test_reap_nonexistent_sandbox_path(self):
+        """ A Run that has no sandbox path should do nothing.
+
+        This used to raise an exception, but it's a valid scenario. When a run
+        is cancelled before it starts, it never gets a sandbox path.
         """
-        A Run that has no sandbox path should raise an exception.
-        """
-        run = Run(pipeline=self.noop_pl, user=self.noop_pl.user)
+        now = datetime.now()
+        run = Run(pipeline=self.noop_pl,
+                  user=self.noop_pl.user,
+                  start_time=now,
+                  end_time=now,
+                  _runstate_id=runstates.SUCCESSFUL_PK)
         run.save()
 
-        self.assertRaisesRegexp(
-            SandboxActiveException,
-            re.escape("Run (pk={}, Pipeline={}, queued {}, User=RemOver) has no sandbox path".format(
-                run.id,
-                self.noop_pl,
-                run.time_queued)),
-            run.collect_garbage
-        )
+        run.collect_garbage()
+
+        reloaded_run = Run.objects.get(id=run.id)
+        self.assertTrue(reloaded_run.purged)
 
     def test_reap_unfinished_run(self):
         """

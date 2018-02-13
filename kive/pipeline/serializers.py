@@ -239,7 +239,7 @@ class PipelineSerializer(AccessControlSerializer,
         source='family',
         view_name='pipelinefamily-detail',
         lookup_field='pk',
-        queryset=PipelineFamily.objects.all())
+        read_only=True)
     inputs = TransformationInputSerializer(many=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
 
