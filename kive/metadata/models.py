@@ -512,7 +512,7 @@ class Datatype(AccessControl):
         return ','.join([dt['name'] for dt in self.restricts.values()])
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(Datatype, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
         self.effective_constraints = {}
 
@@ -1340,7 +1340,7 @@ class CompoundDatatype(AccessControl):
         ordering = ["name"]
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(CompoundDatatype, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def set_name(self, save=True):

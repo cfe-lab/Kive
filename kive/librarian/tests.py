@@ -15,7 +15,6 @@ import stat
 from StringIO import StringIO
 
 from django.core.exceptions import ValidationError
-from django.utils import timezone
 from django.contrib.auth.models import User, Group
 from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
@@ -438,6 +437,7 @@ class FindCompatibleERTests(TestCase):
         methodoutput = runstep.log.methodoutput
         methodoutput.return_code = 1  # make this a failure
         methodoutput.save()
+        # noinspection PyUnresolvedReferences
         runstep._runcomponentstate = RunComponentState.objects.get(pk=runcomponentstates.FAILED_PK)
         runstep.save()
 
@@ -887,6 +887,7 @@ class RemovalTests(TestCase):
         execlogs_affected = redaction_plan["OutputLogs"].union(
             redaction_plan["ErrorLogs"]).union(redaction_plan["ReturnCodes"])
         for log in execlogs_affected:
+            # noinspection PyUnresolvedReferences
             reloaded_log = ExecLog.objects.get(pk=log.pk)
             if log in redaction_plan["OutputLogs"]:
                 self.assertTrue(reloaded_log.methodoutput.is_output_redacted())
@@ -1121,7 +1122,6 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         self.detail_view, _, _ = resolve(self.detail_path)
         self.redaction_view, _, _ = resolve(self.redaction_path)
         self.removal_view, _, _ = resolve(self.removal_path)
-
 
         tz = timezone.get_current_timezone()
         apples_date = timezone.make_aware(datetime(2017, 1, 1), tz)
@@ -1447,6 +1447,32 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         self.assertTrue(dataset.is_redacted())
 
     def test_dataset_purge(self):
+        request = self.factory.patch(self.detail_path,
+                                     json.dumps({'dataset_file': None}),
+                                     content_type='application/json')
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        dataset = Dataset.objects.get(pk=self.detail_pk)
+        self.assertFalse(dataset.has_data())
+
+    def test_dataset_purge_again(self):
+        # Purge the dataset file.
+        Dataset.objects.get(pk=self.detail_pk).dataset_file.delete(save=True)
+
+        # Now send a request to purge it again. Should do nothing.
+        request = self.factory.patch(self.detail_path,
+                                     json.dumps({'dataset_file': None}),
+                                     content_type='application/json')
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_200_OK)
+
+        dataset = Dataset.objects.get(pk=self.detail_pk)
+        self.assertFalse(dataset.has_data())
+
+    def test_dataset_view_purged(self):
         dataset = Dataset.objects.get(id=self.detail_pk)
         dataset.dataset_file.delete(save=True)
 
@@ -1456,6 +1482,8 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(
             response.data['description'],
             "Test data for a test that tests test data")
+        self.assertFalse(response.data['has_data'])
+        self.assertFalse(response.data['is_redacted'])
 
 
 @skipIfDBFeature('is_mocked')

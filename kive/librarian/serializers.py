@@ -83,6 +83,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'MD5_checksum',
             'has_data',
             'is_redacted',
+            'uploaded',
 
             'user',  # inherited
             'users_allowed',

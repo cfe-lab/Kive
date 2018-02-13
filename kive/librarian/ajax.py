@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 from django.db import transaction
@@ -22,6 +23,7 @@ from kive.ajax import RemovableModelViewSet, RedactModelMixin, IsGrantedReadCrea
     convert_validation
 
 JSON_CONTENT_TYPE = 'application/json'
+logger = logging.getLogger(__name__)
 
 
 class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
@@ -70,9 +72,10 @@ class DatasetViewSet(RemovableModelViewSet,
     """ List and modify datasets.
 
     POST to the list to upload a new dataset, DELETE an instance to remove it
-    along with all runs that produced or consumed it, or PATCH is_redacted=true
+    along with all runs that produced or consumed it, or PATCH is_redacted="true"
     on an instance to blank its contents along with any other instances or logs
-    that used it as input.
+    that used it as input. PATCH dataset_file=null to purge a dataset's contents,
+    but leave related records intact.
 
     Query parameters for the list view:
     * page_size=n - limit the results and page through them
@@ -153,6 +156,17 @@ class DatasetViewSet(RemovableModelViewSet,
 
     def patch_object(self, request, pk=None):
         obj = self.get_object()
+
+        try:
+            dataset_file = request.data["dataset_file"]
+            is_purged = dataset_file is None
+        except KeyError:
+            # No data file in request.
+            is_purged = False
+
+        if is_purged:
+            obj.dataset_file.delete(save=True)
+
         return Response(DatasetSerializer(obj, context={'request': request}).data)
 
     # noinspection PyUnusedLocal

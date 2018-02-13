@@ -2,7 +2,7 @@
 
 from __future__ import unicode_literals
 
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
 from csv import DictWriter
 import os
 import re
@@ -14,9 +14,14 @@ from time import sleep
 
 
 def parse_args():
-    parser = ArgumentParser(description='Log free memory.')
-    parser.add_argument('-d', '--delay', type=int, default=60)
-    parser.add_argument('log', type=FileType('w'))
+    parser = ArgumentParser(description='Log free memory.',
+                            formatter_class=ArgumentDefaultsHelpFormatter)
+    parser.add_argument('-d',
+                        '--delay',
+                        type=int,
+                        help='delay in seconds between measurements',
+                        default=60)
+    parser.add_argument('log', type=FileType('w'), help='log file to write')
 
     return parser.parse_args()
 
@@ -116,6 +121,7 @@ def main():
         writer.write(datetime.now(), entries)
 
         sleep(args.delay)
+
 
 if __name__ == '__main__':
     main()

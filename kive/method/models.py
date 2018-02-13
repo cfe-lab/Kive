@@ -204,7 +204,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         return reverse("resource_revision_view", kwargs={"pk": self.pk})
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(CodeResourceRevision, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):

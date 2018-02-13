@@ -41,6 +41,7 @@ class Command(BaseCommand):
             help='comma-separated list of output names to purge')
 
     def handle(self, *args, **options):
+        # See also: utils/request_reruns.py
         logger.info('Starting.')
         if options['run_ids']:
             run_ids = map(int, options['run_ids'].split(','))

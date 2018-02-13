@@ -235,6 +235,11 @@ class PipelineSerializer(AccessControlSerializer,
         slug_field='name',
         queryset=PipelineFamily.objects.all()
     )
+    family_url = serializers.HyperlinkedRelatedField(
+        source='family',
+        view_name='pipelinefamily-detail',
+        lookup_field='pk',
+        queryset=PipelineFamily.objects.all())
     inputs = TransformationInputSerializer(many=True)
     outputs = TransformationOutputSerializer(many=True, read_only=True)
 
@@ -250,6 +255,7 @@ class PipelineSerializer(AccessControlSerializer,
         read_only=True,
         default=PipelineRevisionNumberGetter()
     )
+    pipeline_instances = serializers.HyperlinkedIdentityField(view_name='pipeline-instances')
 
     class Meta:
         model = Pipeline
@@ -257,6 +263,7 @@ class PipelineSerializer(AccessControlSerializer,
             'id',
             'url',
             'family',
+            'family_url',
             "display_name",
             'revision_name',
             "revision_desc",
@@ -275,6 +282,7 @@ class PipelineSerializer(AccessControlSerializer,
             'step_updates',
             "absolute_url",
             "view_url",
+            "pipeline_instances"
         )
 
     def __init__(self, *args, **kwargs):

@@ -8,6 +8,7 @@ from rest_framework.decorators import detail_route
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
+from archive.serializers import RunSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin, convert_validation, StandardPagination,\
     SearchableModelMixin
@@ -15,7 +16,7 @@ from metadata.models import AccessControl
 from pipeline.models import Pipeline, PipelineFamily
 from pipeline.serializers import PipelineFamilySerializer, PipelineSerializer,\
     PipelineStepUpdateSerializer
-from portal.views import admin_check, developer_check
+from portal.views import developer_check
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,6 +41,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
 
+    # noinspection PyUnusedLocal
     @detail_route(methods=["get"])
     def pipelines(self, request, pk=None):
         """In this routine, we are responding to an API request which looks something
@@ -67,16 +69,6 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
                                                context={"request": request})
         return Response(member_serializer.data)
 
-    def partial_update(self, request, pk=None):
-        """
-        Defines PATCH functionality on a PipelineFamily.
-        """
-        if "published_version" in request.data:
-            # This is a PATCH to change the published version.
-            return self.change_published_version(request)
-
-        return Response({"message": "No action taken."})
-
     def get_serializer_context(self):
         """
         Return the context for the serializer.
@@ -87,21 +79,6 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
         is_developer = developer_check(self.request.user)
         context["only_is_published"] = not is_developer
         return context
-
-    def change_published_version(self, request):
-        family_to_publish = self.get_object()
-        if request.data.get("published_version") == "" or request.data.get("published_version") is None:
-            new_published_version = None
-        else:
-            new_published_version = Pipeline.objects.get(pk=request.data["published_version"])
-
-        family_to_publish.published_version = new_published_version
-        family_to_publish.save()
-        response_msg = 'PipelineFamily "{}" published_version set to "{}".'.format(
-            family_to_publish,
-            new_published_version
-        )
-        return Response({'message': response_msg})
 
     def filter_queryset(self, queryset):
         queryset = super(PipelineFamilyViewSet, self).filter_queryset(queryset)
@@ -166,6 +143,7 @@ class PipelineViewSet(CleanCreateModelMixin,
 
         return prefetchd
 
+    # noinspection PyUnusedLocal
     @detail_route(methods=['get'], suffix='Step Updates')
     def step_updates(self, request, pk=None):
         updates = self.get_object().find_step_updates()
@@ -185,6 +163,7 @@ class PipelineViewSet(CleanCreateModelMixin,
         except DjangoValidationError as ex:
             raise convert_validation(ex)
 
+    # noinspection PyUnusedLocal
     def partial_update(self, request, pk=None):
         """
         Defines PATCH functionality on a Pipeline.
@@ -230,3 +209,19 @@ class PipelineViewSet(CleanCreateModelMixin,
         if key == "user":
             return queryset.filter(user__username__icontains=value)
         raise APIException('Unknown filter key: {}'.format(key))
+
+    # noinspection PyUnusedLocal
+    @detail_route(methods=["get"], suffix="Instances")
+    def instances(self, request, pk=None):
+        queryset = self.get_object().pipeline_instances.all()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            # Not paging.
+            serializer = RunSerializer(page,
+                                       many=True,
+                                       context=self.get_serializer_context())
+            return self.get_paginated_response(serializer.data)
+        serializer = RunSerializer(queryset,
+                                   many=True,
+                                   context=self.get_serializer_context())
+        return Response(serializer.data)

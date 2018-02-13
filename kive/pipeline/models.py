@@ -204,7 +204,7 @@ class Pipeline(transformation.models.Transformation):
         # input/outputs for this pipeline as a whole.  This also checks for
         # coherence of permissions on the inputs/outputs, and therefore on
         # all the cables.
-        super(self.__class__, self).clean()
+        super(Pipeline, self).clean()
 
         self.validate_restrict_access([self.family])
 
@@ -1030,7 +1030,7 @@ class PipelineStepInputCable(PipelineCable):
     # Coherence of data is already enforced by Pipeline
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(PipelineStepInputCable, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
@@ -1393,7 +1393,7 @@ class PipelineOutputCable(PipelineCable):
 
     def __init__(self, *args, **kwargs):
         self.logger = logging.getLogger(self.__class__.__name__)
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(PipelineOutputCable, self).__init__(*args, **kwargs)
 
     def __str__(self):
         """ Represent with the pipeline name, and TO output index + name """

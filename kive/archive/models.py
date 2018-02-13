@@ -719,19 +719,15 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
         """
         Dispose of the sandbox used by the Run.
         """
-        if self.sandbox_path == "":
-            raise archive.exceptions.SandboxActiveException(
-                "Run (pk={}, Pipeline={}, queued {}, User={}) has no sandbox path".format(
-                    self.pk, self.pipeline, self.time_queued, self.user)
-                )
-        elif not self.is_complete():
+        if not self.is_complete():
             raise archive.exceptions.SandboxActiveException(
                 "Run (pk={}, Pipeline={}, queued {}, User={}) is not finished".format(
                     self.pk, self.pipeline, self.time_queued, self.user)
                 )
 
-        # This may raise OSError; the caller should catch it.
-        shutil.rmtree(self.sandbox_path)
+        if self.sandbox_path != "":
+            # This may raise OSError; the caller should catch it.
+            shutil.rmtree(self.sandbox_path)
         self.purged = True
         self.save()
 
@@ -2720,7 +2716,7 @@ class ExecLog(stopwatch.models.Stopwatch):
     # Since this inherits from Stopwatch, it has start_time and end_time.
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(ExecLog, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     @classmethod

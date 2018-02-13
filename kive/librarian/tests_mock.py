@@ -20,7 +20,7 @@ from kive.tests import dummy_file
 from kive.tests import ViewMockTestCase
 from librarian.models import Dataset, ExecRecord, ExecRecordOut, ExecRecordIn, DatasetStructure
 from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype, kive_user, KiveUser
-from archive.models import RunStep, ExecLog, Run, RunOutputCable, RunSIC, RunInput
+from archive.models import RunStep, ExecLog, Run, RunOutputCable, RunSIC, RunInput, RunComponent
 from method.models import Method
 from pipeline.models import PipelineOutputCable, PipelineStepInputCable, PipelineStep, Pipeline, PipelineCable, \
     CustomCableWire
@@ -229,6 +229,23 @@ Dave,40
         expected_bad_data.cell_errors.create.assert_called_once_with(
             column=count_column,
             row_num=expected_bad_row)
+
+    def test_uploaded(self):
+        dataset = Dataset()
+
+        self.assertTrue(dataset.uploaded)
+
+    def test_file_source_means_not_uploaded(self):
+        dataset = Dataset()
+        dataset.file_source = RunComponent()
+
+        self.assertFalse(dataset.uploaded)
+
+    def test_usurps_means_not_uploaded(self):
+        dataset = Dataset(name='failed_integrity_check.txt')
+        dataset.usurps = Dataset(name='original.txt')
+
+        self.assertFalse(dataset.uploaded)
 
 
 class DatasetViewMockTests(ViewMockTestCase):

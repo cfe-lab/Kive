@@ -198,7 +198,7 @@ class Dataset(metadata.models.AccessControl):
         ordering = ["-date_created", "name"]
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(Dataset, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
@@ -1068,7 +1068,11 @@ class Dataset(metadata.models.AccessControl):
                 newly_computed_MD5 = file_access_utils.compute_md5(f)
 
         if newly_computed_MD5 != self.MD5_checksum:
-            self.logger.warn("md5s do not agree (old: {}; new: {})".format(self.MD5_checksum, newly_computed_MD5))
+            self.logger.warn(
+                "md5s do not agree for dataset id %d (old: %s; new: %s)",
+                self.id,
+                self.MD5_checksum,
+                newly_computed_MD5)
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
@@ -1250,6 +1254,10 @@ class Dataset(metadata.models.AccessControl):
 
     def is_redacted(self):
         return self._redacted
+
+    @property
+    def uploaded(self):
+        return self.file_source is None and not hasattr(self, 'usurps')
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
@@ -1567,7 +1575,7 @@ class ExecRecord(models.Model):
     # FIXME exactly one of these must be non-null
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(ExecRecord, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
@@ -1950,7 +1958,7 @@ class ExecRecordIn(models.Model):
         unique_together = ("execrecord", "generic_input")
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(ExecRecordIn, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
@@ -2105,7 +2113,7 @@ class ExecRecordOut(models.Model):
         unique_together = ("execrecord", "generic_output")
 
     def __init__(self, *args, **kwargs):
-        super(self.__class__, self).__init__(*args, **kwargs)
+        super(ExecRecordOut, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def __str__(self):
