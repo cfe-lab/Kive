@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from random import shuffle
 from subprocess import check_output, STDOUT, CalledProcessError
 
-from itertools import islice
+from itertools import islice, repeat
 
 import signal
 
@@ -52,6 +52,10 @@ def parse_args():
     parser.add_argument('--plot',
                         type=FileType('w'),
                         help='file name to plot file sizes instead of copying')
+    parser.add_argument('--skip_copy',
+                        '-s',
+                        action='store_true',
+                        help='Skip the copy step, repeatedly unzip the first file')
     return parser.parse_args()
 
 
@@ -80,8 +84,11 @@ def copy_file(args, file_info):
         logger.debug('%s, %s', source_file.is_link, source_file.path)
         file_name = os.path.basename(source_file.path)
         file_name = '{:04}-{}'.format(file_number, file_name)
-        target_file = os.path.join(args.target_dir, file_name)
-        shutil.copyfile(source_file.path, target_file)
+        if args.skip_copy:
+            target_file = source_file.path
+        else:
+            target_file = os.path.join(args.target_dir, file_name)
+            shutil.copyfile(source_file.path, target_file)
         python_template = """\
 from gzip import GzipFile
 with GzipFile({!r}) as f:
@@ -114,7 +121,8 @@ with GzipFile({!r}) as f:
         except CalledProcessError as ex:
             report = 'Copy failed for ' + source_file.path + '\n'
             report += ex.output
-        os.remove(target_file)
+        if not args.skip_copy:
+            os.remove(target_file)
         return report
     except Exception:
         logger.error('Copy failed.', exc_info=True)
@@ -150,6 +158,9 @@ def main():
             figure.savefig(args.plot)
             logger.info('Plotted %d files.', source_data.size)
         else:
+            if args.skip_copy:
+                only_file = next(source_files)
+                source_files = repeat(only_file)
             pool = Pool(args.processes, init_worker)
             copy_func = partial(copy_file, args)
             for report in pool.imap_unordered(copy_func,
