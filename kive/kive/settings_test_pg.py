@@ -2,6 +2,8 @@
 # while still using PostgreSQL for thoroughness.
 # Use it by running ./manage.py test --settings=kive.settings_test_pg
 
+import os
+
 from settings import *  # @UnusedWildImport
 
 # Avoid overwriting developer data files

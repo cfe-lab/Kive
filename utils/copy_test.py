@@ -39,6 +39,11 @@ def parse_args():
                         type=int,
                         default=100,
                         help='Number of files to copy')
+    parser.add_argument('-p',
+                        '--processes',
+                        type=int,
+                        default=16,
+                        help='Number processes to run at the same time')
     parser.add_argument('--plot',
                         type=FileType('w'),
                         help='file name to plot file sizes instead of copying')
@@ -139,8 +144,7 @@ def main():
             figure.savefig(args.plot)
             logger.info('Plotted %d files.', source_data.size)
         else:
-            processes = None
-            pool = Pool(processes, init_worker)
+            pool = Pool(args.processes, init_worker)
             copy_func = partial(copy_file, args)
             for report in pool.imap_unordered(copy_func,
                                               enumerate(islice(source_files,

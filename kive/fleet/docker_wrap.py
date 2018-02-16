@@ -304,6 +304,7 @@ def create_subcommand(subcommand, args, is_reading=False, is_running=False):
         new_args.append('sudo')
     new_args.append(args.script)
     new_args.append(subcommand)
+    new_args.append(args.image)
     if subcommand == '--write':
         new_args.append('--time_limit')
         new_args.append(str(args.time_limit))
@@ -316,7 +317,6 @@ def create_subcommand(subcommand, args, is_reading=False, is_running=False):
         new_args.append("--is_reading")
     if is_running:
         new_args.append("--is_running")
-    new_args.append(args.image)
     new_args.append(args.session)
     return new_args
 
