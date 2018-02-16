@@ -1,7 +1,5 @@
 # Django settings for server project.
 
-import os
-
 # Copy this file to settings.py, then adjust the settings in the copy.
 # Kive-specific things to set:
 # DATABASES: NAME, USER, and PASSWORD are site-specific

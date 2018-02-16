@@ -142,6 +142,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         RunBatch.
 
     Parameter for a PATCH:
+
     * is_stop_requested(=true) - the Run is marked for stopping.
     """
     queryset = Run.objects.all()

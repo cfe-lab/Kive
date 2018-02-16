@@ -211,20 +211,13 @@ class DockerHandler(BaseDockerHandler):
     @staticmethod
     def check_is_alive():
         """Return True if the docker configuration is adequate for Kive's purposes.
-        This is done by
-        1) calling 'docker -v' and checking for exceptions.
-        2) calling bzip2 and checking for exceptions. bzip2 is needed when loading
-        a docker image from a file.
-        3) calling 'docker version' and checking for exceptions.
 
-        NOTE: the difference between 'docker -v' and 'docker version' is that the first
-        is not as rigorous a test. The first is used to see whether the docker executable
-        can be found. The second is used to see whether the docker daemon can be reached
-        and whether the permissions on /var/run/docker.sock (used to connect to the docker daemon)
-        allows communication.
+        This is done by
+        1) calling bzip2 and checking for exceptions. bzip2 is needed when loading
+        a docker image from a file.
+        2) calling 'docker version' and checking for exceptions.
         """
-        for cmd_lst in [[DOCKER_COMMAND, '-v'],
-                        [BZIP2_COMMAND, '-h'],
+        for cmd_lst in [[BZIP2_COMMAND, '-h'],
                         ['sudo', DOCKER_COMMAND, 'version']]:
             DockerHandler._run_shell_command(cmd_lst)
             logger.debug("%s passed.", " ".join(cmd_lst))

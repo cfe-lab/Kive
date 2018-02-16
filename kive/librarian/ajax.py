@@ -78,6 +78,7 @@ class DatasetViewSet(RemovableModelViewSet,
     but leave related records intact.
 
     Query parameters for the list view:
+
     * page_size=n - limit the results and page through them
     * is_granted=true - For administrators, this limits the list to only include
         records that the user has been explicitly granted access to. For other
