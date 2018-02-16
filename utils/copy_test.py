@@ -44,6 +44,11 @@ def parse_args():
                         type=int,
                         default=16,
                         help='Number processes to run at the same time')
+    parser.add_argument('-t',
+                        '--test',
+                        choices=('docker', 'python'),
+                        default='docker',
+                        help='How to run the test on each file')
     parser.add_argument('--plot',
                         type=FileType('w'),
                         help='file name to plot file sizes instead of copying')
@@ -77,34 +82,35 @@ def copy_file(args, file_info):
         file_name = '{:04}-{}'.format(file_number, file_name)
         target_file = os.path.join(args.target_dir, file_name)
         shutil.copyfile(source_file.path, target_file)
-        python_source = """\
+        python_template = """\
 from gzip import GzipFile
-with GzipFile('/mnt/input/in.fastq.gz') as f:
+with GzipFile({!r}) as f:
     i = 0
     for i, line in enumerate(f):
         pass
     print(i, 'lines')
 """
+        if args.test == 'python':
+            python_source = python_template.format(target_file)
+            command_args = ["python3",
+                            "-c",
+                            python_source]
+        else:
+            python_source = python_template.format('/mnt/input/in.fastq.gz')
+            command_args = ["docker_wrap.py",
+                            "python:3",
+                            "--sudo",
+                            "--quiet",
+                            "--inputs",
+                            target_file + ":in.fastq.gz",
+                            "--",
+                            file_name,
+                            "python",
+                            "-c",
+                            python_source]
         try:
-            report = check_output(["docker_wrap.py",
-                                   "python:3",
-                                   "--sudo",
-                                   "--quiet",
-                                   "--inputs",
-                                   target_file + ":in.fastq.gz",
-                                   "--",
-                                   file_name,
-                                   "python",
-                                   "-c",
-                                   python_source],
-                                  stderr=STDOUT)
+            report = check_output(command_args, stderr=STDOUT)
             report = report.strip() + ' ' + file_name
-            # sleep(20)
-            # with GzipFile(target_file) as zip_file:
-            #     while True:
-            #         chunk = zip_file.read(1024)
-            #         if chunk == '':
-            #             break
         except CalledProcessError as ex:
             report = 'Copy failed for ' + source_file.path + '\n'
             report += ex.output
