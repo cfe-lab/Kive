@@ -10,7 +10,7 @@ from multiprocessing import Pool
 from random import shuffle
 from subprocess import check_output, STDOUT, CalledProcessError
 
-from itertools import islice, repeat
+from itertools import islice, repeat, imap
 
 import signal
 
@@ -161,11 +161,15 @@ def main():
             if args.skip_copy:
                 only_file = next(source_files)
                 source_files = repeat(only_file)
-            pool = Pool(args.processes, init_worker)
             copy_func = partial(copy_file, args)
-            for report in pool.imap_unordered(copy_func,
-                                              enumerate(islice(source_files,
-                                                               args.num_files))):
+            if args.processes == 1:
+                map_function = imap
+            else:
+                pool = Pool(args.processes, init_worker)
+                map_function = pool.imap_unordered
+            for report in map_function(copy_func,
+                                       enumerate(islice(source_files,
+                                                        args.num_files))):
                 logger.debug(report)
 
         logger.info('Done.')
