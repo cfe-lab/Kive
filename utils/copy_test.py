@@ -56,6 +56,10 @@ def parse_args():
                         '-s',
                         action='store_true',
                         help='Skip the copy step, repeatedly unzip the first file')
+    parser.add_argument('--skip_zip',
+                        '-z',
+                        action='store_true',
+                        help='Skip the gzip step, just read the file')
     return parser.parse_args()
 
 
@@ -89,7 +93,19 @@ def copy_file(args, file_info):
         else:
             target_file = os.path.join(args.target_dir, file_name)
             shutil.copyfile(source_file.path, target_file)
-        python_template = """\
+        if args.skip_zip:
+            python_template = """\
+with open({!r}, 'rb') as f:
+    i = 0
+    while True:
+        chunk = f.read(1000)
+        if len(chunk) == 0:
+            break
+        i += len(chunk)
+    print(i, 'bytes')
+"""
+        else:
+            python_template = """\
 from gzip import GzipFile
 with GzipFile({!r}) as f:
     i = 0
