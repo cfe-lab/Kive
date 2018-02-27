@@ -183,8 +183,6 @@ class BaseSlurmScheduler(object):
                    workingdir,
                    driver_name,
                    driver_arglst,
-                   user_id,
-                   group_id,
                    prio_level,
                    num_cpus,
                    stdoutfile,
@@ -204,9 +202,6 @@ class BaseSlurmScheduler(object):
         driver_name (string): name of the command to execute as the main job script.
 
         driver_arglst (list of strings): arguments to the driver_name executable.
-
-        user_id, group_id (integers): the unix user under whose account the jobs will
-        be executed.
 
         prio_level (integer): priority level of the job (0 is lowest).
 
@@ -355,7 +350,7 @@ class SlurmScheduler(BaseSlurmScheduler):
 
     @classmethod
     def _int_prio_to_part_name(cls, intprio):
-        """Translate an priority provided as an integer into
+        """Translate a priority provided as an integer into
         a slurm partition name.
         """
         # priority is an integer; we translate it to one of the Slurm queue names.
@@ -370,8 +365,6 @@ class SlurmScheduler(BaseSlurmScheduler):
                    workingdir,
                    driver_name,
                    driver_arglst,
-                   user_id,
-                   group_id,
                    prio_level,
                    num_cpus,
                    stdoutfile,
@@ -383,13 +376,13 @@ class SlurmScheduler(BaseSlurmScheduler):
         job_name = job_name or driver_name
         if cls._qnames is None:
             raise RuntimeError("Must call slurm_is_alive before submitting jobs")
-        if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
+        if num_cpus <= 0:
             full_path = os.path.join(workingdir, driver_name)
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
         prio_level, partname = cls._int_prio_to_part_name(prio_level)
-        cmd_lst = ["sbatch", "-D", workingdir, "--gid={}".format(group_id),
+        cmd_lst = ["sbatch", "-D", workingdir,
                    "-J", job_name, "-p", partname,
-                   "-s", "--uid={}".format(user_id),
+                   "-s",
                    "-c", str(num_cpus),
                    "--mem={}".format(mem),
                    "--export=PYTHONPATH={}".format(workingdir),
@@ -456,8 +449,32 @@ class SlurmScheduler(BaseSlurmScheduler):
     @classmethod
     def job_cancel(cls, jobhandle):
         """Cancel a given job given its jobhandle.
-
         Log a warning if an error occurs, return nothing.
+
+        NOTE: For the version of kive using a wrapper script to launch docker images,
+        special consideration to cancelling jobs must be made.
+        The way scancel works is different depending on whether the -s option is used or not
+        (see slurm docs for scancel). Without -s option: scancel talks to slurmctld, with -s option
+        scancel talks to slurmd on the compute node that the job is running on.
+
+        For us this means that:
+        If the slurm job is in the running state:
+           issuing 'scancel -sint' is required, because the wrapper script needs this to
+           clean up its docker volumes.
+        If the slurm job is in the pending state:
+           issuing 'scancel -sint' will hang until the jobs starts to run, so we must issue
+           scancel without the -s option.
+
+        In order to ensure that the job of interest does not change state between the time
+        that we determine its status and cancel it, we first issue an 'scontrol hold' command.
+        (a running job will stay running, a pending job will stay pending).
+        The steps therefore are:
+        1) scontrol hold XYZ
+        2) runstate := 'get state of job XYZ'
+        3) if runstate == 'running':
+              scancel -sint -f XYZ
+           else:
+              scancel XYZ
         """
         accounting_info = cls.get_accounting_info([jobhandle])
         if accounting_info:
@@ -465,20 +482,25 @@ class SlurmScheduler(BaseSlurmScheduler):
             if job_info and job_info['end_time']:
                 # Already finished, nothing to cancel.
                 return
-
-        logger.info('Cancelling Slurm job id %s.', jobhandle.job_id)
-        cmd_lst = ["scancel",
-                   "-sint",  # Send interrupt instead of kill to allow cleanup.
-                   "-f",  # Also send signal to child processes.
-                   "{}".format(jobhandle.job_id)]
-        try:
-            sp.check_output(cmd_lst, stderr=sp.STDOUT)
-        except sp.CalledProcessError as ex:
-            logger.warn('scancel failed for job id %s',
-                        jobhandle.job_id,
-                        exc_info=True)
-            for line in ex.output.splitlines(False):
-                logger.info(line)
+        logger.info('Holding to cancel slurm job id %s.', jobhandle.job_id)
+        cls._hold_jobs([jobhandle.job_id])
+        cur_state = None
+        accounting_info = cls.get_accounting_info([jobhandle])
+        if accounting_info:
+            job_info = accounting_info.get(jobhandle.job_id)
+            cur_state = None if job_info is None else job_info[cls.ACC_STATE]
+        if cur_state is None:
+            raise RuntimeError("Cannot determine job state after holding")
+        logger.info('Slurm job state after hold: %s.', cur_state)
+        cmd_lst = ["scancel"]
+        docker_has_launched_states = set(cls.RUNNING)
+        if cur_state in docker_has_launched_states:
+            # -sint: Send interrupt instead of kill to allow cleanup.
+            # -f: also send signal to child processes.
+            cmd_lst.extend(["-sint", "-f"])
+        cmd_lst.append("{}".format(jobhandle.job_id))
+        logger.info("Cancelling slurm job with '{}'".format(" ".join(cmd_lst)))
+        cls._call_to_outstr(cmd_lst)
 
     @classmethod
     def slurm_is_alive(cls, skip_extras=False):
@@ -487,9 +509,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         a) There are three partitions of differing priorities that we can use.
            This is checked by running 'sinfo' and checking its state.
         b) slurm control daemon can be reached (for submitting jobs).
-           This is tested by running 'squeue' and checking for exceptions.
-        c) slurm accounting is configured properly.
-           This is tested by running 'sacct' and checking for exceptions.
+           This is tested by running get_accounting_info() and checking for exceptions.
+           This calls 'squeue' and also checks that slurm accounting is configured properly
+           by running 'sacct' and checking for exceptions.
+        c) checks for the existence of the manage.py script.
         """
         # noinspection PyBroadException
         try:
@@ -527,12 +550,10 @@ class SlurmScheduler(BaseSlurmScheduler):
         return is_alive
 
     @classmethod
-    def _call_to_dict(cls, cmd_lst, splitchar=None, num_retry=NUM_RETRY):
+    def _call_to_outstr(cls, cmd_lst, num_retry=NUM_RETRY):
         """ Helper routine:
-        Call a slurm command provided in cmd_lst and parse the tabular output, returning
-        a list of dictionaries.
-        The first lines of the output should be the table headings, which are used
-        as the dictionary keys.
+        Call a slurm command provided in cmd_lst and return the output string if it
+        is successful.
         """
         logger.debug(" ".join(cmd_lst))
         out_str = ''
@@ -563,6 +584,20 @@ class SlurmScheduler(BaseSlurmScheduler):
                 os.remove(stderr_path)
             except OSError:
                 pass
+        return out_str
+
+    @classmethod
+    def _call_to_dict(cls, cmd_lst, splitchar=None, num_retry=NUM_RETRY):
+        """ Helper routine:
+        Call a slurm command provided in cmd_lst and parse the tabular output, returning
+        a list of dictionaries.
+        The first lines of the output should be the table headings, which are used
+        as the dictionary keys.
+        """
+        try:
+            out_str = cls._call_to_outstr(cmd_lst, num_retry=num_retry)
+        except (OSError, sp.CalledProcessError, IOError):
+            raise
 
         # NOTE: sinfo et al add an empty line to the end of its output. Remove that here.
         lns = [ln for ln in out_str.split('\n') if ln]
@@ -713,6 +748,15 @@ class SlurmScheduler(BaseSlurmScheduler):
         else:
             num_retry = NUM_RETRY
         return cls._call_to_dict(cmd_lst, splitchar=' ', num_retry=num_retry)
+
+    @classmethod
+    def _hold_jobs(cls, job_id_iter):
+        """Issue an 'scontrol hold jobids' command to slurm.
+        Any pending job will be held in its state, any running job will be unaffected.
+        """
+        cmd_lst = ["scontrol", "hold"]
+        cmd_lst.append(",".join(job_id_iter))
+        cls._call_to_outstr(cmd_lst)
 
     @classmethod
     def get_accounting_info(cls, job_handle_iter=None):
@@ -892,8 +936,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             settings.KIVE_HOME,
             cable_exec_path,
             [],
-            sandbox.uid,
-            sandbox.gid,
             sandbox.run.priority,
             cable_info.threads_required,
             cable_info.stdout_path(),
@@ -931,8 +973,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             settings.KIVE_HOME,
             step_exec_path,
             [],
-            sandbox.uid,
-            sandbox.gid,
             sandbox.run.priority,
             1,
             step_info.setup_stdout_path(),
@@ -970,8 +1010,6 @@ class SlurmScheduler(BaseSlurmScheduler):
             settings.KIVE_HOME,
             book_exec_path,
             [],
-            sandbox.uid,
-            sandbox.gid,
             sandbox.run.priority,
             1,
             step_info.bookkeeping_stdout_path(),
@@ -1303,8 +1341,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                    workingdir,
                    driver_name,
                    driver_arglst,
-                   user_id,
-                   group_id,
                    prio_level,
                    num_cpus,
                    stdoutfile,
@@ -1323,7 +1359,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         full_path = os.path.join(workingdir, driver_name)
         if not os.path.isfile(full_path):
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
-        if user_id <= 0 or group_id <= 0 or num_cpus <= 0:
+        if num_cpus <= 0:
             raise sp.CalledProcessError(cmd=full_path, output=None, returncode=-1)
 
         jdct = dict(
@@ -1331,8 +1367,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 ('workingdir', workingdir),
                 ('driver_name', driver_name),
                 ('driver_arglst', driver_arglst),
-                ('user_id', user_id),
-                ('group_id', group_id),
                 ('prio_level', prio_level),
                 ('num_cpus', num_cpus),
                 ('stdoutfile', stdoutfile),
@@ -1432,8 +1466,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
-                     ('user_id', sandbox.uid),
-                     ('group_id', sandbox.gid),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', cable_info.threads_required),
                      ('stdoutfile', cable_info.stdout_path()),
@@ -1486,8 +1518,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
-                     ('user_id', sandbox.uid),
-                     ('group_id', sandbox.gid),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', 1),
                      ('stdoutfile', step_info.setup_stdout_path()),
@@ -1530,8 +1560,6 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         jdct = dict([('workingdir', settings.KIVE_HOME),
                      ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
                      ('driver_arglst', driver_arglst),
-                     ('user_id', sandbox.uid),
-                     ('group_id', sandbox.gid),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', 1),
                      ('stdoutfile', step_info.bookkeeping_stdout_path()),

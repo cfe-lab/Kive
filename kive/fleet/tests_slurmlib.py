@@ -41,16 +41,12 @@ TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/slurm_test_files/slurmrundir")
 
 
 def _submit_job_n(n, prio, afteroklst=None, afteranylst=None, sched_cls=None):
-    user_id = os.getuid()
-    group_id = os.getgid()
     wdir = osp.join(TEST_DIR, "job%02d" % n)
     jobname = "sleep%02d.sh" % n
     return sched_cls.submit_job(
         wdir,
         jobname,
         [],
-        user_id,
-        group_id,
         prio,
         1,
         osp.join(wdir, "out.txt"),
@@ -159,8 +155,6 @@ class SlurmDummyTests(TestCase):
         """
         if lverb:
             print "--test_submit_job02"
-        user_id = os.getuid()
-        group_id = os.getgid()
         prio = PRIO_MEDIUM
         n, m = 1, 2
         wdir = osp.join(TEST_DIR, "job%02d" % n)
@@ -170,8 +164,6 @@ class SlurmDummyTests(TestCase):
                 wdir,
                 jobname,
                 [],
-                user_id,
-                group_id,
                 prio,
                 1,
                 osp.join(wdir, "out.txt"),
@@ -183,8 +175,6 @@ class SlurmDummyTests(TestCase):
         """Submission should fail (priority a string instead of int)"""
         if lverb:
             print "--test_submit_job03"
-        user_id = os.getuid()
-        group_id = os.getgid()
         prio = 'illegal priostring'
         n = 1
         wdir = osp.join(TEST_DIR, "job%02d" % n)
@@ -194,8 +184,6 @@ class SlurmDummyTests(TestCase):
                 wdir,
                 jobname,
                 [],
-                user_id,
-                group_id,
                 prio,
                 1,
                 osp.join(wdir, "out.txt"),
@@ -223,70 +211,14 @@ class SlurmDummyTests(TestCase):
             time.sleep(5)
             curstate = jhandle.get_state()
             i += 1
-        assert curstate == self.sched_cls.FAILED, "failed to get a 'FAILED' state.."
+        assert curstate == self.sched_cls.FAILED, "failed to get a 'FAILED' state. got {}".format(curstate)
         if lverb:
             print "---test_submit_job04: Success, got an expected FAILED status"
-
-    def test_submit_job05(self, lverb=False):
-        """Submission should fail (illegal uid)"""
-        if lverb:
-            print "--test_submit_job05"
-        # user_id = os.getuid()
-        user_id = 0
-        group_id = os.getgid()
-        prio = PRIO_MEDIUM
-        n = 1
-        wdir = osp.join(TEST_DIR, "job%02d" % n)
-        jobname = "sleep%02d.sh" % n
-        with self.assertRaises(sp.CalledProcessError):
-            self.sched_cls.submit_job(
-                wdir,
-                jobname,
-                [],
-                user_id,
-                group_id,
-                prio,
-                1,
-                osp.join(wdir, "out.txt"),
-                osp.join(wdir, "err.txt"),
-                None
-            )
-        if lverb:
-            print "--test_submit_job05 SUCCESS"
-
-    def test_submit_job06(self, lverb=False):
-        """Submission should fail (illegal uid)"""
-        if lverb:
-            print "--test_submit_job06"
-        # user_id = os.getuid()
-        user_id = 0
-        group_id = os.getgid()
-        prio = PRIO_MEDIUM
-        n = 1
-        wdir = osp.join(TEST_DIR, "job%02d" % n)
-        jobname = "sleep%02d.sh" % n
-        with self.assertRaises(sp.CalledProcessError):
-            self.sched_cls.submit_job(
-                wdir,
-                jobname,
-                [],
-                user_id,
-                group_id,
-                prio,
-                1,
-                osp.join(wdir, "out.txt"),
-                osp.join(wdir, "err.txt"),
-                None
-            )
-        if lverb:
-            print "--test_submit_job06 SUCCESS"
 
     def test_submit_job07(self, lverb=False):
         """Submission should fail (illegal cpu_number)"""
         if lverb:
             print "--test_submit_job07"
-        user_id = os.getuid()
-        group_id = os.getgid()
         num_cpu = 0
         prio = PRIO_MEDIUM
         n = 1
@@ -297,8 +229,6 @@ class SlurmDummyTests(TestCase):
                 wdir,
                 jobname,
                 [],
-                user_id,
-                group_id,
                 prio,
                 num_cpu,
                 osp.join(wdir, "out.txt"),
@@ -520,7 +450,7 @@ class SlurmDummyTests(TestCase):
             time.sleep(5)
             i += 1
             curstate = jobid_01.get_state()
-        assert curstate == self.sched_cls.CANCELLED, "job is not cancelled"
+        assert curstate == self.sched_cls.CANCELLED, "job is not cancelled: got {}".format(curstate)
         if lverb:
             print "--test_cancel_jobs01 SUCCESS"
 
@@ -563,8 +493,10 @@ class SlurmDummyTests(TestCase):
             are_cancelled = tuple([curstate[jid][ACC_STATE] for jid in jobidlst]) == check_tuple
         if lverb:
             print "final states", [curstate[jid][ACC_STATE] for jid in jobidlst]
-        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 01"
-        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 02"
+        assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.CANCELLED,\
+            "unexpected state 01: got {}".format(curstate[jobid_01.job_id][ACC_STATE])
+        assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED,\
+            "unexpected state 02: got {}".format(curstate[jobid_02.job_id][ACC_STATE])
         if lverb:
             print "---test_cancel_jobs02 SUCCESS"
 
@@ -587,7 +519,7 @@ class SlurmDummyTests(TestCase):
             has_finished = (curstate in self.sched_cls.STOPPED_SET)
             time.sleep(5)
             i += 1
-        assert curstate == self.sched_cls.COMPLETED, "unexpected final state"
+        assert curstate == self.sched_cls.COMPLETED, "unexpected final state: got {}".format(curstate)
         if lverb:
             print "--test_get_state_01 SUCCESS"
 
@@ -614,6 +546,10 @@ class SlurmDummyTests(TestCase):
         priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
         if lverb:
             print "state+priority after submission", priolst
+        any_done = any([state == self.sched_cls.COMPLETED for state, prio in priolst])
+        if any_done:
+            raise RuntimeError("Test failed as jobs completed before we could change prio")
+        # now change the priority..
         self.sched_cls.set_job_priority(jobhandles, high_prio)
         test_passed = False
         while cs[jobidlst[0]][ACC_STATE] != self.sched_cls.PENDING and not test_passed:
@@ -684,7 +620,8 @@ class SlurmDummyTests(TestCase):
             is_finished = cs[job02.job_id][ACC_STATE] == self.sched_cls.COMPLETED
             i += 1
         # --
-        assert i < numtests, "job02 failed to complete in 40 iterations"
+        assert i < numtests,\
+            "job02 failed to complete in 40 iterations. got state: {}".format(cs[job02.job_id][ACC_STATE])
         if lverb:
             print "--test_acc_info_01(): SUCCESS"
 

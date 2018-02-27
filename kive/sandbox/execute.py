@@ -76,15 +76,6 @@ class Sandbox:
         PRECONDITIONS
         run.inputs must have real data
         """
-        if settings.KIVE_SANDBOX_WORKER_ACCOUNT:
-            pwd_info = pwd.getpwnam(settings.KIVE_SANDBOX_WORKER_ACCOUNT)
-            self.uid = pwd_info.pw_uid
-            self.gid = pwd_info.pw_gid
-        else:
-            # get our own current uid/hid
-            self.uid = os.getuid()
-            self.gid = os.getgid()
-
         self.run = run
         user = run.user
         my_pipeline = run.pipeline
@@ -1889,8 +1880,6 @@ class Sandbox:
             host_rundir,
             launch_args[0],
             launch_args[1:],
-            self.uid,
-            self.gid,
             self.run.priority,
             step_execute_info.threads_required,
             step_execute_info.driver_stdout_path(),
