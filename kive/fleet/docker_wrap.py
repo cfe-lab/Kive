@@ -158,6 +158,11 @@ def parse_args():
     return args
 
 
+def handle_terminate(signum, frame):
+    # Convert terminate signal to interrupt, to allow clean up.
+    raise KeyboardInterrupt
+
+
 def stop_container(container, stdout=None, stderr=None):
     """
     Helper that invokes `docker stop`.
@@ -427,6 +432,7 @@ def clean_up(session):
 
 
 def main():
+    signal.signal(signal.SIGTERM, handle_terminate)
     args = parse_args()
 
     # Configure the logging.

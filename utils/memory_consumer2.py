@@ -10,10 +10,8 @@ def parse_args():
                         '--time',
                         type=int,
                         help='time in seconds to run')
-    parser.add_argument('source',
+    parser.add_argument('--source',
                         type=FileType('rb'),
-                        default='/dev/urandom',
-                        nargs='?',
                         help='source file to read data from')
     parser.add_argument('size',
                         type=int,
@@ -36,6 +34,12 @@ def read_chunk(source):
     return chunk
 
 
+def generate_chunk(i):
+    letter = chr(ord('A') + i % 26)
+    chunk = (1024*1024) * letter
+    return chunk
+
+
 def main():
     args = parse_args()
     if args.time is None:
@@ -47,7 +51,11 @@ def main():
     while end_time is None or datetime.now() < end_time:
         while len(chunks) > args.size:
             chunks.pop(0)
-        chunks.append(read_chunk(args.source))
+        if args.source is None:
+            chunk = generate_chunk(allocated_count)
+        else:
+            chunk = read_chunk(args.source)
+        chunks.append(chunk)
         allocated_count += 1
     print('Allocated {}; now holding {}.'.format(allocated_count, len(chunks)))
 
