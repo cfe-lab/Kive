@@ -26,6 +26,10 @@ def parse_args():
         type=int_list,
         help='comma-separated list of runs to purge and rerun')
     parser.add_argument(
+        "--batch_ids",
+        type=int_list,
+        help='comma-separated list of run batches to purge and rerun')
+    parser.add_argument(
         "--pipeline_ids",
         type=int_list,
         default=[],
@@ -50,6 +54,10 @@ def parse_args():
         type=str_list,
         default=[],
         help='comma-separated list of output names to purge')
+    parser.add_argument(
+        "--no_launch",
+        action='store_true',
+        help='do not launch new runs')
     return parser.parse_args()
 
 
@@ -86,6 +94,8 @@ def main():
     launched_run_ids = set()
     if args.run_ids:
         runs = find_runs_by_id(kive, args.run_ids)
+    elif args.batch_ids:
+        runs = find_runs_by_batch(kive, args.batch_ids)
     else:
         if args.pipeline_ids:
             pipeline_ids = args.pipeline_ids
@@ -118,6 +128,10 @@ def main():
                                       headers={'Content-Type': 'application/json',
                                                'X-CSRFToken': kive.csrf_token})
             raise_for_status_from_json(patch_result)
+
+        if args.no_launch:
+            continue
+
         run_inputs = [dict(dataset=run_input['id'],
                            index=i)
                       for i, run_input in enumerate(run_outputs['input_summary'],
@@ -237,6 +251,12 @@ def find_runs_by_pipeline(kive, pipeline_ids, run_count):
             logger.warn('Only found %d runs for pipeline %s.',
                         pipeline_run_count,
                         pipeline)
+
+
+def find_runs_by_batch(kive, batch_ids):
+    for batch_id in batch_ids:
+        for run in kive.find_runs(batch_pk=batch_id):
+            yield run.raw
 
 
 main()

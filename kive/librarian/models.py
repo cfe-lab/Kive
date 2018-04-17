@@ -969,6 +969,9 @@ class Dataset(metadata.models.AccessControl):
             return ccl
 
         my_CDT = self.get_cdt()
+        file_path_to_report = (file_handle.name
+                               if file_handle
+                               else file_path_to_check)
 
         # This may raise a VerificationMethodError; if so, then throw away the ContentCheckLog.
         try:
@@ -982,31 +985,31 @@ class Dataset(metadata.models.AccessControl):
             raise
 
         if "bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary:
-            self.logger.warn("malformed header")
+            self.logger.warn("malformed header in %r.", file_path_to_report)
             ccl.add_bad_header()
             ccl.stop(save=True, clean=True)
             return ccl
 
         if csv_summary["num_rows"] == 0:
-            self.logger.warn("file had no rows")
+            self.logger.debug("file had no rows in %r.", file_path_to_report)
 
         csv_baddata = False
         self.structure.num_rows = csv_summary["num_rows"]
         self.structure.save()
         if max_row is not None and csv_summary["num_rows"] > max_row:
-            self.logger.warn("too many rows")
+            self.logger.warn("too many rows in %r.", file_path_to_report)
             # FIXME: Do we only create these BD objects if they don't already exist?
             ccl.add_bad_num_rows()
             csv_baddata = True
 
         if min_row is not None and csv_summary["num_rows"] < min_row:
-            self.logger.warn("too few rows")
+            self.logger.warn("too few rows in %r.", file_path_to_report)
             # FIXME: Do we only create these BD objects if they don't already exist?
             ccl.add_bad_num_rows()
             csv_baddata = True
 
         if "failing_cells" in csv_summary:
-            self.logger.warn("cells failed datatype check")
+            self.logger.warn("cells failed datatype check in %r.", file_path_to_report)
 
             if not csv_baddata:
                 bad_data = BadData.objects.create(contentchecklog=ccl)

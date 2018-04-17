@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from random import randrange
 from time import sleep
 
 
 def parse_args():
-    parser = ArgumentParser(description='Consume memory and hold it.')
+    parser = ArgumentParser(description='Consume memory and hold it.',
+                            formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--repeat',
                         '-r',
                         type=int,
