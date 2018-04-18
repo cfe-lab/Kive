@@ -613,6 +613,15 @@ of the database Kive is to use under the key `NAME` (e.g. `'kive'`).
 This is a database that must be created by an administrator prior to using
 Kive.
 
+In production, you must generate a new secret key for the server. The easiest
+way to do that is to let Django create a new project, copy the key, then delete
+the new project.
+
+    cd ~/junk # Go to some safe directory to create a new project.
+    django-admin startproject django_scratch
+    grep SECRET_KEY django_scratch/django_scratch/settings.py # copy to Kive
+    rm -R django_scratch
+
 Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
 working files for the server and any uploaded files. Create the directory if it
 doesn't already exist.
@@ -624,13 +633,12 @@ server on your workstation.
 You may also wish to modify the `TIME_ZONE` setting to your region, although 
 this localization is not strictly necessary.
 
-It's easiest to leave `DEBUG` set to `True`, but that can consume a lot of
-memory after you run several pipelines. If you want to process a lot of
-data in your development environment, you will probably need to set it to
-`False`. However, that means you'll have to set
-`ALLOWED_HOSTS` to `['localhost']`. When you launch the server, you'll also
-need to call `./manage.py runserver --insecure`. That lets it serve static
-files.
+It's easiest to leave `DEBUG` set to `True` for developer workstations. In
+production, definitely set it to `False`. However, that means you'll have to set
+`ALLOWED_HOSTS` to `['your-domain.com']`, or `['localhost']` for a developer
+workstation. When you launch the server on a developer workstation that's not
+in debug mode, you'll also need to call `./manage.py runserver --insecure`.
+That lets it serve static files.
 
 #### Enabling Kive to run code as an unprivileged user
 

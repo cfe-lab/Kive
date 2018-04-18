@@ -113,7 +113,7 @@ STATICFILES_FINDERS = (
 )
 
 # Make this unique, and don't share it with anybody.
-SECRET_KEY = 'n+m#lw#z3!ertoh&vx_bs0)c9*z5)eadw0k_hpzp^&s@xbbkx$'
+SECRET_KEY = 'CHANGE ME! No seriously, go read INSTALL.md.'
 
 TEMPLATES = [
     {
