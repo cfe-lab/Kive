@@ -2,6 +2,7 @@
 *.pyc
 # Ignore the database file
 db/kive.db
+/.pytest_cache
 # Don't get the settings.py or hostfile files that have been customized
 kive/kive/hostfile
 kive/kive/settings.py
@@ -20,6 +21,7 @@ kive/.coverage
 kive/fleet/slurm_test_files/slurmrundir/job*/out.txt
 api/results
 utils/memory_plot.png
+/utils/speed_data_slurm.csv
 /static_root
 /static_root.tar.gz
 

@@ -1,0 +1,6 @@
+-r requirements.txt
+django-mock-queries==1.0.2
+mock==1.0.1
+pysqlite==2.8.2
+pytest==3.5.0
+pytest-django==3.2.1
