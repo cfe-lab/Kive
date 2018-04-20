@@ -1,3 +1,4 @@
+import os
 import re
 from argparse import ArgumentTypeError
 from collections import namedtuple
@@ -38,8 +39,34 @@ def parse_memory(text):
     return int(0.5 + multiplier*float(text[:-1]))
 
 
-def read_slurm(f, args, job_type_filter=None):
-    reader = DictReader(f)
+def read_dump(f):
+    for line in f:
+        fields = line.split('\t')
+        start = datetime.fromtimestamp(int(fields[37]))
+        end = datetime.fromtimestamp(int(fields[38]))
+        duration = end-start
+        elapsed = '0:0:{}'.format(int(duration.total_seconds()))
+        yield {'JobID': fields[0],
+               'JobName': fields[12],
+               'MaxRSS': None,
+               'NodeList': fields[28],
+               'Start': start.strftime('%Y-%m-%dT%H:%M:%S'),
+               'Elapsed': elapsed}
+
+
+def read_optional_file(filename):
+    if not os.path.exists(filename):
+        return
+    with open(filename) as f:
+        for line in f:
+            yield line
+
+
+def read_slurm(f, args, job_type_filter=None, is_dump=False):
+    if is_dump:
+        reader = read_dump(f)
+    else:
+        reader = DictReader(f)
     current_job_id = job_type = run_id = duration = node_list = memory = None
     start = None
     for row in chain(reader, [{'JobName': None, 'JobID': None}]):
@@ -50,7 +77,13 @@ def read_slurm(f, args, job_type_filter=None):
             new_job_id = current_job_id
             memory = parse_memory(row['MaxRSS'])
         if new_job_id != current_job_id and current_job_id is not None:
-            if job_type_filter is None or job_type == job_type_filter:
+            if node_list == 'None assigned':
+                pass
+            elif not (args.start_date <= start <= args.end_date):
+                pass
+            elif job_type_filter is not None and job_type != job_type_filter:
+                pass
+            else:
                 job = SlurmJob(job_type=job_type,
                                run_id=run_id,
                                start=start,
@@ -66,8 +99,12 @@ def read_slurm(f, args, job_type_filter=None):
         memory = parse_memory(row['MaxRSS'])
         node_list = row['NodeList']
         match = re.match(r'^r(?:un)?(\d+)(?:s\d+)?_?(.*?)\d*$', job_name)
-        run_id = int(match.group(1))
-        job_type = match.group(2)
+        if match:
+            run_id = int(match.group(1))
+            job_type = match.group(2)
+        else:
+            run_id = 0
+            job_type = 'unknown'
         start = datetime.strptime(row['Start'], '%Y-%m-%dT%H:%M:%S')
         duration_parts = [int(part)
                           for part in row['Elapsed'].split(':')]
