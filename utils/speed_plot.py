@@ -1,4 +1,5 @@
 import os
+import re
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from collections import defaultdict
 from csv import DictReader, DictWriter
@@ -7,7 +8,6 @@ from itertools import islice, chain
 
 import seaborn as sns
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import pandas as pd
 
 from kiveapi import KiveAPI
@@ -131,7 +131,7 @@ def plot_size_and_memory(slurm_jobs, args):
          'duration (hours)': job.duration.total_seconds()/3600.0}
         for job in slurm_jobs])
     input_sizes = fetch_input_sizes(args, df['job'])
-    df['size'] = [input_sizes[job.run_id] for job in df['job']]
+    df['size (MB)'] = [input_sizes[job.run_id] for job in df['job']]
     limits = df.agg({'start': ['min', 'max']})
     min_start = limits['start']['min']
     interval_size = timedelta(days=7)
@@ -141,32 +141,44 @@ def plot_size_and_memory(slurm_jobs, args):
     df = df.dropna(subset=['memory (MB)'])
     df = df[df['duration (hours)'] > 31/3600.0]  # Checks memory every 30s
     # df = df[df['job type'] == 'driver[prelim_map.py]']
-    df = df[~(df['job type'].isin(('bookkeeping', 'setup', 'Xcable',
-                                   'driver[trim_fastqs.py]',  #
-                                   'driver[sam2aln.py]',
-                                   'driver[remap.py]',  #
+    df = df[~(df['job type'].isin(('bookkeeping', 'Xsetup', 'cable',
+                                   'Xdriver[trim_fastqs.py]',  #
+                                   'Xdriver[sam2aln.py]',
+                                   'Xdriver[remap.py]',  #
                                    'Xdriver[prelim_map.py]',  #
                                    'driver[filter_quality.py]',
-                                   'driver[fastq_g2p.py]',  #
+                                   'Xdriver[fastq_g2p.py]',  #
                                    'driver[coverage_plots.py]',
                                    'driver[cascade_report.py]',
                                    'driver[aln2counts.py]')))]
-    cmaps = ['Reds', 'Blues', 'Greens', 'Greys', 'Purples', 'Oranges']
     grouped = df.groupby('job type')
-    label_patches = []
     groups = grouped.groups
-    for group, group_jobs in groups.items():
+    column_count = 3
+    row_count = (len(groups) + column_count-1) // column_count
+    # noinspection PyTypeChecker
+    fig, subplot_axes = plt.subplots(row_count,
+                                     column_count,
+                                     squeeze=False,
+                                     sharex=True,
+                                     sharey=True)
+
+    for i, (group, group_jobs) in enumerate(groups.items()):
+        row = i // column_count
+        column = i % column_count
+        ax = subplot_axes[row][column]
         group_size = len(group_jobs)
+        match = re.search(r'\[(.*)\]', group)
+        group_name = match.group(1) if match else group
+        ax.set_title('{} ({})'.format(group_name, group_size))
         if group_size <= 2:
             continue
-        cmap = cmaps[len(label_patches) % len(cmaps)]
-        x = df['size'][group_jobs]
+        x = df['size (MB)'][group_jobs]
         y = df['memory (MB)'][group_jobs]
-        sns.kdeplot(x, y, cmap=cmap+'_d')
-        label_patch = mpatches.Patch(color=sns.color_palette(cmap)[2],
-                                     label='{} ({})'.format(group, group_size))
-        label_patches.append(label_patch)
-    plt.legend(handles=label_patches)
+        sns.kdeplot(x, y, ax=ax)
+        if row != row_count - 1 or column != 0:
+            ax.set_xlabel('')
+            ax.set_ylabel('')
+    plt.suptitle('Memory use by input sizes in Kive v0.11 (job count)')
     plt.show()
 
 
