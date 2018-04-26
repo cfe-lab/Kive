@@ -1,17 +1,15 @@
 import os
-import re
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, FileType, SUPPRESS
 from collections import defaultdict
-from csv import DictReader, DictWriter
 from datetime import timedelta
-from itertools import islice, chain
+from itertools import islice
 
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from kiveapi import KiveAPI
-from utils.speed_plot_loader import fetch_slurm, read_slurm, parse_date, read_optional_file
+from utils.speed_plot_loader import fetch_slurm, read_slurm, parse_date, \
+    fetch_input_sizes
 
 
 def parse_args():
@@ -33,45 +31,38 @@ def parse_args():
                         default='kive',
                         help='Kive user to connect with')
     parser.add_argument('--kive_password',
-                        default='kive',
-                        help='Kive password to connect with')
+                        default=SUPPRESS,
+                        help='Kive password to connect with (default from '
+                             'KIVE_PASSWORD environment variable)')
     parser.add_argument('--slurm_user',
                         default='kivefleet',
                         help='Kive user to connect with')
-    parser.add_argument('--slurm_data',
-                        default='speed_data_slurm.csv',
-                        help='Slurm accounting data file to write or read')
-    parser.add_argument('--kive_data',
-                        default='speed_data_kive.csv',
-                        help='Kive runs data file to write or read')
+    parser.add_argument('--slurm_job_dump',
+                        type=FileType(),
+                        help='Slurm accounting job dump: typically '
+                             'linux0_cluster_job_table.txt. '
+                             'Requires --slurm_step_dump.')
+    parser.add_argument('--slurm_step_dump',
+                        type=FileType(),
+                        help='Slurm accounting step dump: typically '
+                             'linux0_cluster_step_table.txt. '
+                             'Requires --slurm_job_dump.')
+    parser.add_argument('--cache_folder',
+                        default='speed_plot_cache',
+                        help='Folder to cache fetched data')
     parser.add_argument('--refresh',
                         action='store_true',
-                        help='Refresh the data files, even if they exist?')
-    return parser.parse_args()
+                        help='Refresh the cache files, even if they exist?')
 
+    args = parser.parse_args()
+    if args.slurm_job_dump and not args.slurm_step_dump:
+        parser.error('Option --slurm_step_dump is required with --slurm_job_dump.')
+    if args.slurm_step_dump and not args.slurm_job_dump:
+        parser.error('Option --slurm_job_dump is required with --slurm_step_dump.')
+    if not hasattr(args, 'kive_password'):
+        args.kive_password = os.environ.get('KIVE_PASSWORD', 'kive')
 
-def fetch_input_sizes(args, slurm_jobs):
-    data_path = 'speed_data_sizes.csv'
-    try:
-        with open(data_path) as f:
-            reader = DictReader(f)
-            return {int(row['run_id']): float(row['MB'])
-                    for row in reader}
-    except OSError:
-        pass
-    session = KiveAPI(args.kive_server)
-    session.login(args.kive_user, args.kive_password)
-    with open(data_path, 'w') as f:
-        writer = DictWriter(f, ['run_id', 'MB'])
-        writer.writeheader()
-        input_sizes = {}
-        for job in slurm_jobs:
-            run = session.get_run(job.run_id)
-            dataset = session.get_dataset(run.raw['inputs'][0]['dataset'])
-            dataset_size = dataset.raw['filesize'] / 1024 / 1024  # in MB
-            input_sizes[job.run_id] = dataset_size
-            writer.writerow({'run_id': job.run_id, 'MB': dataset_size})
-    return input_sizes
+    return args
 
 
 def all_jobs(categorized_jobs):
@@ -132,6 +123,8 @@ def plot_size_and_memory(slurm_jobs, args):
         for job in slurm_jobs])
     input_sizes = fetch_input_sizes(args, df['job'])
     df['size (MB)'] = [input_sizes[job.run_id] for job in df['job']]
+    df['node type'] = ['head' if job.node == 'octomore' else 'compute'
+                       for job in df['job']]
     limits = df.agg({'start': ['min', 'max']})
     min_start = limits['start']['min']
     interval_size = timedelta(days=7)
@@ -142,15 +135,19 @@ def plot_size_and_memory(slurm_jobs, args):
     df = df[df['duration (hours)'] > 31/3600.0]  # Checks memory every 30s
     # df = df[df['job type'] == 'driver[prelim_map.py]']
     df = df[~(df['job type'].isin(('bookkeeping', 'Xsetup', 'cable',
-                                   'Xdriver[trim_fastqs.py]',  #
-                                   'Xdriver[sam2aln.py]',
-                                   'Xdriver[remap.py]',  #
-                                   'Xdriver[prelim_map.py]',  #
-                                   'driver[filter_quality.py]',
-                                   'Xdriver[fastq_g2p.py]',  #
-                                   'driver[coverage_plots.py]',
-                                   'driver[cascade_report.py]',
-                                   'driver[aln2counts.py]')))]
+                                   'Xtrim_fastqs.py_s2',  #
+                                   'Xsam2aln.py_s6',
+                                   'sam2aln.py_s2',  # Mixed-HCV pipeline
+                                   'Xremap.py_s5',  #
+                                   'random-primer-hcv.py_s1',
+                                   'Xprelim_map.py_s4',  #
+                                   'merge_by_ref_gene.py_s4',
+                                   'filter_quality.py_s1',
+                                   'Xfastq_g2p.py_s3',  #
+                                   'coverage_plots.py_s9',
+                                   'cascade_report.py_s7',
+                                   'aln2counts.py_s8',
+                                   'aln2aafreq.py_s3')))]
     grouped = df.groupby('job type')
     groups = grouped.groups
     column_count = 3
@@ -167,37 +164,28 @@ def plot_size_and_memory(slurm_jobs, args):
         column = i % column_count
         ax = subplot_axes[row][column]
         group_size = len(group_jobs)
-        match = re.search(r'\[(.*)\]', group)
-        group_name = match.group(1) if match else group
-        ax.set_title('{} ({})'.format(group_name, group_size))
+        name_parts = group.split('_')
+        if len(name_parts) > 1:
+            name_parts.pop()
+        ax.set_title('{} ({})'.format('_'.join(name_parts), group_size))
         if group_size <= 2:
             continue
         x = df['size (MB)'][group_jobs]
         y = df['memory (MB)'][group_jobs]
-        sns.kdeplot(x, y, ax=ax)
+        clip = ((-50, 200), (-50, 200))
+        sns.kdeplot(x, y, ax=ax, clip=clip)
         if row != row_count - 1 or column != 0:
             ax.set_xlabel('')
             ax.set_ylabel('')
-    plt.suptitle('Memory use by input sizes in Kive v0.11 (job count)')
+    plt.suptitle('Memory use in Kive v0.10 and v0.11 (job count)')
     plt.show()
 
 
 def main(job_limit=None):
     args = parse_args()
     sns.set(color_codes=True)
-    if args.refresh or not os.path.exists(args.slurm_data):
-        fetch_slurm(args)
-    old_slurm_file = read_optional_file('linux0_cluster_job_table.txt')
-    with open(args.slurm_data, 'r') as f:
-        job_type_filter = None
-        plot_size_and_memory(
-            islice(chain(read_slurm(old_slurm_file,
-                                    args,
-                                    job_type_filter=job_type_filter,
-                                    is_dump=True),
-                         read_slurm(f, args, job_type_filter=job_type_filter)),
-                   job_limit),
-            args)
+    fetch_slurm(args)
+    plot_size_and_memory(islice(read_slurm(args), job_limit), args)
     print('Done.')
 
 

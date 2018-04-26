@@ -21,9 +21,7 @@ kive/.coverage
 kive/fleet/slurm_test_files/slurmrundir/job*/out.txt
 api/results
 utils/memory_plot.png
-/utils/speed_data_slurm.csv
-/utils/speed_data_sizes.csv
-/utils/linux0_cluster_job_table.txt
+/utils/speed_plot_cache
 /static_root
 /static_root.tar.gz
 
