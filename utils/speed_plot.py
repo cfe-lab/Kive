@@ -131,11 +131,13 @@ def plot_size_and_memory(slurm_jobs, args):
     # min_start += interval_size  # First week only had 1 run.
     df['interval'] = [int((job.start - min_start) / interval_size)
                       for job in df['job']]
+    df['is_new'] = df['start'] > args.change_date
     df = df.dropna(subset=['memory (MB)'])
-    df = df[df['duration (hours)'] > 31/3600.0]  # Checks memory every 30s
+    # df = df[df['duration (hours)'] > 31/3600.0]  # Checks memory every 30s
     # df = df[df['job type'] == 'driver[prelim_map.py]']
-    df = df[~(df['job type'].isin(('bookkeeping', 'Xsetup', 'cable',
-                                   'Xtrim_fastqs.py_s2',  #
+    # df = df[df['node type'] == 'compute']
+    df = df[~(df['job type'].isin(('bookkeeping', 'setup', 'cable',
+                                   'trim_fastqs.py_s2',  #
                                    'Xsam2aln.py_s6',
                                    'sam2aln.py_s2',  # Mixed-HCV pipeline
                                    'Xremap.py_s5',  #
@@ -143,14 +145,14 @@ def plot_size_and_memory(slurm_jobs, args):
                                    'Xprelim_map.py_s4',  #
                                    'merge_by_ref_gene.py_s4',
                                    'filter_quality.py_s1',
-                                   'Xfastq_g2p.py_s3',  #
+                                   'fastq_g2p.py_s3',  #
                                    'coverage_plots.py_s9',
                                    'cascade_report.py_s7',
                                    'aln2counts.py_s8',
                                    'aln2aafreq.py_s3')))]
-    grouped = df.groupby('job type')
+    grouped = df.groupby(['job type', 'is_new'])
     groups = grouped.groups
-    column_count = 3
+    column_count = 2
     row_count = (len(groups) + column_count-1) // column_count
     # noinspection PyTypeChecker
     fig, subplot_axes = plt.subplots(row_count,
@@ -164,20 +166,20 @@ def plot_size_and_memory(slurm_jobs, args):
         column = i % column_count
         ax = subplot_axes[row][column]
         group_size = len(group_jobs)
-        name_parts = group.split('_')
-        if len(name_parts) > 1:
-            name_parts.pop()
-        ax.set_title('{} ({})'.format('_'.join(name_parts), group_size))
+        job_type, is_new = group
+        ax.set_title('{} {} ({})'.format('new' if is_new else 'old',
+                                         job_type,
+                                         group_size))
         if group_size <= 2:
             continue
         x = df['size (MB)'][group_jobs]
-        y = df['memory (MB)'][group_jobs]
+        y = df['duration (hours)'][group_jobs]
         clip = ((-50, 200), (-50, 200))
         sns.kdeplot(x, y, ax=ax, clip=clip)
         if row != row_count - 1 or column != 0:
             ax.set_xlabel('')
             ax.set_ylabel('')
-    plt.suptitle('Memory use in Kive v0.10 and v0.11 (job count)')
+    plt.suptitle('Processing time in Kive v0.10 and v0.11 (job count)')
     plt.show()
 
 
