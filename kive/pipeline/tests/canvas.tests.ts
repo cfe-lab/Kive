@@ -1930,7 +1930,7 @@ describe("Canvas classes", function() {
                     this.state.draw(this.ctx);
                 });
 
-                it('should autolayout', function() {
+                it('should autolayout', function(done) {
                     this.expectedInput.x = 92.44925586885002;
                     this.expectedInput.y = 22.5;
                     this.expectedMethod.x = 207.55074413115;
@@ -1944,10 +1944,16 @@ describe("Canvas classes", function() {
                     this.expectedCanvas.drawText(
                             {x: 218.800744131, y: 92, text: "example", style: "node", dir: 0});
 
-                    this.state.draw(this.ctx);
-                    this.state.testExecutionOrder();
-                    this.state.autoLayout();
-                    this.state.draw(this.ctx);
+                    let state = this.state;
+                    let ctx = this.ctx;
+                    state.draw(ctx);
+                    state.testExecutionOrder();
+                    state.autoLayout(function() {
+                        state.draw(ctx);
+                        console.log('finishing autolayout');
+                        done();
+                        console.log('finished autolayout')
+                    });
                 });
 
                 describe('and output', function() {

@@ -465,7 +465,12 @@ export class CanvasState {
         };
     }
 
-    autoLayout(): void {
+    /**
+     * Automatically recalculate the canvas layout.
+     * @param complete - if given, this will be called when the calculation is
+     *  finished.
+     */
+    autoLayout(complete?): void {
         if (!this.exec_order) {
             return;
         }
@@ -557,7 +562,7 @@ export class CanvasState {
                 this.detectCollisions(shape);
             }
             this.valid = false;
-            $(this.canvas).fadeIn();
+            $(this.canvas).fadeIn({complete: complete});
         }});
     };
 

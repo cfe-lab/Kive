@@ -550,8 +550,12 @@ var permissions = (function() {
     
     function addFilter(filterSet, key, value) {
         var $filter,
-            $duplicates;
-        $filter = $('<div class="filter"/>').data({ key: key, val: value });
+            $duplicates,
+            data = { key: key };
+        if (value !== undefined) {
+            data.val = value;
+        }
+        $filter = $('<div class="filter"/>').data(data);
 
         if (key != "smart") {
             $filter.append($('<span class="field"/>').text(key + ':'));
