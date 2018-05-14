@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('transformation', '0103_no_default_user'),
-        ('pipeline', '0100_unlink_apps'),
+        ('pipeline', '0101_squashed2'),
     ]
 
     operations = [

@@ -613,11 +613,11 @@ class CodeResourceViewMockTests(ViewMockTestCase):
         self.addCleanup(patcher.stop)
 
         # noinspection PyUnresolvedReferences
-        patchers = [patch.object(CodeResource,
-                                 '_default_manager',
+        patchers = [patch.object(CodeResource._meta,
+                                 'default_manager',
                                  CodeResource.objects),
-                    patch.object(CodeResourceRevision,
-                                 '_default_manager',
+                    patch.object(CodeResourceRevision._meta,
+                                 'default_manager',
                                  CodeResource.objects)]
 
         def dummy_save(r):
@@ -784,8 +784,8 @@ class MethodViewMockTests(ViewMockTestCase):
         self.addCleanup(patcher.stop)
 
         # noinspection PyUnresolvedReferences
-        patcher = patch.object(MethodFamily,
-                               '_default_manager',
+        patcher = patch.object(MethodFamily._meta,
+                               'default_manager',
                                MethodFamily.objects)
         patcher.start()
         self.addCleanup(patcher.stop)

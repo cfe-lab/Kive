@@ -11,8 +11,6 @@ import re
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'transformation', '0001_initial'), (b'transformation', '0002_auto_20150128_1024'), (b'transformation', '0003_auto_20150204_1703'), (b'transformation', '0004_auto_20150210_0947'), (b'transformation', '0005_auto_20150213_1703'), (b'transformation', '0006_redacted_20150417_1128'), (b'transformation', '0007_xput_validate_slug_20150612_0937'), (b'transformation', '0008_django_19_20160202_1038'), (b'transformation', '0009_permissions_remove_null_20160203_1033'), (b'transformation', '0010_xput_ordering_20160527_1449'), (b'transformation', '0100_unlink_apps')]
-
     initial = True
 
     dependencies = [

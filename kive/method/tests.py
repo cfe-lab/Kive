@@ -10,6 +10,7 @@ import tempfile
 import copy
 import re
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files import File
@@ -18,6 +19,7 @@ from django.core.urlresolvers import resolve
 from django.db import transaction
 
 from django.test import TestCase, skipIfDBFeature
+from django_mock_queries.mocks import mocked_relations
 from rest_framework import status
 from rest_framework.reverse import reverse
 from rest_framework.test import force_authenticate
@@ -33,7 +35,6 @@ from method.models import CodeResource, CodeResourceRevision, \
 from method.serializers import CodeResourceRevisionSerializer, MethodSerializer
 import kive.testing_utils as tools
 from fleet.workers import Manager
-from portal.utils import update_all_contenttypes
 
 
 # This was previously defined here but has been moved to metadata.tests.
@@ -67,7 +68,6 @@ class FileAccessTests(TestCase):
     def tearDown(self):
         tools.clean_up_all_files()
         tools.fd_count("FDs (end)")
-        update_all_contenttypes(verbosity=0)
 
     def test_close_save(self):
         with open(os.path.join(samplecode_path, self.fn), "rb") as f:
@@ -877,10 +877,6 @@ with open(outfile, "wb") as f:
             name="numbers", description="1-2-3-4"
         )
 
-    def tearDown(self):
-        # Our tests fail post-teardown without this.
-        update_all_contenttypes(verbosity=0)
-
     def test_find_compatible_ER_non_reusable_method(self):
         """
         The ExecRecord of a non-reusable Method should not be found compatible.
@@ -1179,8 +1175,13 @@ echo "Hello World"
     # In many situations below, the ContentFile object doesn't work with the DRF serializers.
     # In those situations, we'll open the file in the test and insert it into case.crr_data
     # so that we don't have an open file handle being passed around.
-    case.hello_world_fd, case.hello_world_filename = tempfile.mkstemp()
-    with os.fdopen(case.hello_world_fd, "wb") as f:
+    file_prefix = os.path.join(settings.MEDIA_ROOT,
+                               CodeResourceRevision.UPLOAD_DIR,
+                               'hello')
+    with tempfile.NamedTemporaryFile(prefix=file_prefix,
+                                     suffix='.sh',
+                                     delete=False) as f:
+        case.hello_world_filename = f.name
         f.write(case.hello_world)
 
     case.crr_dependency = """language = ENG"""
@@ -1540,6 +1541,12 @@ class MethodApiMockTests(BaseTestCases.ApiTestCase):
     def setUp(self):
         self.mock_viewset(MethodViewSet)
         super(MethodApiMockTests, self).setUp()
+
+        patcher = mocked_relations(MethodFamily,
+                                   CodeResourceRevision,
+                                   DockerImage)
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
         self.list_path = reverse("method-list")
         self.detail_pk = 43

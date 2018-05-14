@@ -11,8 +11,6 @@ import re
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'pipeline', '0001_initial'), (b'pipeline', '0002_auto_20150204_1703'), (b'pipeline', '0003_auto_20150213_1703'), (b'pipeline', '0004_auto_20150216_1641'), (b'pipeline', '0005_pipeline_parent_set_null_20150429_1025'), (b'pipeline', '0006_pipelinefamily_published_version_set_null_20150505_1157'), (b'pipeline', '0007_pipeline_ordering_20150601_1348'), (b'pipeline', '0008_pipelinestep_fill_colour'), (b'pipeline', '0009_auto_20150615_1403'), (b'pipeline', '0010_pipelinestep_order_by_stepnum'), (b'pipeline', '0011_poc_validate_slug_20150702_1147'), (b'pipeline', '0012_pipeline_published'), (b'pipeline', '0013_pipeline_convert_published_version_20150917_1511'), (b'pipeline', '0014_remove_pipelinefamily_published_version'), (b'pipeline', '0015_django_19_20160202_1038'), (b'pipeline', '0016_permissions_remove_null_20160203_1033'), (b'pipeline', '0100_unlink_apps')]
-
     initial = True
 
     dependencies = [

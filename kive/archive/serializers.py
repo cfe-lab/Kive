@@ -358,6 +358,8 @@ class RunSerializer(AccessControlSerializer, serializers.ModelSerializer):
         First, check that the inputs are correctly specified; then,
         check that the permissions are OK.
         """
+        data = super(RunSerializer, self).validate(data)
+
         pipeline = data["pipeline"]
 
         posted_input_count = len(data["inputs"])
@@ -547,6 +549,7 @@ class RunBatchSerializer(AccessControlSerializer, serializers.ModelSerializer):
         In particular, check that the permissions specified for the Run
         do not exceed those of the RunBatch.
         """
+        data = super(RunBatchSerializer, self).validate(data)
         # If this is an update of a RunBatch, and we are trying to set the
         # permissions but the Runs aren't complete yet, we should fail immediately.
         permission_change_requested = (data.get("users_allowed") is not None or

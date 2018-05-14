@@ -13,8 +13,6 @@ import re
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'librarian', '0001_initial'), (b'librarian', '0002_auto_20150204_1703'), (b'librarian', '0003_auto_20150213_1703'), (b'librarian', '0004_redacted_20150417_1128'), (b'librarian', '0005_merge_dataset_SD_20151116_1012'), (b'librarian', '0006_transfer_datasets_to_SDs_20151116_1022'), (b'librarian', '0007_transition_SD_to_dataset_20151117_1748'), (b'librarian', '0008_transition_SD_fks_20151117_1759'), (b'librarian', '0009_file_source_20151118_1506'), (b'librarian', '0010_dataset_file_not_null'), (b'librarian', '0011_permissions_remove_null_20160203_1033'), (b'librarian', '0012_external_path_20160318_1516'), (b'librarian', '0013_efd_name_unique_20160404_1010'), (b'librarian', '0012_dataset_file_index_20160406_1051'), (b'librarian', '0014_merge'), (b'librarian', '0100_unlink_apps')]
-
     initial = True
 
     dependencies = [

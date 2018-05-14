@@ -10,10 +10,8 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('librarian', '0100_unlink_apps'),
-        ('archive', '0001_initial'),
-        ('archive', '0019_prepare_merge_dataset_SD_20151116_1012'),
-        ('archive', '0020_date_created_default_20151116_1040'),
+        ('librarian', '0101_squashed'),
+        ('archive', '0101_squashed'),
     ]
 
     operations = [

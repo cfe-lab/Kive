@@ -9,9 +9,8 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('metadata', '0100_unlink_apps'),
-        ('librarian', '0005_merge_dataset_SD_20151116_1012'),
-        ('librarian', '0007_transition_SD_to_dataset_20151117_1748'),
+        ('metadata', '0101_squashed'),
+        ('librarian', '0101_squashed'),
     ]
 
     operations = [

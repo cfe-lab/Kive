@@ -9,13 +9,11 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('archive', '0100_unlink_apps'),
-        ('pipeline', '__first__'),
-        ('fleet', '0008_rtp_time_queued_default_20151103_1606'),
-        ('librarian', '__first__'),
-        ('librarian', '0004_redacted_20150417_1128'),
-        ('librarian', '0007_transition_SD_to_dataset_20151117_1748'),
-        ('metadata', '0017_order_cdt_by_name_20160215_1637'),
+        ('archive', '0101_squashed'),
+        ('pipeline', '0101_squashed2'),
+        ('fleet', '0101_squashed'),
+        ('librarian', '0101_squashed'),
+        ('metadata', '0101_squashed'),
     ]
 
     operations = [

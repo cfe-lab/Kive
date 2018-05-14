@@ -69,6 +69,7 @@ class CompoundDatatypeSerializer(AccessControlSerializer, serializers.ModelSeria
         """
         Check that the indices and permissions are coherent.
         """
+        data = super(CompoundDatatypeSerializer, self).validate(data)
         members = data.get("members", [])
         indices = sorted([x["column_idx"] for x in members])
         if indices != range(1, len(indices) + 1):

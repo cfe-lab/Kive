@@ -9,8 +9,6 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'datachecking', '0001_initial'), (b'datachecking', '0002_blankcell'), (b'datachecking', '0003_auto_20150204_1703'), (b'datachecking', '0004_redacted_20150417_1128'), (b'datachecking', '0005_conflicting_SD_workaround_20151118_1025'), (b'datachecking', '0006_transition_SD_to_dataset_20151117_1748'), (b'datachecking', '0007_transition_SD_fks_20151117_1759'), (b'datachecking', '0008_runsic_input_integrity_check_20160323_1550'), (b'datachecking', '0100_unlink_apps')]
-
     initial = True
 
     dependencies = [

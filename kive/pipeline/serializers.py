@@ -313,6 +313,7 @@ class PipelineSerializer(AccessControlSerializer,
         """
         Check that cables in the Pipeline are properly specified.
         """
+        data = super(PipelineSerializer, self).validate(data)
         input_names = [x["dataset_name"] for x in data["inputs"]]
 
         for step_data in data["steps"]:
@@ -528,9 +529,7 @@ class PipelineFamilySerializer(AccessControlSerializer,
                   "num_revisions",
                   "members",
                   "members_url")
-        read_only_fields = (
-            "members"
-        )
+        read_only_fields = ("members", )
 
     def get_members(self, obj):
         """

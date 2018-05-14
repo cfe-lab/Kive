@@ -60,3 +60,8 @@ class AccessControlSerializer(serializers.Serializer):
         allow_null=True,
         required=False
     )
+
+    def validate(self, data):
+        validated_data = super(AccessControlSerializer, self).validate(data)
+        validated_data.setdefault("user", self.root.context['request'].user)
+        return validated_data

@@ -22,6 +22,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 # from django.utils.timezone import get_default_timezone, get_current_timezone
 from django.utils import timezone
+from django_mock_queries.mocks import mocked_relations
 from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
@@ -1108,6 +1109,9 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         super(DatasetApiMockTests, self).setUp()
         # num_cols = 12
 
+        patcher = mocked_relations(CompoundDatatype)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.list_path = reverse("dataset-list")
         self.list_view, _, _ = resolve(self.list_path)
 

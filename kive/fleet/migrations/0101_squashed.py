@@ -8,8 +8,6 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'fleet', '0001_initial'), (b'fleet', '0002_auto_20150220_1339'), (b'fleet', '0003_runtoprocess_purged'), (b'fleet', '0004_run_to_process_run_one_to_one_20150713_1111'), (b'fleet', '0005_runtoprocessinput_related_name_20150713_1434'), (b'fleet', '0006_runtoprocess_name'), (b'fleet', '0007_runtoprocess_description_20151021_1517'), (b'fleet', '0008_rtp_time_queued_default_20151103_1606'), (b'fleet', '0009_remove_all_models_20151104_1717')]
-
     initial = True
 
     dependencies = [

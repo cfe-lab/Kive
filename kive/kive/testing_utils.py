@@ -8,6 +8,7 @@ import logging
 import hashlib
 import time
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.files import File
 from django.db import transaction
@@ -1591,7 +1592,10 @@ def create_method_test_environment(case):
     resource = CodeResource(name="noop", filename="noop.sh", user=case.myUser)
     resource.save()
     resource.grant_everyone_access()
-    with tempfile.NamedTemporaryFile() as f:
+    file_prefix = os.path.join(settings.MEDIA_ROOT,
+                               CodeResourceRevision.UPLOAD_DIR,
+                               'noop')
+    with tempfile.NamedTemporaryFile(prefix=file_prefix, suffix='.sh') as f:
         f.write("#!/bin/bash\ncat $1")
         case.noop_data_file = f.name
         revision = CodeResourceRevision(coderesource=resource,

@@ -55,7 +55,7 @@ class ViewMockTestCase(TestCase, object):
         User.objects.add(user)
         User.objects.model = User
         # noinspection PyUnresolvedReferences
-        patcher = patch.object(User, '_default_manager', User.objects)
+        patcher = patch.object(User._meta, 'default_manager', User.objects)
         patcher.start()
         self.addCleanup(patcher.stop)
         dummy_session_key = 'dummysession'

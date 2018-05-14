@@ -15,13 +15,9 @@ import django.core.validators
 from django.db import models, migrations, transaction, DEFAULT_DB_ALIAS, connections
 import django.db.models.deletion
 
-import portal.utils
-
 
 @transaction.atomic
 def load_initial_groups(apps, schema_editor):
-    # update_all_contenttypes(verbosity=0)
-    portal.utils.update_all_contenttypes(verbosity=0)
     auth_app_config = django_apps.get_app_config("auth")
     create_permissions(auth_app_config, verbosity=0)
     call_command("loaddata", "initial_groups", app_label="metadata")
@@ -256,30 +252,12 @@ def noop(apps, schema_editor):
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'metadata', '0001_initial'),
-                (b'metadata', '0002_compounddatatypemember_blankable'),
-                (b'metadata', '0003_auto_20150212_1013'),
-                (b'metadata', '0004_auto_20150213_1703'),
-                (b'metadata', '0005_kiveuser'),
-                (b'metadata', '0006_auto_20150217_1254'),
-                (b'metadata', '0007_auto_20150218_1045'),
-                (b'metadata', '0008_load_initial_data_users_groups_20150303_1209'),
-                (b'metadata', '0009_redacted_20150417_1128'),
-                (b'metadata', '0010_datatype_proto_sd'),
-                (b'metadata', '0011_remove_datatype_prototype'),
-                (b'metadata', '0012_transition_SD_to_dataset_20151117_1748'),
-                (b'metadata', '0013_permissions_remove_null_20160203_1033'),
-                (b'metadata', '0014_restricts_remove_null_20160203_1038'),
-                (b'metadata', '0015_compounddatatype_name'),
-                (b'metadata', '0016_set_cdt_names_20160215_1525'),
-                (b'metadata', '0017_order_cdt_by_name_20160215_1637'),
-                (b'metadata', '0100_unlink_apps')]
     initial = True
 
     dependencies = [
         ('contenttypes', '0002_remove_content_type_name'),
         ('method', '__first__'),
-        ('archive', '0001_initial'),
+        ('archive', '0101_squashed'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('auth', '0001_initial'),
         # ('librarian', '0005_merge_dataset_SD_20151116_1012'),
