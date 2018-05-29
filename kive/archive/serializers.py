@@ -235,7 +235,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 output.handle_output_log('output', methodoutput, request, execlog)
                 outputs.append(output)
             except ValueError as e:
-                print "stdout serializer", e
+                print("stdout serializer", e)
             # Now handle the stderr file
             output = _RunDataset(step_name="",
                                  name=step_prefix + 'stderr',
@@ -245,7 +245,7 @@ class RunOutputsSerializer(serializers.ModelSerializer):
                 output.handle_output_log('error', methodoutput, request, execlog)
                 outputs.append(output)
             except ValueError as e:
-                print "stderr serializer", e
+                print("stderr serializer", e)
             if runstep.execrecord is not None:
                 for execrecordout in runstep.execrecord.execrecordouts_in_order:
                     transform_output = execrecordout.generic_output.definite

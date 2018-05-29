@@ -105,7 +105,7 @@ class SlurmDummyTests(TestCase):
         """ Should return 0 """
         n = 1
         if lverb:
-            print "---test_callit01", n
+            print("---test_callit01", n)
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         # arglst, stderr, stdout = [], None, None
@@ -113,16 +113,16 @@ class SlurmDummyTests(TestCase):
         with open("/tmp/out.txt", "w") as stdout, open("/tmp/err.txt", "w") as stderr:
             retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
             if retval != 0:
-                print "the error is '%s'" % os.strerror(retval)
+                print("the error is '%s'" % os.strerror(retval))
                 assert retval == 0, "expected retval 0"
         if lverb:
-            print "---END test_callit01", n
+            print("---END test_callit01", n)
 
     def test_callit02(self, lverb=False):
         """ Should return 2 """
         n = FAIL_JOB_NUMBER
         if lverb:
-            print "---test_callit01", n
+            print("---test_callit01", n)
         wdir = osp.join(TEST_DIR, "job%02d" % n)
         jobname = "sleep%02d.sh" % n
         arglst = []
@@ -130,7 +130,7 @@ class SlurmDummyTests(TestCase):
             retval = slurmlib.callit(wdir, jobname, arglst, stdout, stderr)
             assert retval == 2, "expected retval 2"
         if lverb:
-            print "---END test_callit01", n
+            print("---END test_callit01", n)
 
     def test_is_alive(self):
         """test_is_alive() should return True"""
@@ -145,16 +145,16 @@ class SlurmDummyTests(TestCase):
     def test_submit_job01(self, lverb=False):
         """ Submitting this job should succeed."""
         if lverb:
-            print "--test_submit_job01"
+            print("--test_submit_job01")
         jhandle = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "submitted job", jhandle
+            print("submitted job", jhandle)
 
     def test_submit_job02(self, lverb=False):
         """Submission should fail (nonexistent job script)
         """
         if lverb:
-            print "--test_submit_job02"
+            print("--test_submit_job02")
         prio = PRIO_MEDIUM
         n, m = 1, 2
         wdir = osp.join(TEST_DIR, "job%02d" % n)
@@ -174,7 +174,7 @@ class SlurmDummyTests(TestCase):
     def test_submit_job03(self, lverb=False):
         """Submission should fail (priority a string instead of int)"""
         if lverb:
-            print "--test_submit_job03"
+            print("--test_submit_job03")
         prio = 'illegal priostring'
         n = 1
         wdir = osp.join(TEST_DIR, "job%02d" % n)
@@ -196,29 +196,29 @@ class SlurmDummyTests(TestCase):
         I.e. submission should succeed, but the job should have a non-zero exit code.
         """
         if lverb:
-            print "---test_submit_job04"
+            print("---test_submit_job04")
         jhandle = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "successfully launched job %s, now waiting for its failure..." % jhandle
+            print("successfully launched job %s, now waiting for its failure..." % jhandle)
         time.sleep(2)
         num_tries, i = 20, 0
         curstate = jhandle.get_state()
         if lverb:
-            print "gotstate", curstate
+            print("gotstate", curstate)
         while (i < num_tries) and (curstate != self.sched_cls.FAILED):
             if lverb:
-                print i, "curstate...", curstate
+                print(i, "curstate...", curstate)
             time.sleep(5)
             curstate = jhandle.get_state()
             i += 1
         assert curstate == self.sched_cls.FAILED, "failed to get a 'FAILED' state. got {}".format(curstate)
         if lverb:
-            print "---test_submit_job04: Success, got an expected FAILED status"
+            print("---test_submit_job04: Success, got an expected FAILED status")
 
     def test_submit_job07(self, lverb=False):
         """Submission should fail (illegal cpu_number)"""
         if lverb:
-            print "--test_submit_job07"
+            print("--test_submit_job07")
         num_cpu = 0
         prio = PRIO_MEDIUM
         n = 1
@@ -236,19 +236,19 @@ class SlurmDummyTests(TestCase):
                 None
             )
         if lverb:
-            print "--test_submit_job07 SUCCESS"
+            print("--test_submit_job07 SUCCESS")
 
     def test_dep_jobs01_okay(self, lverb=False):
         """Submit one job dependent on the other with an after_okay dependency.
         Both jobs should succeed."""
         if lverb:
-            print "--test_dep_jobs01_okay"
+            print("--test_dep_jobs01_okay")
         jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "first job", jobid_01
+            print("first job", jobid_01)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "dependent job", jobid_02
+            print("dependent job", jobid_02)
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
@@ -256,7 +256,7 @@ class SlurmDummyTests(TestCase):
         curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
         while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED:
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst])
             time.sleep(5)
             curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
             i += 1
@@ -265,19 +265,19 @@ class SlurmDummyTests(TestCase):
         assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job01: failed to run successfully"
         assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job02: failed to run successfully"
         if lverb:
-            print "--test_dep_jobs01_okay SUCCESS"
+            print("--test_dep_jobs01_okay SUCCESS")
 
     def test_dep_jobs01_any(self, lverb=False):
         """Submit one job dependent on the other with an after_any dependency.
         Both jobs should succeed."""
         if lverb:
-            print "--test_dep_jobs01_any"
+            print("--test_dep_jobs01_any")
         jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "first job", jobid_01
+            print("first job", jobid_01)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "dependent job", jobid_02
+            print("dependent job", jobid_02)
         my_handles = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in my_handles]
         time.sleep(2)
@@ -285,31 +285,31 @@ class SlurmDummyTests(TestCase):
         curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
         while i < num_tries and curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED:
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst])
             time.sleep(5)
             curstate = get_accounting_info(my_handles, sched_cls=self.sched_cls)
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
-            print "FINAL STATE", [curstate[jid][ACC_STATE] for jid in jobidlst]
+            print("FINAL STATE", [curstate[jid][ACC_STATE] for jid in jobidlst])
         assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job01: failed to run successfully"
         assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, "job02: failed to run successfully"
         if lverb:
-            print "--test_dep_jobs01_any SUCCESS"
+            print("--test_dep_jobs01_any SUCCESS")
 
     def test_dep_jobs02_ok(self, lverb=False):
         """Submit job 01, and job 02 dependent on 01 with an after_ok dependency.
         Job 01 will fail. Job 02 must be cancelled.
         """
         if lverb:
-            print "--test_dep_jobs02_ok"
+            print("--test_dep_jobs02_ok")
         jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "first job that will fail:", jobid_01
+            print("first job that will fail:", jobid_01)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "dependent job:", jobid_02
+            print("dependent job:", jobid_02)
         joblst = [jobid_01, jobid_02]
         not_failed, num_tries, i = True, 40, 0
         curstate = None
@@ -317,67 +317,67 @@ class SlurmDummyTests(TestCase):
             time.sleep(2)
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
-                print "step %02d:" % i, curstate[jobid_01.job_id][ACC_STATE], curstate[jobid_02.job_id][ACC_STATE]
+                print("step %02d:" % i, curstate[jobid_01.job_id][ACC_STATE], curstate[jobid_02.job_id][ACC_STATE])
             not_failed = curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         if lverb:
-            print "job01 state:", curstate[jobid_01.job_id]
-            print "job02 state:", curstate[jobid_02.job_id]
+            print("job01 state:", curstate[jobid_01.job_id])
+            print("job02 state:", curstate[jobid_02.job_id])
         assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.FAILED, "unexpected state 01"
         assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED, "unexpected state 02"
         if lverb:
-            print "--test_dep_jobs02_ok SUCCESS"
+            print("--test_dep_jobs02_ok SUCCESS")
 
     def test_dep_jobs02_any(self, lverb=False):
         """Submit job 01, and job 02 dependent on 01 with an after_any dependency.
         Job 01 will fail. Job 02 must run anyway.
         """
         if lverb:
-            print "--test_dep_jobs02_any"
+            print("--test_dep_jobs02_any")
         jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "first job that will fail:", jobid_01
+            print("first job that will fail:", jobid_01)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, None, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "dependent job:", jobid_02
+            print("dependent job:", jobid_02)
         joblst = [jobid_01, jobid_02]
         jidlst = [jh.job_id for jh in joblst]
         if lverb:
-            print "waiting for job 01 to fail"
+            print("waiting for job 01 to fail")
         not_failed, num_tries, i = True, 40, 0
         curstate = None
         while (i < num_tries) and not_failed:
             time.sleep(2)
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst])
             not_failed = curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED
             i += 1
         if i == num_tries:
             raise RuntimeError("test inconclusive: didn't wait long enough")
         # wait for jobid_02 to start running
         if lverb:
-            print "OK, waiting for job 02 to run"
+            print("OK, waiting for job 02 to run")
         is_running, num_tries, i = curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED, 40, 0
         while (i < num_tries) and not is_running:
             time.sleep(2)
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jidlst])
             is_running = curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.COMPLETED
         if i == num_tries:
             raise RuntimeError("failed: job 02 did not complete")
         if lverb:
-            print "job01 state:", curstate[jobid_01.job_id]
-            print "job02 state:", curstate[jobid_02.job_id]
+            print("job01 state:", curstate[jobid_01.job_id])
+            print("job02 state:", curstate[jobid_02.job_id])
         state_02 = curstate[jobid_02.job_id][ACC_STATE]
         ok_state_02 = state_02 == self.sched_cls.RUNNING or state_02 == self.sched_cls.COMPLETED
         assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.FAILED, "unexpected state 01"
         assert ok_state_02, "unexpected state 02"
         if lverb:
-            print "--test_dep_jobs02_any SUCCESS"
+            print("--test_dep_jobs02_any SUCCESS")
 
     def test_dep_jobs01_multi(self, lverb=False):
         """Submit job 01 that will fail.
@@ -386,16 +386,16 @@ class SlurmDummyTests(TestCase):
         Job 03 must be run.
         """
         if lverb:
-            print "--test_dep_jobs01_multi"
+            print("--test_dep_jobs01_multi")
         jobid_01 = _submit_job_n(FAIL_JOB_NUMBER, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "first job that will fail:", jobid_01
+            print("first job that will fail:", jobid_01)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "second job that will succeed", jobid_02
+            print("second job that will succeed", jobid_02)
         jobid_03 = _submit_job_n(1, PRIO_MEDIUM, [jobid_02], [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "third job that should run", jobid_02
+            print("third job that should run", jobid_02)
         joblst = [jobid_01, jobid_02, jobid_03]
         jobidlst = [j.job_id for j in joblst]
         still_running, num_tries, i = True, 40, 0
@@ -404,7 +404,7 @@ class SlurmDummyTests(TestCase):
             time.sleep(2)
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst])
             still_running = (curstate[jobid_01.job_id][ACC_STATE] != self.sched_cls.FAILED) or\
                             (curstate[jobid_02.job_id][ACC_STATE] != self.sched_cls.COMPLETED)
             i += 1
@@ -414,59 +414,59 @@ class SlurmDummyTests(TestCase):
         state_02 = curstate[jobid_02.job_id][ACC_STATE]
         state_03 = curstate[jobid_03.job_id][ACC_STATE]
         if lverb:
-            print "state after loop:", [curstate[jid][ACC_STATE] for jid in jobidlst]
+            print("state after loop:", [curstate[jid][ACC_STATE] for jid in jobidlst])
         assert state_01 == self.sched_cls.FAILED, "unexpected state 01"
         assert state_02 == self.sched_cls.COMPLETED, "unexpected state 02"
         ok_state_03 = state_03 in self.sched_cls.RUNNING_STATES
         assert ok_state_03, "unexpected state 03"
         if lverb:
-            print "--test_dep_jobs01_multi SUCCESS"
+            print("--test_dep_jobs01_multi SUCCESS")
 
     def test_cancel_jobs01(self, lverb=False):
         """Submit a job, then cancel it"""
         if lverb:
-            print "--test_cancel_jobs01"
+            print("--test_cancel_jobs01")
         jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "submitted job", jobid_01
-            print "wait for running status..."
+            print("submitted job", jobid_01)
+            print("wait for running status...")
         num_tries, i, curstate = 40, 0, jobid_01.get_state()
         while i < num_tries and curstate not in self.sched_cls.RUNNING_STATES:
             if lverb:
-                print "step %02d:" % i, curstate
+                print("step %02d:" % i, curstate)
             time.sleep(2)
             i += 1
             curstate = jobid_01.get_state()
         assert curstate in self.sched_cls.RUNNING_STATES, "Job is not running, cannot test cancelling it"
         if lverb:
-            print "job is running, now cancelling job 01..."
+            print("job is running, now cancelling job 01...")
         self.sched_cls.job_cancel(jobid_01)
         if lverb:
-            print "wait for cancelled status...."
+            print("wait for cancelled status....")
         i, curstate = 0, jobid_01.get_state()
         while i < num_tries and curstate in self.sched_cls.RUNNING_STATES:
             if lverb:
-                print "step %02d:" % i, curstate
+                print("step %02d:" % i, curstate)
             time.sleep(5)
             i += 1
             curstate = jobid_01.get_state()
         assert curstate == self.sched_cls.CANCELLED, "job is not cancelled: got {}".format(curstate)
         if lverb:
-            print "--test_cancel_jobs01 SUCCESS"
+            print("--test_cancel_jobs01 SUCCESS")
 
     def test_cancel_jobs02(self, lverb=False):
         """Submit a job, then a second one dependent on the first.
         When we cancel the first, slurm should cancel the second one as well.
         """
         if lverb:
-            print "---test_cancel_jobs02"
+            print("---test_cancel_jobs02")
         jobid_01 = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "started 01:", jobid_01
+            print("started 01:", jobid_01)
         time.sleep(2)
         jobid_02 = _submit_job_n(3, PRIO_MEDIUM, [jobid_01], sched_cls=self.sched_cls)
         if lverb:
-            print "started 02 (dependent on 01):", jobid_02
+            print("started 02 (dependent on 01):", jobid_02)
         joblst = [jobid_01, jobid_02]
         jobidlst = [j.job_id for j in joblst]
         are_ready, i, num_tries = False, 0, 40
@@ -475,30 +475,30 @@ class SlurmDummyTests(TestCase):
             i += 1
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst])
             are_ready = curstate[jobid_01.job_id][ACC_STATE] in self.sched_cls.RUNNING_STATES
         assert are_ready, "failed to submit the two jobs..."
         if lverb:
-            print "OK, two jobs submitted, now cancelling job 01"
+            print("OK, two jobs submitted, now cancelling job 01")
         self.sched_cls.job_cancel(jobid_01)
         check_tuple = (self.sched_cls.CANCELLED, self.sched_cls.CANCELLED)
         curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
         are_cancelled, i = False, 0
         while i < num_tries and not are_cancelled:
             if lverb:
-                print "step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst]
+                print("step %02d:" % i, [curstate[jid][ACC_STATE] for jid in jobidlst])
             time.sleep(2)
             i += 1
             curstate = get_accounting_info(joblst, sched_cls=self.sched_cls)
             are_cancelled = tuple([curstate[jid][ACC_STATE] for jid in jobidlst]) == check_tuple
         if lverb:
-            print "final states", [curstate[jid][ACC_STATE] for jid in jobidlst]
+            print("final states", [curstate[jid][ACC_STATE] for jid in jobidlst])
         assert curstate[jobid_01.job_id][ACC_STATE] == self.sched_cls.CANCELLED,\
             "unexpected state 01: got {}".format(curstate[jobid_01.job_id][ACC_STATE])
         assert curstate[jobid_02.job_id][ACC_STATE] == self.sched_cls.CANCELLED,\
             "unexpected state 02: got {}".format(curstate[jobid_02.job_id][ACC_STATE])
         if lverb:
-            print "---test_cancel_jobs02 SUCCESS"
+            print("---test_cancel_jobs02 SUCCESS")
 
     def test_get_state_01(self, lverb=False):
         """Submit a job, then follow its state using squeue.
@@ -506,46 +506,46 @@ class SlurmDummyTests(TestCase):
         a COMPLETED result.
         """
         if lverb:
-            print "--test_get_state_01"
+            print("--test_get_state_01")
         jhandle = _submit_job_n(1, PRIO_MEDIUM, sched_cls=self.sched_cls)
         if lverb:
-            print "submitted job", jhandle
+            print("submitted job", jhandle)
         i, num_tries, has_finished = 0, 20, False
         curstate = None
         while (i < num_tries) and not has_finished:
             curstate = jhandle.get_state()
             if lverb:
-                print "step %02d:" % i, curstate
+                print("step %02d:" % i, curstate)
             has_finished = (curstate in self.sched_cls.STOPPED_SET)
             time.sleep(5)
             i += 1
         assert curstate == self.sched_cls.COMPLETED, "unexpected final state: got {}".format(curstate)
         if lverb:
-            print "--test_get_state_01 SUCCESS"
+            print("--test_get_state_01 SUCCESS")
 
     def test_set_priority_01(self, lverb=False):
         """Start some jobs with a given priority, then change it.
         See if this was successful.
         """
         if lverb:
-            print "--test_set_priority_01"
+            print("--test_set_priority_01")
         # first, submit a number of high prio jobs in order to fill the queue
         # we can only change the priority of a job if it is not yet running
         low_prio = self.sched_cls.MIN_PRIO
         high_prio = low_prio + 1
-        for i in xrange(4):
+        for i in range(4):
             submit_all(high_prio, sched_cls=self.sched_cls)
         if lverb:
-            print "submitting low_prio jobs..."
+            print("submitting low_prio jobs...")
         jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         jobidlst = [jh.job_id for jh in jobhandles]
         if lverb:
-            print "job_ids", jobidlst
+            print("job_ids", jobidlst)
         time.sleep(2)
         cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
         priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
         if lverb:
-            print "state+priority after submission", priolst
+            print("state+priority after submission", priolst)
         any_done = any([state == self.sched_cls.COMPLETED for state, prio in priolst])
         if any_done:
             raise RuntimeError("Test failed as jobs completed before we could change prio")
@@ -554,20 +554,20 @@ class SlurmDummyTests(TestCase):
         test_passed = False
         while cs[jobidlst[0]][ACC_STATE] != self.sched_cls.PENDING and not test_passed:
             if lverb:
-                print "waiting"
+                print("waiting")
             time.sleep(2)
             cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
             test_passed = all([prio == high_prio for state, prio in priolst])
         if lverb:
-            print " after wait"
+            print(" after wait")
         assert test_passed, "setting high prio failed"
         if lverb:
-            print "Test passed"
+            print("Test passed")
         if lverb:
             cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             priolst = [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jobidlst]
-            print "final states:", priolst
+            print("final states:", priolst)
 
     def test_set_priority_02(self):
         """Set an illegal job priority type (str instead of int).
@@ -601,10 +601,10 @@ class SlurmDummyTests(TestCase):
         ==> there will be no information of job B by accounting.
         """
         if lverb:
-            print "--test_acc_info_01:"
+            print("--test_acc_info_01:")
         low_prio = PRIO_LOW
         if lverb:
-            print "submitting low_prio jobs..."
+            print("submitting low_prio jobs...")
         jobhandles = submit_all(low_prio, sched_cls=self.sched_cls)
         job01 = jobhandles[0]
         job02 = _submit_job_n(1, PRIO_MEDIUM, [job01], sched_cls=self.sched_cls)
@@ -615,7 +615,7 @@ class SlurmDummyTests(TestCase):
         while i < numtests and not is_finished:
             cs = get_accounting_info(jobhandles, sched_cls=self.sched_cls)
             if lverb:
-                print i, [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jidlst]
+                print(i, [(cs[jid][ACC_STATE], cs[jid][ACC_PRIONUM]) for jid in jidlst])
             time.sleep(2)
             is_finished = cs[job02.job_id][ACC_STATE] == self.sched_cls.COMPLETED
             i += 1
@@ -623,7 +623,7 @@ class SlurmDummyTests(TestCase):
         assert i < numtests,\
             "job02 failed to complete in 40 iterations. got state: {}".format(cs[job02.job_id][ACC_STATE])
         if lverb:
-            print "--test_acc_info_01(): SUCCESS"
+            print("--test_acc_info_01(): SUCCESS")
 
     def test_multi_check_output_echo(self):
         expected_output = 'Lorem ipsum\n'
@@ -653,39 +653,39 @@ class SlurmDummyTests(TestCase):
         and priorities could also be ignored.
         """
         if lverb:
-            print "--test_squeue_jobs01"
+            print("--test_squeue_jobs01")
         low_prio = PRIO_LOW
         hi_prio = PRIO_HIGH
         if lverb:
-            print "submitting low_prio jobs..."
+            print("submitting low_prio jobs...")
         jh_lst = submit_all(low_prio, sched_cls=self.sched_cls)
         time.sleep(1)
         jobid_01 = _submit_job_n(1, hi_prio)
         if lverb:
-            print "submitted a high prio job", jobid_01
+            print("submitted a high prio job", jobid_01)
         jh_lst.append(jobid_01)
         is_done, i, num_tries = False, 0, 40
         job_state_dct = None
         while (i < num_tries) and not is_done:
             if lverb:
-                print "step %d/%d" % (i, num_tries)
+                print("step %d/%d" % (i, num_tries))
             job_state_dct = get_accounting_info(jh_lst, sched_cls=self.sched_cls)
             for j_state in sorted(job_state_dct.values(), key=lambda a: a[ACC_JOB_ID]):
                 # has_finished = (j_state["ST"] == 'CD'  or j_state["ST"] == 'UKN')
                 if lverb:
-                    print "%02d: %5s  %s" % (i, j_state[ACC_JOB_ID], j_state[ACC_STATE])
-                    print
+                    print("%02d: %5s  %s" % (i, j_state[ACC_JOB_ID], j_state[ACC_STATE]))
+                    print()
                 is_done = job_state_dct[jobid_01.job_id][ACC_STATE] == self.sched_cls.COMPLETED
                 time.sleep(5)
                 i += 1
         if lverb:
-            print "exited  loop...FINAL STATE:"
+            print("exited  loop...FINAL STATE:")
             for j_state in sorted(job_state_dct.values(), key=lambda a: a[ACC_JOB_ID]):
-                print "FINAL: %5s  %s" % (j_state[ACC_JOB_ID], j_state[ACC_STATE])
-            print
+                print("FINAL: %5s  %s" % (j_state[ACC_JOB_ID], j_state[ACC_STATE]))
+            print()
         assert i < num_tries, "failed to wait for completed jobs!"
         if lverb:
-            print "--test_squeue_jobs01 SUCCESS"
+            print("--test_squeue_jobs01 SUCCESS")
 
 
 @skipIf(not settings.RUN_SLURM_TESTS, "Slurm tests disabled.")

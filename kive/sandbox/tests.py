@@ -29,7 +29,7 @@ import file_access_utils
 
 
 def execute_tests_environment_setup(case):
-    print "FOOOOOOBAR {}".format(settings.MEDIA_ROOT)
+    print("FOOOOOOBAR {}".format(settings.MEDIA_ROOT))
     # Users + method/pipeline families
     case.myUser = User.objects.create_user('john', 'lennon@thebeatles.com', 'johnpassword')
     case.myUser.save()

@@ -43,7 +43,8 @@ import librarian.signals
 import file_access_utils
 from constants import maxlengths, runcomponentstates
 from datachecking.models import BadData
-import filewalker
+import librarian.filewalker as filewalker
+import six
 
 LOGGER = logging.getLogger(__name__)
 
@@ -387,9 +388,9 @@ class Dataset(metadata.models.AccessControl):
             if l_score == u_score == float('inf'):
                 pass
             elif u_score < l_score and u_score != float('inf'):
-                [expt.insert(i, "") for _ in xrange(u_score)]
+                [expt.insert(i, "") for _ in range(u_score)]
             elif l_score <= u_score and l_score != float('inf'):
-                [obs.insert(i, "") for _ in xrange(l_score)]
+                [obs.insert(i, "") for _ in range(l_score)]
                 insert += [i] * l_score  # keep track of where to insert columns in the resulting view
             i += 1
 
@@ -921,10 +922,10 @@ class Dataset(metadata.models.AccessControl):
                         )
 
                         new_datasets.extend([new_dataset])
-            except Exception, e:
+            except Exception as e:
                 message = "Error while parsing line " + str(line) + ":\n" + str(row)
                 LOGGER.exception(message)
-                raise ValueError(message + ":\n" + str(e)), None, sys.exc_info()[2]
+                six.reraise(ValueError(message + ":\n" + str(e)), None, sys.exc_info()[2])
 
         return new_datasets
 
@@ -1026,7 +1027,7 @@ class Dataset(metadata.models.AccessControl):
                         blank_cell = datachecking.models.BlankCell(cellerror=new_cell_error)
                         blank_cell.save()
                     # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    elif not isinstance(failed_constr, basestring):
+                    elif not isinstance(failed_constr, six.string_types):
                         new_cell_error.constraint_failed = failed_constr
 
                     new_cell_error.clean()
@@ -1583,8 +1584,8 @@ class ExecRecord(models.Model):
 
     def __str__(self):
         """Unicode representation of this ExecRecord."""
-        inputs_list = [unicode(eri) for eri in self.execrecordins.all()]
-        outputs_list = [unicode(ero) for ero in self.execrecordouts.all()]
+        inputs_list = [str(eri) for eri in self.execrecordins.all()]
+        outputs_list = [str(ero) for ero in self.execrecordouts.all()]
 
         if type(self.general_transf()) == method.models.Method:
             return "{}({}) = ({})".format(
@@ -1594,7 +1595,7 @@ class ExecRecord(models.Model):
         else:
             # Return a representation for a cable.
             return ("{}".format(", ".join(inputs_list)) +
-                    " ={" + "{}".format(self.general_transf()) + "}=> " +
+                    " ={" + "{}".format(str(self.general_transf())) + "}=> " +
                     "{}".format(", ".join(outputs_list)))
 
     @property

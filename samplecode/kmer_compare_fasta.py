@@ -34,8 +34,8 @@ try:
             counts.append(len(re.findall('(?=%s)' % kmer.replace('?', '\?'), s)))
         dref.update({h: dict(zip(kmers, counts))})
 except:
-    print 'Error parsing reference sequences'
-    print 
+    print('Error parsing reference sequences')
+    print()
     raise
 
 f.close()

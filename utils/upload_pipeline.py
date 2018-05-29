@@ -17,7 +17,7 @@ from operator import attrgetter
 from kiveapi.pipeline import PipelineFamily, Pipeline
 from itertools import count, chain
 from constants import maxlengths
-
+from six.moves import input
 DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
 DEFAULT_MEMORY = 6000
 
@@ -268,7 +268,7 @@ def choose_folder():
     folder = None
     while folder is None:
         try:
-            choice = int(raw_input('Enter the number: '))
+            choice = int(input('Enter the number: '))
             folder = dump_folders[choice - 1]
         except ValueError:
             pass
@@ -292,7 +292,7 @@ def choose_family(kive):
         print('  {}: {}'.format(i, family.name))
     family_name = ''
     while not family_name:
-        family_name = raw_input('Enter the number or a new family name:')
+        family_name = input('Enter the number or a new family name:')
     try:
         pipeline_family = pipeline_families[int(family_name)-1]
         return pipeline_family
@@ -536,7 +536,7 @@ def main():
 
     folder = choose_folder()
     pipeline_family = choose_family(kive)
-    groups = raw_input('Groups allowed? [Everyone] ') or 'Everyone'
+    groups = input('Groups allowed? [Everyone] ') or 'Everyone'
     groups = groups.split(',')
 
     CompoundDatatypeRequest.load_existing(kive)
@@ -548,15 +548,15 @@ def main():
     load_pipeline(pipeline_config)
     print('Uploading {!r} to {} for {}.'.format(folder, pipeline_family, groups))
     for i, step in enumerate(steps, start=1):
-        print '  {}: {}'.format(i, step.get_display())
+        print('  {}: {}'.format(i, step.get_display()))
         for dependency in step.dependencies:
-            print '     ' + dependency['requirement'].get_display()
+            print('     ' + dependency['requirement'].get_display())
     new_compound_datatypes = [request.representation
                               for request in CompoundDatatypeRequest.new_requests]
     new_compound_datatypes.sort()
     print('New compound datatypes:')
     print('\n'.join(new_compound_datatypes))
-    revision_name = raw_input('Enter a revision name, or leave blank to abort: ')
+    revision_name = input('Enter a revision name, or leave blank to abort: ')
     if not revision_name:
         return
 

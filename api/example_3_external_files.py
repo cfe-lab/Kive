@@ -34,7 +34,7 @@ except KiveMalformedDataException:
 # Now get the file and check that the results make sense.
 retrieved_ext_ds = kive.get_dataset(ext_ds.dataset_id)
 
-print retrieved_ext_ds.__dict__
+print(retrieved_ext_ds.__dict__)
 
 assert retrieved_ext_ds.dataset_id == ext_ds.dataset_id
 assert retrieved_ext_ds.filename == ext_ds.filename

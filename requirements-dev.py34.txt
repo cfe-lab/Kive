@@ -1,0 +1,6 @@
+-r requirements-test.py34.txt
+requests==2.18.4
+matplotlib==2.2.2
+pandas==0.20.1
+seaborn==0.8.1
+

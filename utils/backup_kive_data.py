@@ -109,7 +109,7 @@ def main():
 
     # Now, compose and send an email.
     if still_locked or rsync_failure:
-        print "[{}] {}".format(datetime.now(), failure_message)
+        print("[{}] {}".format(datetime.now(), failure_message))
         msg = MIMEText(
             email_template.format(
                 failure_message,
@@ -130,7 +130,7 @@ def main():
         smtp.quit()
 
     else:
-        print "[{}] Backup appears to have succeeded.".format(datetime.now())
+        print("[{}] Backup appears to have succeeded.".format(datetime.now()))
 
 
 if __name__ == "__main__":

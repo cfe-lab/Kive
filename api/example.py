@@ -22,15 +22,15 @@ fastq2 = kive.find_datasets(name='1234A_R2.fastq')[0]
 # Pipeline
 pipeline = kive.get_pipeline(13)
 
-print pipeline
+print(pipeline)
 # # Get the pipeline by family ID
 # pipeline_family = kive.get_pipeline_family(2)
 #
-# print 'Using data:'
-# print fastq1, fastq2
+# print('Using data:')
+# print(fastq1, fastq2)
 #
-# print 'With pipeline:'
-# print pipeline_family.published_or_latest()
+# print('With pipeline:')
+# print(pipeline_family.published_or_latest())
 
 # Run the pipeline
 status = kive.run_pipeline(
@@ -44,18 +44,19 @@ s = sched.scheduler(time.time, time.sleep)
 
 def check_run(sc, run):
     # do your stuff
-    print run.get_status()
+    print(run.get_status())
 
     if run.is_running() or run.is_complete():
-        print '{} {:.0f}%'.format(run.get_progress(), run.get_progress_percent())
+        print('{} {:.0f}%'.format(run.get_progress(), run.get_progress_percent()))
 
     if not run.is_complete():
         sc.enter(5, 1, check_run, (sc, run,))
 
+
 s.enter(5, 1, check_run, (s, status,))
 s.run()
 
-print 'Finished Run, nabbing files'
+print('Finished Run, nabbing files')
 
 for dataset in status.get_results():
     with open(os.path.join('results', dataset.filename), 'wb') as file_handle:

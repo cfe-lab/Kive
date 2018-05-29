@@ -21,11 +21,11 @@ except KiveMalformedDataException:
 # Get the pipeline by family ID
 pipeline_family = kive.get_pipeline_family(2)
 
-print 'Using data:'
-print fastq1, fastq2
+print('Using data:')
+print(fastq1, fastq2)
 
-print 'With pipeline:'
-print pipeline_family.published_or_latest()
+print('With pipeline:')
+print(pipeline_family.published_or_latest())
 
 # Create a RunBatch.
 rb = kive.create_run_batch(

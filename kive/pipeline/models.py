@@ -15,7 +15,6 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.core.urlresolvers import reverse
 
 import csv
-import exceptions
 import os
 import logging
 import sys
@@ -105,7 +104,7 @@ class PipelineFamily(transformation.models.TransformationFamily):
         return removal_plan
 
 
-class PipelineSerializationException(exceptions.Exception):
+class PipelineSerializationException(Exception):
     """
     An exception class for problems arising in defining Pipelines from the UI.
     """
@@ -1045,7 +1044,7 @@ class PipelineStepInputCable(PipelineCable):
         step_str = "[no pipeline step set]"
         is_raw_str = ""
         if self.pipelinestep is not None:
-            step_str = unicode(self.pipelinestep)
+            step_str = str(self.pipelinestep)
         if self.is_raw():
             is_raw_str = "(raw)"
         return "{}:{}{}".format(step_str, self.dest.dataset_name, is_raw_str)
@@ -1113,7 +1112,7 @@ class PipelineStepInputCable(PipelineCable):
                 pk=self.dest.pk).exists():
             raise ValidationError(
                 "Transformation at step {} does not have input \"{}\"".
-                format(self.pipelinestep.step_num, unicode(self.dest)))
+                format(self.pipelinestep.step_num, str(self.dest)))
 
         # Check that the source is available.
         if self.source_step == 0:
@@ -1123,7 +1122,7 @@ class PipelineStepInputCable(PipelineCable):
             if self.source.definite not in pipeline_inputs:
                 raise ValidationError(
                     "Pipeline does not have input \"{}\"".
-                    format(unicode(self.source)))
+                    format(str(self.source)))
 
         # If not from step 0, input derives from the output of a pipeline step
         else:
@@ -1136,7 +1135,7 @@ class PipelineStepInputCable(PipelineCable):
                 raise ValidationError(
                     "Transformation at step {} does not produce output \"{}\"".
                     format(self.source_step,
-                           unicode(self.source.definite)))
+                           str(self.source.definite)))
 
         # Propagate to more specific clean functions.
         if self.is_raw():
@@ -1152,9 +1151,9 @@ class PipelineStepInputCable(PipelineCable):
         # clean() of PipelineStep.
 
         # These are source and destination row constraints.
-        source_min_row = (0 if self.source.get_min_row() == None
+        source_min_row = (0 if self.source.get_min_row() is None
                           else self.source.get_min_row())
-        dest_min_row = (0 if self.dest.get_min_row() == None
+        dest_min_row = (0 if self.dest.get_min_row() is None
                         else self.dest.get_min_row())
 
         # Check for contradictory min row constraints
@@ -1164,9 +1163,9 @@ class PipelineStepInputCable(PipelineCable):
                 format(self.dest.dataset_name, self.pipelinestep.step_num))
 
         # Similarly, these are max-row constraints.
-        source_max_row = (float("inf") if self.source.get_max_row() == None
+        source_max_row = (float("inf") if self.source.get_max_row() is None
                           else self.source.get_max_row())
-        dest_max_row = (float("inf") if self.dest.get_max_row() == None
+        dest_max_row = (float("inf") if self.dest.get_max_row() is None
                         else self.dest.get_max_row())
 
         # Check for contradictory max row constraints
@@ -1203,7 +1202,7 @@ class PipelineStepInputCable(PipelineCable):
             if not self.custom_wires.all().exists():
                 raise ValidationError(
                     "Custom wiring required for cable \"{}\"".
-                    format(unicode(self)))
+                    format(str(self)))
 
         # Validate whatever wires there are.
         if self.custom_wires.all().exists():
@@ -1221,12 +1220,12 @@ class PipelineStepInputCable(PipelineCable):
                 if numwires == 0:
                     raise ValidationError(
                         "Destination member \"{}\" has no wires leading to it".
-                        format(unicode(dest_member)))
+                        format(str(dest_member)))
 
                 if numwires > 1:
                     raise ValidationError(
                         "Destination member \"{}\" has multiple wires leading to it".
-                        format(unicode(dest_member)))
+                        format(str(dest_member)))
 
     def is_raw(self):
         """True if this cable maps raw data; false otherwise."""
@@ -1400,7 +1399,7 @@ class PipelineOutputCable(PipelineCable):
 
         pipeline_name = "[no pipeline set]"
         if self.pipeline is not None:
-            pipeline_name = unicode(self.pipeline)
+            pipeline_name = str(self.pipeline)
 
         return "POC feeding Output_idx [{}], Output_name [{}] for pipeline [{}]".format(
                 self.output_idx,

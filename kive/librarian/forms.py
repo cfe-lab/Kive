@@ -15,7 +15,7 @@ import metadata.forms
 
 import zipfile
 import tarfile
-import StringIO
+import six
 from zipfile import ZipFile
 
 from constants import maxlengths
@@ -297,7 +297,7 @@ class BulkAddDatasetForm (BaseMultiDatasetAddForm):
                                                  file_handle=uploaded_file)
                 dataset.grant_from_json(self.cleaned_data["permissions"])
 
-            except Exception, e:
+            except Exception as e:
                 error_str = str(e)
                 LOGGER.exception("Error while creating Dataset for file with original file name=" +
                                  str(uploaded_file.name) +
@@ -364,7 +364,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
             def get_filestream(filename):
                 f = archive.open(filename)
                 size = archive.getinfo(filename).file_size
-                streamable = StringIO.StringIO(f.read())
+                streamable = six.StringIO(f.read())
                 streamable.name = f.name.replace('/', '_')
 #                streamable.name = f.name.split('/')[-1]
                 f.close()

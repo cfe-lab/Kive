@@ -14,6 +14,7 @@ import os
 from urlparse import urlparse
 
 from requests.adapters import HTTPAdapter
+import six.moves
 
 from kiveapi import KiveAPI
 
@@ -66,18 +67,18 @@ def main():
     all_pipelines = kive.get_pipelines()
     pipelines = list(recent_pipelines(all_pipelines))
     hostname = urlparse(kive.server_url).hostname
-    print 'Recent pipelines from {}:'.format(hostname)
+    print('Recent pipelines from {}:'.format(hostname))
     for pipeline in pipelines:
-        print '{} - {}, id {}'.format(pipeline.family,
+        print('{} - {}, id {}'.format(pipeline.family,
                                       pipeline,
-                                      pipeline.pipeline_id)
-    pipeline_request = raw_input("Enter pipeline id to dump, or 'm' for more:")
+                                      pipeline.pipeline_id))
+    pipeline_request = six.moves.input("Enter pipeline id to dump, or 'm' for more:")
     if pipeline_request == 'm':
         for pipeline in all_pipelines:
-            print '{} - {}, id {}'.format(pipeline.family,
+            print('{} - {}, id {}'.format(pipeline.family,
                                           pipeline,
-                                          pipeline.pipeline_id)
-        pipeline_request = raw_input("Enter pipeline id to dump:")
+                                          pipeline.pipeline_id))
+        pipeline_request = six.moves.input("Enter pipeline id to dump:")
     pipeline_id = int(pipeline_request)
     dump_folder = os.path.abspath(
         'dump/{}_pipeline{}'.format(hostname, pipeline_id))
@@ -133,7 +134,7 @@ def main():
     used_revisions = set()
     pipeline_wrapper = kive.get_pipeline(pipeline_id)
     pipeline = pipeline_wrapper.details
-    print 'Dumping {} in {}.'.format(pipeline_wrapper, dump_folder)
+    print('Dumping {} in {}.'.format(pipeline_wrapper, dump_folder))
     dump = dict(positions=dict(inputs={},
                                outputs={},
                                steps={}))
@@ -215,7 +216,7 @@ def main():
         raise RuntimeError('Multiple versions found: ' +
                            ', '.join(duplicate_filenames))
 
-    print 'Dumped {}.'.format(pipeline_wrapper)
+    print('Dumped {}.'.format(pipeline_wrapper))
 
 
 class CodeResourceRevision(dict):

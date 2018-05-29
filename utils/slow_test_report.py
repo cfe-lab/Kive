@@ -40,8 +40,8 @@ def parseOptions():
                         help='number of tests to report as the slowest ones',
                         type=int,
                         default=10)
-    
     return parser.parse_args()
+
 
 class SlowTestReport(object):
     def load(self, report_files, count):
@@ -69,29 +69,33 @@ class SlowTestReport(object):
             total_time)
         return self
 
+
 class Test(object):
     def __init__(self, testcase):
         self.time = float(testcase.attrib['time'])
         path = testcase.attrib['classname'].split('.')
-        path.pop(1) # remove the 'tests' module name
+        path.pop(1)  # remove the 'tests' module name
         path.append(testcase.attrib['name'])
         self.description = '{:.0f}s for {}'.format(self.time, '.'.join(path))
-    
+
     def __cmp__(self, other):
-        return -cmp(self.time, other.time) # longer time sorts earlier
+        # return -cmp(self.time, other.time)  # longer time sorts earlier
+        return -self.time.__cmp__(other.time)  # longer time sorts earlier
+
 
 def main():
     args = parseOptions()
     report_files = glob.glob1(args.folder, 'TEST-*.xml')
     summary = SlowTestReport().load(report_files, args.count)
-    
-    print summary.description
+
+    print(summary.description)
     for test in summary.tests:
-        print test.description
-    
-    print 'Slowest test classes:'
+        print(test.description)
+
+    print('Slowest test classes:')
     for time, file in summary.files[0:10]:
-        print -time, file
-        
+        print(-time, file)
+
+
 if __name__ == '__main__':
     main()

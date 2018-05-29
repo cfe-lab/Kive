@@ -30,7 +30,7 @@ try:
                     # Output column names must be registered in kive
                     output.write("c,d\n")
                     continue
-                print "Processing row {}".format(i)
+                print("Processing row {}".format(i))
                 a = str(row[0])
                 b = int(row[1])
                 c = 2*b

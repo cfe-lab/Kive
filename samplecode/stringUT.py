@@ -54,7 +54,7 @@ try:
 		# why csv.reader() is not placed inside the try block
 		try:
 			for row in string_csv:
-				print row
+				print(row)
 				pass
 
 		# If csv __next__() throws an error, return error code 1
