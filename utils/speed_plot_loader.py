@@ -181,12 +181,16 @@ def read_slurm(args):
             run_id = 0
             job_type = 'unknown'
         start = datetime.strptime(row['Start'], '%Y-%m-%dT%H:%M:%S')
-        duration_parts = [int(part)
-                          for part in row['Elapsed'].split(':')]
-        assert len(duration_parts) == 3
-        duration = timedelta(hours=duration_parts[0],
-                             minutes=duration_parts[1],
-                             seconds=duration_parts[2])
+        duration_parts = row['Elapsed'].split('-')
+        duration_parts[-1:] = duration_parts[-1].split(':')
+        if len(duration_parts) == 3:
+            duration_parts.insert(0, '0')
+        duration_parts = [int(part) for part in duration_parts]
+        assert len(duration_parts) == 4
+        duration = timedelta(days=duration_parts[0],
+                             hours=duration_parts[1],
+                             minutes=duration_parts[2],
+                             seconds=duration_parts[3])
 
 
 def fetch_input_size(slurm_job, cache, kive_session):

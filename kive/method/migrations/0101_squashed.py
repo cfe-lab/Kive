@@ -12,23 +12,6 @@ import django.db.models.deletion
 
 class Migration(migrations.Migration):
 
-    replaces = [(b'method', '0001_initial'),
-                (b'method', '0002_auto_20150204_1703'),
-                (b'method', '0003_auto_20150213_1703'),
-                (b'method', '0004_auto_20150216_1641'),
-                (b'method', '0005_redacted_20150417_1128'),
-                (b'method', '0006_add_method_crr_related_name_20150417_1656'),
-                (b'method', '0007_method_ordering_20150601_1348'),
-                (b'method', '0008_coderesourcerevision_ordering_20150604_1501'),
-                (b'method', '0009_coderesourcerevision_revision_number_positive_20150604_1553'),
-                (b'method', '0010_coderesourcerevision_unique_together_20150604_1623'),
-                (b'method', '0011_permissions_remove_null_20160203_1033'),
-                (b'method', '0012_methoddependency'),
-                (b'method', '0013_transfer_crd_to_md_20160224_1627'),
-                (b'method', '0014_remove_crd_20160225_1602'),
-                (b'method', '0015_eliminate_empty_crr_add_default_20160225_1616'),
-                (b'method', '0016_eliminate_empty_crr_remove_default_20160225_1619')]
-
     initial = True
 
     dependencies = [
