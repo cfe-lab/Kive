@@ -144,12 +144,14 @@ class MethodDependencyForm(forms.Form):
     # The attrs to the widget are to enhance the resulting HTML output.
     coderesource = forms.ChoiceField(
         widget=forms.Select(attrs={'class': 'coderesource'}),
-        choices=[('', '--- CodeResource ---')]
+        choices=[('', '--- CodeResource ---')],
+        required=False
     )
 
     # We override this field so that it doesn't try to validate.
     revisions = forms.IntegerField(
-        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]))
+        widget=forms.Select(choices=[('', '--- select a CodeResource first ---')]),
+        required=False)
 
     path = forms.CharField(
         label="Dependency path",
