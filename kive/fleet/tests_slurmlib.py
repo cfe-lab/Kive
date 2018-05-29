@@ -135,6 +135,7 @@ class SlurmDummyTests(TestCase):
     def test_is_alive(self):
         """test_is_alive() should return True"""
         is_alive = self.sched_cls.slurm_is_alive()
+        print "this should break py3"
         assert is_alive, "Calling is_alive fails"
 
     def test_slurm_ident(self):

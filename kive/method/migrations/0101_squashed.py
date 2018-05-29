@@ -82,7 +82,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(help_text='The name given to a group of methods/pipelines', max_length=60, verbose_name='Transformation family name')),
                 ('description', models.TextField(blank=True, help_text='A description for this collection of methods/pipelines', max_length=1000, verbose_name='Transformation family description')),
-                ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_methodfamily_has_access_to', to=b'auth.Group')),
+                ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_methodfamily_has_access_to', to='auth.Group')),
                 ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
                 ('users_allowed', models.ManyToManyField(blank=True, help_text='Which users have access?', related_name='method_methodfamily_has_access_to', to=settings.AUTH_USER_MODEL)),
             ],
@@ -113,7 +113,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='coderesource',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_coderesource_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_coderesource_has_access_to', to='auth.Group'),
         ),
         migrations.AddField(
             model_name='coderesource',
@@ -129,7 +129,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='coderesourcerevision',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='method_coderesourcerevision_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='method_coderesourcerevision_has_access_to', to='auth.Group'),
         ),
         migrations.AddField(
             model_name='coderesourcerevision',
@@ -167,7 +167,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='coderesourcerevision',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_coderesourcerevision_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='method_coderesourcerevision_has_access_to', to='auth.Group'),
         ),
         migrations.AlterField(
             model_name='coderesourcerevision',

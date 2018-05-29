@@ -363,7 +363,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='run',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='archive_run_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='archive_run_has_access_to', to='auth.Group'),
         ),
         migrations.AddField(
             model_name='run',
@@ -491,7 +491,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='run',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='archive_run_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='archive_run_has_access_to', to='auth.Group'),
         ),
         migrations.AlterField(
             model_name='run',

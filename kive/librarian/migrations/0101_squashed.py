@@ -64,7 +64,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('MD5_checksum', models.CharField(blank=True, default='', help_text='Validates file integrity', max_length=64, validators=[django.core.validators.RegexValidator(message='MD5 checksum is not either 32 hex characters or blank', regex=re.compile('(^[0-9A-Fa-f]{32}$)|(^$)'))])),
-                ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='librarian_symbolicdataset_has_access_to', to=b'auth.Group')),
+                ('groups_allowed', models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='librarian_symbolicdataset_has_access_to', to='auth.Group')),
                 ('user', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
                 ('users_allowed', models.ManyToManyField(blank=True, help_text='Which users have access?', null=True, related_name='librarian_symbolicdataset_has_access_to', to=settings.AUTH_USER_MODEL)),
                 ('_redacted', models.BooleanField(default=False)),
@@ -125,7 +125,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='dataset',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='librarian_dataset_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', null=True, related_name='librarian_dataset_has_access_to', to='auth.Group'),
         ),
         migrations.AlterField(
             model_name='dataset',
@@ -155,7 +155,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='dataset',
             name='groups_allowed',
-            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='librarian_dataset_has_access_to', to=b'auth.Group'),
+            field=models.ManyToManyField(blank=True, help_text='What groups have access?', related_name='librarian_dataset_has_access_to', to='auth.Group'),
         ),
         migrations.AlterField(
             model_name='dataset',
