@@ -131,55 +131,79 @@ def plot_size_and_memory(slurm_jobs, args):
     # min_start += interval_size  # First week only had 1 run.
     df['interval'] = [int((job.start - min_start) / interval_size)
                       for job in df['job']]
-    df['is_new'] = df['start'] > args.change_date
-    df = df.dropna(subset=['memory (MB)'])
+    df['start day'] = (
+            (df['start'] - (df['interval']*interval_size + min_start)) /
+            timedelta(days=1))
+    # df['is_new'] = df['start'] > args.change_date
+    # df = df.dropna(subset=['memory (MB)'])
     # df = df[df['duration (hours)'] > 31/3600.0]  # Checks memory every 30s
-    # df = df[df['job type'] == 'driver[prelim_map.py]']
+    # df = df[df['job type'] == 'remap.py_s5']
     # df = df[df['node type'] == 'compute']
     df = df[~(df['job type'].isin(('bookkeeping', 'setup', 'cable',
-                                   'trim_fastqs.py_s2',  #
-                                   'Xsam2aln.py_s6',
+                                   'Xtrim_fastqs.py_s2',  #
+                                   'sam2aln.py_s6',
                                    'sam2aln.py_s2',  # Mixed-HCV pipeline
                                    'Xremap.py_s5',  #
                                    'random-primer-hcv.py_s1',
-                                   'Xprelim_map.py_s4',  #
+                                   'prelim_map.py_s4',  #
                                    'merge_by_ref_gene.py_s4',
                                    'filter_quality.py_s1',
                                    'fastq_g2p.py_s3',  #
                                    'coverage_plots.py_s9',
-                                   'cascade_report.py_s7',
+                                   'Xcascade_report.py_s7',
                                    'aln2counts.py_s8',
                                    'aln2aafreq.py_s3')))]
-    grouped = df.groupby(['job type', 'is_new'])
+    grouped = df.groupby(['interval'])
     groups = grouped.groups
-    column_count = 2
-    row_count = (len(groups) + column_count-1) // column_count
-    # noinspection PyTypeChecker
-    fig, subplot_axes = plt.subplots(row_count,
-                                     column_count,
-                                     squeeze=False,
-                                     sharex=True,
-                                     sharey=True)
 
-    for i, (group, group_jobs) in enumerate(groups.items()):
+    plot_data = []  # [(title1, start_days, title2, sizes, durations)]
+    for group, group_jobs in groups.items():
+        group_size = len(group_jobs)
+        if group_size <= 100:
+            continue
+        group_rows = df.reindex(index=group_jobs)
+        start_date = group*interval_size + min_start
+        title1 = '{} ({})'.format(start_date.strftime('%Y-%m-%d'), group_size)
+        compute_node_remaps = group_rows[
+            (group_rows['job type'] == 'remap.py_s5') &
+            (group_rows['node type'] == 'compute')]
+        title2 = '{} ({})'.format(start_date.strftime('%Y-%m-%d'),
+                                  len(compute_node_remaps))
+        sizes = compute_node_remaps['size (MB)']
+        durations = compute_node_remaps['duration (hours)']
+        start_days = group_rows['start day']
+        plot_data.append((title1, start_days, title2, sizes, durations))
+    column_count = 3
+    row_count = (len(plot_data) + column_count-1) // column_count
+    fig1, subplot_axes1 = plt.subplots(row_count,
+                                       column_count,
+                                       squeeze=False,
+                                       sharex='all')
+    fig2, subplot_axes2 = plt.subplots(row_count,
+                                       column_count,
+                                       squeeze=False,
+                                       sharex='all',
+                                       sharey='all')
+    clip = ((-50, 200), (-50, 200))
+    for i, (title1, start_days, title2, sizes, durations) in enumerate(plot_data):
         row = i // column_count
         column = i % column_count
-        ax = subplot_axes[row][column]
-        group_size = len(group_jobs)
-        job_type, is_new = group
-        ax.set_title('{} {} ({})'.format('new' if is_new else 'old',
-                                         job_type,
-                                         group_size))
-        if group_size <= 2:
-            continue
-        x = df['size (MB)'][group_jobs]
-        y = df['duration (hours)'][group_jobs]
-        clip = ((-50, 200), (-50, 200))
-        sns.kdeplot(x, y, ax=ax, clip=clip)
+        ax1 = subplot_axes1[row][column]
+        ax2 = subplot_axes2[row][column]
+        ax1.set_title(title1)
+        sns.kdeplot(start_days, ax=ax1, legend=False)
+        ax2.set_title(title2)
+        sns.kdeplot(sizes, durations, ax=ax2, clip=clip)
         if row != row_count - 1 or column != 0:
-            ax.set_xlabel('')
-            ax.set_ylabel('')
-    plt.suptitle('Processing time in Kive v0.10 and v0.11 (job count)')
+            ax2.set_xlabel('')
+            ax2.set_ylabel('')
+        else:
+            ax1.set_xlabel('days after Wednesday')
+            ax1.set_ylabel('distribution')
+    fig1.suptitle('Weekly work load (job count)')
+    fig1.tight_layout(rect=[0, 0, 1, 0.95])
+    fig2.suptitle('Remap durations on compute nodes (job count)')
+    fig2.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
 
 
