@@ -8,7 +8,7 @@ import tempfile
 import json
 import time
 import multiprocessing as mp
-import Queue
+from six.moves import queue
 
 import re
 import subprocess as sp
@@ -33,6 +33,9 @@ SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
 
 
 def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
+    """ This routine should always return a (unicode) string.
+    Under python3, check_output returns bytes.
+    """
     itry, cmd_retry = 1, True
     out_str = None
     while cmd_retry:
@@ -55,8 +58,7 @@ def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
                 time.sleep(SLEEP_SECS)
             else:
                 raise
-
-    return out_str
+    return out_str.decode()
 
 
 class SlurmJobHandle:
@@ -1085,7 +1087,7 @@ class DummyWorkerProc(DummyJobState):
         if any_cond and okay_cond:
             return True, False
         any_cancel = okay_cancel = False
-        finset = set(findct.iterkeys())
+        finset = set(findct.keys())
         if not any_cond:
             checkset = set([jhandle.job_id for jhandle in after_any])
             common_set = checkset & finset
@@ -1201,7 +1203,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         while True:
             try:
                 jtup = jobqueue.get(block=False, timeout=1)
-            except Queue.Empty:
+            except queue.Empty:
                 jtup = None
             if jtup is not None:
                 assert isinstance(jtup, tuple), 'Tuple expected'
@@ -1231,7 +1233,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             # lets update our worker dicts
             # first the waiting dct
             rdylst = []
-            for pid, proc in waitdct.items():
+            for pid, proc in list(waitdct.items()):
                 is_ready_to_run, will_never_run = proc.check_ready_state(findct)
                 if will_never_run:
                     del waitdct[pid]

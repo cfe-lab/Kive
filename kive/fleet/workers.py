@@ -152,7 +152,7 @@ class Manager(object):
         if inspect.isgenerator(newidletask):
             # we prime the generator so that it advances to the first time that
             # it encounters a 'time_to_stop = (yield)' statement.
-            newidletask.next()
+            next(newidletask)
             self.idle_job_queue.append(newidletask)
         else:
             raise RuntimeError("add_idletask: Expecting a generator as a task")

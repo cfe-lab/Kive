@@ -1,8 +1,7 @@
 from mock import patch
 from subprocess import STDOUT, CalledProcessError
 from unittest import TestCase
-from urllib2 import URLError
-
+from six.moves.urllib.error import URLError
 from fleet.docker_build import main
 
 

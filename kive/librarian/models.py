@@ -619,7 +619,7 @@ class Dataset(metadata.models.AccessControl):
         md5gen = hashlib.md5()
         with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
             for line in f:
-                md5gen.update(line)
+                md5gen.update(line.encode())
                 num_rows += 1
 
         self.structure.num_rows = num_rows
@@ -977,7 +977,7 @@ class Dataset(metadata.models.AccessControl):
         # This may raise a VerificationMethodError; if so, then throw away the ContentCheckLog.
         try:
             with file_access_utils.FileReadHandler(file_path=file_path_to_check,
-                                                   file_handle=file_handle, access_mode="rb") as f:
+                                                   file_handle=file_handle, access_mode="r") as f:
                 csv_summary = my_CDT.summarize_csv(f)
         except metadata.models.VerificationMethodError:
             self.logger.error("ContentCheckLog for file %s failed because the verification method failed",

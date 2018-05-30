@@ -171,7 +171,7 @@ class IdleTaskTests(TestCase):
 
         gg = Dataset.idle_dataset_purge(max_storage=max_storage, target_size=target_size)
         self.man._add_idletask(gg)
-        for i in xrange(10):
+        for i in range(10):
             # print "TEST", i
             time_limit = time.time() + 10.0
             self.man._do_idle_tasks(time_limit)
@@ -181,7 +181,7 @@ class IdleTaskTests(TestCase):
 
         gg = Dataset.idle_external_file_check()
         self.man._add_idletask(gg)
-        for i in xrange(10):
+        for i in range(10):
             # print "TEST", i
             time_limit = time.time() + 10.0
             self.man._do_idle_tasks(time_limit)
@@ -191,7 +191,7 @@ class IdleTaskTests(TestCase):
 
         gg = Dataset.idle_dataset_purge()
         self.man._add_idletask(gg)
-        for i in xrange(10):
+        for i in range(10):
             # print "TEST", i
             time_limit = time.time() + 10.0
             self.man._do_idle_tasks(time_limit)
@@ -200,7 +200,7 @@ class IdleTaskTests(TestCase):
         # dataset_dir = os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR)
         gg = MethodOutput.idle_logfile_purge()
         self.man._add_idletask(gg)
-        for i in xrange(10):
+        for i in range(10):
             # print "TEST", i
             time_limit = time.time() + 10.0
             self.man._do_idle_tasks(time_limit)

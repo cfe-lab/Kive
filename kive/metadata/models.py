@@ -14,6 +14,7 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
 from django.core.urlresolvers import reverse
+import six
 
 import re
 import csv
@@ -409,7 +410,7 @@ class AccessControl(models.Model):
             queryset = cls.objects.all()
         if is_admin:
             if not admin_check(user):
-                raise StandardError('User is not an administrator.')
+                raise Exception('User is not an administrator.')
         else:
             user_plus = KiveUser.kiveify(user)
             allowed_items = queryset.filter(user_plus.access_query())
@@ -925,7 +926,7 @@ class Datatype(AccessControl):
         """
         self.logger.debug('Checking constraints for Datatype "{}" on its prototype'.format(self))
 
-        with open(self.prototype.dataset_file.path) as f:
+        with open(self.prototype.dataset_file.path, "rt") as f:
             reader = csv.reader(f)
             next(reader)  # skip header - we already know it's good from cleaning the prototype
             summary = summarize_csv([self, Datatype.objects.get(pk=datatypes.BOOL_PK)], reader)
@@ -935,7 +936,7 @@ class Datatype(AccessControl):
         except KeyError:
             failing_cells = []
 
-        with open(self.prototype.dataset_file.path) as f:
+        with open(self.prototype.dataset_file.path, "r") as f:
             reader = csv.reader(f)
             next(reader)  # skip header again
             for rownum, row in enumerate(reader, start=1):
@@ -1294,7 +1295,7 @@ class CompoundDatatypeMember(models.Model):
         """
         blankable_marker = "?" if self.blankable else ""
         return '{}: {}{}'.format(self.column_name,
-                                 unicode(self.datatype),
+                                 str(self.datatype),
                                  blankable_marker)
 
     def check_basic_constraints(self, value):
@@ -1587,7 +1588,7 @@ class CompoundDatatype(AccessControl):
             if check is None:
                 return []
             err = check.check_basic_constraints(value)
-            return ['Failed check \'%s\'' % e if not isinstance(e, (str, unicode)) else e for e in err]
+            return ['Failed check \'%s\'' % e if not isinstance(e, (str, six.string_types)) else e for e in err]
 
         # noinspection PyTypeChecker
         return [_check_constr(chk, val)

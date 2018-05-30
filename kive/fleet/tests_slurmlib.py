@@ -12,7 +12,7 @@ import datetime
 # import pytest
 import unittest
 from unittest import skipIf
-
+import six
 import fleet.slurmlib as slurmlib
 from django.conf import settings
 
@@ -71,7 +71,7 @@ def get_accounting_info(jhandles=None, sched_cls=None):
         assert gotset == jidset, "Did not get results from all submitted jobs"
 
     cls = sched_cls
-    for jid, dct in curstates.iteritems():
+    for jid, dct in curstates.items():
         # makes sure all required fields are defined
         assert cls.ACC_SET == set(dct.keys()), "inconsistent key set"
         assert jid == dct[cls.ACC_JOB_ID]
@@ -135,7 +135,6 @@ class SlurmDummyTests(TestCase):
     def test_is_alive(self):
         """test_is_alive() should return True"""
         is_alive = self.sched_cls.slurm_is_alive()
-        print "this should break py3"
         assert is_alive, "Calling is_alive fails"
 
     def test_slurm_ident(self):
@@ -627,20 +626,22 @@ class SlurmDummyTests(TestCase):
             print("--test_acc_info_01(): SUCCESS")
 
     def test_multi_check_output_echo(self):
-        expected_output = 'Lorem ipsum\n'
+        expected_output = u'Lorem ipsum\n'
 
         output = slurmlib.multi_check_output(['echo', 'Lorem', 'ipsum'])
-
+        assert isinstance(output, six.text_type), "string expected, but got {}".format(type(output))
         self.assertEqual(expected_output, output)
 
     def test_multi_check_output_echoxxx(self):
-        expected_error = (
+        expected_py2_error = (
             '[Errno 2] No such file or directory: echoxxx Lorem ipsum')
-
+        expected_py3_error = (
+            "[Errno 2] No such file or directory: 'echoxxx': echoxxx Lorem ipsum")
         with self.assertRaises(OSError) as context:
             slurmlib.multi_check_output(['echoxxx', 'Lorem', 'ipsum'])
-
-        self.assertEqual(expected_error, str(context.exception))
+        got_err = str(context.exception)
+        assert got_err == expected_py2_error or got_err == expected_py3_error, "unexpected error"
+        # self.assertEqual(expected_error, )
 
     def show_squeue_jobs01(self, lverb=False):
         """Submit all jobs with a low priority, then an additional one with high

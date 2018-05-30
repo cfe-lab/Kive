@@ -2077,7 +2077,8 @@ def make_first_revision(resname, resdesc, resfn, contents, user, grant_everyone_
     if grant_everyone_access:
         resource.grant_everyone_access()
     with tempfile.TemporaryFile() as f:
-        f.write(contents)
+        cont_write = contents.encode()
+        f.write(cont_write)
         with transaction.atomic():
             revision = CodeResourceRevision(
                 coderesource=resource,
@@ -2088,7 +2089,7 @@ def make_first_revision(resname, resdesc, resfn, contents, user, grant_everyone_
 
             # We need to set the MD5.
             md5gen = hashlib.md5()
-            md5gen.update(contents)
+            md5gen.update(cont_write)
             revision.MD5_checksum = md5gen.hexdigest()
 
             revision.save()

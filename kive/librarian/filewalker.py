@@ -20,7 +20,7 @@ import csv
 def consumer(func):
     def wrapper(*args, **kw):
         gen = func(*args, **kw)
-        gen.next()
+        next(gen)
         return gen
     wrapper.__name__ = func.__name__
     wrapper.__dict__ = func.__dict__
@@ -103,6 +103,7 @@ class fileclass(object):
         return {"filename": self._fname,
                 "size": self._size,
                 "atime": self._atime}
+
 
 SECS_PER_HR = 3600.0
 
@@ -335,8 +336,8 @@ class FilePurger:
                 else:
                     real_time_limit = time_to_stop - SAFETY_MARGIN_SECS
                     while time.time() < real_time_limit:
-                        for i in xrange(5):
-                            dir_entry = iwalk.next()
+                        for i in range(5):
+                            dir_entry = next(iwalk)
                             self._add_new_file_class(fileclass(dir_entry))
         except StopIteration:
             yield True

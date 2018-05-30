@@ -26,7 +26,7 @@ import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 from tempfile import NamedTemporaryFile
 from six.moves.urllib.error import URLError
-from six.moves.urllib.request import Request
+# from six.moves.urllib.request import Request
 
 
 def parse_args(argv=None):
@@ -45,9 +45,9 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    request = Request(args.git)
-    if request.get_type() not in ('http', 'https'):
+    if not args.git.startswith('http'):
         raise URLError('Git repository must use http or https.')
+    # request = Request(args.git)
     if '#' in args.git:
         raise URLError('Git repository may not contain #fragments.')
     docker_tag = args.image + ':' + args.tag

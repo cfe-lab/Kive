@@ -1,7 +1,7 @@
 import errno
 import os
 import shutil
-from StringIO import StringIO
+from django.utils.six import StringIO
 from datetime import timedelta
 
 from django.core import serializers
