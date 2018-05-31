@@ -110,7 +110,7 @@ def submit_files(source_files, args):
                                  source_file.path,
                                  args.target_dir,
                                  "--read"],
-                                stderr=STDOUT)
+                                stderr=STDOUT, universal_newlines=True)
         job_id = int(response.split()[-1])
         input_files[job_id] = target_file
     logger.info('Waiting for jobs to finish.')
@@ -150,7 +150,7 @@ def get_slurm_jobs():
                                 '--noheader',
                                 '-o',
                                 '%i'],
-                               stderr=STDOUT)
+                               stderr=STDOUT, universal_newlines=True)
     job_ids = {int(line) for line in slurm_queue.splitlines()}
     return job_ids
 

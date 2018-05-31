@@ -11,6 +11,7 @@ import os
 import glob
 import shutil
 import inspect
+import six
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -363,7 +364,7 @@ class Manager(object):
             mgr_logger.error("Manager failed.", exc_info=True)
             self.shutdown_exception = ex
 
-        for foreman in self.runs_in_progress.itervalues():
+        for foreman in six.itervalues(self.runs_in_progress):
             foreman.cancel_all_slurm_jobs()
         self.slurm_sched_class.shutdown()
 
@@ -462,7 +463,7 @@ class Foreman(object):
         """
         # For each task, get all relevant Slurm job handles.
         our_slurm_jobs = []
-        for task_dict in self.tasks_in_progress.itervalues():
+        for task_dict in six.itervalues(self.tasks_in_progress):
             if "cable" in task_dict:
                 our_slurm_jobs.append(task_dict["cable"])
             else:
@@ -486,8 +487,8 @@ class Foreman(object):
         end_keyword = self.slurm_sched_class.ACC_END_TIME
         return_code_keyword = self.slurm_sched_class.ACC_RETURN_CODE
 
-        # self.tasks_in_progress may change during this loop, so we iterate over the keys.
-        tasks = self.tasks_in_progress.keys()
+        # self.tasks_in_progress may change during this loop, so we iterate over a list of the keys.
+        tasks = list(self.tasks_in_progress.keys())
         for task in tasks:
             task_dict = self.tasks_in_progress[task]
             raw_slurm_state = None
@@ -1175,7 +1176,7 @@ class Foreman(object):
         """
         Cancel all Slurm jobs relating to this Foreman.
         """
-        for task, task_dict in self.tasks_in_progress.iteritems():
+        for task, task_dict in six.iteritems(self.tasks_in_progress):
             if isinstance(task, RunStep):
                 parts_to_kill = ("setup", "driver")
                 if "bookkeeping" in task_dict:

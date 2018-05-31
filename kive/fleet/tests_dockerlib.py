@@ -10,6 +10,7 @@ import fleet.dockerlib as dockerlib
 from django.conf import settings
 
 from django.test import TestCase
+import six
 
 TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/dockerlib_test_files")
 
@@ -28,7 +29,7 @@ class DummyDockerLibTests(TestCase):
         """Test the docker_ident call"""
         idstr = self.docker_handler_class.docker_ident()
         # print("Docker idents as:\n{}".format(idstr))
-        assert isinstance(idstr, str)
+        assert isinstance(idstr, six.string_types)
 
 
 @skipIf(not settings.RUN_DOCKER_TESTS, "Docker tests are disabled")
@@ -76,12 +77,16 @@ class DockerLibTests(DummyDockerLibTests):
         output = dockerlib.DockerHandler._run_twopipe_command(
             ['echo', 'Alpha\nBeta\nDelta'],
             ['grep', 'B', '-'])
-
+        assert isinstance(output, six.string_types)
         self.assertEqual(expected_output, output)
 
     def test_two_pipe_command_first_not_found(self):
-        expected_error = """\
+        expected_error2 = """\
 [Errno 2] No such file or directory: echoxxx Alpha
+Beta
+Delta | grep B -"""
+        expected_error3 = """\
+[Errno 2] No such file or directory: 'echoxxx': echoxxx Alpha
 Beta
 Delta | grep B -"""
 
@@ -89,12 +94,20 @@ Delta | grep B -"""
             dockerlib.DockerHandler._run_twopipe_command(
                 ['echoxxx', 'Alpha\nBeta\nDelta'],
                 ['grep', 'B', '-'])
-
-        self.assertEqual(expected_error, str(context.exception))
+        got_err = str(context.exception)
+        if got_err != expected_error2 and got_err != expected_error3:
+            raise RuntimeError("unexpected error message '{}' '{} '{}'".format(got_err,
+                                                                               expected_error2,
+                                                                               expected_error3))
+        # self.assertEqual(expected_error, ))
 
     def test_two_pipe_command_second_not_found(self):
-        expected_error = """\
+        expected_error2 = """\
 [Errno 2] No such file or directory: echo Alpha
+Beta
+Delta | grepxxx B -"""
+        expected_error3 = """\
+[Errno 2] No such file or directory: 'grepxxx': echo Alpha
 Beta
 Delta | grepxxx B -"""
 
@@ -102,8 +115,12 @@ Delta | grepxxx B -"""
             dockerlib.DockerHandler._run_twopipe_command(
                 ['echo', 'Alpha\nBeta\nDelta'],
                 ['grepxxx', 'B', '-'])
-
-        self.assertEqual(expected_error, str(context.exception))
+        got_err = str(context.exception)
+        if got_err != expected_error2 and got_err != expected_error3:
+            raise RuntimeError("unexpected error message '{}' '{} '{}'".format(got_err,
+                                                                               expected_error2,
+                                                                               expected_error3))
+        # self.assertEqual(expected_error, )
 
     def test_two_pipe_command_second_fails(self):
         expected_error = (
@@ -118,7 +135,7 @@ Delta | grepxxx B -"""
         self.assertEqual(expected_error, str(context.exception))
         self.assertEqual(expected_output, context.exception.output)
 
-    def test(self):
+    def test_two_pipe_command_first_fails(self):
         """ Failure in first process causes failure in second. """
         expected_error = (
             "Command '['grep', 'B', '-']' returned non-zero exit status 1")

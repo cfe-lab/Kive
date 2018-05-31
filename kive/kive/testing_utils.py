@@ -1,3 +1,5 @@
+
+import six
 import csv
 import os
 import random
@@ -939,7 +941,7 @@ TTCCTCTA
 AAAAAAAG
 GGGAGTTC
 CCCTCCTC
-""")
+    """.encode())
     seq_datafile.close()
     seq_dataset = Dataset.create_dataset(
         file_path=seq_datafile.name,
@@ -1016,7 +1018,7 @@ AAAA
 CCCCC
 GGGGGG
 TTTTTTC
-""")
+    """.encode())
     two_step_seq_datafile.close()
     two_step_seq_dataset = Dataset.create_dataset(
         file_path=two_step_seq_datafile.name,
@@ -1596,7 +1598,7 @@ def create_method_test_environment(case):
                                CodeResourceRevision.UPLOAD_DIR,
                                'noop')
     with tempfile.NamedTemporaryFile(prefix=file_prefix, suffix='.sh') as f:
-        f.write("#!/bin/bash\ncat $1")
+        f.write("#!/bin/bash\ncat $1".encode())
         case.noop_data_file = f.name
         revision = CodeResourceRevision(coderesource=resource,
                                         content_file=File(f),
@@ -1644,7 +1646,7 @@ def create_method_test_environment(case):
     case.noop_indata = "word\nhello\nworld"
 
     with open(case.noop_infile, "w") as handle:
-        handle.write(case.noop_indata)
+        handle.write(case.noop_indata.encode())
 
     file_access_utils.configure_sandbox_permissions(case.noop_infile)
     file_access_utils.configure_sandbox_permissions(case.noop_outfile)
@@ -1810,7 +1812,7 @@ def create_sequence_manipulation_environment(case):
         delete=False,
         dir=file_access_utils.sandbox_base_path()
     )
-    case.datafile.write(case.labdata)
+    case.datafile.write(case.labdata.encode())
     case.datafile.close()
     file_access_utils.configure_sandbox_permissions(case.datafile.name)
 
@@ -1972,7 +1974,7 @@ def create_word_reversal_environment(case):
 
     # Some data of type (case.datatype_str: word).
     string_datafile = tempfile.NamedTemporaryFile(delete=False)
-    string_datafile.write("word\n")
+    string_datafile.write("word\n".encode())
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
@@ -2071,27 +2073,31 @@ def make_first_revision(resname, resdesc, resfn, contents, user, grant_everyone_
     """
     Helper function to make a CodeResource and the first version.
     """
+    assert isinstance(resname, six.string_types), "string expected for resname"
+    assert isinstance(resdesc, six.string_types), "string expected for resdesc"
+    assert isinstance(resfn, six.string_types), "string expected for resfn"
+    assert isinstance(contents, six.string_types), "string expected for contents"
     resource = CodeResource(name=resname, description=resdesc, filename=resfn, user=user)
     # resource.clean()
     resource.save()
     if grant_everyone_access:
         resource.grant_everyone_access()
+    cont_bytes = contents.encode()
     with tempfile.TemporaryFile() as f:
-        cont_write = contents.encode()
-        f.write(cont_write)
+        f.write(cont_bytes)
         with transaction.atomic():
+            # NOTE: 2018-05-30: must provide a name to File for py3.
             revision = CodeResourceRevision(
                 coderesource=resource,
                 revision_name="1",
                 revision_desc="first version",
-                content_file=File(f),
+                content_file=File(f, name="blaname"),
                 user=user)
 
             # We need to set the MD5.
             md5gen = hashlib.md5()
-            md5gen.update(cont_write)
+            md5gen.update(cont_bytes)
             revision.MD5_checksum = md5gen.hexdigest()
-
             revision.save()
             revision.clean()
     if grant_everyone_access:
@@ -2224,7 +2230,7 @@ def make_words_dataset(case):
     PRE: the specified test case has a member CDT called cdt_string and user user_bob.
     """
     string_datafile = tempfile.NamedTemporaryFile(delete=False)
-    string_datafile.write("word\n")
+    string_datafile.write("word\n".encode())
     string_datafile.close()
     os.system("head -1 /usr/share/dict/words >> {}".
               format(string_datafile.name))
@@ -2291,11 +2297,11 @@ def create_grandpa_sandbox_environment(case):
 
     # Some data to run through the faulty pipelines.
     case.grandpa_datafile = tempfile.NamedTemporaryFile(delete=False)
-    case.grandpa_datafile.write("word\n")
+    case.grandpa_datafile.write("word\n".encode())
     random.seed("Constant seed avoids intermittent failures.")
     for _ in range(20):
         i = random.randint(1, 99171)
-        case.grandpa_datafile.write("{}\n".format(i))
+        case.grandpa_datafile.write("{}\n".format(i).encode())
     case.grandpa_datafile.close()
     case.dataset_grandpa = Dataset.create_dataset(
         file_path=case.grandpa_datafile.name,
@@ -2318,7 +2324,7 @@ def make_dataset(contents, CDT, keep_file, user, name, description, file_source,
     Wrapper for create_dataset that creates a Dataset from a string.
     """
     with tempfile.TemporaryFile() as f:
-        f.write(contents)
+        f.write(contents.encode())
         test_dataset = Dataset.create_dataset(
             None,
             user,

@@ -193,11 +193,10 @@ class DockerHandler(BaseDockerHandler):
                 p1 = sp.Popen(cmd_lst1, stdout=sp.PIPE, stderr=devnull)
                 return sp.check_output(cmd_lst2,
                                        stdin=p1.stdout,
-                                       stderr=devnull)
+                                       stderr=devnull, universal_newlines=True)
         except OSError as e:
             # Typically happens if the executable wasn't found.
-            e.strerror += ': {} | {}'.format(" ".join(cmd_lst1),
-                                             " ".join(cmd_lst2))
+            e.strerror += ': {} | {}'.format(" ".join(cmd_lst1), " ".join(cmd_lst2))
             raise
 
     @staticmethod
@@ -271,8 +270,8 @@ class DockerHandler(BaseDockerHandler):
         if not cls._is_alive:
             cls.check_is_alive()
             # Find docker_wrap.py on path, to match permissions in sudoers.
-            cls.docker_wrap_path = sp.check_output(['which', 'docker_wrap.py']).strip()
-
+            res_str = sp.check_output(['which', 'docker_wrap.py'], universal_newlines=True)
+            cls.docker_wrap_path = res_str.strip()
             cls._is_alive = True
         return True
 

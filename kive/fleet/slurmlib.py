@@ -8,6 +8,7 @@ import tempfile
 import json
 import time
 import multiprocessing as mp
+import six
 from six.moves import queue
 
 import re
@@ -34,14 +35,15 @@ SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
 
 def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
     """ This routine should always return a (unicode) string.
-    Under python3, check_output returns bytes.
+    NOTE: Under python3, sp.check_output returns bytes by default, so we
+    set universal_newlines=True to guarantee strings.
     """
     itry, cmd_retry = 1, True
     out_str = None
     while cmd_retry:
         cmd_retry = False
         try:
-            out_str = sp.check_output(cmd_lst, stderr=stderr)
+            out_str = sp.check_output(cmd_lst, stderr=stderr, universal_newlines=True)
         except OSError as e:
             # typically happens if the executable cannot execute at all (e.g. not installed)
             # ==> we just pass this error up with extra context
@@ -58,12 +60,12 @@ def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
                 time.sleep(SLEEP_SECS)
             else:
                 raise
-    return out_str.decode()
+    return out_str
 
 
 class SlurmJobHandle:
     def __init__(self, job_id, slurm_sched_class):
-        assert isinstance(job_id, str), "job_id must be a string!"
+        assert isinstance(job_id, six.string_types), "job_id must be a string, not a {}".format(type(job_id))
         self.job_id = job_id
         self.slurm_sched_class = slurm_sched_class
 
@@ -309,13 +311,18 @@ class BaseSlurmScheduler(object):
         raise NotImplementedError
 
     @classmethod
-    def _dump_json(cls, directory, prefix, datastruct):
+    def _dump_fd_json(cls, fd, datastruct):
+        with os.fdopen(fd, "w") as f:
+            f.write(json.dumps(datastruct))
+
+    @classmethod
+    def _dump_temp_json(cls, directory, prefix, datastruct):
         """ Helper routine: Create a temporary file in the provided directory
         with the prefix provided and the suffix json.
         Write the provided data structure to this file and return the path to the file.
         """
         fd, path = tempfile.mkstemp(dir=directory, prefix=prefix, suffix=".json")
-        with os.fdopen(fd, "wb") as f:
+        with os.fdopen(fd, "w") as f:
             f.write(json.dumps(datastruct))
         return path
 
@@ -874,9 +881,9 @@ class SlurmScheduler(BaseSlurmScheduler):
         cable_info = sandbox.cable_execute_info[(runcable.parent_run, runcable.component)]
         # Submit the job.
         cable_dir = cable_info.cable_info_dir
-        cable_execute_dict_path = cls._dump_json(cable_dir,
-                                                 "cable_info",
-                                                 cable_info.dict_repr())
+        cable_execute_dict_path = cls._dump_temp_json(cable_dir,
+                                                      "cable_info",
+                                                      cable_info.dict_repr())
         cable_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
         cable_args_list = [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path]
         cable_args = " ".join([re.escape(x) for x in cable_args_list])
@@ -907,7 +914,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         # First, serialize the task execution information.
         step_info = sandbox.step_execute_info[(runstep.run, runstep.pipelinestep)]
         step_dir = step_info.step_run_dir
-        step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
+        step_execute_dict_path = cls._dump_temp_json(step_dir, "step_info", step_info.dict_repr())
 
         step_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
         step_args_list = [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path]
@@ -944,7 +951,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         # Submit a job for the setup.
         step_execute_dict_path = info_path
         if info_path is None:
-            step_execute_dict_path = cls._dump_json(step_dir, "step_info", step_info.dict_repr())
+            step_execute_dict_path = cls._dump_temp_json(step_dir, "step_info", step_info.dict_repr())
 
         book_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
         book_args_list = [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path]
@@ -1408,8 +1415,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             prefix="cable_info",
             suffix=".json"
         )
-        with os.fdopen(cable_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(cable_info_dict))
+        cls._dump_fd_json(cable_execute_dict_fd, cable_info_dict)
 
         sandbox.__class__.finish_cable(cable_info_dict)
         driver_arglst = [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path]
@@ -1447,9 +1453,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
             prefix="step_info",
             suffix=".json"
         )
-        with os.fdopen(step_execute_dict_fd, "wb") as f:
-            f.write(json.dumps(step_execute_dict))
-
+        cls._dump_fd_json(step_execute_dict_fd, step_execute_dict)
         try:
             curr_rs = sandbox.__class__.step_execution_setup(step_execute_dict)
         except StopExecution:
@@ -1501,9 +1505,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
                 prefix="step_info",
                 suffix=".json"
             )
-            with os.fdopen(step_execute_dict_fd, "wb") as f:
-                f.write(json.dumps(step_execute_dict))
-
+            cls._dump_fd_json(step_execute_dict_fd, step_execute_dict)
         sandbox.__class__.step_execution_bookkeeping(step_execute_dict)
         driver_arglst = [settings.STEP_HELPER_COMMAND, "--bookkeeping", step_execute_dict_path]
         job_name = "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,

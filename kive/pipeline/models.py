@@ -341,8 +341,9 @@ class Pipeline(transformation.models.Transformation):
             # The CDT's match. Is the number of rows okay?
             minrows = pipeline_input.get_min_row() or 0
             maxrows = pipeline_input.get_max_row()
-            maxrows = maxrows if maxrows is not None else sys.maxint
-
+            # NOTE: 2018-05-30: sys.maxint changed to sys.maxsize for py3 portability below
+            # under the assumption that all we need is a 'big number'
+            maxrows = maxrows if maxrows is not None else sys.maxsize
             if not minrows <= supplied_input.num_rows() <= maxrows:
                 raise ValueError('Pipeline "{}" expected input {} to have between {} and {} rows, but got one with {}'
                                  .format(self, i, minrows, maxrows, supplied_input.num_rows()))

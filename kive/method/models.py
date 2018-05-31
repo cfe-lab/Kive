@@ -182,6 +182,7 @@ class CodeResourceRevision(metadata.models.AccessControl):
         Return original file name (without path to CodeResources, timestamp).
         TODO: use os.path.split() instead of split("/")
         """
+        print("FILENAMEY '{}'".format(self.content_file.name))
         return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
 
     @property
@@ -222,7 +223,10 @@ class CodeResourceRevision(metadata.models.AccessControl):
         """Save this CodeResourceRevision, incrementing the revision number."""
         if not self.revision_number:
             self.revision_number = self.coderesource.next_revision()
-
+        # this check put in when chasing a py3 porting problem. The assert fails
+        # when a File() object is created without a name argument.
+        assert not isinstance(self.content_file.name, int),\
+            "file name is an int '{}'".format(self.content_file)
         super(CodeResourceRevision, self).save(*args, **kwargs)
 
     def compute_md5(self):
@@ -486,7 +490,7 @@ non-reusable: no -- there may be meaningful differences each time (e.g., timesta
 
         # MethodFamily may not be temporally saved in DB if created by the admin page.
         if hasattr(self, "family"):
-            return string_rep.format(unicode(self.family))
+            return string_rep.format(self.family)
         else:
             return string_rep.format("[family unset]")
 

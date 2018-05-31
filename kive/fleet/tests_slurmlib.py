@@ -629,7 +629,7 @@ class SlurmDummyTests(TestCase):
         expected_output = u'Lorem ipsum\n'
 
         output = slurmlib.multi_check_output(['echo', 'Lorem', 'ipsum'])
-        assert isinstance(output, six.text_type), "string expected, but got {}".format(type(output))
+        assert isinstance(output, six.string_types), "string expected, but got {}".format(type(output))
         self.assertEqual(expected_output, output)
 
     def test_multi_check_output_echoxxx(self):

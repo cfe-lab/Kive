@@ -110,10 +110,10 @@ def main():
     writer = LogWriter(args.log)
     command = ['bpsh', '-sap', 'cat', '/proc/zoneinfo', '/proc/meminfo']
     while True:
-        zone_info = check_output(command[2:])
+        zone_info = check_output(command[2:], universal_newlines=True)
         lines = ['head: ' + line for line in zone_info.splitlines()]
         try:
-            zone_info = check_output(command)
+            zone_info = check_output(command, universal_newlines=True)
             lines.extend(zone_info.splitlines())
         except OSError:
             pass
