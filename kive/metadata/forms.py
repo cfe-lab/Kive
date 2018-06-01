@@ -47,6 +47,7 @@ class GroupsAllowedWidget(forms.SelectMultiple):
 
 
 class PermissionsWidget(forms.MultiWidget):
+    template_name = "metadata/permissions_widget.html"
 
     def __init__(self, user_choices=None, group_choices=None, attrs=None):
         self.user_choices = user_choices or []
@@ -95,17 +96,11 @@ class PermissionsWidget(forms.MultiWidget):
 
         return [users_allowed, groups_allowed]
 
-    def format_output(self, rendered_widgets):
-        pw_template = loader.get_template("metadata/permissions_widget.html")
-        users = [{"username": x[0], "username": x[1]} for x in self.user_choices]
-        groups = [{"name": x[0], "name": x[1]} for x in self.group_choices]
-        c = {
-            "users": users,
-            "groups": groups,
-            "users_widget": rendered_widgets[0],
-            "groups_widget": rendered_widgets[1]
-        }
-        return pw_template.render(c)
+    def get_context(self, name, value, attrs):
+        context = super(PermissionsWidget, self).get_context(name, value, attrs)
+        context['users'] = [{"username": x[0]} for x in self.user_choices]
+        context['groups'] = [{"name": x[0]} for x in self.group_choices]
+        return context
 
 
 def user_choices(user_queryset):
