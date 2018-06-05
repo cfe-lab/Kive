@@ -182,7 +182,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
         Return original file name (without path to CodeResources, timestamp).
         TODO: use os.path.split() instead of split("/")
         """
-        print("FILENAMEY '{}'".format(self.content_file.name))
         return '_'.join(self.content_file.name.split('/')[-1].split('_')[:-1])
 
     @property
