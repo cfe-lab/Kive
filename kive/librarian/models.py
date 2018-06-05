@@ -220,12 +220,17 @@ class Dataset(metadata.models.AccessControl):
             return None
         return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
 
-    def get_open_file_handle(self, mode="rb"):
+    def get_open_file_handle(self, mode):
         """
         Retrieves an open Django file with which to access the data.
 
         This is self.dataset_file if possible, falls back to the external file if possible,
         and otherwise returns None.
+
+        NOTE: for python3 there is a significant difference in opening a file in binary or
+        text mode.
+        Use binary when calculating hashes.
+        Use text when read the CSV contents.
         """
         if self.dataset_file:
             try:
@@ -242,7 +247,7 @@ class Dataset(metadata.models.AccessControl):
                 except IOError as e:
                     self.logger.warn('error accessing external file: %s', e)
                     return None
-                return File(fhandle)
+                return File(fhandle, name=abs_path)
         return None
 
     def all_rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
@@ -258,7 +263,7 @@ class Dataset(metadata.models.AccessControl):
         :return: an iterator over the rows, each row is either [field_value] or
         [(field_value, [error])], depending on data_check.
         """
-        data_handle = self.get_open_file_handle()
+        data_handle = self.get_open_file_handle("r")
         if data_handle is None:
             raise RuntimeError('Dataset file has been removed.')
 
@@ -480,7 +485,7 @@ class Dataset(metadata.models.AccessControl):
         """
         data_handle = None
         try:
-            data_handle = self.get_open_file_handle()
+            data_handle = self.get_open_file_handle("rb")
             if data_handle is None:
                 return None
             return data_handle.size
@@ -496,7 +501,7 @@ class Dataset(metadata.models.AccessControl):
         """
         data_handle = None
         try:
-            data_handle = self.get_open_file_handle()
+            data_handle = self.get_open_file_handle("rb")
             if data_handle is None:
                 return None, 'missing'
             return os.path.basename(data_handle.name), filesizeformat(data_handle.size)
@@ -514,7 +519,7 @@ class Dataset(metadata.models.AccessControl):
         """Computes the MD5 checksum of the Dataset.
         Return None if the file could not be accessed.
         """
-        data_handle = self.get_open_file_handle()
+        data_handle = self.get_open_file_handle("rb")
         if data_handle is None:
             self.logger.warn('cannot access file handle')
             return None
@@ -545,7 +550,7 @@ class Dataset(metadata.models.AccessControl):
         return True
 
     def has_data(self):
-        data_handle = self.get_open_file_handle()
+        data_handle = self.get_open_file_handle("rb")
         if data_handle is not None:
             data_handle.close()
             return True
@@ -617,7 +622,9 @@ class Dataset(metadata.models.AccessControl):
 
         num_rows = -1  # skip header
         md5gen = hashlib.md5()
-        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
+        with file_access_utils.FileReadHandler(file_path=file_path,
+                                               file_handle=file_handle,
+                                               access_mode="r") as f:
             for line in f:
                 md5gen.update(line.encode())
                 num_rows += 1
@@ -647,8 +654,14 @@ class Dataset(metadata.models.AccessControl):
         """
         assert not bool(self.dataset_file)
 
-        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="r") as f:
-            self.dataset_file.save(os.path.basename(f.name), File(f))
+        with file_access_utils.FileReadHandler(file_path=file_path,
+                                               file_handle=file_handle,
+                                               access_mode="rb") as f:
+            full_name = file_path
+            assert isinstance(full_name, six.string_types), "fname '{}' is not a string {}".format(f.name,
+                                                                                                   type(f.name))
+            fname = os.path.basename(full_name)
+            self.dataset_file.save(fname, File(f))
 
         self.clean()
         self.save()
@@ -731,7 +744,8 @@ class Dataset(metadata.models.AccessControl):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None, cdt=None, keep_file=True,
+    def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None,
+                       cdt=None, keep_file=True,
                        name=None, description=None, file_source=None, check=True, file_handle=None,
                        instance=None, externalfiledirectory=None, precomputed_md5=None):
         """
@@ -770,12 +784,14 @@ class Dataset(metadata.models.AccessControl):
         else:
             raise ValueError("Must supply either the file path or file handle")
 
+        if not isinstance(file_name, six.string_types):
+            raise ValueError("file_name '{}' is not a string '{}'".format(file_name, type(file_name)))
         with transaction.atomic():
             external_path = ""
             # We do this in the transaction because we're accessing ExternalFileDirectory.
             if externalfiledirectory:
                 # Check that file_path is in the specified ExternalFileDirectory.
-                normalized_path = os.path.normpath(file_path)
+                normalized_path = os.path.normpath(file_name)
                 normalized_efd_with_slash = "{}/".format(os.path.normpath(externalfiledirectory.path))
                 assert normalized_path.startswith(normalized_efd_with_slash)
                 external_path = normalized_path.replace(normalized_efd_with_slash, "", 1)
@@ -793,9 +809,9 @@ class Dataset(metadata.models.AccessControl):
             if precomputed_md5 is not None:
                 new_dataset.MD5_checksum = precomputed_md5
             elif new_dataset.is_raw():
-                new_dataset.set_MD5(file_path, file_handle)
+                new_dataset.set_MD5(file_name, file_handle)
             else:
-                new_dataset.set_MD5_and_count_rows(file_path, file_handle)
+                new_dataset.set_MD5_and_count_rows(file_name, file_handle)
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(
@@ -808,7 +824,7 @@ class Dataset(metadata.models.AccessControl):
                 # verification method fails.  We allow the error to propagate
                 # up.
                 content_check = new_dataset.check_file_contents(
-                    file_path_to_check=file_path,
+                    file_path_to_check=file_name,
                     file_handle=file_handle,
                     summary_path=run_dir,
                     min_row=None,
@@ -841,7 +857,7 @@ class Dataset(metadata.models.AccessControl):
                 LOGGER.debug("Read {} rows from file {}".format(new_dataset.structure.num_rows, file_name))
 
             if keep_file:
-                new_dataset.register_file(file_path=file_path, file_handle=file_handle)
+                new_dataset.register_file(file_path=file_name, file_handle=file_handle)
 
             new_dataset.clean()
             if not new_dataset.is_raw():
@@ -977,7 +993,8 @@ class Dataset(metadata.models.AccessControl):
         # This may raise a VerificationMethodError; if so, then throw away the ContentCheckLog.
         try:
             with file_access_utils.FileReadHandler(file_path=file_path_to_check,
-                                                   file_handle=file_handle, access_mode="r") as f:
+                                                   file_handle=file_handle,
+                                                   access_mode="r") as f:
                 csv_summary = my_CDT.summarize_csv(f)
         except metadata.models.VerificationMethodError:
             self.logger.error("ContentCheckLog for file %s failed because the verification method failed",

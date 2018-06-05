@@ -7,12 +7,12 @@ import random
 import tempfile
 import time
 import itertools
-import pwd
+# import pwd
 
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
-from django.conf import settings
+# from django.conf import settings
 
 from archive.models import RunStep, Run, ExecLog, RunSIC, RunCable, RunComponent, RunOutputCable
 from constants import dirnames, extensions, runcomponentstates

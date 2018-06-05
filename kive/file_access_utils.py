@@ -152,6 +152,8 @@ def compute_md5(file_to_checksum):
     file_to_checksum should be an open, readable, file handle, with
     its position at the beginning, i.e. so that .read() gets the
     entire contents of the file.
+    NOTE: under python3, the file should have been open in binary mode ("rb")
+    so that bytes (not strings) are returned when iterating over the file.
     """
     md5gen = hashlib.md5()
     for line in file_to_checksum:
@@ -311,6 +313,13 @@ class FileReadHandler:
     If the file_handle is given, then seeks the beginning of the file.
     Otherwise, opens the file using the file_path.
     Only closes the file upon exit if the file source was a string file path.
+
+    NOTE: under python3, the access mode is significant. Therefore, if the
+    mode on the open file handle is not the same as asked for in access_mode, then
+    we create a new file handle in the required mode and return it.
+    This new file handle is closed upon __exit__ .
+    Note that a file handle can also be stringio object which has no mode attribute, in which
+    case no copy of the file handle is made.
     """
     def __init__(self, file_path, file_handle, access_mode):
         if file_handle:
@@ -320,16 +329,33 @@ class FileReadHandler:
             self.file_path = file_path
             self.file_handle = None
         self.access_mode = access_mode
+        assert file_path or file_handle, "must provide a file_path or file_handle"
 
     def __enter__(self):
+        self._did_dup = False
         if not self.file_handle:
             self.file_handle = open(self.file_path, self.access_mode)
         else:
+            has_mode = getattr(self.file_handle, "mode", None)
+            if has_mode is not None and has_mode != self.access_mode:
+                # the open file is in the wrong mode
+                # we cannot use the filename, as there might not be one for temporary files
+                orgfdnum = self.file_handle.fileno()
+                fdnum = os.dup(orgfdnum)
+                self._did_dup = True
+                logger.debug("reopening fd name {} (fdnums {} -> {}) (modes {} -> {})".format(
+                    self.file_handle.name,
+                    orgfdnum, fdnum,
+                    self.file_handle.mode,
+                    self.access_mode))
+                self.file_handle = os.fdopen(fdnum, self.access_mode)
+                assert self.file_handle.mode == self.access_mode,\
+                    "file handle in wrong mode. Actual: {}, wanted: {}".format(self.file_handle.mode, self.access_mode)
             self.file_handle.seek(0)
         return self.file_handle
 
     def __exit__(self, extype, value, traceback):
-        if self.file_path:
+        if self.file_path or self._did_dup:
             self.file_handle.close()
 
 

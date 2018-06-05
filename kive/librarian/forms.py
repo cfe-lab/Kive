@@ -364,7 +364,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
             def get_filestream(filename):
                 f = archive.open(filename)
                 size = archive.getinfo(filename).file_size
-                streamable = six.StringIO(f.read())
+                streamable = six.BytesIO(f.read())
                 streamable.name = f.name.replace('/', '_')
 #                streamable.name = f.name.split('/')[-1]
                 f.close()

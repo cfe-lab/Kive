@@ -1,6 +1,7 @@
 from datetime import datetime
 from io import BytesIO
 import os
+import six
 from zipfile import ZipFile
 
 from django.contrib.auth.models import Group, User
@@ -40,7 +41,7 @@ Dave,40
                          [('Dave', []), ('40', [])]]
 
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
         expected_check = dataset.content_checks.create()
         type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
@@ -58,7 +59,7 @@ Dave,40
                          [('', []), ('', []), ('Dave', []), ('40', [])]]
 
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
         expected_check = dataset.content_checks.create()
         type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
@@ -83,7 +84,7 @@ Tom,15
                                               datatype=int_datatype)
         cell_error = CellError(column=count_column, row_num=bad_row)
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
         expected_check = dataset.content_checks.create()
         ContentCheckLog.baddata = PropertyMock()
         expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
@@ -108,7 +109,7 @@ Tom,15
                                               datatype=int_datatype)
         cell_error = CellError(column=count_column, row_num=bad_row)
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
         expected_check = dataset.content_checks.create()
         ContentCheckLog.baddata = PropertyMock()
         expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = [cell_error]
@@ -147,7 +148,7 @@ Jim,th1rty
         extra_cell_errors = [{'column_id': count_column_id,
                               'row_num__min': bad_row}]
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
         expected_check = dataset.content_checks.create()
         ContentCheckLog.baddata = PropertyMock()
         expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = []
@@ -172,7 +173,7 @@ Dave,40
                          ['Dave', '40']]
 
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
 
         rows = list(dataset.rows(data_check=False))
 
@@ -188,7 +189,7 @@ Dave,40
                          [('Dave', []), ('40', [])]]
 
         dataset = Dataset()
-        dataset.get_open_file_handle = lambda: data_file
+        dataset.get_open_file_handle = lambda md: data_file
 
         rows = list(dataset.rows(data_check=True))
 
@@ -257,7 +258,7 @@ class DatasetViewMockTests(ViewMockTestCase):
 
         self.client = self.create_client()
         self.dataset = Dataset(pk='99', user=kive_user())
-        self.file_content = 'example data'
+        self.file_content = b'example data'
         self.dataset.dataset_file = ContentFile(self.file_content, name='example.txt')
 
         self.other_dataset = Dataset(pk='150', user=User(pk=5))
@@ -291,8 +292,12 @@ class DatasetViewMockTests(ViewMockTestCase):
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.file_content, response.content)
+        # under python3 serialize_headers returns bytes, not strings
+        header_bytes = response.serialize_headers()
+        header_str = header_bytes.decode()
+        assert isinstance(header_str, six.string_types), "not a string {}".format(type(header_str))
         self.assertIn('Content-Disposition: attachment; filename="example.txt"',
-                      response.serialize_headers())
+                      header_str)
 
     def test_dataset_view_404(self):
         response = self.client.get(reverse('dataset_view',
@@ -367,7 +372,7 @@ class DatasetViewMockTests(ViewMockTestCase):
     def test_datasets_add_archive(self, register_file, compute_md5):
         zip_buffer = BytesIO()
         zip_file = ZipFile(zip_buffer, "w")
-        expected_content = "Hello, World!"
+        expected_content = b"Hello, World!"
         zip_file.writestr("added.txt", expected_content)
         zip_file.close()
         upload_file = SimpleUploadedFile("added.zip", zip_buffer.getvalue())
@@ -387,9 +392,9 @@ class DatasetViewMockTests(ViewMockTestCase):
     @patch.multiple(Dataset, register_file=mock.DEFAULT, compute_md5=mock.DEFAULT)
     def test_datasets_add_bulk(self, register_file, compute_md5):
         filename1 = "added1.txt"
-        upload_file1 = SimpleUploadedFile(filename1, "Hello, World!")
+        upload_file1 = SimpleUploadedFile(filename1, b"Hello, World!")
         filename2 = "added2.txt"
-        upload_file2 = SimpleUploadedFile(filename2, "Goodbye, Town!")
+        upload_file2 = SimpleUploadedFile(filename2, b"Goodbye, Town!")
         response = self.client.post(
             reverse('datasets_add_bulk'),
             data=dict(compound_datatype=CompoundDatatype.RAW_ID,
@@ -842,7 +847,9 @@ class ExecRecordMockTests(TestCase):
             execrecordout.clean)
 
     @mocked_relations(Dataset, TransformationXput, CompoundDatatype)
-    def test_pipeline_execrecordout_cdt_cdt(self):
+    def test_pipeline_execrecordout_cdt_cdt01(self):
+        """NOTE 2018-06-4: this routine was named the same as pne further below, and so
+        was overwritten. Added the 01 at the end of the name avoid this."""
         cdt = CompoundDatatype()
 
         execrecordout = self.create_pipeline_execrecordout()

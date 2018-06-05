@@ -12,7 +12,7 @@ import logging
 import json
 import shutil
 import stat
-from StringIO import StringIO
+import six
 
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
@@ -103,7 +103,7 @@ class DatasetTests(LibrarianTestCase):
         self.datatype_str = Datatype.objects.get(pk=datatypes.STR_PK)
         self.datatype_dna = Datatype(name="DNA", description="sequences of ATCG",
                                      user=self.myUser)
-        self.datatype_dna.clean()
+        # self.datatype_dna.clean()
         self.datatype_dna.save()
         self.datatype_dna.restricts.add(self.datatype_str)
         self.datatype_dna.complete_clean()
@@ -118,7 +118,8 @@ class DatasetTests(LibrarianTestCase):
         self.cdt_record.clean()
 
         self.data_file = tempfile.NamedTemporaryFile(delete=False)
-        self.data_file.write(self.header + "\n" + self.data)
+        data_str = self.header + "\n" + self.data
+        self.data_file.write(data_str.encode())
         self.file_path = self.data_file.name
         self.data_file.close()
 
@@ -143,7 +144,7 @@ class DatasetTests(LibrarianTestCase):
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
 
         tmpfile = tempfile.NamedTemporaryFile(delete=False)
-        tmpfile.file.write("Random stuff")
+        tmpfile.file.write("Random stuff".encode())
         tmpfile.file.flush()  # flush python buffer to os buffer
         os.fsync(tmpfile.file.fileno())  # flush os buffer to disk
         tmpfile.file.seek(0)  # go to beginning of file before calculating expected md5
@@ -181,7 +182,7 @@ class DatasetTests(LibrarianTestCase):
         """
         # Write the data with no header.
         data_file = tempfile.NamedTemporaryFile()
-        data_file.write(self.data)
+        data_file.write(self.data.encode())
 
         # Try to create a dataset.
         self.assertRaisesRegexp(ValueError,
@@ -216,7 +217,7 @@ class DatasetTests(LibrarianTestCase):
             data_file.write("""\
 header,sequence,extra
 foo,bar,baz
-""")
+            """.encode())
             data_file.flush()
             file_path = data_file.name
 
@@ -238,7 +239,7 @@ foo,bar,baz
             data_file.write("""\
 header,sequence
 foo,bar
-""")
+""".encode())
             data_file.flush()
             file_path = data_file.name
 
@@ -256,7 +257,7 @@ foo,bar
                                          column_idx=2)
         compound_datatype.clean()
 
-        data_file = StringIO("""\
+        data_file = six.StringIO("""\
 name,count
 Bob,tw3nty
 """)
@@ -294,14 +295,14 @@ Bob,tw3nty
         """
         Test coherence of the Dataset created alongsite a Dataset.
         """
-        bulk_dataset_csv = tempfile.NamedTemporaryFile(suffix="csv")
+        bulk_dataset_csv = tempfile.NamedTemporaryFile(suffix="csv", mode="w")
         bulk_dataset_csv.write("Name,Description,File")
         dsname = "tempdataset"
         dsdesc = "some headers and sequences"
         file_paths = []
         data_files = []
         for i in range(2):
-            data_files.append(tempfile.NamedTemporaryFile())
+            data_files.append(tempfile.NamedTemporaryFile(mode="w"))
             data_files[-1].write(self.header + "\n" + self.data)
             file_path = data_files[-1].name
             file_paths.extend([file_path])
@@ -1295,9 +1296,9 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         # This should equal librarian.ajax.DatasetViewSet.as_view({"get": "list"}).
         self.list_view, _, _ = resolve(self.list_path)
 
-        with tempfile.TemporaryFile() as f:
+        with tempfile.NamedTemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
-            f.write(data)
+            f.write(data.encode())
             f.seek(0)
             self.test_dataset = Dataset.create_dataset(
                 file_path=None,
@@ -1310,7 +1311,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                 description="Test data for a test that tests test data",
                 file_source=None,
                 check=True,
-                file_handle=f
+                file_handle=f,
             )
             self.test_dataset_path = "{}{}/".format(self.list_path,
                                                     self.test_dataset.pk)
@@ -1343,10 +1344,10 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
-            f.write(data)
-            for i in xrange(num_files):
+            f.write(data.encode())
+            for i in range(num_files):
                 f.seek(0, FROM_FILE_END)
-                f.write('data file {}\n'.format(i))
+                f.write('data file {}\n'.format(i).encode())
                 f.seek(0)
                 request = self.factory.post(
                     self.list_path,
@@ -1382,7 +1383,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
-            f.write(data)
+            f.write(data.encode())
             f.seek(0)
 
             # First, we add this file and it works.
@@ -1505,7 +1506,7 @@ class DatasetSerializerTests(TestCase):
         self.duck_context = DuckContext()
 
         num_cols = 12
-        self.raw_file_contents = ','.join(map(str, range(num_cols)))
+        self.raw_file_contents = ','.join(map(str, range(num_cols))).encode()
 
         # A CompoundDatatype that belongs to the Kive user.
         self.kive_CDT = CompoundDatatype(user=self.kive_user)
@@ -1517,7 +1518,7 @@ class DatasetSerializerTests(TestCase):
         )
         self.kive_CDT.full_clean()
 
-        self.kive_file_contents = """col1
+        self.kive_file_contents = b"""col1
 foo
 bar
 baz
@@ -1554,7 +1555,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
 
             ds = DatasetSerializer(
                 data=self.data_to_serialize,
@@ -1570,7 +1571,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["users_allowed"].append(self.myUser.username)
 
             ds = DatasetSerializer(
@@ -1587,7 +1588,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["groups_allowed"].append(everyone_group().name)
 
             ds = DatasetSerializer(
@@ -1604,7 +1605,7 @@ baz
             f.write(self.kive_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
 
             ds = DatasetSerializer(
@@ -1621,7 +1622,7 @@ baz
             f.write(self.kive_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
 
             ds = DatasetSerializer(
@@ -1680,7 +1681,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
 
             ds = DatasetSerializer(
                 data=self.data_to_serialize,
@@ -1688,7 +1689,7 @@ baz
             )
             self.assertFalse(ds.is_valid())
             self.assertSetEqual(
-                set(ds.errors["non_field_errors"]),
+                set([str(e) for e in ds.errors["non_field_errors"]]),
                 {
                     "external_path should not be specified if dataset_file is",
                     "externalfiledirectory should not be specified if dataset_file is"
@@ -1703,7 +1704,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
 
             ds = DatasetSerializer(
                 data=self.data_to_serialize,
@@ -1727,7 +1728,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["save_in_db"] = False
 
             ds = DatasetSerializer(
@@ -1752,7 +1753,7 @@ baz
             f.write(self.kive_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["compounddatatype"] = self.kive_CDT.pk
 
             ds = DatasetSerializer(
@@ -1773,7 +1774,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["users_allowed"].append(self.myUser.username)
 
             ds = DatasetSerializer(
@@ -1794,7 +1795,7 @@ baz
             f.write(self.raw_file_contents)
             f.seek(0)
 
-            self.data_to_serialize["dataset_file"] = File(f)
+            self.data_to_serialize["dataset_file"] = File(f, name="bla")
             self.data_to_serialize["groups_allowed"].append(everyone_group().name)
 
             ds = DatasetSerializer(
@@ -1985,12 +1986,12 @@ class ExternalFileTests(TestCase):
         self.ext1_path = "ext1.txt"
         self.ext1_contents = "First test file"
         with open(os.path.join(self.working_dir, self.ext1_path), "wb") as f:
-            f.write(self.ext1_contents)
+            f.write(self.ext1_contents.encode())
 
         self.ext2_path = "ext2.txt"
         self.ext2_contents = "Second test file"
         with open(os.path.join(self.working_dir, self.ext2_path), "wb") as f:
-            f.write(self.ext2_contents)
+            f.write(self.ext2_contents.encode())
 
         os.makedirs(os.path.join(self.working_dir, "ext_subdir"))
         os.makedirs(os.path.join(self.working_dir, "ext_subdir2"))
@@ -1998,7 +1999,7 @@ class ExternalFileTests(TestCase):
         self.ext_sub1_path = os.path.join("ext_subdir", "ext_sub1.txt")
         self.ext_sub1_contents = "Test file in subdirectory"
         with open(os.path.join(self.working_dir, self.ext_sub1_path), "wb") as f:
-            f.write(self.ext_sub1_contents)
+            f.write(self.ext_sub1_contents.encode())
 
         self.external_file_ds = Dataset.create_dataset(
             os.path.join(self.working_dir, self.ext1_path),
@@ -2056,7 +2057,7 @@ class ExternalFileTests(TestCase):
 
         self.assertEquals(external_file_ds.external_path, self.ext1_path)
 
-        external_file_ds.dataset_file.open("rb")
+        external_file_ds.dataset_file.open("r")
         with external_file_ds.dataset_file:
             self.assertEquals(external_file_ds.dataset_file.read(), self.ext1_contents)
 
@@ -2093,7 +2094,7 @@ class ExternalFileTests(TestCase):
         self.assertEquals(external_file_ds.externalfiledirectory, self.efd)
         self.assertEquals(external_file_ds.external_path, self.ext_sub1_path)
 
-        external_file_ds.dataset_file.open("rb")
+        external_file_ds.dataset_file.open("r")
         with external_file_ds.dataset_file:
             self.assertEquals(external_file_ds.dataset_file.read(), self.ext_sub1_contents)
 
@@ -2112,12 +2113,12 @@ class ExternalFileTests(TestCase):
         )
 
         # Where possible get_file_handle uses the internal copy.
-        with external_file_ds.get_open_file_handle() as data_handle:
+        with external_file_ds.get_open_file_handle("r") as data_handle:
             self.assertEquals(data_handle, external_file_ds.dataset_file)
 
         # It falls back on the external copy.
         external_file_ds.dataset_file.delete()
-        with external_file_ds.get_open_file_handle() as external_file_handle:
+        with external_file_ds.get_open_file_handle('r') as external_file_handle:
             self.assertEquals(os.path.abspath(external_file_handle.name), ext_sub1_path)
 
     def test_get_file_handle_subdirectory(self):
@@ -2125,11 +2126,11 @@ class ExternalFileTests(TestCase):
         Test retrieving a file handle on a Dataset with a file in a subdirectory.
         """
         # Where possible get_file_handle uses the internal copy.
-        with self.external_file_ds.get_open_file_handle() as data_handle:
+        with self.external_file_ds.get_open_file_handle('r') as data_handle:
             self.assertEquals(data_handle, self.external_file_ds.dataset_file)
 
         # It falls back on the external copy.
-        with self.external_file_ds_no_internal.get_open_file_handle() as external_file_handle:
+        with self.external_file_ds_no_internal.get_open_file_handle('r') as external_file_handle:
             self.assertEquals(
                 os.path.abspath(external_file_handle.name),
                 os.path.abspath(os.path.join(self.working_dir, self.ext1_path))
@@ -2159,7 +2160,7 @@ class ExternalFileTests(TestCase):
         ext_path = "ext_test_has_data.txt"
         ext_contents = "File has data"
         with open(os.path.join(self.working_dir, ext_path), "wb") as f:
-            f.write(ext_contents)
+            f.write(ext_contents.encode())
 
         external_path = os.path.join(self.working_dir, ext_path)
         external_file_ds_no_internal = Dataset.create_dataset(
@@ -2174,7 +2175,7 @@ class ExternalFileTests(TestCase):
 
         # Now test when the file exists but is unreadable.
         with open(os.path.join(self.working_dir, ext_path), "wb") as f:
-            f.write(ext_contents)
+            f.write(ext_contents.encode())
         self.assertTrue(external_file_ds_no_internal.has_data())
         os.chmod(external_path, stat.S_IWUSR | stat.S_IXUSR)
         self.assertFalse(external_file_ds_no_internal.has_data())

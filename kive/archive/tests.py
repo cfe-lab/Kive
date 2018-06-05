@@ -1042,7 +1042,7 @@ class RunStepTests(ArchiveTestCase):
         self.doublet_dataset.file_source = self.step_E1_RS
         self.doublet_dataset.MD5_checksum = "foo"
         self.doublet_dataset.save()
-        with open(self.doublet_dataset.dataset_file.path) as f:
+        with open(self.doublet_dataset.dataset_file.path, 'rb') as f:
             checksum = compute_md5(f)
 
         self.assertRaisesRegexp(ValidationError,
@@ -2855,7 +2855,7 @@ import sys
 import datetime
 import csv
 
-with open(sys.argv[2], "wb") as f:
+with open(sys.argv[2], "w") as f:
     dt_writer = csv.writer(f)
     dt_writer.writerow(("year", "month", "day", "hour", "minute", "second", "microsecond"))
 
@@ -3036,9 +3036,9 @@ year,month,day,hour,minute,second,microsecond
 
         # Oops!  Between runs, self.method_noop gets screwed with.
         with tempfile.TemporaryFile() as f:
-            f.write("#!/bin/bash\n exit 1")
+            f.write("#!/bin/bash\n exit 1".encode())
             os.remove(self.coderev_noop.content_file.path)
-            self.coderev_noop.content_file = File(f)
+            self.coderev_noop.content_file = File(f, name="bla")
             self.coderev_noop.save()
 
         p_two = tools.make_first_pipeline("p_two", "one no-op then one trivial", self.user_bob)
@@ -3142,10 +3142,10 @@ year,month,day,hour,minute,second,microsecond
 #! /usr/bin/env python
 import sys
 
-with open(sys.argv[2], "wb") as f:
+with open(sys.argv[2], "w") as f:
     f.write("word\\n")
     for i in range(%d):
-        print i
+        print(i)
         f.write("{}\\n".format(i))
 """ % iteration_count
         expected_output = '\n'.join(map(str, range(iteration_count))) + '\n'
@@ -3177,7 +3177,7 @@ with open(sys.argv[2], "wb") as f:
 
         run_step = active_run.runsteps.get(pipelinestep__step_num=1)
         stdout_file = run_step.log.methodoutput.output_log
-        stdout_file.open()
+        stdout_file.open(mode="r")
         try:
             stdout_content = stdout_file.read()
         finally:

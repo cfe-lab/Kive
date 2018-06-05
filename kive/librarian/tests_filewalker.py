@@ -9,17 +9,15 @@ import os.path as osp
 import random
 import tempfile
 import shutil
-
+import six
 import datetime as dt
 import time
 import logging
 
-from filewalker import FilePurger, iter_walk
+from librarian.filewalker import FilePurger, iter_walk
 
 from django.conf import settings
 from django.test import TestCase
-# import kive.testing_utils as tools
-
 
 # NOTE: this directory will be created before and also deleted after all tests
 # see setUpClass and tearDownClass below
@@ -72,7 +70,7 @@ def create_randomfile(dirname, size, atime):
     Return name, size and atime of the file created.
     """
     with tempfile.NamedTemporaryFile(mode="wb", dir=dirname, suffix=".dat",
-                                     delete=False) as fo, open("/dev/zero", "r") as fi:
+                                     delete=False) as fo, open("/dev/zero", "rb") as fi:
         name = fo.name
         ntodo = size
         while ntodo > 0:
@@ -170,7 +168,7 @@ class FileWalkerTests(TestCase):
         plst = []
         try:
             while True:
-                p = iwalk.next()
+                p = six.next(iwalk)
                 plst.append(p)
         except StopIteration:
             # print("got the stop")

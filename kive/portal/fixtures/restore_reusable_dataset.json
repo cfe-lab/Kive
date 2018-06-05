@@ -831,7 +831,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "70b0b8bd967b4981a4a395e47fb47b15", 
+            "MD5_checksum": "47ce4dafc561b053378491af90eb93b9", 
             "coderesource": 1, 
             "content_file": "CodeResources/sums_and_products.py", 
             "groups_allowed": [
@@ -850,7 +850,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "2069c24f06ad2c48833648c475101298", 
+            "MD5_checksum": "b1a966dbc9cec1fe2dc88ef156b70f01", 
             "coderesource": 2, 
             "content_file": "CodeResources/total_sums.py", 
             "groups_allowed": [
@@ -869,7 +869,7 @@
     }, 
     {
         "fields": {
-            "MD5_checksum": "d7b66610f9b11a5ad16cddd4bc5fe6f6", 
+            "MD5_checksum": "85bb2c51fa3720a5ff1aba0631e19d25", 
             "coderesource": 3, 
             "content_file": "CodeResources/total_products.py", 
             "groups_allowed": [

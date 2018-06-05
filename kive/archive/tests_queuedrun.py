@@ -246,7 +246,8 @@ class RestoreReusableDatasetTest(BaseTestCases.SlurmExecutionTestCase):
         install_fixture_files("restore_reusable_dataset")
 
     def tearDown(self):
-        remove_fixture_files()
+        # remove_fixture_files()
+        pass
 
     def execute_pipeline(self, pipeline):
         dataset = Dataset.objects.get(name="pairs")
@@ -255,10 +256,12 @@ class RestoreReusableDatasetTest(BaseTestCases.SlurmExecutionTestCase):
 
     def test_run_new_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
-
         run_to_process = self.execute_pipeline(pipeline)
-
-        self.assertTrue(run_to_process.is_successful())
+        self.assertIsNotNone(run_to_process)
+        if not run_to_process.is_successful():
+            state_name = run_to_process.get_state_name()
+            print("unexpected run state name: '{}'".format(state_name))
+            self.fail("run is not successful")
 
     def test_rerun_old_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums only')
@@ -731,7 +734,7 @@ class RunSerializerTests(RunSerializerTestBase):
         rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
-        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+        self.assertEquals([str(e) for e in rtp_serializer.errors["non_field_errors"]],
                           [u"Pipeline has 3 inputs, but only received 2."])
 
     def test_validate_inputs_oversated(self):
@@ -760,7 +763,7 @@ class RunSerializerTests(RunSerializerTestBase):
         rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
-        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+        self.assertEquals([str(e) for e in rtp_serializer.errors["non_field_errors"]],
                           [u"Pipeline inputs must be uniquely specified"])
 
     def test_validate_input_index_dne(self):
@@ -789,7 +792,7 @@ class RunSerializerTests(RunSerializerTestBase):
         rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
-        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+        self.assertEquals([str(e) for e in rtp_serializer.errors["non_field_errors"]],
                           [u"Pipeline {} has no input with index {}".format(
                               self.em_pipeline, 4
                           )])
@@ -821,7 +824,7 @@ class RunSerializerTests(RunSerializerTestBase):
         rtp_serializer = RunSerializer(data=serialized_rtp, context=self.john_context)
 
         self.assertFalse(rtp_serializer.is_valid())
-        self.assertEquals(rtp_serializer.errors["non_field_errors"],
+        self.assertEquals([str(e) for e in rtp_serializer.errors["non_field_errors"]],
                           [u"Illegal priority level"])
 
     def test_validate_input_CDT_incompatible(self):
@@ -883,7 +886,7 @@ class RunSerializerTests(RunSerializerTestBase):
 
         self.assertFalse(rtp_serializer.is_valid())
         self.assertEqual(
-            set(rtp_serializer.errors["non_field_errors"]),
+            set([str(e) for e in rtp_serializer.errors["non_field_errors"]]),
             set([
                 u"User(s) {} may not be granted access".format(usrlst2str([self.kive_user])),
                 u"Group(s) {} may not be granted access".format(grplst2str([everyone_group()]))
@@ -1015,8 +1018,10 @@ class RunBatchSerializerTests(RunSerializerTestBase):
                 2
             ),
         ])
-        got_set = set(rb_serializer.errors["non_field_errors"])
+        # we must convert the list of ErrorDetail into strings first...
+        got_set = set([str(e) for e in rb_serializer.errors["non_field_errors"]])
         self.assertSetEqual(expected_set, got_set)
+        # assert False, "force fail"
 
     def test_validate_coherent_permissions(self):
         """
@@ -1076,7 +1081,7 @@ class RunBatchSerializerTests(RunSerializerTestBase):
                 1
             )
         ])
-        got_set = set(rb_serializer.errors["non_field_errors"])
+        got_set = set([str(e) for e in rb_serializer.errors["non_field_errors"]])
         self.assertSetEqual(expected_set, got_set)
 
     def test_validate_everyone_has_access(self):
@@ -1293,7 +1298,7 @@ class RunBatchSerializerTests(RunSerializerTestBase):
         self.assertFalse(update_serializer.is_valid())  # note that we patched Run.is_complete so this would work
 
         self.assertSetEqual(
-            set(update_serializer.errors["non_field_errors"]),
+            set([str(e) for e in update_serializer.errors["non_field_errors"]]),
             {
                 "Group(s) {} may not be granted access to run {}".format(
                     grplst2str([new_group]),

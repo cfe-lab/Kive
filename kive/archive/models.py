@@ -13,6 +13,7 @@ import os
 import time
 from datetime import datetime, timedelta
 import shutil
+import six
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -46,7 +47,7 @@ def empty_redaction_plan():
 
 
 def summarize_redaction_plan(redaction_plan):
-    counts = {key: len(targets) for key, targets in redaction_plan.iteritems()}
+    counts = {key: len(targets) for key, targets in six.iteritems(redaction_plan)}
     return counts
 
 
@@ -99,7 +100,7 @@ class update_field(object):
                 if this.pk is not None:
                     try:
                         this.save(update_fields=[self.field])
-                    except:
+                    except Exception:
                         pass
             return result
         return wrapper
@@ -650,7 +651,7 @@ class Run(stopwatch.models.Stopwatch, metadata.models.AccessControl):
                 try:
                     step_progress[-1]['log_id'] = step.execrecord.generator.\
                         methodoutput.id
-                except:
+                except Exception:
                     pass
 
         # Just finished a step, but didn't start the next one?
@@ -1092,7 +1093,7 @@ class RunComponent(stopwatch.models.Stopwatch):
         True if RunComponent is successful; False otherwise.
         """
         retval = self._runcomponentstate_id == runcomponentstates.SUCCESSFUL_PK
-        self.logger.debug("is_successful returning %d (state= %s)" % (retval, self._runcomponentstate_id))
+        self.logger.debug("is_successful returning {} (state={})".format(retval, self._runcomponentstate_id))
         return retval
 
     def is_cancelled(self):

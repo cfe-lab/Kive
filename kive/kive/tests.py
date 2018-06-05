@@ -202,7 +202,7 @@ class BaseTestCases(object):
             self.assertTrue(run.is_successful())
 
 
-def dummy_file(content, name='dummy_file'):
+def dummy_file(content, name='dummy_file', mode='rb'):
     """ Create an in-memory, file-like object.
 
     :param str content: the contents of the file

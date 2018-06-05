@@ -2323,8 +2323,10 @@ def make_dataset(contents, CDT, keep_file, user, name, description, file_source,
     """
     Wrapper for create_dataset that creates a Dataset from a string.
     """
-    with tempfile.TemporaryFile() as f:
+    with tempfile.NamedTemporaryFile(mode="wb", delete=False) as f:
         f.write(contents.encode())
+        fname = f.name
+    with open(fname, "r") as f:
         test_dataset = Dataset.create_dataset(
             None,
             user,

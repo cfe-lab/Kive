@@ -10,7 +10,7 @@ from rest_framework.decorators import detail_route, list_route
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
-
+import six
 from archive.serializers import MethodOutputSerializer, RunSerializer,\
     RunProgressSerializer, RunOutputsSerializer, RunBatchSerializer
 from archive.models import Run, RunInput, ExceedsSystemCapabilities, MethodOutput,\
@@ -50,7 +50,7 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
             return Response(
                 {'errors': ['Cannot update fields ' + ','.join(unexpected_keys)]},
                 status=status.HTTP_400_BAD_REQUEST)
-        for field, redact in redactions.iteritems():
+        for field, redact in six.iteritems(redactions):
             if request.data.get(field, False):
                 redact()
         return self.patch_object(request, pk)

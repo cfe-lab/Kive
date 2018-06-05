@@ -1010,6 +1010,8 @@ def callit(wdir, dname, arglst, stdout, stderr):
 
 class DummyJobState:
     def __init__(self, priolevel, jobname):
+        if type(self) is DummyJobState:
+            raise Exception('DummyJobState is an abstract base class')
         global _dummy_pid
         self.sco_pid = "%d" % _dummy_pid
         _dummy_pid += 1
@@ -1190,7 +1192,10 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         Return the sco_pid iff successful, otherwise return DUMMY_FAIL.
         """
         try:
-            newproc = DummyJobState(jdct["prio_level"], jdct["job_name"])
+            # NOTE: should not instantiate a DummyJobState because it does not have
+            # a do_cancel method.
+            # newproc = DummyJobState(jdct["prio_level"], jdct["job_name"])
+            newproc = DummyWorkerProc(jdct)
             # set the state based on the exit code.
             if jdct['return_code'] == 0:
                 newproc.set_runstate(BaseSlurmScheduler.COMPLETED)

@@ -1,7 +1,8 @@
 """
 librarian views
 """
-import urllib
+
+from six.moves.urllib.parse import unquote
 import logging
 import mimetypes
 import os
@@ -64,7 +65,7 @@ def dataset_download(request, dataset_id):
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    data_handle = dataset.get_open_file_handle()
+    data_handle = dataset.get_open_file_handle('r')
     if data_handle is None:
         raise Http404("ID {} cannot be accessed (file access)".format(dataset_id))
     else:
@@ -172,7 +173,7 @@ def dataset_view(request, dataset_id):
 
         # Test whether this is a binary file or not.
         # Read 1000 characters.
-        data_handle = dataset.get_open_file_handle()
+        data_handle = dataset.get_open_file_handle('r')
         if data_handle is None:
             c["missing_data_message"] = "Data has been removed or renamed."
         else:
@@ -499,9 +500,9 @@ def dataset_lookup(request, filename=None, filesize=None, md5_checksum=None):
         raise RuntimeError("filename or md5_sum is missing")
     try:
         filesize_int = int(filesize)
-    except:
+    except Exception:
         raise RuntimeError("integer conversion error")
-    filename = urllib.unquote(filename)
+    filename = unquote(filename)
     dataset_query = librarian.models.Dataset.filter_by_user(request.user).filter(
         MD5_checksum=md5_checksum).exclude(file_source=None).order_by('-date_created')
     num_datasets = dataset_query.count()

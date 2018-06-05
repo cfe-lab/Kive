@@ -10,7 +10,7 @@ parser.add_argument("input_csv",
                     type=FileType('rU'),
                     help="CSV containing (sum,product) pairs");
 parser.add_argument("output_csv",
-                    type=FileType('wb'),
+                    type=FileType('w'),
                     help="CSV containing one (sum,product) pair");
 args = parser.parse_args();
 

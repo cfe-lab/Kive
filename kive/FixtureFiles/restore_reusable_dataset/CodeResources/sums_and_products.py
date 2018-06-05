@@ -11,7 +11,7 @@ parser.add_argument("input_csv",
                     type=FileType('rU'),
                     help="CSV containing (x,y) pairs");
 parser.add_argument("output_csv",
-                    type=FileType('wb'),
+                    type=FileType('w'),
                     help="CSV containing (x+y,xy) pairs");
 args = parser.parse_args();
 
