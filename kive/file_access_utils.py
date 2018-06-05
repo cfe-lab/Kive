@@ -173,6 +173,51 @@ def file_exists(path):
         raise
 
 
+COPY_BUFFSIZE = 1024*1024
+
+# python2.7 versions of shutil do not have a SameFileError defined.
+# Define our own version here if needed.
+if getattr(shutil, "SameFileError", None) is None:
+    class SameFileError(Exception):
+        pass
+else:
+    class SameFileError(shutil.SameFileError):
+        pass
+
+
+def copyfile(src, dst, follow_symlinks=True):
+    """Copy data from src to dst.
+
+    If follow_symlinks is not set and src is a symbolic link, a new
+    symlink will be created instead of copying the file it points to.
+
+    NOTE: this is a copy of shutil.copyfile from python 3.5, modified to be compatible
+    with python2.7, with the exception of the buffer size
+    used in copying the file contents.
+    """
+    if shutil._samefile(src, dst):
+        raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
+
+    for fn in [src, dst]:
+        try:
+            st = os.stat(fn)
+        except OSError:
+            # File most likely does not exist
+            pass
+        else:
+            # XXX What about other special files? (sockets, devices...)
+            if stat.S_ISFIFO(st.st_mode):
+                raise shutil.SpecialFileError("`%s` is a named pipe" % fn)
+
+    if not follow_symlinks and os.path.islink(src):
+        os.symlink(os.readlink(src), dst)
+    else:
+        with open(src, 'rb') as fsrc:
+            with open(dst, 'wb') as fdst:
+                shutil.copyfileobj(fsrc, fdst, length=COPY_BUFFSIZE)
+    return dst
+
+
 def copy_and_confirm(source,
                      destination,
                      max_num_tries=settings.CONFIRM_COPY_RETRIES,
@@ -180,12 +225,16 @@ def copy_and_confirm(source,
                      wait_max=settings.CONFIRM_COPY_WAIT_MAX):
     """
     A function that copies the file at source to destination and confirms that it was successful.
+    source and destination are strings: the names of the files to copy from/to.
 
     Raises an IOError if the copy failed; raises FileCreationError if the
     resulting file fails confirmation.
+
+    Returns the destination string upon success so as to mimic shutil.copyfile
     """
-    shutil.copyfile(source, destination)
+    copyfile(source, destination)
     confirm_file_copy(source, destination, max_num_tries, wait_min, wait_max)
+    return destination
 
 
 def confirm_file_copy(source,
