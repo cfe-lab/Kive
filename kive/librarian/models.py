@@ -220,7 +220,7 @@ class Dataset(metadata.models.AccessControl):
             return None
         return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
 
-    def get_open_file_handle(self, mode):
+    def get_open_file_handle(self, mode="rb"):
         """
         Retrieves an open Django file with which to access the data.
 
