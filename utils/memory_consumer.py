@@ -89,5 +89,6 @@ def main():
     for _ in consumer:
         sleep(1)
 
+
 if __name__ == '__main__':
     main()

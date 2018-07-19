@@ -24,6 +24,7 @@ utils/memory_plot.png
 /utils/speed_plot_cache
 /static_root
 /static_root.tar.gz
+/vagrant/.vagrant
 
 # Ignore nodeJS modules
 node_modules/
