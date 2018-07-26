@@ -14,6 +14,9 @@ You will need django_extensions and pygraphviz installed, see the INSTALL.md fil
 #### archive ####
 ![archive classes](archive.png)
 
+#### container ####
+![container classes](container.png)
+
 #### datachecking ####
 ![datachecking classes](datachecking.png)
 
