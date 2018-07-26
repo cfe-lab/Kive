@@ -9,6 +9,7 @@ import subprocess as sp
 
 from fleet.slurmlib import multi_check_output
 from django.conf import settings
+from method.models import DockerImage
 
 
 logger = logging.getLogger("fleet.dockerlib")
@@ -151,7 +152,10 @@ class DockerHandler(BaseDockerHandler):
     def _run_shell_command(cmd_lst):
         """ Helper routine:
         Call a shell command provided in cmd_lst
+        Any exception encountered will be raised, otherwise the resulting
+        stdout is returned.
         """
+        assert isinstance(cmd_lst, list), "list expected"
         logger.debug(" ".join(cmd_lst))
         out_str = None
         stderr_fd, stderr_path = tempfile.mkstemp()
@@ -209,8 +213,9 @@ class DockerHandler(BaseDockerHandler):
 
     @staticmethod
     def check_is_alive():
-        """Return True if the docker configuration is adequate for Kive's purposes.
-
+        """Check that the docker configuration is adequate for Kive's purposes.
+        This routine does not return anything; if it runs through without
+        an exception, this is considered a pass.
         This is done by
         1) calling bzip2 and checking for exceptions. bzip2 is needed when loading
         a docker image from a file.
@@ -344,3 +349,146 @@ class DockerHandler(BaseDockerHandler):
         args.extend(in_args)
         args.extend(out_args)
         return args
+
+
+SINGULARITY_COMMAND = 'singularity'
+DOCKER_REPO_URL = '192.168.0.1:5000'
+
+
+class SingularityDockerHandler(DockerHandler):
+    """A Docker Handler that uses singularity to launch docker containers"""
+
+    singularity_cmd_path = None
+    sing_version = None
+
+    @classmethod
+    def docker_is_alive(cls):
+        """Make sure the docker/singularity environment is properly set up.
+        a) run the normal docker tests (docker and bzip2 executables). We do NOT need docker_wrap.py
+        b) check for existence of singularity executable; determine its path and version
+        c) Access to docker repository and ability to build the kive-default image from it.
+        """
+        if not cls._is_alive:
+            cls.check_is_alive()
+            # singularity existence and version
+            cmd_lst = [SINGULARITY_COMMAND, '--version']
+            cls.sing_version = DockerHandler._run_shell_command(cmd_lst)
+            logger.debug("%s passed.", " ".join(cmd_lst))
+            res_str = sp.check_output(['which', SINGULARITY_COMMAND], universal_newlines=True)
+            cls.singularity_cmd_path = res_str.strip()
+            if cls.singularity_cmd_path is None:
+                raise RuntimeError('Cannot determine singularity command path')
+            logger.debug("singularity command path: '{}'".format(cls.singularity_cmd_path))
+            # docker repo
+            builddir = tempfile.mkdtemp()
+            test_image_name = os.path.join(builddir, "test.img")
+            build_command_str = cls._generate_build_string(DockerImage.DEFAULT_IMAGE,
+                                                           test_image_name)
+            out_str = cls._run_shell_command(build_command_str.split())
+            logger.debug("singularity build returned: '{}'".format(out_str))
+            cls._is_alive = True
+        return True
+
+    @classmethod
+    def docker_ident(cls):
+        """Return a string with some pertinent information about the docker configuration."""
+        if not cls._is_alive:
+            raise RuntimeError("Must call docker_is_alive before docker_ident")
+        dock_str = DockerHandler._run_shell_command(['sudo', DOCKER_COMMAND, "version"])
+        return "Singularity version {}\n{}".format(cls.sing_version, dock_str)
+
+    @classmethod
+    def _generate_build_string(cls, docker_image_id, outfilename):
+        """Generate a shell command string that will build a singularity image
+        file (a squashfs file system) from a docker image name.
+        The docker image is expected to exist in the local rep.
+        """
+        image_name = 'docker://{}/{}'.format(DOCKER_REPO_URL, docker_image_id)
+        return "{} build {} {}".format(cls.singularity_cmd_path,
+                                       outfilename,
+                                       image_name)
+
+    @classmethod
+    def generate_launch_args(cls,
+                             host_step_dir,
+                             input_file_paths,
+                             output_file_paths,
+                             driver_name,
+                             dependency_paths,
+                             image_id):
+        """ Generate the launch command for a method.
+
+        This version uses 'singularity build' to create a local copy of the docker
+        image, then uses 'singularity exec' or 'singularity run' to run the driver
+        within the docker container.
+
+        :param host_step_dir: step folder under sandbox folder on host computer
+        :param input_file_paths: list of input file paths on host computer
+        :param output_file_paths: list of output file paths on host computer
+        :param driver_name: file name of driver script that will be saved in
+            the sandbox folder, or None to use the image's entry point.
+        :param dependency_paths: relative paths of dependency files that will
+            be saved under the sandbox folder
+        :param image_id: docker image id
+        """
+        if not cls._is_alive:
+            raise RuntimeError("Must call docker_is_alive before generate_launch_args")
+        if driver_name is None:
+            raise NotImplementedError()
+        if cls.singularity_cmd_path is None:
+            raise RuntimeError('Cannot determine singularity command path')
+        # we want to run the code in the docker container under a standardised directory,
+        # so we convert the argument path names.
+        docker_input_path = "/mnt/input"
+        docker_output_path = "/mnt/output"
+        docker_bin_path = "/mnt/bin"
+        host_input_path = os.path.join(host_step_dir, 'input_data')
+        host_output_path = os.path.join(host_step_dir, 'output_data')
+        docker_in_args = [os.path.join(docker_input_path,
+                                       os.path.relpath(file_path, host_input_path))
+                          for file_path in input_file_paths]
+        docker_out_args = [os.path.join(docker_output_path,
+                                        os.path.relpath(file_path, host_output_path))
+                           for file_path in output_file_paths]
+
+        local_image_name = quote("{}.image".format(image_id))
+        # NOTE: the driver program is run in the /mnt/bin directory in the container.
+        # some drivers will want to write temporary files, therefore we must mount
+        # it rw.
+        opt_string = "-B {}:{}:ro,{}:{}:rw,{}:{}:rw --pwd {}".format(host_input_path, docker_input_path,
+                                                                     host_output_path, docker_output_path,
+                                                                     host_step_dir, docker_bin_path,
+                                                                     docker_bin_path)
+        # NOTE: if the driver_name is given, we must use 'singularity exec' otherwise
+        # 'singularity run' (which runs the image's entry point
+        if driver_name is None:
+            launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
+                                                   opt_string,
+                                                   local_image_name)
+        else:
+            launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
+                                                         opt_string,
+                                                         local_image_name,
+                                                         driver_name)
+        wrapper_template = """\
+#!/usr/bin/env bash
+cd {}
+{}
+{} {}
+"""
+        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
+        wrapper = wrapper_template.format(
+            quote(host_step_dir),
+            cls._generate_build_string(image_id, local_image_name),
+            launch_command, arg_string)
+        with tempfile.NamedTemporaryFile('w',
+                                         prefix=driver_name,
+                                         suffix='.sh',
+                                         dir=host_step_dir,
+                                         delete=False) as wrapper_file:
+            wrapper_file.write(wrapper)
+            mode = os.fstat(wrapper_file.fileno()).st_mode
+            mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH  # execute bits
+            os.fchmod(wrapper_file.fileno(), stat.S_IMODE(mode))
+
+        return [wrapper_file.name]

@@ -390,3 +390,7 @@ RUN_DOCKER_TESTS = False
 
 DOCK_DOCKER_COMMAND = "/usr/bin/docker"
 DOCK_BZIP2_COMMAND = "/bin/bzip2"
+
+# Attempt to run the system tests that use singularity
+# NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
+RUN_SINGULARITY_TESTS = False

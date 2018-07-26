@@ -24,7 +24,7 @@ from archive.models import Dataset, Run, RunStep, RunSIC, MethodOutput, ExecLog
 import file_access_utils
 from sandbox.execute import Sandbox, sandbox_glob
 from fleet.slurmlib import SlurmScheduler, DummySlurmScheduler, BaseSlurmScheduler
-from fleet.dockerlib import DockerHandler, DummyDockerHandler
+from fleet.dockerlib import DummyDockerHandler, DockerHandler, SingularityDockerHandler
 
 
 mgr_logger = logging.getLogger("fleet.Manager")
@@ -50,7 +50,7 @@ class Manager(object):
             quit_idle=False,
             history=0,
             slurm_sched_class=SlurmScheduler,
-            docker_handler_class=DockerHandler,
+            docker_handler_class=SingularityDockerHandler,
             stop_username=None,
             no_stop=False):
         self.shutdown_exception = None
