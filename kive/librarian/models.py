@@ -1432,7 +1432,11 @@ class Dataset(metadata.models.AccessControl):
                 relpath = os.path.relpath(filepath, settings.MEDIA_ROOT)
                 total_size += filesize
                 heapq.heappush(files, (filedate, relpath, filesize))
-        if total_size >= max_storage:
+        if total_size < max_storage:
+            cls.logger.debug('Dataset purge not needed at %s over %d files.',
+                             filesizeformat(total_size),
+                             len(files))
+        else:
             cls.logger.info('Dataset purge triggered at %s over %d files.',
                             filesizeformat(total_size),
                             len(files))
