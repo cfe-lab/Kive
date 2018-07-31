@@ -27,7 +27,6 @@ class DummyDockerLibTests(TestCase):
         self.docker_handler_class = self.get_docker_handler_class()
         is_docker_alive = self.docker_handler_class.docker_is_alive()
         self.assertTrue(is_docker_alive)
-        print('SEEETUP')
 
     def test_ident(self):
         """Test the docker_ident call"""
@@ -172,7 +171,7 @@ Delta | grepxxx B -"""
                 assert isinstance(retlst, list), 'expected a list'
                 for s in retlst:
                     assert isinstance(s, six.string_types), 'expected a string'
-                lverb = True
+                lverb = False
                 if lverb:
                     print("got launch {}".format(retlst))
             except NotImplementedError:

@@ -393,4 +393,4 @@ DOCK_BZIP2_COMMAND = "/bin/bzip2"
 
 # Attempt to run the system tests that use singularity
 # NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
-RUN_SINGULARITY_TESTS = False
+RUN_SINGULARITY_TESTS = RUN_DOCKER_TESTS and False

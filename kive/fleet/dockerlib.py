@@ -379,13 +379,6 @@ class SingularityDockerHandler(DockerHandler):
             if cls.singularity_cmd_path is None:
                 raise RuntimeError('Cannot determine singularity command path')
             logger.debug("singularity command path: '{}'".format(cls.singularity_cmd_path))
-            # docker repo
-            builddir = tempfile.mkdtemp()
-            test_image_name = os.path.join(builddir, "test.img")
-            build_command_str = cls._generate_build_string(DockerImage.DEFAULT_IMAGE,
-                                                           test_image_name)
-            out_str = cls._run_shell_command(build_command_str.split())
-            logger.debug("singularity build returned: '{}'".format(out_str))
             cls._is_alive = True
         return True
 
