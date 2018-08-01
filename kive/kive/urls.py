@@ -2,6 +2,7 @@ from django.conf.urls import url, include
 import django.contrib.auth.views
 
 from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
+from container.ajax import ContainerFamilyViewSet
 from librarian.ajax import DatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
@@ -12,6 +13,7 @@ from portal.ajax import UserViewSet
 from portal.forms import LoginForm
 
 import portal.views
+import container.views
 import metadata.views
 import method.views
 import pipeline.views
@@ -27,6 +29,7 @@ router = KiveRouter()
 router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
+router.register(r'containerfamilies', ContainerFamilyViewSet)
 router.register(r'dockerimages', DockerImageViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'externalfiledirectories', ExternalFileDirectoryViewSet)
@@ -61,6 +64,16 @@ urlpatterns = [
 
     url(r'^dev.html$', portal.views.dev, name='dev'),
     url(r'^usr.html$', portal.views.usr, name='usr'),
+
+    url(r'^container_families$',
+        container.views.ContainerFamilyList.as_view(),
+        name='container_families'),
+    url(r'^container_family_add$',
+        container.views.ContainerFamilyCreate.as_view(),
+        name='container_family_add'),
+    url(r'^container_family_update/(?P<pk>\d+)/$',
+        container.views.ContainerFamilyUpdate.as_view(),
+        name='container_family_update'),
 
     url(r'^datatypes$', metadata.views.datatypes, name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', metadata.views.datatype_detail, name='datatype_detail'),

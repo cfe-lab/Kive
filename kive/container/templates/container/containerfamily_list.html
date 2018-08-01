@@ -1,0 +1,94 @@
+<!-- Django template -->
+<!-- Display container families -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Families{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/container/ContainerFamilyTable.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+
+    <script type="text/javascript">
+
+    $(function(){
+        var table = new permissions.ContainerFamilyTable(
+            $("#containerfamilies"),
+            {{ is_user_admin|lower }},
+            $(".navigation_links")
+        );
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+        asf.reloadTable();
+    });
+
+    </script>
+
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+{% endblock %}
+
+{% block content %}
+
+<a href="dev.html" rel="prev">Back to developer's portal</a>
+
+<h2>Container Families</h2>
+
+<p>
+A container family is a set of Singularity containers that are all built from
+    different versions of the same source.
+</p>
+
+<a class="button" href="/container_family_add">+&ensp;<span class="button-lbl">Create
+    a new container family</span></a>
+
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label for="search-name">Name</label><input
+                name="name"
+                id="search-name"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-description">Description</label><input
+                name="description"
+                id="search-description"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-git">Git</label><input
+                name="git"
+                id="search-git"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
+    </form>
+</div>
+
+<div class="navigation_links"></div>
+
+<div class="dev_results">
+    <table id="containerfamilies"></table>
+</div>
+
+{% endblock %}

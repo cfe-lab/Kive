@@ -1,0 +1,44 @@
+<!-- Django template -->
+<!-- Add ContainerFamily -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container family{% endblock %}
+
+{% block javascript %}
+<script src="/static/portal/jquery-2.0.3.min.js"></script>
+<script src="/static/portal/noxss.js"></script>
+<script src="/static/portal/helptext.js"></script>
+{% endblock %}
+
+{% block widget_media %}
+{{ form.media }}}
+{% endblock %}
+
+{% block content %}
+
+<a href="/container_families" rel="prev">return to container families</a>
+
+<h2>Container Family</h2>
+
+<p>This describes a set of Singularity containers that are all built from
+    different versions of the same source. If the source is a Git repository,
+    fill in the Git URL field, and tag each container with the Git tag that
+    it was built from.</p>
+
+<pre>
+    {{ object_form.non_field_errors }}
+</pre>
+
+<!-- Form for inserting new DockerImage -->
+<form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+
+{% endblock %}

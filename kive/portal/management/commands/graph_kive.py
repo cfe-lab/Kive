@@ -18,7 +18,7 @@ class Command(BaseCommand):
                 if not (app.startswith('django') or app == 'rest_framework')]
         apps.sort()
         for app in apps:
-            print app
+            print(app)
             call_command("graph_models",
                          app,
                          pygraphviz=True,
