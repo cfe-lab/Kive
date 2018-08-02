@@ -6,7 +6,6 @@ from django.db.models import Q
 from django.http import HttpResponse
 from rest_framework import permissions
 from rest_framework.decorators import action
-from rest_framework.exceptions import APIException
 
 from container.models import ContainerFamily, Container
 from container.serializers import ContainerFamilySerializer, ContainerSerializer
@@ -44,30 +43,19 @@ class ContainerFamilyViewSet(CleanCreateModelMixin,
     serializer_class = ContainerFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
-
-    def filter_queryset(self, queryset):
-        queryset = super(ContainerFamilyViewSet, self).filter_queryset(queryset)
-        return self.apply_filters(queryset)
-
-    @staticmethod
-    def _add_filter(queryset, key, value):
-        """
-        Filter the specified queryset by the specified key and value.
-        """
-        if key == 'smart':
-            return queryset.filter(Q(name__icontains=value) |
-                                   Q(git__icontains=value) |
-                                   Q(description__icontains=value))
-        if key == 'name':
-            return queryset.filter(name__icontains=value)
-        if key == 'git':
-            return queryset.filter(git__icontains=value)
-        if key == 'description':
-            return queryset.filter(description__icontains=value)
-        if key == "user":
-            return queryset.filter(user__username__icontains=value)
-
-        raise APIException('Unknown filter key: {}'.format(key))
+    filters = dict(
+        smart=lambda queryset, value: queryset.filter(
+            Q(name__icontains=value) |
+            Q(git__icontains=value) |
+            Q(description__icontains=value)),
+        name=lambda queryset, value: queryset.filter(
+            name__icontains=value),
+        git=lambda queryset, value: queryset.filter(
+            git__icontains=value),
+        description=lambda queryset, value: queryset.filter(
+            description__icontains=value),
+        user=lambda queryset, value: queryset.filter(
+            user__username__icontains=value))
 
 
 class ContainerViewSet(CleanCreateModelMixin,
@@ -102,10 +90,6 @@ class ContainerViewSet(CleanCreateModelMixin,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
 
-    def filter_queryset(self, queryset):
-        queryset = super(ContainerViewSet, self).filter_queryset(queryset)
-        return self.apply_filters(queryset)
-
     # noinspection PyUnusedLocal
     @action(detail=True)
     def download(self, request, pk=None):
@@ -124,24 +108,15 @@ class ContainerViewSet(CleanCreateModelMixin,
             container.file.close()
         return response
 
-    @staticmethod
-    def _add_filter(queryset, key, value):
-        """
-        Filter the specified queryset by the specified key and value.
-        """
-        if key == 'family_id':
-            return queryset.filter(family_id=value)
-        if key == 'smart':
-            return queryset.filter(Q(family__name__icontains=value) |
-                                   Q(tag__icontains=value) |
-                                   Q(description__icontains=value))
-        if key == 'name':
-            return queryset.filter(family__name__icontains=value)
-        if key == 'tag':
-            return queryset.filter(tag__icontains=value)
-        if key == 'description':
-            return queryset.filter(description__icontains=value)
-        if key == "user":
-            return queryset.filter(user__username__icontains=value)
-
-        raise APIException('Unknown filter key: {}'.format(key))
+    filters = dict(
+        family_id=lambda queryset, value: queryset.filter(
+            family_id=value),
+        smart=lambda queryset, value: queryset.filter(
+            Q(tag__icontains=value) |
+            Q(description__icontains=value)),
+        tag=lambda queryset, value: queryset.filter(
+            tag__icontains=value),
+        description=lambda queryset, value: queryset.filter(
+            description__icontains=value),
+        user=lambda queryset, value: queryset.filter(
+            user__username__icontains=value))

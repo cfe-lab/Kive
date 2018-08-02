@@ -4,6 +4,7 @@ from django.db import transaction
 
 from rest_framework import permissions, mixins, serializers
 from rest_framework.decorators import action
+from rest_framework.generics import GenericAPIView
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -212,10 +213,19 @@ class CleanCreateModelMixin(mixins.CreateModelMixin):
             raise convert_validation(ex.messages)
 
 
-class SearchableModelMixin(object):
+class SearchableModelMixin(GenericAPIView):
     """
     Implements some boilerplate code common to ViewSets that allow filtering.
+
+    Replace the filters class attribute with
+    {key: lambda queryset, value: queryset} or override _add_filter().
     """
+    filters = None
+
+    def get_queryset(self):
+        queryset = super(SearchableModelMixin, self).get_queryset()
+        return self.apply_filters(queryset)
+
     def apply_filters(self, queryset):
         # Parse the request to get all the applied filters, and refine the queryset.
         idx = 0
@@ -224,14 +234,22 @@ class SearchableModelMixin(object):
             if key is None:
                 break
             value = self.request.GET.get('filters[{}][val]'.format(idx), '')
-            queryset = self._add_filter(queryset, key, value)
+            if self.filters is None:
+                queryset = self._add_filter(queryset, key, value)
+            else:
+                apply_filter = self.filters.get(key)
+                if apply_filter is None:
+                    raise APIException('Unknown filter key: {}'.format(key))
+                queryset = apply_filter(queryset, value)
+
             idx += 1
 
         return queryset
 
-    @staticmethod
-    def _add_filter(queryset, key, value):
+    def _add_filter(self, queryset, key, value):
         """
         Filter the specified queryset by the specified key and value.
         """
-        raise NotImplementedError("This must be overridden by the subclass")
+        if self.filters is None:
+            raise NotImplementedError(
+                "Override _add_filter() or set the filters class attribute.")
