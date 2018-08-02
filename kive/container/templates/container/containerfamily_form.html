@@ -1,18 +1,40 @@
 <!-- Django template -->
-<!-- Add ContainerFamily -->
 
 {% extends "portal/base.html" %}
 
 {% block title %}Container family{% endblock %}
 
 {% block javascript %}
-<script src="/static/portal/jquery-2.0.3.min.js"></script>
-<script src="/static/portal/noxss.js"></script>
-<script src="/static/portal/helptext.js"></script>
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+    <script src="/static/container/ContainerTable.js"></script>
+    <script type="text/javascript">
+
+    $(function(){
+        var table = new permissions.ContainerTable(
+            $("#containers"),
+            {{ is_user_admin|lower }},
+            $(".navigation_links")
+        );
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+
+        // This adds a filter for the current CodeResource.
+        table.filterSet.add("family_id", {{containerfamily.id}}, true).hide();
+
+        asf.reloadTable();
+    });
+    </script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/search.css"/>
 {% endblock %}
 
 {% block widget_media %}
-{{ form.media }}}
+{{ form.media }}
 {% endblock %}
 
 {% block content %}
@@ -27,10 +49,9 @@
     it was built from.</p>
 
 <pre>
-    {{ object_form.non_field_errors }}
+    {{ form.non_field_errors }}
 </pre>
 
-<!-- Form for inserting new DockerImage -->
 <form action="" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <table>
@@ -40,5 +61,46 @@
     <input type="submit" value="Submit" />
 </form>
 
+{% if object %}
+    <h3>Containers:</h3>
+    <a class="button" href="container_add">+&ensp;<span class="button-lbl">Create
+        a new container</span></a>
+
+    <div id="asf">
+        <form class="asf-form">
+            <div class="asf-main-search">
+                <div class="asf-active-filters"></div>
+                <input type="text" name="smart" class="asf-search-field">
+                <input type="button" class="advanced ctrl" value="Advanced">
+                <input type="submit" value="Filter" class="asf-search-button">
+            </div>
+        </form>
+        <form class="asf-advanced-form">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <h4>Advanced search</h4>
+            <div class="asf-field-container">
+                <label for="search-description">Description</label><input
+                    name="description"
+                    id="search-description"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="search-tag">Tag</label><input
+                    name="tag"
+                    id="search-tag"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <input type="submit" value="Filter" class="asf-search-button">
+        </form>
+    </div>
+
+    <div class="navigation_links"></div>
+
+    <div class="dev_results">
+        <table id="containers"></table>
+    </div>
+{% endif %}
 
 {% endblock %}

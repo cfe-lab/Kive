@@ -24,6 +24,9 @@ class ContainerFamily(AccessControl):
     class Meta(object):
         ordering = ['name']
 
+    def __str__(self):
+        return self.name
+
     def get_absolute_url(self):
         return reverse('container_family_update', kwargs=dict(pk=self.pk))
 
@@ -52,3 +55,9 @@ class Container(AccessControl):
     created = models.DateTimeField(
         auto_now_add=True,
         help_text="When this was added to Kive.")
+
+    class Meta:
+        ordering = ['family__name', 'tag']
+
+    def get_absolute_url(self):
+        return reverse('container_update', kwargs=dict(pk=self.pk))

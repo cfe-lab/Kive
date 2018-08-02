@@ -156,6 +156,7 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
     'metadata',
     'archive',
+    'container',
     'librarian',
     'method',
     'pipeline',
