@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError, \
 from django.db import transaction
 
 from rest_framework import permissions, mixins, serializers
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
@@ -151,7 +151,7 @@ class RedactModelMixin(object):
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)
 
-    @detail_route(methods=['get'])
+    @action(detail=True)
     def redaction_plan(self, request, pk=None):
         redaction_plan = self.get_object().build_redaction_plan()
         return Response(summarize_redaction_plan(redaction_plan))
@@ -171,7 +171,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
         call remove(). Returns a dict: {model_name: set(instance)}
     """
 
-    @detail_route(methods=['get'], suffix='Removal Plan')
+    @action(detail=True, suffix='Removal Plan')
     def removal_plan(self, request, pk=None):
         try:
             removal_plan = self.get_object().build_removal_plan()

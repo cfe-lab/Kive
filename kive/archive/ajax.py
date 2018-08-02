@@ -6,7 +6,7 @@ from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 
 from rest_framework import permissions, status
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -55,7 +55,8 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                 redact()
         return self.patch_object(request, pk)
 
-    @detail_route(methods=['get'])
+    # noinspection PyUnusedLocal
+    @action(detail=True)
     def output_redaction_plan(self, request, pk=None):
         execlog = self.get_object().execlog
         redaction_plan = execlog.build_redaction_plan(output_log=True,
@@ -63,7 +64,8 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                                                       return_code=False)
         return Response(summarize_redaction_plan(redaction_plan))
 
-    @detail_route(methods=['get'])
+    # noinspection PyUnusedLocal
+    @action(detail=True)
     def error_redaction_plan(self, request, pk=None):
         execlog = self.get_object().execlog
         redaction_plan = execlog.build_redaction_plan(output_log=False,
@@ -71,7 +73,8 @@ class MethodOutputViewSet(ReadOnlyModelViewSet):
                                                       return_code=False)
         return Response(summarize_redaction_plan(redaction_plan))
 
-    @detail_route(methods=['get'])
+    # noinspection PyUnusedLocal
+    @action(detail=True)
     def code_redaction_plan(self, request, pk=None):
         execlog = self.get_object().execlog
         redaction_plan = execlog.build_redaction_plan(output_log=False,
@@ -154,7 +157,7 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
     status_pagination_class = StandardPagination
     status_serializer_class = RunProgressSerializer
 
-    @list_route(methods=['get'], suffix='Status List')
+    @action(detail=False, suffix='Status List')
     def status(self, request):
         runs = self.get_queryset().order_by('-time_queued')
         runs = self.apply_filters(runs)
@@ -172,7 +175,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
         bare_serializer = self.status_serializer_class(runs, many=True, context={"request": request})
         return Response(bare_serializer.data)
 
-    @detail_route(methods=['get'], suffix='Status')
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Status')
     def run_status(self, request, pk=None):
         runs = Run.objects.filter(pk=pk)
         runs = self._build_run_prefetch(runs)
@@ -184,7 +188,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
 
         return Response(progress)
 
-    @detail_route(methods=['get'], suffix='Outputs')
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Outputs')
     def run_outputs(self, request, pk=None):
         run = self.get_object()
         return Response(RunOutputsSerializer(
@@ -269,7 +274,8 @@ class RunViewSet(CleanCreateModelMixin, RemovableModelViewSet,
 
         raise APIException('Unknown filter key: {}'.format(key))
 
-    @detail_route(methods=['get'], suffix='Eligible Permissions')
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Eligible Permissions')
     def eligible_permissions(self, request, pk=None):
         run = self.get_object()
 
@@ -303,7 +309,8 @@ class RunBatchViewSet(CleanCreateModelMixin, GrantedModelMixin, ReadOnlyModelVie
     permission_classes = (permissions.IsAuthenticated, RunPermission)
     pagination_class = StandardPagination
 
-    @detail_route(methods=['get'], suffix='Eligible Permissions')
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Eligible Permissions')
     def eligible_permissions(self, request, pk=None):
         rb = self.get_object()
 

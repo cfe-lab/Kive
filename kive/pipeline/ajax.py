@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Q
 from rest_framework import permissions
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
@@ -42,7 +42,7 @@ class PipelineFamilyViewSet(CleanCreateModelMixin,
     pagination_class = StandardPagination
 
     # noinspection PyUnusedLocal
-    @detail_route(methods=["get"])
+    @action(detail=True)
     def pipelines(self, request, pk=None):
         """In this routine, we are responding to an API request which looks something
         like: 'hostname:/api/pipelinefamilies/2/pipelines/'
@@ -144,7 +144,7 @@ class PipelineViewSet(CleanCreateModelMixin,
         return prefetchd
 
     # noinspection PyUnusedLocal
-    @detail_route(methods=['get'], suffix='Step Updates')
+    @action(detail=True, suffix='Step Updates')
     def step_updates(self, request, pk=None):
         updates = self.get_object().find_step_updates()
         return Response(PipelineStepUpdateSerializer(updates,
@@ -211,7 +211,7 @@ class PipelineViewSet(CleanCreateModelMixin,
         raise APIException('Unknown filter key: {}'.format(key))
 
     # noinspection PyUnusedLocal
-    @detail_route(methods=["get"], suffix="Instances")
+    @action(detail=True, suffix="Instances")
     def instances(self, request, pk=None):
         queryset = self.get_object().pipeline_instances.all()
         page = self.paginate_queryset(queryset)

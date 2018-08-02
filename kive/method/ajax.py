@@ -1,7 +1,7 @@
 from django.db.models import Q
 
 from rest_framework import permissions, status
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import APIException
 
@@ -45,7 +45,7 @@ class CodeResourceViewSet(CleanCreateModelMixin,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
 
-    @detail_route(methods=["get"])
+    @action(detail=True)
     def revisions(self, request, pk=None):
         if self.request.query_params.get('is_granted') == 'true':
             is_admin = False
@@ -115,7 +115,7 @@ class CodeResourceRevisionViewSet(CleanCreateModelMixin, RemovableModelViewSet,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
 
-    @detail_route(methods=['get'])
+    @action(detail=True)
     def download(self, request, pk=None):
         """
         Download the file pointed to by this CodeResourceRevision.
@@ -185,7 +185,7 @@ class MethodFamilyViewSet(CleanCreateModelMixin,
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
 
-    @detail_route(methods=["get"])
+    @action(detail=True)
     def methods(self, request, pk=None):
         if self.request.query_params.get('is_granted') == 'true':
             is_admin = False
