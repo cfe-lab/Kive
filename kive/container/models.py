@@ -1,17 +1,22 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
+import errno
+import logging
 import os
 import re
+from subprocess import STDOUT, CalledProcessError, check_output
+from tempfile import NamedTemporaryFile
 
-import errno
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
 from django.dispatch import receiver
+from django.forms.fields import FileField as FileFormField
 from django.urls import reverse
 
 from constants import maxlengths
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
+
+logger = logging.getLogger(__name__)
 
 
 class ContainerFamily(AccessControl):
@@ -52,11 +57,56 @@ class ContainerFamily(AccessControl):
         remove_helper(removal_plan)
 
 
+class ContainerFileFormField(FileFormField):
+    default_error_messages = {
+        'invalid_container': "Upload a valid container file."}
+
+    def to_python(self, data):
+        """ Checks that the file-upload data contains a valid container. """
+        f = super(ContainerFileFormField, self).to_python(data)
+        if f is None:
+            return None
+
+        # We need to get a file object to validate. We might have a path or we might
+        # have to read the data out of memory.
+        if hasattr(data, 'temporary_file_path'):
+            self.validate_container(data.temporary_file_path())
+        else:
+            upload_name = getattr(data, 'name', 'container')
+            upload_base, upload_ext = os.path.splitext(upload_name)
+            with NamedTemporaryFile(prefix=upload_base,
+                                    suffix=upload_ext) as f_temp:
+                if hasattr(data, 'read'):
+                    f_temp.write(data.read())
+                else:
+                    f_temp.write(data['content'])
+                f_temp.flush()
+                self.validate_container(f_temp.name)
+
+        if hasattr(f, 'seek') and callable(f.seek):
+            f.seek(0)
+        return f
+
+    def validate_container(self, filename):
+        try:
+            check_output(['singularity', 'check', filename], stderr=STDOUT)
+        except CalledProcessError as ex:
+            logger.warning('Invalid container file:\n%s', ex.output)
+            raise ValidationError(self.error_messages['invalid_container'],
+                                  code='invalid_container')
+
+
+class ContainerFileField(models.FileField):
+    def formfield(self, **kwargs):
+        kwargs.setdefault('form_class', ContainerFileFormField)
+        return super(ContainerFileField, self).formfield(**kwargs)
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "CodeResources"
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
-    file = models.FileField(
+    file = ContainerFileField(
         "Container file",
         upload_to=UPLOAD_DIR,
         help_text="Singularity container file")
