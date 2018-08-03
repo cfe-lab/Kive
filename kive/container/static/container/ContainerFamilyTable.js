@@ -6,6 +6,7 @@
 	    this.registerLinkColumn("Name", "", "name", "absolute_url");
 	    this.registerColumn("Git", "git");
 	    this.registerColumn("Description", "description");
+	    this.registerColumn("Containers", "num_containers");
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");

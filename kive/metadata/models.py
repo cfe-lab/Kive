@@ -36,7 +36,8 @@ LOGGER = logging.getLogger(__name__)  # Module level logger.
 deletion_order = [
     "ExecRecords", "Datasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
     "MethodFamilies", "CompoundDatatypes", "Datatypes",
-    "CodeResourceRevisions", "CodeResources", "DockerImages"
+    "CodeResourceRevisions", "CodeResources", "DockerImages", "Containers",
+    "ContainerFamilies"
 ]
 
 

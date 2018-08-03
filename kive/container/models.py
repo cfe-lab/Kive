@@ -1,14 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import os
 import re
 
+import errno
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
+from django.dispatch import receiver
 from django.urls import reverse
 
 from constants import maxlengths
-from metadata.models import AccessControl
+from metadata.models import AccessControl, empty_removal_plan, remove_helper
 
 
 class ContainerFamily(AccessControl):
@@ -20,6 +23,7 @@ class ContainerFamily(AccessControl):
         help_text='URL of Git repository that containers were built from',
         max_length=2000,
         blank=True)
+    containers = None  # Filled in later from child table.
 
     class Meta(object):
         ordering = ['name']
@@ -29,6 +33,23 @@ class ContainerFamily(AccessControl):
 
     def get_absolute_url(self):
         return reverse('container_family_update', kwargs=dict(pk=self.pk))
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["ContainerFamilies"]
+        removal_plan["ContainerFamilies"].add(self)
+
+        for container in self.containers.all():
+            container.build_removal_plan(removal_plan)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
 
 
 class Container(AccessControl):
@@ -61,3 +82,27 @@ class Container(AccessControl):
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Containers"]
+        removal_plan["Containers"].add(self)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+
+@receiver(models.signals.post_delete, sender=Container)
+def delete_container_file(instance, **_kwargs):
+    if instance.file:
+        try:
+            os.remove(instance.file.path)
+        except OSError as ex:
+            if ex.errno != errno.ENOENT:
+                raise

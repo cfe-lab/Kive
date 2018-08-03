@@ -3,6 +3,7 @@ import os
 from wsgiref.util import FileWrapper
 
 from django.db.models import Q
+from django.db.models.aggregates import Count
 from django.http import HttpResponse
 from rest_framework import permissions
 from rest_framework.decorators import action
@@ -39,7 +40,8 @@ class ContainerFamilyViewSet(CleanCreateModelMixin,
     * filters[n][key]=user&filters[n][val]=match - username of creator contains
         the value (case insensitive)
     """
-    queryset = ContainerFamily.objects.all()
+    queryset = ContainerFamily.objects.annotate(
+        num_containers=Count('containers'))
     serializer_class = ContainerFamilySerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination

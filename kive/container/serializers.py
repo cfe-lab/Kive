@@ -8,9 +8,9 @@ from kive.serializers import AccessControlSerializer
 class ContainerFamilySerializer(AccessControlSerializer,
                                 serializers.ModelSerializer):
     absolute_url = URLField(source='get_absolute_url', read_only=True)
-    # TODO: removal plan here and in fields
-    # removal_plan = serializers.HyperlinkedIdentityField(
-    #     view_name='dockerimage-removal-plan')
+    num_containers = serializers.IntegerField()
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='containerfamily-removal-plan')
 
     class Meta:
         model = ContainerFamily
@@ -23,15 +23,13 @@ class ContainerFamilySerializer(AccessControlSerializer,
             "git",
             "user",
             "users_allowed",
-            "groups_allowed")
+            "groups_allowed",
+            "num_containers",
+            "removal_plan")
 
 
 class ContainerSerializer(AccessControlSerializer,
                           serializers.ModelSerializer):
-    # TODO: removal plan here and in fields
-    # removal_plan = serializers.HyperlinkedIdentityField(
-    #     view_name='dockerimage-removal-plan')
-
     absolute_url = URLField(source='get_absolute_url', read_only=True)
     family = serializers.SlugRelatedField(
         slug_field='name',
@@ -43,6 +41,8 @@ class ContainerSerializer(AccessControlSerializer,
         read_only=True)
     download_url = serializers.HyperlinkedIdentityField(
         view_name='container-download')
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='container-removal-plan')
 
     class Meta:
         model = Container
@@ -59,4 +59,5 @@ class ContainerSerializer(AccessControlSerializer,
                   'created',
                   'user',
                   'users_allowed',
-                  'groups_allowed')
+                  'groups_allowed',
+                  'removal_plan')
