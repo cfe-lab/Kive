@@ -81,6 +81,13 @@ class ContainerCreate(CreateView):
         context['family_id'] = self.kwargs['family_id']
         return context
 
+    def get_form_kwargs(self):
+        kwargs = super(ContainerCreate, self).get_form_kwargs()
+        access_limits = kwargs.setdefault('access_limits', [])
+        access_limits.append(
+            ContainerFamily.objects.get(pk=self.kwargs['family_id']))
+        return kwargs
+
 
 @method_decorator(decorators, name='dispatch')
 class ContainerUpdate(UpdateView):
@@ -103,3 +110,9 @@ class ContainerUpdate(UpdateView):
         context['download_url'] = reverse('container-download',
                                           kwargs=dict(pk=self.object.pk))
         return context
+
+    def get_form_kwargs(self):
+        kwargs = super(ContainerUpdate, self).get_form_kwargs()
+        access_limits = kwargs.setdefault('access_limits', [])
+        access_limits.append(self.object.family)
+        return kwargs

@@ -89,6 +89,18 @@ class ContainerViewSet(CleanCreateModelMixin,
     serializer_class = ContainerSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
+    filters = dict(
+        family_id=lambda queryset, value: queryset.filter(
+            family_id=value),
+        smart=lambda queryset, value: queryset.filter(
+            Q(tag__icontains=value) |
+            Q(description__icontains=value)),
+        tag=lambda queryset, value: queryset.filter(
+            tag__icontains=value),
+        description=lambda queryset, value: queryset.filter(
+            description__icontains=value),
+        user=lambda queryset, value: queryset.filter(
+            user__username__icontains=value))
 
     # noinspection PyUnusedLocal
     @action(detail=True)
@@ -107,16 +119,3 @@ class ContainerViewSet(CleanCreateModelMixin,
         finally:
             container.file.close()
         return response
-
-    filters = dict(
-        family_id=lambda queryset, value: queryset.filter(
-            family_id=value),
-        smart=lambda queryset, value: queryset.filter(
-            Q(tag__icontains=value) |
-            Q(description__icontains=value)),
-        tag=lambda queryset, value: queryset.filter(
-            tag__icontains=value),
-        description=lambda queryset, value: queryset.filter(
-            description__icontains=value),
-        user=lambda queryset, value: queryset.filter(
-            user__username__icontains=value))
