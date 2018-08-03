@@ -32,7 +32,17 @@
     <table>
         {% if download_url %}
             <tr>
-                <td colspan="2"><a href="{{ download_url }}" class="large button">Download</a></td>
+                <th>File:</th>
+                <td colspan="2">
+                    {{ file_name }}&nbsp;
+                    <a href="{{ download_url }}" class="large button">Download</a>
+                </td>
+            </tr>
+            <tr>
+                <th>MD5:</th>
+                <td colspan="2">
+                    {{ object.md5 }}
+                </td>
             </tr>
         {% endif %}
 
