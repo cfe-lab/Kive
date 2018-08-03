@@ -52,6 +52,8 @@ class PermissionsWidget(forms.MultiWidget):
     def __init__(self, user_choices=None, group_choices=None, attrs=None):
         self.user_choices = user_choices or []
         self.group_choices = group_choices or []
+        self.old_users = []
+        self.old_groups = []
         attrs = attrs or {}
 
         hidden_ms_class = "pw-hidden-multiselect"
@@ -71,8 +73,7 @@ class PermissionsWidget(forms.MultiWidget):
 
         sub_widgets = [
             UsersAllowedWidget(attrs=users_attrs, choices=self.user_choices),
-            GroupsAllowedWidget(attrs=groups_attrs, choices=self.group_choices)
-        ]
+            GroupsAllowedWidget(attrs=groups_attrs, choices=self.group_choices)]
         super(PermissionsWidget, self).__init__(sub_widgets, attrs)
 
     def decompress(self, value):
@@ -100,6 +101,8 @@ class PermissionsWidget(forms.MultiWidget):
         context = super(PermissionsWidget, self).get_context(name, value, attrs)
         context['users'] = [{"username": x[0]} for x in self.user_choices]
         context['groups'] = [{"name": x[0]} for x in self.group_choices]
+        context['old_users'] = [{"username": x[0]} for x in self.old_users]
+        context['old_groups'] = [{"name": x[0]} for x in self.old_groups]
         return context
 
 
@@ -164,6 +167,16 @@ class PermissionsField(forms.MultiValueField):
         self.widget.group_choices = group_choices(groups_allowed)
         self.fields[1].queryset = groups_allowed
         self.widget.widgets[1].choices = self.widget.group_choices
+
+    def set_old_users_groups(self, old_users, old_groups):
+        self.widget.old_users = user_choices(old_users)
+        self.widget.old_groups = group_choices(old_groups)
+        if self.widget.old_users or self.widget.old_groups:
+            placeholder = [('None', 'None')]
+            if not self.widget.old_users:
+                self.widget.old_users = placeholder
+            if not self.widget.old_groups:
+                self.widget.old_groups = placeholder
 
 
 class AccessControlForm(forms.Form):
@@ -237,6 +250,9 @@ class PermissionsForm(forms.ModelForm):
             addable_groups = Group.objects.all()
         else:
             addable_users, addable_groups = instance.other_users_groups()
+            self.fields["permissions"].set_old_users_groups(
+                instance.users_allowed.all(),
+                instance.groups_allowed.all())
 
         # Limit to users and groups that can see dependencies.
         for access_limit in self.access_limits:
