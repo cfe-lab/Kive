@@ -160,6 +160,7 @@ Delta | grepxxx B -"""
         output_file_paths = ["output1.dat", "output2.dat", "output3.dat"]
         dep_paths = ["dep01.py", "dep02.py"]
         image_id = "kive-default"
+        container_file = "kive-default.simg"
         for driver_name in [None, "my_driver_prog.py"]:
             try:
                 retlst = self.docker_handler_class.generate_launch_args(hoststepdir,
@@ -167,7 +168,8 @@ Delta | grepxxx B -"""
                                                                         output_file_paths,
                                                                         driver_name,
                                                                         dep_paths,
-                                                                        image_id)
+                                                                        image_id,
+                                                                        container_file)
                 assert isinstance(retlst, list), 'expected a list'
                 for s in retlst:
                     assert isinstance(s, six.string_types), 'expected a string'

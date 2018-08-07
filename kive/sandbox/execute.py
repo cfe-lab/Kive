@@ -12,11 +12,12 @@ import itertools
 from django.utils import timezone
 from django.db import transaction, OperationalError, InternalError
 from django.contrib.auth.models import User
-# from django.conf import settings
+from django.conf import settings
 
 from archive.models import RunStep, Run, ExecLog, RunSIC, RunCable, RunComponent, RunOutputCable
 from constants import dirnames, extensions, runcomponentstates
 import file_access_utils
+from container.models import Container
 from librarian.models import Dataset, ExecRecord
 import pipeline.models
 from method.models import Method, DockerImage
@@ -1851,6 +1852,9 @@ class Sandbox:
         docker_image = method.docker_image
         image_id = (docker_image and docker_image.hash or
                     DockerImage.DEFAULT_IMAGE)
+        container_id = (method.container_id or settings.DEFAULT_CONTAINER_ID)
+        container = Container.objects.get(id=container_id)
+        container_file = container.get_absolute_path()
         driver = method.driver
         if driver is None:
             driver_name = docker_image.full_name
@@ -1870,12 +1874,14 @@ class Sandbox:
         logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_run_step.pk)
         # Collect information we need for the wrapper script
         host_rundir = step_execute_info.step_run_dir
-        launch_args = docker_handler_class.generate_launch_args(host_rundir,
-                                                                input_paths,
-                                                                step_execute_info.output_paths,
-                                                                driver_filename,
-                                                                dependency_paths,
-                                                                image_id=image_id)
+        launch_args = docker_handler_class.generate_launch_args(
+            host_rundir,
+            input_paths,
+            step_execute_info.output_paths,
+            driver_filename,
+            dependency_paths,
+            image_id=image_id,
+            container_file=container_file)
         job_handle = slurm_sched_class.submit_job(
             host_rundir,
             launch_args[0],

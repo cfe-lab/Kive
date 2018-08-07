@@ -6,6 +6,7 @@ import re
 from subprocess import STDOUT, CalledProcessError, check_output
 from tempfile import NamedTemporaryFile
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, transaction
@@ -132,6 +133,9 @@ class Container(AccessControl):
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
+
+    def get_absolute_path(self):
+        return os.path.join(settings.MEDIA_ROOT, self.file.name)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):

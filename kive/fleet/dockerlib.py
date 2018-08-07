@@ -2,14 +2,15 @@
 
 import logging
 import os
+# noinspection PyProtectedMember
 from pipes import quote
 import stat
 import tempfile
 import subprocess as sp
 
-from fleet.slurmlib import multi_check_output
 from django.conf import settings
-from method.models import DockerImage
+
+from fleet.slurmlib import multi_check_output
 
 
 logger = logging.getLogger("fleet.dockerlib")
@@ -63,7 +64,8 @@ class BaseDockerHandler(object):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for a method.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -74,6 +76,7 @@ class BaseDockerHandler(object):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         raise NotImplementedError
 
@@ -105,7 +108,8 @@ class DummyDockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for a method.
 
         This version just launches it on the host computer.
@@ -117,6 +121,7 @@ class DummyDockerHandler(BaseDockerHandler):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         if driver_name is None:
             raise NotImplementedError()
@@ -294,7 +299,8 @@ class DockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for the docker wrapper.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -305,6 +311,7 @@ class DockerHandler(BaseDockerHandler):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before generate_launch_args")
@@ -391,24 +398,14 @@ class SingularityDockerHandler(DockerHandler):
         return "Singularity version {}\n{}".format(cls.sing_version, dock_str)
 
     @classmethod
-    def _generate_build_string(cls, docker_image_id, outfilename):
-        """Generate a shell command string that will build a singularity image
-        file (a squashfs file system) from a docker image name.
-        The docker image is expected to exist in the local rep.
-        """
-        image_name = 'docker://{}/{}'.format(DOCKER_REPO_URL, docker_image_id)
-        return "{} build {} {}".format(cls.singularity_cmd_path,
-                                       outfilename,
-                                       image_name)
-
-    @classmethod
     def generate_launch_args(cls,
                              host_step_dir,
                              input_file_paths,
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for a method.
 
         This version uses 'singularity build' to create a local copy of the docker
@@ -423,6 +420,7 @@ class SingularityDockerHandler(DockerHandler):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before generate_launch_args")
@@ -430,6 +428,8 @@ class SingularityDockerHandler(DockerHandler):
             raise NotImplementedError()
         if cls.singularity_cmd_path is None:
             raise RuntimeError('Cannot determine singularity command path')
+        if container_file is None:
+            raise RuntimeError('No singularity container selected.')
         # we want to run the code in the docker container under a standardised directory,
         # so we convert the argument path names.
         docker_input_path = "/mnt/input"
@@ -444,7 +444,6 @@ class SingularityDockerHandler(DockerHandler):
                                         os.path.relpath(file_path, host_output_path))
                            for file_path in output_file_paths]
 
-        local_image_name = quote("{}.image".format(image_id))
         # NOTE: the driver program is run in the /mnt/bin directory in the container.
         # some drivers will want to write temporary files, therefore we must mount
         # it rw.
@@ -457,22 +456,20 @@ class SingularityDockerHandler(DockerHandler):
         if driver_name is None:
             launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
                                                    opt_string,
-                                                   local_image_name)
+                                                   container_file)
         else:
             launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
                                                          opt_string,
-                                                         local_image_name,
+                                                         container_file,
                                                          driver_name)
         wrapper_template = """\
 #!/usr/bin/env bash
 cd {}
-{}
 {} {}
 """
         arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
         wrapper = wrapper_template.format(
             quote(host_step_dir),
-            cls._generate_build_string(image_id, local_image_name),
             launch_command, arg_string)
         with tempfile.NamedTemporaryFile('w',
                                          prefix=driver_name,

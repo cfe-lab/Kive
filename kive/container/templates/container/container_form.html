@@ -44,6 +44,12 @@
                     {{ object.md5 }}
                 </td>
             </tr>
+            <tr>
+                <th>Size:</th>
+                <td colspan="2">
+                    {{ object.file.size | filesizeformat }}
+                </td>
+            </tr>
         {% endif %}
 
         {{ form.as_table }}
