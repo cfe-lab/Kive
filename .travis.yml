@@ -12,6 +12,13 @@ install:
     - nodejs --version
     - npm --version
     - npm install
+    - git clone https://github.com/singularityware/singularity.git
+    - cd singularity
+    - git checkout -q tags/2.5.2
+    - ./autogen.sh
+    - ./configure --prefix=/usr/local
+    - make
+    - sudo make install
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
 script:
