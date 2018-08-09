@@ -50,9 +50,10 @@ class Manager(object):
             quit_idle=False,
             history=0,
             slurm_sched_class=SlurmScheduler,
-            docker_handler_class=SingularityDockerHandler,
+            docker_handler_class=DockerHandler,
             stop_username=None,
-            no_stop=False):
+            no_stop=False,
+            singularity_handler_class=SingularityDockerHandler):
         self.shutdown_exception = None
         self.quit_idle = quit_idle
 
@@ -84,6 +85,14 @@ class Manager(object):
         if not docker_is_ok:
             raise RuntimeError("Docker is down or badly configured.")
         mgr_logger.info("Docker identifies as: '%s'" % self.docker_handler_class.docker_ident())
+
+        self.singularity_handler_class = singularity_handler_class
+        singularity_is_ok = self.singularity_handler_class.docker_is_alive()
+        mgr_logger.info("Singularity is OK: %s" % singularity_is_ok)
+        if not singularity_is_ok:
+            raise RuntimeError("Singularity is down or badly configured.")
+        mgr_logger.info("Singularity identifies as: '%s'" %
+                        self.singularity_handler_class.docker_ident())
 
         if not no_stop:
             if stop_username is None:
@@ -186,7 +195,8 @@ class Manager(object):
                 # lets try and run this run
                 foreman = Foreman(run_to_process,
                                   self.slurm_sched_class,
-                                  self.docker_handler_class)
+                                  self.docker_handler_class,
+                                  self.singularity_handler_class)
                 foreman.start_run()
 
                 run_to_process.refresh_from_db()
@@ -432,7 +442,11 @@ class Foreman(object):
     """
     Coordinates the execution of a Run in a Sandbox.
     """
-    def __init__(self, run, slurm_sched_class, docker_handler_class):
+    def __init__(self,
+                 run,
+                 slurm_sched_class,
+                 docker_handler_class,
+                 singularity_handler_class=None):
         # tasks_in_progress tracks the Slurm IDs of currently running tasks:
         # If the task is a RunStep:
         # task -|--> {
@@ -448,6 +462,7 @@ class Foreman(object):
         # }
         self.slurm_sched_class = slurm_sched_class
         self.docker_handler_class = docker_handler_class
+        self.singularity_handler_class = singularity_handler_class
         self.tasks_in_progress = {}
         self.sandbox = Sandbox(run=run)
         # A flag to indicate that this Foreman is in the process of terminating its Run and Sandbox.
@@ -892,7 +907,8 @@ class Foreman(object):
             step_info,
             after_okay=[setup_slurm_handle],
             slurm_sched_class=self.slurm_sched_class,
-            docker_handler_class=self.docker_handler_class
+            docker_handler_class=self.docker_handler_class,
+            singularity_handler_class=self.singularity_handler_class
         )
 
         return {

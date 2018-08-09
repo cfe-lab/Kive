@@ -182,7 +182,13 @@
     </tr>
     <tr>
         <td>Revision:</td>
-        <td><a href="{{run.pipeline.view_url}}">{{ run.pipeline.display_name }}</a></td>
+        <td>
+        {% if is_user_developer %}
+            <a href="{{run.pipeline.view_url}}">{{ run.pipeline.display_name }}</a>
+        {% else %}
+            {{ run.pipeline.display_name }}
+        {% endif %}
+        </td>
     </tr>
     </table>
 

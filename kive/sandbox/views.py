@@ -15,7 +15,7 @@ from rest_framework.renderers import JSONRenderer
 from archive.models import Run, RunBatch
 from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
-from portal.views import admin_check
+from portal.views import admin_check, developer_check
 from sandbox.forms import RunDetailsForm, RunBatchDetailsForm, StartRunBatchForm
 
 from constants import runstates
@@ -157,6 +157,7 @@ def view_results(request, run_id):
         "is_complete": run_complete,
         "is_owner": run.user == request.user,
         "is_user_admin": admin_check(request.user),
+        "is_user_developer": developer_check(request.user),
         "back_to_view": go_back_to_view
     }
 

@@ -1818,7 +1818,8 @@ class Sandbox:
 
     def submit_step_execution(self, step_execute_info, after_okay,
                               slurm_sched_class,
-                              docker_handler_class):
+                              docker_handler_class,
+                              singularity_handler_class=None):
         """
         Submit the step execution to Slurm.
 
@@ -1850,11 +1851,16 @@ class Sandbox:
                             for dep in dependencies.all()]
         # Driver name
         docker_image = method.docker_image
-        image_id = (docker_image and docker_image.hash or
-                    DockerImage.DEFAULT_IMAGE)
-        container_id = (method.container_id or settings.DEFAULT_CONTAINER_ID)
-        container = Container.objects.get(id=container_id)
-        container_file = container.get_absolute_path()
+        image_id = (docker_image and docker_image.hash)
+        container_id = method.container_id
+        if container_id is None and image_id is not None:
+            handler_class = docker_handler_class
+            container_file = None
+        else:
+            handler_class = singularity_handler_class
+            container_id = container_id or settings.DEFAULT_CONTAINER_ID
+            container = Container.objects.get(id=container_id)
+            container_file = container.get_absolute_path()
         driver = method.driver
         if driver is None:
             driver_name = docker_image.full_name
@@ -1874,7 +1880,7 @@ class Sandbox:
         logger.debug("Submitting driver '%s', task_pk %d", driver_filename, curr_run_step.pk)
         # Collect information we need for the wrapper script
         host_rundir = step_execute_info.step_run_dir
-        launch_args = docker_handler_class.generate_launch_args(
+        launch_args = handler_class.generate_launch_args(
             host_rundir,
             input_paths,
             step_execute_info.output_paths,

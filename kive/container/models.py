@@ -128,8 +128,14 @@ class Container(AccessControl):
         auto_now_add=True,
         help_text="When this was added to Kive.")
 
+    # Related model gets set later.
+    methods = None
+
     class Meta:
-        ordering = ['family__name', 'tag']
+        ordering = ['family__name', '-tag']
+
+    def __str__(self):
+        return '{}:{}'.format(self.family.name, self.tag)
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
@@ -143,6 +149,9 @@ class Container(AccessControl):
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["Containers"]
         removal_plan["Containers"].add(self)
+
+        for method in self.methods.all():
+            method.build_removal_plan(removal_plan)
 
         return removal_plan
 

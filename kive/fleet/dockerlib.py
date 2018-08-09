@@ -365,6 +365,7 @@ DOCKER_REPO_URL = '192.168.0.1:5000'
 class SingularityDockerHandler(DockerHandler):
     """A Docker Handler that uses singularity to launch docker containers"""
 
+    _is_alive = False
     singularity_cmd_path = None
     sing_version = None
 
@@ -424,8 +425,6 @@ class SingularityDockerHandler(DockerHandler):
         """
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before generate_launch_args")
-        if driver_name is None:
-            raise NotImplementedError()
         if cls.singularity_cmd_path is None:
             raise RuntimeError('Cannot determine singularity command path')
         if container_file is None:
@@ -447,21 +446,27 @@ class SingularityDockerHandler(DockerHandler):
         # NOTE: the driver program is run in the /mnt/bin directory in the container.
         # some drivers will want to write temporary files, therefore we must mount
         # it rw.
-        opt_string = "-B {}:{}:ro,{}:{}:rw,{}:{}:rw --pwd {}".format(host_input_path, docker_input_path,
-                                                                     host_output_path, docker_output_path,
-                                                                     host_step_dir, docker_bin_path,
-                                                                     docker_bin_path)
+        opt_string = "--containall -B {}:{}:rw,{}:{}:rw,{}:{}:rw --pwd {}".format(
+            host_input_path,
+            docker_input_path,
+            host_output_path,
+            docker_output_path,
+            host_step_dir,
+            docker_bin_path,
+            docker_bin_path)
         # NOTE: if the driver_name is given, we must use 'singularity exec' otherwise
         # 'singularity run' (which runs the image's entry point
         if driver_name is None:
             launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
                                                    opt_string,
                                                    container_file)
+            prefix = 'launch'
         else:
             launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
                                                          opt_string,
                                                          container_file,
                                                          driver_name)
+            prefix = driver_name
         wrapper_template = """\
 #!/usr/bin/env bash
 cd {}
@@ -472,7 +477,7 @@ cd {}
             quote(host_step_dir),
             launch_command, arg_string)
         with tempfile.NamedTemporaryFile('w',
-                                         prefix=driver_name,
+                                         prefix=prefix,
                                          suffix='.sh',
                                          dir=host_step_dir,
                                          delete=False) as wrapper_file:

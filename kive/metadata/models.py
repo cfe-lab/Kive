@@ -274,8 +274,9 @@ class AccessControl(models.Model):
         blank=True
     )
 
-    # Avoid PyCharm warnings. This gets overwritten later with a real manager.
+    # Avoid PyCharm warnings. These get overwritten later with the real thing.
     objects = None
+    DoesNotExist = None
 
     class Meta:
         abstract = True

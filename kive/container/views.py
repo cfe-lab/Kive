@@ -59,8 +59,7 @@ class ContainerFamilyCreate(CreateView):
         return response
 
     def get_success_url(self):
-        return reverse('container_family_update',
-                       kwargs=dict(pk=self.object.id))
+        return reverse('container_families')
 
 
 @method_decorator(decorators, name='dispatch')

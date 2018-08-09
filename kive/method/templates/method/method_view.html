@@ -100,6 +100,10 @@
     <td><a href="{{ method.docker_image.absolute_url }}">{{ method.docker_image }}</a></td>
 </tr>
 <tr>
+    <td>Container:</td>
+    <td><a href="{{ method.container.get_absolute_url }}">{{ method.container }}</a></td>
+</tr>
+<tr>
     <td>Reusable:</td>
     <td>{{ method.get_reusable_display }}</td>
 </tr>
