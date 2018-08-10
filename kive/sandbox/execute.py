@@ -1858,9 +1858,11 @@ class Sandbox:
             container_file = None
         else:
             handler_class = singularity_handler_class
-            container_id = container_id or settings.DEFAULT_CONTAINER_ID
-            container = Container.objects.get(id=container_id)
-            container_file = container.get_absolute_path()
+            if container_id is None:
+                container_file = settings.DEFAULT_CONTAINER
+            else:
+                container = Container.objects.get(id=container_id)
+                container_file = container.get_absolute_path()
         driver = method.driver
         if driver is None:
             driver_name = docker_image.full_name

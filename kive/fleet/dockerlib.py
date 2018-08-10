@@ -428,7 +428,10 @@ class SingularityDockerHandler(DockerHandler):
         if cls.singularity_cmd_path is None:
             raise RuntimeError('Cannot determine singularity command path')
         if container_file is None:
-            raise RuntimeError('No singularity container selected.')
+            raise RuntimeError('No singularity container selected, is '
+                               'DEFAULT_CONTAINER configured?')
+        if not os.path.exists(container_file):
+            raise RuntimeError('Container file not found: ' + container_file)
         # we want to run the code in the docker container under a standardised directory,
         # so we convert the argument path names.
         docker_input_path = "/mnt/input"
