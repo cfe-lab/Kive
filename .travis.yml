@@ -21,7 +21,6 @@ install:
     - make
     - sudo make install
     - cd ..
-    - sudo singularity build /tmp/python-2.7.simg docker://python:2.7
 before_script:
     - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
 script:
