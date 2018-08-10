@@ -7,11 +7,14 @@ from django.db.models.aggregates import Count
 from django.http import HttpResponse
 from rest_framework import permissions
 from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from container.models import ContainerFamily, Container
 from container.serializers import ContainerFamilySerializer, ContainerSerializer
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination
+from metadata.models import AccessControl
+from portal.views import admin_check
 
 
 class ContainerFamilyViewSet(CleanCreateModelMixin,
@@ -58,6 +61,23 @@ class ContainerFamilyViewSet(CleanCreateModelMixin,
             description__icontains=value),
         user=lambda queryset, value: queryset.filter(
             user__username__icontains=value))
+
+    @action(detail=True)
+    def containers(self, request, pk=None):
+        if self.request.query_params.get('is_granted') == 'true':
+            is_admin = False
+        else:
+            is_admin = admin_check(self.request.user)
+
+        family_members = AccessControl.filter_by_user(
+            request.user,
+            is_admin=is_admin,
+            queryset=Container.objects.filter(family_id=pk))
+
+        return Response(
+            ContainerSerializer(family_members,
+                                many=True,
+                                context={"request": request}).data)
 
 
 class ContainerViewSet(CleanCreateModelMixin,

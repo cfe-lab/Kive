@@ -1853,6 +1853,7 @@ class Sandbox:
         docker_image = method.docker_image
         image_id = (docker_image and docker_image.hash)
         container_id = method.container_id
+        container = None
         if container_id is None and image_id is not None:
             handler_class = docker_handler_class
             container_file = None
@@ -1865,7 +1866,8 @@ class Sandbox:
                 container_file = container.get_absolute_path()
         driver = method.driver
         if driver is None:
-            driver_name = docker_image.full_name
+            driver_name = (container and container.family.name or
+                           docker_image and docker_image.full_name)
             driver_filename = None
         else:
             driver_name = driver_filename = driver.coderesource.filename

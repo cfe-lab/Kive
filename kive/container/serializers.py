@@ -11,6 +11,8 @@ class ContainerFamilySerializer(AccessControlSerializer,
     num_containers = serializers.IntegerField()
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerfamily-removal-plan')
+    containers = serializers.HyperlinkedIdentityField(
+        view_name="containerfamily-containers")
 
     class Meta:
         model = ContainerFamily
@@ -25,6 +27,7 @@ class ContainerFamilySerializer(AccessControlSerializer,
             "users_allowed",
             "groups_allowed",
             "num_containers",
+            "containers",
             "removal_plan")
 
 

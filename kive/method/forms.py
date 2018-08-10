@@ -7,6 +7,7 @@ from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 
+from container.models import ContainerFamily
 from method.models import CodeResource, CodeResourceRevision, Method, MethodFamily, DockerImage
 from metadata.models import CompoundDatatype
 from metadata.forms import AccessControlForm, PermissionsField
@@ -209,10 +210,10 @@ class MethodReviseForm(AccessControlForm):
         help_text='Select a revision of the driver script.',
         required=False)
 
-    docker_image = forms.ModelChoiceField(
-        DockerImage.objects.all(),
-        label="Docker Image",
-        help_text="Method will run in this image")
+    container = forms.IntegerField(
+        label="Container",
+        widget=forms.Select(choices=[('', '--- select a Container Family first ---')]),
+        help_text="Method will run in this container")
 
     revision_name = forms.CharField(
         label="Name",
@@ -260,6 +261,12 @@ class MethodForm(MethodReviseForm):
         help_text="Driver script for the method",
         required=False)
 
+    containerfamily = forms.ChoiceField(
+        choices=[('', '--- Container Family ---')],
+        label='Container Family',
+        help_text="Container to run the method in",
+        required=False)
+
     def __init__(self, data=None, user=None, *args, **kwargs):
         super(MethodForm, self).__init__(data, *args, **kwargs)
 
@@ -269,6 +276,9 @@ class MethodForm(MethodReviseForm):
                 [('', '--- CodeResource ---')] +
                 [(x.id, x.name) for x in CodeResource.filter_by_user(user).order_by('name')]
             )
+            self.fields["containerfamily"].choices = (
+                [('', '--- Container Family ---')] +
+                [(x.id, x.name) for x in ContainerFamily.filter_by_user(user)])
 
 
 class MethodDetailsForm(forms.ModelForm):

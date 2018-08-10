@@ -1,9 +1,11 @@
 $(function(){ // wait for page to finish loading before executing jQuery code
     "use strict";
     
-    var cr_id;
-    var $coderesource = $("#id_coderesource");
-    var $dependencyForms = $("#dependencyForms");
+    var cr_id,
+        cf_id,
+        $coderesource = $("#id_coderesource"),
+        $containerfamily = $("#id_containerfamily"),
+        $dependencyForms = $("#dependencyForms");
     
     function td($elem) {
         return $('<td>').append($elem);
@@ -51,6 +53,21 @@ $(function(){ // wait for page to finish loading before executing jQuery code
             $select.html('<option value="">--- select a CodeResource first ---</option>');
         }
     }
+    function populateCRRs(cf_id, $select) {
+        if (cf_id !== undefined && cf_id !== "") {
+            $.getJSON("/api/containerfamilies/" + cf_id + "/containers/")
+                .then(function(results) {
+                    var $options = results.map(function(result) {
+                        return $('<option>').val(result.id).text(result.tag);
+                    });
+                    $select.empty().append($options);
+                }, function(err) {
+                    $select.html('<option value="">ERROR! Could not retrieve Containers</option>');
+                });
+        } else {
+            $select.html('<option value="">--- select a Container Family first ---</option>');
+        }
+    }
     /* http://stackoverflow.com/questions/2735067/how-to-convert-a-dom-node-list-to-an-array-in-javascript */
     function toArray(obj) {
         var array = [];
@@ -65,6 +82,12 @@ $(function(){ // wait for page to finish loading before executing jQuery code
     $coderesource.on('change', function() {
         cr_id = this.value;
         populateCRRs(cr_id, $("#id_driver_revisions"));
+    }).change(); // trigger on load
+
+    // trigger ajax on Container Family drop-down to populate container select
+    $containerfamily.on('change', function() {
+        cf_id = this.value;
+        populateCRRs(cf_id, $("#id_container"));
     }).change(); // trigger on load
 
     /* populate CR revision dropdown on selection of CodeResource
