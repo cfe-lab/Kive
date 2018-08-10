@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 # some simple  tests for the dockerlib module
+import os
+import shutil
 from unittest import skipIf, skip
 
 import os.path as osp
@@ -155,30 +157,35 @@ Delta | grepxxx B -"""
 
     def test_gen_launch_cmd01(self):
         """ Check sanity of generated a launch command """
-        hoststepdir = tempfile.gettempdir()
-        input_file_paths = ["input1.dat", "input2.dat"]
-        output_file_paths = ["output1.dat", "output2.dat", "output3.dat"]
-        dep_paths = ["dep01.py", "dep02.py"]
-        image_id = "kive-default"
-        container_file = "kive-default.simg"
-        for driver_name in [None, "my_driver_prog.py"]:
-            try:
-                retlst = self.docker_handler_class.generate_launch_args(hoststepdir,
-                                                                        input_file_paths,
-                                                                        output_file_paths,
-                                                                        driver_name,
-                                                                        dep_paths,
-                                                                        image_id,
-                                                                        container_file)
-                assert isinstance(retlst, list), 'expected a list'
-                for s in retlst:
-                    assert isinstance(s, six.string_types), 'expected a string'
-                lverb = False
-                if lverb:
-                    print("got launch {}".format(retlst))
-            except NotImplementedError:
-                pass
-
+        hoststepdir = tempfile.mkdtemp(prefix="kive_sandbox")
+        try:
+            input_file_paths = ["input1.dat", "input2.dat"]
+            output_file_paths = ["output1.dat", "output2.dat", "output3.dat"]
+            dep_paths = ["dep01.py", "dep02.py"]
+            image_id = "kive-default"
+            container_file = os.path.join(hoststepdir, "kive-default.simg")
+            with open(container_file, "w"):
+                pass  # Touch the file.
+            for driver_name in [None, "my_driver_prog.py"]:
+                try:
+                    retlst = self.docker_handler_class.generate_launch_args(
+                        hoststepdir,
+                        input_file_paths,
+                        output_file_paths,
+                        driver_name,
+                        dep_paths,
+                        image_id,
+                        container_file)
+                    assert isinstance(retlst, list), 'expected a list'
+                    for s in retlst:
+                        assert isinstance(s, six.string_types), 'expected a string'
+                    lverb = False
+                    if lverb:
+                        print("got launch {}".format(retlst))
+                except NotImplementedError:
+                    pass
+        finally:
+            shutil.rmtree(hoststepdir)
 
 @skipIf(not settings.RUN_SINGULARITY_TESTS, "Singularity tests are disabled")
 class SingularityDockerLibTests(DockerLibTests):

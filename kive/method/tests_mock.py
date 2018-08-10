@@ -10,6 +10,7 @@ from constants import users, groups
 from django_mock_queries.query import MockSet
 from django_mock_queries.mocks import mocked_relations, PatcherChain
 
+from container.models import Container, ContainerFamily
 from kive.tests import ViewMockTestCase
 from metadata.models import CompoundDatatype, KiveUser, kive_user, empty_removal_plan
 from method.forms import MethodForm
@@ -766,20 +767,13 @@ class MethodViewMockTests(ViewMockTestCase):
                                    CodeResource,
                                    CodeResourceRevision,
                                    CompoundDatatype,
-                                   DockerImage,
+                                   ContainerFamily,
+                                   Container,
                                    Transformation,
                                    TransformationInput,
                                    TransformationOutput,
                                    User,
                                    Group)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-
-        docker_image_field = MethodForm.base_fields['docker_image']
-        # noinspection PyUnresolvedReferences
-        patcher = patch.object(docker_image_field,
-                               '_queryset',
-                               DockerImage.objects)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -789,9 +783,6 @@ class MethodViewMockTests(ViewMockTestCase):
                                MethodFamily.objects)
         patcher.start()
         self.addCleanup(patcher.stop)
-
-        DockerImage.objects._prefetch_related_lookups = False
-        DockerImage.objects.add(DockerImage(pk='20'))
 
         self.client = self.create_client()
         self.dev_group = Group(pk=groups.DEVELOPERS_PK)
@@ -862,7 +853,7 @@ class MethodViewMockTests(ViewMockTestCase):
             data=dict(name='foo',
                       memory='100',
                       threads='1',
-                      docker_image='20',
+                      container='20',
                       reusable='1',
                       dataset_name_in_0='in_csv',
                       compounddatatype_in_0='__raw__',
