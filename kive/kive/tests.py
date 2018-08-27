@@ -236,6 +236,21 @@ def install_fixture_files(fixture_name):
         dir_to_install = os.path.join(fixture_files_path, target)
         shutil.copytree(dir_to_install, target_path)
 
+    test_container_path = os.path.join(settings.MEDIA_ROOT,
+                                       'CodeResources',
+                                       settings.DEFAULT_CONTAINER)
+    if not os.path.exists(test_container_path):
+        if not settings.RUN_SINGULARITY_TESTS:
+            with open(test_container_path, 'w'):
+                pass  # Touch the file.
+        else:
+            default_container_path = os.path.join(settings.MEDIA_ROOT,
+                                                  '..',
+                                                  'CodeResources',
+                                                  settings.DEFAULT_CONTAINER)
+            shutil.copy(default_container_path,
+                        test_container_path)
+
 
 def remove_fixture_files():
     """

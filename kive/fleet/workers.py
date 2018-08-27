@@ -388,7 +388,8 @@ class Manager(object):
                          name=None,
                          description=None,
                          slurm_sched_class=DummySlurmScheduler,
-                         docker_handler_class=DummyDockerHandler):
+                         docker_handler_class=DummyDockerHandler,
+                         singularity_handler_class=DummyDockerHandler):
         """
         Execute the specified top-level Pipeline with the given inputs.
 
@@ -417,9 +418,11 @@ class Manager(object):
 
         # The run is already in the queue, so we can just start the manager and let it exit
         # when it finishes.
+        # noinspection PyTypeChecker
         manager = cls(quit_idle=True, history=1,
                       slurm_sched_class=slurm_sched_class,
-                      docker_handler_class=docker_handler_class)
+                      docker_handler_class=docker_handler_class,
+                      singularity_handler_class=singularity_handler_class)
         manager.main_procedure()
         return manager
 

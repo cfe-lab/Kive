@@ -1,4 +1,6 @@
-import os.path
+from unittest import skipIf
+
+import os
 import re
 import tempfile
 import itertools
@@ -7,6 +9,7 @@ from datetime import datetime
 
 from mock import patch
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.test import TestCase, skipIfDBFeature
 from django.core.urlresolvers import reverse, resolve
@@ -21,6 +24,7 @@ from archive.serializers import RunSerializer, RunBatchSerializer, grplst2str, u
 from archive.exceptions import SandboxActiveException, RunNotFinished
 from constants import runstates
 from file_access_utils import create_sandbox_base_path
+from fleet.dockerlib import SingularityDockerHandler
 from librarian.models import ExecRecord, Dataset
 from pipeline.models import Pipeline, PipelineFamily
 from metadata.models import kive_user, everyone_group
@@ -257,6 +261,22 @@ class RestoreReusableDatasetTest(BaseTestCases.SlurmExecutionTestCase):
     def test_run_new_pipeline(self):
         pipeline = Pipeline.objects.get(revision_name='sums and products')
         run_to_process = self.execute_pipeline(pipeline)
+        self.assertIsNotNone(run_to_process)
+        if not run_to_process.is_successful():
+            state_name = run_to_process.get_state_name()
+            print("unexpected run state name: '{}'".format(state_name))
+            self.fail("run is not successful")
+
+    @skipIf(not settings.RUN_SINGULARITY_TESTS, "Singularity tests disabled.")
+    def test_run_new_pipeline_with_singularity(self):
+        pipeline = Pipeline.objects.get(revision_name='sums and products')
+        dataset = Dataset.objects.get(name="pairs")
+        mgr = Manager.execute_pipeline(
+            pipeline.user,
+            pipeline,
+            [dataset],
+            singularity_handler_class=SingularityDockerHandler)
+        run_to_process = mgr.get_last_run()
         self.assertIsNotNone(run_to_process)
         if not run_to_process.is_successful():
             state_name = run_to_process.get_state_name()

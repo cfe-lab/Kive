@@ -1860,7 +1860,9 @@ class Sandbox:
         else:
             handler_class = singularity_handler_class
             if container_id is None:
-                container_file = settings.DEFAULT_CONTAINER
+                container_file = os.path.join(settings.MEDIA_ROOT,
+                                              Container.UPLOAD_DIR,
+                                              settings.DEFAULT_CONTAINER)
             else:
                 container = Container.objects.get(id=container_id)
                 container_file = container.get_absolute_path()

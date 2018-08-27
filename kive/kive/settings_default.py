@@ -396,4 +396,5 @@ DOCK_BZIP2_COMMAND = "/bin/bzip2"
 # NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
 RUN_SINGULARITY_TESTS = RUN_DOCKER_TESTS and False
 
-DEFAULT_CONTAINER = '/path/to/kive-default.simg'
+# Container file in CodeResources folder
+DEFAULT_CONTAINER = 'kive-default.simg'
