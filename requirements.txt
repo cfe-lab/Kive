@@ -1,6 +1,5 @@
 binaryornot==0.4.0
 chardet==2.3.0
-coverage==4.2
 Django==1.11.13
 django-extensions==1.6.1
 djangorestframework==3.8.2

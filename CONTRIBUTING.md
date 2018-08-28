@@ -64,7 +64,8 @@ Once you have set up your production server, this is how to deploy a new release
     matches the version on the milestone. If you have to redo
     a release, you can create additional releases with tags vX.Y.1, vX.Y.2, and
     so on. Mark the release as pre-release until you finish deploying it.
-4. Attach the `static_root.tar.gz` file to the release on GitHub.
+4. Attach the `static_root.tar.gz` file to the release on GitHub. Attach it as
+    a binary below the description, not as an attachment in the description.
 4. Check on the site that there are no active runs (as an administrator, go to the 
     Runs page under the User portal, and click the lock to give yourself the ability to
     view all runs), then kill the fleet.

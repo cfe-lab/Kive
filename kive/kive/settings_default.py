@@ -231,6 +231,8 @@ REST_FRAMEWORK = {
     'UPLOADED_FILES_USE_URL': False
 }
 
+FILE_UPLOAD_PERMISSIONS = 0o644
+
 # The polling interval that the manager of the fleet uses between queries to the database.
 FLEET_POLLING_INTERVAL = 30  # in seconds
 FLEET_PURGING_INTERVAL = 3600  # in seconds

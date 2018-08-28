@@ -623,9 +623,13 @@ class Foreman(object):
                                 assert len(stderr_log) == 1, expected
 
                                 with open(stdout_log[0], "rb") as f:
-                                    task_log.methodoutput.output_log.save(f.name, File(f))
+                                    task_log.methodoutput.output_log.save(
+                                        os.path.basename(f.name),
+                                        File(f))
                                 with open(stderr_log[0], "rb") as f:
-                                    task_log.methodoutput.error_log.save(f.name, File(f))
+                                    task_log.methodoutput.error_log.save(
+                                        os.path.basename(f.name),
+                                        File(f))
 
                                 task_log.methodoutput.save()
                                 task_log.save()
