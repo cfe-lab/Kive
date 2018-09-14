@@ -5,7 +5,12 @@ db/kive.db
 /.pytest_cache
 # Don't get the settings.py or hostfile files that have been customized
 kive/kive/hostfile
+# active settings
 kive/kive/settings.py
+# recommended settings for vagrant
+/kive/kive/settings_vagrant.py
+# backup of settings for dev workstation
+/kive/kive/settings_localhost.py
 # Ignore the temporary stuff created during testing
 kive/CodeResources
 kive/VerificationScripts
@@ -24,7 +29,7 @@ utils/memory_plot.png
 /utils/speed_plot_cache
 /static_root
 /static_root.tar.gz
-/vagrant/.vagrant
+/venv_kive
 
 # Ignore nodeJS modules
 node_modules/
@@ -63,3 +68,10 @@ kive/sandbox/static/sandbox/choose_pipeline.js
 kive/sandbox/static/sandbox/view_run.js
 kive/sandbox/static/sandbox/PipelineRunTable.js
 kive/tests.js
+
+# VirtualBox shared folders
+/vagrant/.vagrant
+/vagrant_ubuntu/.vagrant
+/vagrant_ubuntu/media_root_backup
+/vagrant_ubuntu/db_data.sql
+/vagrant_ubuntu/docker
