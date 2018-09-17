@@ -5,7 +5,6 @@ import re
 import tempfile
 import itertools
 import copy
-from datetime import datetime
 
 from mock import patch
 
@@ -324,7 +323,7 @@ class GarbageCollectionTest(TestCase):
         This used to raise an exception, but it's a valid scenario. When a run
         is cancelled before it starts, it never gets a sandbox path.
         """
-        now = datetime.now()
+        now = timezone.now()
         run = Run(pipeline=self.noop_pl,
                   user=self.noop_pl.user,
                   start_time=now,

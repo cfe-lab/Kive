@@ -227,7 +227,7 @@ class DockerHandler(BaseDockerHandler):
         2) calling 'docker version' and checking for exceptions.
         """
         for cmd_lst in [[BZIP2_COMMAND, '-h'],
-                        ['sudo', DOCKER_COMMAND, 'version']]:
+                        ['sudo', '-n', DOCKER_COMMAND, 'version']]:
             DockerHandler._run_shell_command(cmd_lst)
             logger.debug("%s passed.", " ".join(cmd_lst))
 

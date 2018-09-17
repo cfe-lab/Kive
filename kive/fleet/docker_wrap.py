@@ -16,7 +16,8 @@ a command alias like this with the image name you want:
         /path/to/docker_wrap.py --run <image>\:<tag> *, \
         /path/to/docker_wrap.py --write <image>\:<tag> *
 
-Then grant access to one or more users on one or more images like this:
+Then grant access to one or more users on one or more images like this,
+probably after the group "sudo" permissions:
 
     <user1>, <user2> ALL = NOPASSWD: DOCKER_<IMAGE1>, DOCKER_<IMAGE2>
 
