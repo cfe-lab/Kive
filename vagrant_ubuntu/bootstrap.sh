@@ -5,10 +5,10 @@ set -e
 
 apt-get update -qq --fix-missing
 
-# PostgreSQL
+echo ========== Installing PostgreSQL ==========
 apt-get install -qq postgresql postgresql-contrib postgresql-client
 
-# Singularity
+echo  ========== Installing Singularity ==========
 apt-get install -qq python dh-autoreconf build-essential libarchive-dev squashfs-tools
 git clone https://github.com/singularityware/singularity.git
 cd singularity
@@ -20,7 +20,7 @@ make install
 cd ..
 rm -rf singularity
 
-# Docker
+echo ========== Installing Docker ==========
 apt-get install -qq \
     apt-transport-https \
     ca-certificates \
@@ -33,19 +33,21 @@ add-apt-repository \
    stable"
 apt-get install -qq docker-ce
 
-# Slurm
+echo ========== Installing Slurm ==========
 mkdir --parents /etc/slurm-llnl
-cp /usr/local/share/Kive/vagrant_ubuntu/slurm.conf /etc/slurm-llnl/slurm.conf
+cp  /usr/local/share/Kive/vagrant_ubuntu/slurm.conf \
+    /usr/local/share/Kive/vagrant_ubuntu/cgroup.conf \
+    /etc/slurm-llnl/
 apt-get install -qq munge slurm-wlm slurmctld slurm-wlm-basic-plugins
 chmod g+r,o+r /var/log/slurm-llnl/accounting
 
-# pip
+echo ========== Installing pip ==========
 apt-get install -qq wget
 wget -q https://bootstrap.pypa.io/get-pip.py
 python get-pip.py pip==9.0.1
 rm get-pip.py
 
-# Kive
+echo ========== Installing Kive ==========
 apt-get install -qq python-dev libsqlite3-dev wamerican
 cd /usr/local/share/Kive/api
 python setup.py install
