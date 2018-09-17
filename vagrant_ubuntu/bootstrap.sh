@@ -33,13 +33,22 @@ add-apt-repository \
    stable"
 apt-get install -qq docker-ce
 
+echo ========== Installing MySQL ==========
+apt-get install -qq mysql-server
+
 echo ========== Installing Slurm ==========
 mkdir --parents /etc/slurm-llnl
 cp  /usr/local/share/Kive/vagrant_ubuntu/slurm.conf \
     /usr/local/share/Kive/vagrant_ubuntu/cgroup.conf \
+    /usr/local/share/Kive/vagrant_ubuntu/slurmdbd.conf \
     /etc/slurm-llnl/
-apt-get install -qq munge slurm-wlm slurmctld slurm-wlm-basic-plugins
-chmod g+r,o+r /var/log/slurm-llnl/accounting
+mysql --execute "create user slurm@localhost;"
+mysql --execute "grant all on slurm_acct_db.* TO slurm@localhost;"
+mysql --execute "create database slurm_acct_db;"
+apt-get install -qq slurmdbd munge slurm-wlm slurmctld slurm-wlm-basic-plugins
+sacctmgr -i add cluster localhost
+systemctl restart slurmdbd
+systemctl restart slurmctld
 
 echo ========== Installing pip ==========
 apt-get install -qq wget
