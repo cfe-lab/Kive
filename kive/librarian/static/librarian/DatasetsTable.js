@@ -7,8 +7,11 @@
         this.session_page_key = "datasetPage";
         this.registerLinkColumn("Name", "/dataset_view/");
         this.registerColumn("Description", function($td, dataset) {
-            $td.css("white-space", "pre-line") // preserve newlines
-                .text(dataset.description);
+            var description = dataset.description;
+            if (description.length > 80) {
+                description = description.substring(0, 77) + '...';
+            }
+            $td.text(description);
         });
         this.registerColumn("Created", function($td, row) {
             $td.text(permissions.formatDate(row.date_created));

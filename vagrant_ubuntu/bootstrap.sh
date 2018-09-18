@@ -46,6 +46,8 @@ mysql --execute "create user slurm@localhost;"
 mysql --execute "grant all on slurm_acct_db.* TO slurm@localhost;"
 mysql --execute "create database slurm_acct_db;"
 apt-get install -qq slurmdbd munge slurm-wlm slurmctld slurm-wlm-basic-plugins
+chown -R slurm:slurm /etc/slurm-llnl/
+chmod o-r /etc/slurm-llnl/slurmdbd.conf
 sacctmgr -i add cluster localhost
 systemctl restart slurmdbd
 systemctl restart slurmctld
