@@ -1,7 +1,7 @@
-# Kive in an Ubuntu VirtualBox #
-This folder contains scripts to create a full Kive installation in an Ubuntu VirtualBox. It can also be a helpful guide
-for developers configuring their Ubuntu workstations to work on Kive. To run the scripts, install [Vagrant] and its
-[VirtualBox] provider. To install Kive on a regular Ubuntu workstation, just follow the same steps as the `bootstrap.sh`
+# Kive in a CentOS VirtualBox #
+This folder contains scripts to create a full Kive installation in a CentOS VirtualBox. It can also be a helpful guide
+for installing a Kive server on CentOS. To run the scripts, install [Vagrant] and its
+[VirtualBox] provider. To install Kive on a regular CentOS server, just follow the same steps as the `bootstrap.sh`
 script.
 
 The most challenging tool to install is Slurm. See its documentation on [slurm.conf], [consumable resources],

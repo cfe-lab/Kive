@@ -263,7 +263,7 @@ class DockerHandler(BaseDockerHandler):
         """
         fmt_str = """table {{.Repository}}:{{.Tag}}|{{.ID}}|\
         {{.CreatedAt}}|{{.CreatedSince}}|{{.Digest}}|{{.Size}}"""
-        cmd_lst = ['sudo', DOCKER_COMMAND, "images", "--format", fmt_str]
+        cmd_lst = ['sudo', '-n', DOCKER_COMMAND, "images", "--format", fmt_str]
         if repotag_name is not None:
             cmd_lst.append(repotag_name)
         return DockerHandler._run_shell_command_to_dict(cmd_lst, splitchar="|")
@@ -290,7 +290,10 @@ class DockerHandler(BaseDockerHandler):
         """Return a string with some pertinent information about the docker configuration."""
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before docker_ident")
-        return DockerHandler._run_shell_command(['sudo', DOCKER_COMMAND, "version"])
+        return DockerHandler._run_shell_command(['sudo',
+                                                 '-n',
+                                                 DOCKER_COMMAND,
+                                                 "version"])
 
     @classmethod
     def generate_launch_args(cls,
@@ -395,7 +398,10 @@ class SingularityDockerHandler(DockerHandler):
         """Return a string with some pertinent information about the docker configuration."""
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before docker_ident")
-        dock_str = DockerHandler._run_shell_command(['sudo', DOCKER_COMMAND, "version"])
+        dock_str = DockerHandler._run_shell_command(['sudo',
+                                                     '-n',
+                                                     DOCKER_COMMAND,
+                                                     "version"])
         return "Singularity version {}\n{}".format(cls.sing_version, dock_str)
 
     @classmethod
@@ -449,7 +455,7 @@ class SingularityDockerHandler(DockerHandler):
         # NOTE: the driver program is run in the /mnt/bin directory in the container.
         # some drivers will want to write temporary files, therefore we must mount
         # it rw.
-        opt_string = "--containall -B {}:{}:rw,{}:{}:rw,{}:{}:rw --pwd {}".format(
+        opt_string = "--contain -B {}:{}:rw,{}:{}:rw,{}:{}:rw --pwd {}".format(
             host_input_path,
             docker_input_path,
             host_output_path,
@@ -457,28 +463,31 @@ class SingularityDockerHandler(DockerHandler):
             host_step_dir,
             docker_bin_path,
             docker_bin_path)
+        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
         # NOTE: if the driver_name is given, we must use 'singularity exec' otherwise
         # 'singularity run' (which runs the image's entry point
         if driver_name is None:
-            launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
-                                                   opt_string,
-                                                   container_file)
+            launch_command = "{} run {} {} {}".format(
+                cls.singularity_cmd_path,
+                opt_string,
+                container_file,
+                arg_string)
             prefix = 'launch'
         else:
-            launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
-                                                         opt_string,
-                                                         container_file,
-                                                         driver_name)
+            launch_command = "{} exec {} {} /bin/sh -c {}".format(
+                cls.singularity_cmd_path,
+                opt_string,
+                container_file,
+                quote("./" + driver_name + " " + arg_string))
             prefix = driver_name
         wrapper_template = """\
 #!/usr/bin/env bash
 cd {}
-{} {}
+{}
 """
-        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
         wrapper = wrapper_template.format(
             quote(host_step_dir),
-            launch_command, arg_string)
+            launch_command)
         with tempfile.NamedTemporaryFile('w',
                                          prefix=prefix,
                                          suffix='.sh',
