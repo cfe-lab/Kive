@@ -25,8 +25,8 @@ from argparse import ArgumentParser
 import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 from tempfile import NamedTemporaryFile
-from six.moves.urllib.error import URLError
-# from six.moves.urllib.request import Request
+# noinspection PyCompatibility
+from urllib2 import URLError
 
 
 def parse_args(argv=None):

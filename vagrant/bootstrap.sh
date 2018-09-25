@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Exit immediately if any untested command fails.
+set -e
+
 cd /root
 
 echo ========== Installing PostgreSQL ==========
@@ -9,16 +12,21 @@ systemctl enable postgresql
 systemctl start postgresql
 
 echo ========== Installing Singularity ==========
-yum install -q -y git libtool libarchive-devel squashfs-tools python-devel sqlite-devel
+yum groupinstall -q -y 'Development Tools'
+yum install -q -y libarchive-devel squashfs-tools python-devel sqlite-devel
 git clone https://github.com/singularityware/singularity.git
 cd singularity
 git checkout -q tags/2.5.2
 ./autogen.sh
-./configure --prefix=/usr/local
-make
-sudo make install
+./configure
+make dist
 cd ..
-rm -rf singularity
+
+# Install from rpm instead of directly from make, so it can be uninstalled.
+rpmbuild --quiet -ta singularity/singularity-2.5.2.tar.gz
+yum install -q -y rpmbuild/RPMS/x86_64/singularity-2.5.2-1.el7.centos.x86_64.rpm \
+    rpmbuild/RPMS/x86_64/singularity-runtime-2.5.2-1.el7.centos.x86_64.rpm
+rm -rf singularity rpmbuild
 
 echo ========== Installing Docker ==========
 yum install -q -y yum-utils \
@@ -56,7 +64,7 @@ yum install -q -y openssl openssl-devel pam-devel numactl numactl-devel \
     ncurses-devel man2html libibmad libibumad rpm-build perl-devel
 wget -q https://download.schedmd.com/slurm/slurm-17.11.9-2.tar.bz2
 rpmbuild --quiet -ta slurm-17.11.9-2.tar.bz2
-rpm --install \
+yum install -q -y \
     rpmbuild/RPMS/x86_64/slurm-17.11.9-2.el7.centos.x86_64.rpm \
     rpmbuild/RPMS/x86_64/slurm-example-configs-17.11.9-2.el7.centos.x86_64.rpm \
     rpmbuild/RPMS/x86_64/slurm-slurmctld-17.11.9-2.el7.centos.x86_64.rpm \
@@ -92,7 +100,7 @@ python get-pip.py pip==9.0.1
 rm get-pip.py
 
 echo ========== Installing Kive ==========
-yum install -q -y python-devel libsqlite3x-devel words
+yum install -q -y python-devel libsqlite3x-devel words lsof
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..

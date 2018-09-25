@@ -73,7 +73,7 @@ class Command(BaseCommand):
                   '=>',
                   container.tag,
                   'run',
-                  latest_run_step.run_id)
+                  latest_run_step and latest_run_step.run_id)
 
         if not conversions:
             print('None found.')
@@ -99,7 +99,8 @@ class Command(BaseCommand):
 
     def find_run_step(self, image):
         latest_run_step = RunStep.objects.filter(
-            pipelinestep__transformation__method__docker_image_id=image.id).latest('run_id')
+            pipelinestep__transformation__method__docker_image_id=image.id).order_by(
+            'run_id').last()
         return latest_run_step
 
     def find_method_run_step(self, method):

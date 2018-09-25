@@ -6,7 +6,7 @@
 import json
 import logging
 import os
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, SUPPRESS
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from requests.adapters import HTTPAdapter
 
@@ -36,14 +36,10 @@ def parse_args():
                         '-u',
                         default=os.getenv('KIVE_USER',
                                           'kive'),
-                        help='Kive user to connect with.')
-    parser.add_argument('--password',
-                        '-p',
-                        default=SUPPRESS,
-                        help='Kive password to connect with (default not shown).')
+                        help='Kive user to connect with. Set the password '
+                             'in environment variable KIVE_PASSWORD.')
     args = parser.parse_args()
-    if not hasattr(args, 'password'):
-        args.password = 'kive'
+    args.password = os.getenv('KIVE_PASSWORD', 'kive')
 
     return args
 

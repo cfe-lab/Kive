@@ -463,31 +463,28 @@ class SingularityDockerHandler(DockerHandler):
             host_step_dir,
             docker_bin_path,
             docker_bin_path)
-        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
         # NOTE: if the driver_name is given, we must use 'singularity exec' otherwise
         # 'singularity run' (which runs the image's entry point
         if driver_name is None:
-            launch_command = "{} run {} {} {}".format(
-                cls.singularity_cmd_path,
+            launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
                 opt_string,
-                container_file,
-                arg_string)
+                                                   container_file)
             prefix = 'launch'
         else:
-            launch_command = "{} exec {} {} /bin/sh -c {}".format(
-                cls.singularity_cmd_path,
+            launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
                 opt_string,
                 container_file,
-                quote("./" + driver_name + " " + arg_string))
+                                                         driver_name)
             prefix = driver_name
         wrapper_template = """\
 #!/usr/bin/env bash
 cd {}
-{}
+{} {}
 """
+        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
         wrapper = wrapper_template.format(
             quote(host_step_dir),
-            launch_command)
+            launch_command, arg_string)
         with tempfile.NamedTemporaryFile('w',
                                          prefix=prefix,
                                          suffix='.sh',
