@@ -59,7 +59,7 @@ class Command(BaseCommand):
                       image.git,
                       image.tag,
                       'run',
-                      latest_run_step.run_id)
+                      latest_run_step and latest_run_step.run_id)
                 continue
             conversions.append((image, container))
 

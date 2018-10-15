@@ -146,7 +146,11 @@ var permissions = (function() {
         label_field = label_field || "name";
         url_field = url_field || "id";
         this.registerColumn(header, function($td, item) {
-            $('<a>').text(item[label_field])
+            var label_text = item[label_field];
+            if ( ! /\w/.test(label_text)) {
+                label_text += ' [link]';
+            }
+            $('<a>').text(label_text)
                 .attr('href', base_url + item[url_field])
                 .appendTo($td);
         });

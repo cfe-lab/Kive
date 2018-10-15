@@ -128,9 +128,7 @@ class Dataset(metadata.models.AccessControl):
     """
     UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
 
-    name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH,
-                            help_text="Name of this Dataset.",
-                            blank=True)
+    name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH)
     description = models.TextField(help_text="Description of this Dataset.",
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
