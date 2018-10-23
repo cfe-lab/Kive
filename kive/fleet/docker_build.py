@@ -26,7 +26,12 @@ import os
 from subprocess import check_call, check_output, STDOUT, CalledProcessError
 from tempfile import NamedTemporaryFile
 # noinspection PyCompatibility
-from urllib2 import URLError
+try:
+    # python2
+    from urllib2 import URLError
+except ImportError:
+    # python3
+    from urllib.error import URLError
 
 
 def parse_args(argv=None):

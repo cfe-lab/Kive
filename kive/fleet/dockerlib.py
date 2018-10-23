@@ -362,7 +362,6 @@ class DockerHandler(BaseDockerHandler):
 
 
 SINGULARITY_COMMAND = 'singularity'
-DOCKER_REPO_URL = '192.168.0.1:5000'
 
 
 class SingularityDockerHandler(DockerHandler):
@@ -377,7 +376,6 @@ class SingularityDockerHandler(DockerHandler):
         """Make sure the docker/singularity environment is properly set up.
         a) run the normal docker tests (docker and bzip2 executables). We do NOT need docker_wrap.py
         b) check for existence of singularity executable; determine its path and version
-        c) Access to docker repository and ability to build the kive-default image from it.
         """
         if not cls._is_alive:
             cls.check_is_alive()
@@ -415,9 +413,8 @@ class SingularityDockerHandler(DockerHandler):
                              container_file=None):
         """ Generate the launch command for a method.
 
-        This version uses 'singularity build' to create a local copy of the docker
-        image, then uses 'singularity exec' or 'singularity run' to run the driver
-        within the docker container.
+        This version uses 'singularity exec' or 'singularity run' to run the driver
+        within a provided singularity container.
 
         :param host_step_dir: step folder under sandbox folder on host computer
         :param input_file_paths: list of input file paths on host computer
@@ -467,13 +464,13 @@ class SingularityDockerHandler(DockerHandler):
         # 'singularity run' (which runs the image's entry point
         if driver_name is None:
             launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
-                opt_string,
+                                                   opt_string,
                                                    container_file)
             prefix = 'launch'
         else:
             launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
-                opt_string,
-                container_file,
+                                                         opt_string,
+                                                         container_file,
                                                          driver_name)
             prefix = driver_name
         wrapper_template = """\
