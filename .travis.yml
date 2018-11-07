@@ -28,7 +28,7 @@ script:
   - npm run test:travis
   - cd kive
   - pytest --ds kive.settings_mocked
-  - coverage run pytest --ds kive.settings_test_pg
+  - coverage run -m pytest --ds kive.settings_test_pg
   - set +e
 after_success:
     - pip install codecov
