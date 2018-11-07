@@ -417,8 +417,7 @@ class SlurmDummyTests(TestCase):
             print("state after loop:", [curstate[jid][ACC_STATE] for jid in jobidlst])
         assert state_01 == self.sched_cls.FAILED, "unexpected state 01"
         assert state_02 == self.sched_cls.COMPLETED, "unexpected state 02"
-        ok_state_03 = state_03 in self.sched_cls.RUNNING_STATES
-        assert ok_state_03, "unexpected state 03"
+        assert state_03 in self.sched_cls.RUNNING_STATES, "unexpected state 03"
         if lverb:
             print("--test_dep_jobs01_multi SUCCESS")
 
