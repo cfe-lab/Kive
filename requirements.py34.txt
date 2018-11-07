@@ -1,13 +1,10 @@
 binaryornot==0.4.4
 chardet==3.0.4
-coverage==4.5.1
 Django==1.11.13
-django-extensions==1.6.1
 djangorestframework==3.8.2
 funcsigs==1.0.2
 pbr==4.0.3
 psycopg2==2.7.3.2
-scandir==1.7
 # pytz==2012rc0
 # six==1.10.0
-# scandir==1.7
+scandir==1.7

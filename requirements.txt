@@ -1,7 +1,6 @@
 binaryornot==0.4.0
 chardet==2.3.0
 Django==1.11.13
-django-extensions==1.6.1
 djangorestframework==3.8.2
 funcsigs==1.0.2
 pbr==1.10.0
