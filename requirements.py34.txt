@@ -1,6 +1,6 @@
 binaryornot==0.4.4
 chardet==3.0.4
-Django==1.11.13
+Django==1.11.15
 djangorestframework==3.8.2
 funcsigs==1.0.2
 pbr==4.0.3
