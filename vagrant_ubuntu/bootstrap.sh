@@ -59,7 +59,7 @@ python get-pip.py pip==9.0.1
 rm get-pip.py
 
 echo ========== Installing Kive ==========
-apt-get install -qq python-dev libsqlite3-dev wamerican
+apt-get install -qq python-dev libsqlite3-dev wamerican graphviz libgraphviz-dev pkg-config
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..
