@@ -53,8 +53,8 @@ def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
             # typically happens if the executable did run, but returned an error
             # ==> assume the command timed out, so we retry
             cmd_retry = True
-            logger.debug("timeout #%d/%d on command %s (retcode %s)",
-                         itry, num_retry, cmd_lst[0], e.returncode)
+            logger.warn("timeout #%d/%d on command %s (retcode %s)",
+                        itry, num_retry, cmd_lst[0], e.returncode)
             if itry < num_retry:
                 itry += 1
                 time.sleep(SLEEP_SECS)

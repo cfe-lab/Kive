@@ -1,6 +1,22 @@
 <!-- Django template -->
-<!-- Display contents of Datatypes as a HTML table -->
-
+<!-- Display permissions as an HTML table -->
+{% if old_users or old_groups %}
+<div>
+    <h4>Users allowed</h4>
+    <ul>
+        {% for user in old_users %}
+            <li>{{ user.username }}</li>
+        {% endfor %}
+    </ul>
+    <h4>Groups allowed</h4>
+    <ul>
+        {% for group in old_groups %}
+            <li>{{ group.name }}</li>
+        {% endfor %}
+    </ul>
+    <br>
+</div>
+{% endif %}
 <div class="permissions-widget">
  <div class="pw-search-wrapper">
    <div class="pw-users_groups pw-panel">

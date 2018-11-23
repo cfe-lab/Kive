@@ -5,43 +5,34 @@
 from argparse import ArgumentParser
 from collections import Counter
 from datetime import datetime, timedelta
-import errno
 import json
 import logging
 from itertools import groupby
 from operator import itemgetter, attrgetter
 import os
-from urlparse import urlparse
+from six.moves import input
+from six.moves.urllib.parse import urlparse
 
 from requests.adapters import HTTPAdapter
-import six.moves
 
 from kiveapi import KiveAPI
-
-DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
-UNSET = '***'
 
 
 def parse_args():
     parser = ArgumentParser(description='Dump a pipeline into a JSON file.')
-    parser.add_argument('config_file', nargs='?', default=DEFAULT_CONFIG_FILE)
+    parser.add_argument('--server',
+                        '-s',
+                        default=os.getenv('KIVE_SERVER',
+                                          'http://localhost:8000'),
+                        help='Kive server to upload to.')
+    parser.add_argument('--username',
+                        '-u',
+                        default=os.getenv('KIVE_USER',
+                                          'kive'),
+                        help='Kive user to connect with. Set the password '
+                             'in environment variable KIVE_PASSWORD.')
     args = parser.parse_args()
-    try:
-        with open(args.config_file, 'rU') as f:
-            config = json.load(f)
-    except IOError as e:
-        if e.errno != errno.ENOENT:
-            raise
-        with open(args.config_file, 'w') as f:
-            config = dict(username=UNSET,
-                          password=UNSET,
-                          server='http://localhost:8000')
-            json.dump(config, f, indent=4)
-
-    if config['username'] == UNSET:
-        parser.error('Configure {} or choose a different file.'.format(
-            args.config_file))
-    args.config = config
+    args.password = os.getenv('KIVE_PASSWORD', 'kive')
     return args
 
 
@@ -57,28 +48,30 @@ def main():
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
         logging.WARN)
     args = parse_args()
-    config = args.config
     print('Starting.')
 
-    kive = KiveAPI(config['server'])
+    kive = KiveAPI(args.server)
     kive.mount('https://', HTTPAdapter(max_retries=20))
-    kive.login(config['username'], config['password'])
+    kive.login(args.username, args.password)
 
     all_pipelines = kive.get_pipelines()
     pipelines = list(recent_pipelines(all_pipelines))
     hostname = urlparse(kive.server_url).hostname
     print('Recent pipelines from {}:'.format(hostname))
     for pipeline in pipelines:
+        # noinspection PyUnresolvedReferences
         print('{} - {}, id {}'.format(pipeline.family,
                                       pipeline,
                                       pipeline.pipeline_id))
-    pipeline_request = six.moves.input("Enter pipeline id to dump, or 'm' for more:")
+    # noinspection PyCompatibility
+    pipeline_request = input("Enter pipeline id to dump, or 'm' for more:")
     if pipeline_request == 'm':
         for pipeline in all_pipelines:
             print('{} - {}, id {}'.format(pipeline.family,
                                           pipeline,
                                           pipeline.pipeline_id))
-        pipeline_request = six.moves.input("Enter pipeline id to dump:")
+        # noinspection PyCompatibility
+        pipeline_request = input("Enter pipeline id to dump:")
     pipeline_id = int(pipeline_request)
     dump_folder = os.path.abspath(
         'dump/{}_pipeline{}'.format(hostname, pipeline_id))
@@ -210,7 +203,7 @@ def main():
             with open(os.path.join(dump_folder, filename + '_timed_out'), 'w'):
                 pass
     duplicate_filenames = [filename
-                           for filename, count in filename_counts.iteritems()
+                           for filename, count in filename_counts.items()
                            if count > 1]
     if duplicate_filenames:
         raise RuntimeError('Multiple versions found: ' +

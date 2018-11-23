@@ -6,34 +6,41 @@
 import json
 import logging
 import os
-from argparse import ArgumentParser, FileType
+from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 
 from requests.adapters import HTTPAdapter
 
 from kiveapi import KiveAPI
-from urlparse import urlparse
 from glob import glob
 from operator import attrgetter
 from kiveapi.pipeline import PipelineFamily, Pipeline
 from itertools import count, chain
 from constants import maxlengths
 from six.moves import input
-DEFAULT_CONFIG_FILE = os.path.expanduser("~/.dump_pipeline.config")
+from six.moves.urllib.parse import urlparse
 DEFAULT_MEMORY = 6000
 
 
 def parse_args():
-    parser = ArgumentParser(description='Upload a pipeline from a JSON file.')
+    parser = ArgumentParser(description='Upload a pipeline from a JSON file.',
+                            formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument('--docker_default',
                         '-d',
                         help='full name of docker image to use as default')
-    parser.add_argument('config_file',
-                        type=FileType(),
-                        nargs='?',
-                        default=DEFAULT_CONFIG_FILE)
+    parser.add_argument('--server',
+                        '-s',
+                        default=os.getenv('KIVE_SERVER',
+                                          'http://localhost:8000'),
+                        help='Kive server to upload to.')
+    parser.add_argument('--username',
+                        '-u',
+                        default=os.getenv('KIVE_USER',
+                                          'kive'),
+                        help='Kive user to connect with. Set the password '
+                             'in environment variable KIVE_PASSWORD.')
     args = parser.parse_args()
-    with args.config_file as f:
-        args.config = json.load(f)
+    args.password = os.getenv('KIVE_PASSWORD', 'kive')
+
     return args
 
 
@@ -268,6 +275,7 @@ def choose_folder():
     folder = None
     while folder is None:
         try:
+            # noinspection PyCompatibility
             choice = int(input('Enter the number: '))
             folder = dump_folders[choice - 1]
         except ValueError:
@@ -292,6 +300,7 @@ def choose_family(kive):
         print('  {}: {}'.format(i, family.name))
     family_name = ''
     while not family_name:
+        # noinspection PyCompatibility
         family_name = input('Enter the number or a new family name:')
     try:
         pipeline_family = pipeline_families[int(family_name)-1]
@@ -528,14 +537,14 @@ def main():
     logging.getLogger('requests.packages.urllib3.connectionpool').setLevel(
         logging.WARN)
     args = parse_args()
-    config = args.config
 
-    kive = KiveAPI(config['server'])
+    kive = KiveAPI(args.server)
     kive.mount('https://', HTTPAdapter(max_retries=20))
-    kive.login(config['username'], config['password'])
+    kive.login(args.username, args.password)
 
     folder = choose_folder()
     pipeline_family = choose_family(kive)
+    # noinspection PyCompatibility
     groups = input('Groups allowed? [Everyone] ') or 'Everyone'
     groups = groups.split(',')
 
@@ -556,6 +565,7 @@ def main():
     new_compound_datatypes.sort()
     print('New compound datatypes:')
     print('\n'.join(new_compound_datatypes))
+    # noinspection PyCompatibility
     revision_name = input('Enter a revision name, or leave blank to abort: ')
     if not revision_name:
         return

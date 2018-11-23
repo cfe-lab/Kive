@@ -1430,7 +1430,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
-        end_count = Method.objects.all().count()
+        end_count = Dataset.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
 
     def test_dataset_redaction_plan(self):

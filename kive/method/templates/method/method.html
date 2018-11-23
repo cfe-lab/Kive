@@ -1,4 +1,4 @@
-<a-- Django template -->
+<!-- Django template -->
 <!-- Display contents of Datatypes as a HTML table -->
 
 {% extends "portal/base.html" %}
@@ -93,15 +93,25 @@ Revise method '{{ parent.revision_name }}' in family '{{ family.name }}'
      </tr>
      {% endif %}
     <tr>
-        <th>{{ method_form.docker_image.label }}</th>
-        <td colspan="3">
-            {{ method_form.docker_image }}
-            <div class="helptext">{{ method_form.docker_image.help_text }}</div>
+        <th>{{ method_form.containerfamily.label }}</th>
+        <td>
+            {% if parent == None %}
+            {{ method_form.containerfamily }}
+            <div class="helptext">{{ method_form.containerfamily.help_text }}</div>
             <br/>
-            <div class="errortext">{{ method_form.docker_image.errors }}</div>
+            <div class="errortext">{{ method_form.containerfamily.errors }}</div>
+            {% else %}
+            {{ containerfamily }}
+            {% endif %}
         </td>
-        <th></th>
-        <td></td>
+        <th>{{ method_form.container.label }}</th>
+        <td>
+            {{ method_form.container }}
+            <div class="helptext">{{ method_form.container.help_text }}</div>
+            <br/>
+            <div class="errortext">{{ method_form.container.errors }}</div>
+            <br/>
+        </td>
     </tr>
     <tr>
         <th>{{ method_form.reusable.label }}</th>

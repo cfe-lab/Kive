@@ -156,6 +156,7 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
     'metadata',
     'archive',
+    'container',
     'librarian',
     'method',
     'pipeline',
@@ -229,6 +230,8 @@ LOGGING = {
 REST_FRAMEWORK = {
     'UPLOADED_FILES_USE_URL': False
 }
+
+FILE_UPLOAD_PERMISSIONS = 0o644
 
 # The polling interval that the manager of the fleet uses between queries to the database.
 FLEET_POLLING_INTERVAL = 30  # in seconds
@@ -390,3 +393,10 @@ RUN_DOCKER_TESTS = False
 
 DOCK_DOCKER_COMMAND = "/usr/bin/docker"
 DOCK_BZIP2_COMMAND = "/bin/bzip2"
+
+# Attempt to run the system tests that use singularity
+# NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
+RUN_SINGULARITY_TESTS = RUN_DOCKER_TESTS and False
+
+# Container file in CodeResources folder
+DEFAULT_CONTAINER = 'kive-default.simg'

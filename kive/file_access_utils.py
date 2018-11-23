@@ -146,7 +146,7 @@ def set_up_directory(directory_to_use, tolerate=False):
             raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
 
 
-def compute_md5(file_to_checksum):
+def compute_md5(file_to_checksum, chunk_size=1024*64):
     """Computes MD5 checksum of specified file.
 
     file_to_checksum should be an open, readable, file handle, with
@@ -156,9 +156,11 @@ def compute_md5(file_to_checksum):
     so that bytes (not strings) are returned when iterating over the file.
     """
     md5gen = hashlib.md5()
-    for line in file_to_checksum:
-        md5gen.update(line)
-    return md5gen.hexdigest()
+    while True:
+        chunk = file_to_checksum.read(chunk_size)
+        if not chunk:
+            return md5gen.hexdigest()
+        md5gen.update(chunk)
 
 
 def file_exists(path):

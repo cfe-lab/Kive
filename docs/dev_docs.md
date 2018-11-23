@@ -49,6 +49,19 @@ of different program files. Some of these will be _executable_, that is
 they are to be run as a standalone program. We assume that the overall
 computation is performed by a number of these executables in sequence.
 
+## Loading Your Scripts ##
+There are two options for loading your scripts into Kive: a Singularity image
+with scripts and dependencies, or just the scripts. A Singularity image gives
+you complete control, but just the scripts might be easier. Whichever option
+you choose, your scripts will be called in the same way. Imagine you've written
+a `reticulate_splines` script. It reads an input file of splines and writes the
+reticulation statistics to an output file. Kive will launch your script with a
+command line like this:
+
+    /mnt/bin/reticulate_splines /mnt/input/splines.csv /mnt/output/reticulation.csv
+
+You can write your script to expect the absolute file path to each input or
+output file.
 
 ### Kive Nomenclature
 

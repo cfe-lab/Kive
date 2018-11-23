@@ -12,6 +12,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 
+from container.models import Container
 from metadata.models import CompoundDatatype
 from method.models import CodeResource, Method, MethodDependency, \
     MethodFamily, CodeResourceRevision, DockerImage
@@ -396,7 +397,7 @@ def _make_dep_forms(query_dict, user):
     """
     Helper for resource_add and resource_revision_add that creates the MethodDependencyForms.
     """
-    num_dep_forms = sum([1 for k in query_dict.iterkeys() if k.startswith('coderesource_')])
+    num_dep_forms = sum([1 for k in query_dict.keys() if k.startswith('coderesource_')])
     dep_forms = []
     for i in range(num_dep_forms):
         this_cr = query_dict['coderesource_'+str(i)]  # PK of the Method
@@ -551,6 +552,13 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
     except CodeResourceRevision.DoesNotExist:
         coderesource_revision = None
 
+    # Retrieve the Container.
+    try:
+        container = Container.objects.get(
+            pk=method_form.cleaned_data['container'])
+    except Container.DoesNotExist:
+        container = None
+
     new_method = None
     try:
         # Note how the except blocks re-raise their exception: that is to terminate
@@ -572,7 +580,7 @@ def create_method_from_forms(family_form, method_form, dep_forms, input_forms, o
                 revision_desc=method_form.cleaned_data['revision_desc'],
                 revision_parent=parent_method,
                 driver=coderesource_revision,
-                docker_image=method_form.cleaned_data['docker_image'],
+                container=container,
                 reusable=method_form.cleaned_data['reusable'],
                 user=creating_user,
                 threads=method_form.cleaned_data["threads"],
@@ -894,6 +902,16 @@ def method_revise(request, pk):
             creating_user,
             queryset=this_code_resource.revisions.all()).order_by('-revision_DateTime')
 
+    parent_container = parent_method.container
+    if not parent_container:
+        this_container_family = None
+        all_containers = []
+    else:
+        this_container_family = parent_container.family
+        all_containers = Container.filter_by_user(
+            creating_user,
+            queryset=this_container_family.containers.all())
+
     if request.method == 'POST':
         # Because there is no CodeResource specified, the second value is of type MethodReviseForm.
         family_form, method_revise_form,\
@@ -905,6 +923,7 @@ def method_revise(request, pk):
             c.update(
                 {
                     'coderesource': this_code_resource,
+                    'containerfamily': this_container_family,
                     'method_revise_form': method_revise_form,
                     'dep_forms': dep_forms,
                     'input_forms': input_form_tuples,
@@ -996,9 +1015,12 @@ def method_revise(request, pk):
     method_revise_form.fields['driver_revisions'].widget.choices = [
         (str(x.id), '{}: {}'.format(x.revision_number, x.revision_name)) for x in all_revisions
     ]
+    method_revise_form.fields['container'].widget.choices = [
+        (str(x.id), x.tag) for x in all_containers]
     c.update(
         {
             'coderesource': this_code_resource,
+            'containerfamily': this_container_family,
             'method_form': method_revise_form,
             'dep_forms': dep_forms,
             'input_forms': input_form_tuples,

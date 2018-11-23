@@ -7,7 +7,7 @@ import copy
 from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
-from django.template import loader
+from django.forms.utils import ErrorList
 
 from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
 
@@ -52,6 +52,8 @@ class PermissionsWidget(forms.MultiWidget):
     def __init__(self, user_choices=None, group_choices=None, attrs=None):
         self.user_choices = user_choices or []
         self.group_choices = group_choices or []
+        self.old_users = []
+        self.old_groups = []
         attrs = attrs or {}
 
         hidden_ms_class = "pw-hidden-multiselect"
@@ -71,8 +73,7 @@ class PermissionsWidget(forms.MultiWidget):
 
         sub_widgets = [
             UsersAllowedWidget(attrs=users_attrs, choices=self.user_choices),
-            GroupsAllowedWidget(attrs=groups_attrs, choices=self.group_choices)
-        ]
+            GroupsAllowedWidget(attrs=groups_attrs, choices=self.group_choices)]
         super(PermissionsWidget, self).__init__(sub_widgets, attrs)
 
     def decompress(self, value):
@@ -100,6 +101,8 @@ class PermissionsWidget(forms.MultiWidget):
         context = super(PermissionsWidget, self).get_context(name, value, attrs)
         context['users'] = [{"username": x[0]} for x in self.user_choices]
         context['groups'] = [{"name": x[0]} for x in self.group_choices]
+        context['old_users'] = [{"username": x[0]} for x in self.old_users]
+        context['old_groups'] = [{"name": x[0]} for x in self.old_groups]
         return context
 
 
@@ -165,6 +168,16 @@ class PermissionsField(forms.MultiValueField):
         self.fields[1].queryset = groups_allowed
         self.widget.widgets[1].choices = self.widget.group_choices
 
+    def set_old_users_groups(self, old_users, old_groups):
+        self.widget.old_users = user_choices(old_users)
+        self.widget.old_groups = group_choices(old_groups)
+        if self.widget.old_users or self.widget.old_groups:
+            placeholder = [('None', 'None')]
+            if not self.widget.old_users:
+                self.widget.old_users = placeholder
+            if not self.widget.old_groups:
+                self.widget.old_groups = placeholder
+
 
 class AccessControlForm(forms.Form):
 
@@ -186,6 +199,68 @@ class AccessControlForm(forms.Form):
         possible_users_allowed = possible_users_allowed or get_user_model().objects.all()
         possible_groups_allowed = possible_groups_allowed or Group.objects.all()
         self.fields["permissions"].set_users_groups_allowed(possible_users_allowed, possible_groups_allowed)
+
+
+class PermissionsForm(forms.ModelForm):
+    """ Improved version of AccessControlForm.
+
+    Views that use subclasses of this form should override get_form_kwargs()
+    and set kwargs['user'], plus an optional list in kwargs['access_limits'].
+    """
+    permissions = PermissionsField(
+        label="Users and groups allowed",
+        required=False)
+
+    def __init__(self,
+                 data=None,
+                 files=None,
+                 auto_id='id_%s',
+                 prefix=None,
+                 initial=None,
+                 error_class=ErrorList,
+                 label_suffix=None,
+                 empty_permitted=False,
+                 instance=None,
+                 *args,
+                 **kwargs):
+        """ Initialize the permissions field of a form.
+
+        Supports all the regular parameters for a ModelForm, plus:
+        :param access_limits: list of AccessControl objects - a user or group
+            must have access to all of these objects to be available in the
+            permissions field
+        """
+        self.access_limits = kwargs.pop('access_limits', [])
+
+        super(PermissionsForm, self).__init__(data,
+                                              files,
+                                              auto_id,
+                                              prefix,
+                                              initial,
+                                              error_class,
+                                              label_suffix,
+                                              empty_permitted,
+                                              instance,
+                                              *args,
+                                              **kwargs)
+
+        # Find which users and groups haven't been added yet.
+        if instance is None:
+            addable_users = get_user_model().objects.all()
+            addable_groups = Group.objects.all()
+        else:
+            addable_users, addable_groups = instance.other_users_groups()
+            self.fields["permissions"].set_old_users_groups(
+                instance.users_allowed.all(),
+                instance.groups_allowed.all())
+
+        # Limit to users and groups that can see dependencies.
+        for access_limit in self.access_limits:
+            addable_users, addable_groups = access_limit.intersect_permissions(
+                addable_users,
+                addable_groups)
+        self.fields["permissions"].set_users_groups_allowed(addable_users,
+                                                            addable_groups)
 
 
 class DatatypeForm (forms.ModelForm):

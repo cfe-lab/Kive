@@ -36,7 +36,8 @@ LOGGER = logging.getLogger(__name__)  # Module level logger.
 deletion_order = [
     "ExecRecords", "Datasets", "Runs", "Pipelines", "PipelineFamilies", "Methods",
     "MethodFamilies", "CompoundDatatypes", "Datatypes",
-    "CodeResourceRevisions", "CodeResources", "DockerImages"
+    "CodeResourceRevisions", "CodeResources", "DockerImages", "ContainerApps",
+    "Containers", "ContainerFamilies"
 ]
 
 
@@ -272,6 +273,10 @@ class AccessControl(models.Model):
         help_text="What groups have access?",
         blank=True
     )
+
+    # Avoid PyCharm warnings. These get overwritten later with the real thing.
+    objects = None
+    DoesNotExist = None
 
     class Meta:
         abstract = True

@@ -236,6 +236,20 @@ def install_fixture_files(fixture_name):
         dir_to_install = os.path.join(fixture_files_path, target)
         shutil.copytree(dir_to_install, target_path)
 
+    test_container_path = os.path.join(settings.MEDIA_ROOT,
+                                       'CodeResources',
+                                       settings.DEFAULT_CONTAINER)
+    if not os.path.exists(test_container_path):
+        alpine_container_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        os.symlink(alpine_container_path, test_container_path)
+
 
 def remove_fixture_files():
     """

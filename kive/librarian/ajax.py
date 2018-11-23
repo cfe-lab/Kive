@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 
 from rest_framework import permissions, status
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
@@ -55,7 +55,7 @@ class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
         raise APIException('Unknown filter key: {}'.format(key))
 
     # noinspection PyUnusedLocal
-    @detail_route(methods=['get'])
+    @action(detail=True)
     def list_files(self, request, pk=None):
         """
         Retrieves a list of choices for files in this directory.
@@ -171,16 +171,12 @@ class DatasetViewSet(RemovableModelViewSet,
         return Response(DatasetSerializer(obj, context={'request': request}).data)
 
     # noinspection PyUnusedLocal
-    @detail_route(methods=['get'])
+    @action(detail=True)
     def download(self, request, pk=None):
         """
         Handles downloading of the Dataset.
         """
-        accessible_datasets = Dataset.filter_by_user(request.user)
         dataset = self.get_object()
-
-        if not accessible_datasets.filter(pk=dataset.pk).exists():
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
 
         data_handle = dataset.get_open_file_handle()
         if data_handle is None:

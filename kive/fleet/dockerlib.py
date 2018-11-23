@@ -2,13 +2,15 @@
 
 import logging
 import os
+# noinspection PyProtectedMember
 from pipes import quote
 import stat
 import tempfile
 import subprocess as sp
 
-from fleet.slurmlib import multi_check_output
 from django.conf import settings
+
+from fleet.slurmlib import multi_check_output
 
 
 logger = logging.getLogger("fleet.dockerlib")
@@ -62,7 +64,8 @@ class BaseDockerHandler(object):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for a method.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -73,6 +76,7 @@ class BaseDockerHandler(object):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         raise NotImplementedError
 
@@ -104,7 +108,8 @@ class DummyDockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for a method.
 
         This version just launches it on the host computer.
@@ -116,6 +121,7 @@ class DummyDockerHandler(BaseDockerHandler):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         if driver_name is None:
             raise NotImplementedError()
@@ -151,7 +157,10 @@ class DockerHandler(BaseDockerHandler):
     def _run_shell_command(cmd_lst):
         """ Helper routine:
         Call a shell command provided in cmd_lst
+        Any exception encountered will be raised, otherwise the resulting
+        stdout is returned.
         """
+        assert isinstance(cmd_lst, list), "list expected"
         logger.debug(" ".join(cmd_lst))
         out_str = None
         stderr_fd, stderr_path = tempfile.mkstemp()
@@ -209,15 +218,16 @@ class DockerHandler(BaseDockerHandler):
 
     @staticmethod
     def check_is_alive():
-        """Return True if the docker configuration is adequate for Kive's purposes.
-
+        """Check that the docker configuration is adequate for Kive's purposes.
+        This routine does not return anything; if it runs through without
+        an exception, this is considered a pass.
         This is done by
         1) calling bzip2 and checking for exceptions. bzip2 is needed when loading
         a docker image from a file.
         2) calling 'docker version' and checking for exceptions.
         """
         for cmd_lst in [[BZIP2_COMMAND, '-h'],
-                        ['sudo', DOCKER_COMMAND, 'version']]:
+                        ['sudo', '-n', DOCKER_COMMAND, 'version']]:
             DockerHandler._run_shell_command(cmd_lst)
             logger.debug("%s passed.", " ".join(cmd_lst))
 
@@ -253,7 +263,7 @@ class DockerHandler(BaseDockerHandler):
         """
         fmt_str = """table {{.Repository}}:{{.Tag}}|{{.ID}}|\
         {{.CreatedAt}}|{{.CreatedSince}}|{{.Digest}}|{{.Size}}"""
-        cmd_lst = ['sudo', DOCKER_COMMAND, "images", "--format", fmt_str]
+        cmd_lst = ['sudo', '-n', DOCKER_COMMAND, "images", "--format", fmt_str]
         if repotag_name is not None:
             cmd_lst.append(repotag_name)
         return DockerHandler._run_shell_command_to_dict(cmd_lst, splitchar="|")
@@ -280,7 +290,10 @@ class DockerHandler(BaseDockerHandler):
         """Return a string with some pertinent information about the docker configuration."""
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before docker_ident")
-        return DockerHandler._run_shell_command(['sudo', DOCKER_COMMAND, "version"])
+        return DockerHandler._run_shell_command(['sudo',
+                                                 '-n',
+                                                 DOCKER_COMMAND,
+                                                 "version"])
 
     @classmethod
     def generate_launch_args(cls,
@@ -289,7 +302,8 @@ class DockerHandler(BaseDockerHandler):
                              output_file_paths,
                              driver_name,
                              dependency_paths,
-                             image_id):
+                             image_id,
+                             container_file=None):
         """ Generate the launch command for the docker wrapper.
 
         :param host_step_dir: step folder under sandbox folder on host computer
@@ -300,6 +314,7 @@ class DockerHandler(BaseDockerHandler):
         :param dependency_paths: relative paths of dependency files that will
             be saved under the sandbox folder
         :param image_id: docker image id
+        :param container_file: singularity container file name
         """
         if not cls._is_alive:
             raise RuntimeError("Must call docker_is_alive before generate_launch_args")
@@ -344,3 +359,137 @@ class DockerHandler(BaseDockerHandler):
         args.extend(in_args)
         args.extend(out_args)
         return args
+
+
+SINGULARITY_COMMAND = 'singularity'
+
+
+class SingularityDockerHandler(DockerHandler):
+    """A Docker Handler that uses singularity to launch docker containers"""
+
+    _is_alive = False
+    singularity_cmd_path = None
+    sing_version = None
+
+    @classmethod
+    def docker_is_alive(cls):
+        """Make sure the docker/singularity environment is properly set up.
+        a) run the normal docker tests (docker and bzip2 executables). We do NOT need docker_wrap.py
+        b) check for existence of singularity executable; determine its path and version
+        """
+        if not cls._is_alive:
+            cls.check_is_alive()
+            # singularity existence and version
+            cmd_lst = [SINGULARITY_COMMAND, '--version']
+            cls.sing_version = DockerHandler._run_shell_command(cmd_lst)
+            logger.debug("%s passed.", " ".join(cmd_lst))
+            res_str = sp.check_output(['which', SINGULARITY_COMMAND], universal_newlines=True)
+            cls.singularity_cmd_path = res_str.strip()
+            if cls.singularity_cmd_path is None:
+                raise RuntimeError('Cannot determine singularity command path')
+            logger.debug("singularity command path: '{}'".format(cls.singularity_cmd_path))
+            cls._is_alive = True
+        return True
+
+    @classmethod
+    def docker_ident(cls):
+        """Return a string with some pertinent information about the docker configuration."""
+        if not cls._is_alive:
+            raise RuntimeError("Must call docker_is_alive before docker_ident")
+        dock_str = DockerHandler._run_shell_command(['sudo',
+                                                     '-n',
+                                                     DOCKER_COMMAND,
+                                                     "version"])
+        return "Singularity version {}\n{}".format(cls.sing_version, dock_str)
+
+    @classmethod
+    def generate_launch_args(cls,
+                             host_step_dir,
+                             input_file_paths,
+                             output_file_paths,
+                             driver_name,
+                             dependency_paths,
+                             image_id,
+                             container_file=None):
+        """ Generate the launch command for a method.
+
+        This version uses 'singularity exec' or 'singularity run' to run the driver
+        within a provided singularity container.
+
+        :param host_step_dir: step folder under sandbox folder on host computer
+        :param input_file_paths: list of input file paths on host computer
+        :param output_file_paths: list of output file paths on host computer
+        :param driver_name: file name of driver script that will be saved in
+            the sandbox folder, or None to use the image's entry point.
+        :param dependency_paths: relative paths of dependency files that will
+            be saved under the sandbox folder
+        :param image_id: docker image id
+        :param container_file: singularity container file name
+        """
+        if not cls._is_alive:
+            raise RuntimeError("Must call docker_is_alive before generate_launch_args")
+        if cls.singularity_cmd_path is None:
+            raise RuntimeError('Cannot determine singularity command path')
+        if container_file is None:
+            raise RuntimeError('No singularity container selected, is '
+                               'DEFAULT_CONTAINER configured?')
+        if not os.path.exists(container_file):
+            raise RuntimeError('Container file not found: ' + container_file)
+        # we want to run the code in the docker container under a standardised directory,
+        # so we convert the argument path names.
+        docker_input_path = "/mnt/input"
+        docker_output_path = "/mnt/output"
+        docker_bin_path = "/mnt/bin"
+        host_input_path = os.path.join(host_step_dir, 'input_data')
+        host_output_path = os.path.join(host_step_dir, 'output_data')
+        docker_in_args = [os.path.join(docker_input_path,
+                                       os.path.relpath(file_path, host_input_path))
+                          for file_path in input_file_paths]
+        docker_out_args = [os.path.join(docker_output_path,
+                                        os.path.relpath(file_path, host_output_path))
+                           for file_path in output_file_paths]
+
+        # NOTE: the driver program is run in the /mnt/bin directory in the container.
+        # some drivers will want to write temporary files, therefore we must mount
+        # it rw.
+        opt_string = "--contain -B {}:{}:rw,{}:{}:rw,{}:{}:rw --pwd {}".format(
+            host_input_path,
+            docker_input_path,
+            host_output_path,
+            docker_output_path,
+            host_step_dir,
+            docker_bin_path,
+            docker_bin_path)
+        # NOTE: if the driver_name is given, we must use 'singularity exec' otherwise
+        # 'singularity run' (which runs the image's entry point
+        if driver_name is None:
+            launch_command = "{} run {} {}".format(cls.singularity_cmd_path,
+                                                   opt_string,
+                                                   container_file)
+            prefix = 'launch'
+        else:
+            launch_command = "{} exec {} {} ./{}".format(cls.singularity_cmd_path,
+                                                         opt_string,
+                                                         container_file,
+                                                         driver_name)
+            prefix = driver_name
+        wrapper_template = """\
+#!/usr/bin/env bash
+cd {}
+{} {}
+"""
+        arg_string = " ".join((quote(name) for name in docker_in_args + docker_out_args))
+        wrapper = wrapper_template.format(
+            quote(host_step_dir),
+            launch_command, arg_string)
+        with tempfile.NamedTemporaryFile('w',
+                                         prefix=prefix,
+                                         suffix='.sh',
+                                         dir=host_step_dir,
+                                         delete=False) as wrapper_file:
+            wrapper_file.write(wrapper)
+            mode = os.fstat(wrapper_file.fileno()).st_mode
+            mode |= stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH  # execute bits
+            os.fchmod(wrapper_file.fileno(), stat.S_IMODE(mode))
+
+        return [wrapper_file.name]

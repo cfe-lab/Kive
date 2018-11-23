@@ -27,6 +27,7 @@ import transformation.models
 import file_access_utils
 from constants import maxlengths
 import method.signals
+from container.models import Container
 from fleet import docker_build
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
 
@@ -441,7 +442,13 @@ class Method(transformation.models.Transformation):
     docker_image = models.ForeignKey(
         DockerImage,
         related_name="methods",
-        help_text="The method will run inside this docker image.",
+        help_text="The method will run inside this docker image (deprecated).",
+        null=True,
+        blank=True)
+    container = models.ForeignKey(
+        Container,
+        related_name='methods',
+        help_text="The method will run inside this Singularity container.",
         null=True,
         blank=True)
     # Code resource revisions are executable if they link to Method

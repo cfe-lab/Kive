@@ -1,0 +1,39 @@
+<!-- Django template -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container App{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+{% endblock %}
+
+{% block widget_media %}
+{{ form.media }}
+{% endblock %}
+
+{% block content %}
+
+<a href="/container_update/{{ container_id }}" rel="prev">return to family</a>
+
+<h2>Container App</h2>
+
+<p>This describes an app in a Singularity container.</p>
+
+<pre>
+    {{ form.non_field_errors }}
+</pre>
+
+<form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+{% endblock %}

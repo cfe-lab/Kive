@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 
 # some simple  tests for the dockerlib module
+import os
+import shutil
 from unittest import skipIf, skip
 
 import os.path as osp
@@ -9,6 +11,8 @@ import subprocess as sp
 import fleet.dockerlib as dockerlib
 from django.conf import settings
 
+import tempfile
+
 from django.test import TestCase
 import six
 
@@ -16,6 +20,7 @@ TEST_DIR = osp.join(settings.KIVE_HOME, "fleet/dockerlib_test_files")
 
 
 class DummyDockerLibTests(TestCase):
+
     def get_docker_handler_class(self):
         return dockerlib.DummyDockerHandler
 
@@ -34,6 +39,7 @@ class DummyDockerLibTests(TestCase):
 
 @skipIf(not settings.RUN_DOCKER_TESTS, "Docker tests are disabled")
 class DockerLibTests(DummyDockerLibTests):
+
     def get_docker_handler_class(self):
         return dockerlib.DockerHandler
 
@@ -46,7 +52,7 @@ class DockerLibTests(DummyDockerLibTests):
                    'IMAGE ID': '7328f6f8b418',
                    'SIZE': '3.97MB',
                    'DIGEST': '<none>'}
-        img_info_dct = dockerlib.DockerHandler._load_image_from_file(image_name)
+        img_info_dct = self.docker_handler_class._load_image_from_file(image_name)
         # NOTE: we do not check the correctness of the CREATED_SINCE entry (the value
         # will obviously depend on when the test is run). Instead, we simply delete it
         # from the returned dict.
@@ -56,7 +62,7 @@ class DockerLibTests(DummyDockerLibTests):
     def test_load_image02(self):
         """Loading a nonexistent docker image should raise an exception"""
         with self.assertRaises(sp.CalledProcessError):
-            dockerlib.DockerHandler._load_image_from_file("NONEXISTENT-IMAGE")
+            self.docker_handler_class._load_image_from_file("NONEXISTENT-IMAGE")
 
     def test_docker_images01(self):
         """Sanity check the docker_images output."""
@@ -74,7 +80,7 @@ class DockerLibTests(DummyDockerLibTests):
     def test_two_pipe_command(self):
         expected_output = 'Beta\n'
 
-        output = dockerlib.DockerHandler._run_twopipe_command(
+        output = self.docker_handler_class._run_twopipe_command(
             ['echo', 'Alpha\nBeta\nDelta'],
             ['grep', 'B', '-'])
         assert isinstance(output, six.string_types)
@@ -91,7 +97,7 @@ Beta
 Delta | grep B -"""
 
         with self.assertRaises(OSError) as context:
-            dockerlib.DockerHandler._run_twopipe_command(
+            self.docker_handler_class._run_twopipe_command(
                 ['echoxxx', 'Alpha\nBeta\nDelta'],
                 ['grep', 'B', '-'])
         got_err = str(context.exception)
@@ -112,7 +118,7 @@ Beta
 Delta | grepxxx B -"""
 
         with self.assertRaises(OSError) as context:
-            dockerlib.DockerHandler._run_twopipe_command(
+            self.docker_handler_class._run_twopipe_command(
                 ['echo', 'Alpha\nBeta\nDelta'],
                 ['grepxxx', 'B', '-'])
         got_err = str(context.exception)
@@ -128,7 +134,7 @@ Delta | grepxxx B -"""
         expected_output = ""
 
         with self.assertRaises(sp.CalledProcessError) as context:
-            dockerlib.DockerHandler._run_twopipe_command(
+            self.docker_handler_class._run_twopipe_command(
                 ['echo', 'Alpha\nBeta\nDelta'],
                 ['grep', '-X', 'B', '-'])
 
@@ -142,9 +148,51 @@ Delta | grepxxx B -"""
         expected_output = ""
 
         with self.assertRaises(sp.CalledProcessError) as context:
-            dockerlib.DockerHandler._run_twopipe_command(
+            self.docker_handler_class._run_twopipe_command(
                 ['bzip2', 'unknown_file.bz2'],
                 ['grep', 'B', '-'])
 
         self.assertEqual(expected_error, str(context.exception))
         self.assertEqual(expected_output, context.exception.output)
+
+    def test_gen_launch_cmd01(self):
+        """ Check sanity of generated a launch command """
+        hoststepdir = tempfile.mkdtemp(prefix="kive_sandbox")
+        try:
+            input_file_paths = ["input1.dat", "input2.dat"]
+            output_file_paths = ["output1.dat", "output2.dat", "output3.dat"]
+            dep_paths = ["dep01.py", "dep02.py"]
+            image_id = "kive-default"
+            container_file = os.path.join(hoststepdir, "kive-default.simg")
+            with open(container_file, "w"):
+                pass  # Touch the file.
+            for driver_name in [None, "my_driver_prog.py"]:
+                try:
+                    retlst = self.docker_handler_class.generate_launch_args(
+                        hoststepdir,
+                        input_file_paths,
+                        output_file_paths,
+                        driver_name,
+                        dep_paths,
+                        image_id,
+                        container_file)
+                    assert isinstance(retlst, list), 'expected a list'
+                    for s in retlst:
+                        assert isinstance(s, six.string_types), 'expected a string'
+                    lverb = False
+                    if lverb:
+                        print("got launch {}".format(retlst))
+                except NotImplementedError:
+                    pass
+        finally:
+            shutil.rmtree(hoststepdir)
+
+@skipIf(not settings.RUN_SINGULARITY_TESTS, "Singularity tests are disabled")
+class SingularityDockerLibTests(DockerLibTests):
+
+    def get_docker_handler_class(self):
+        return dockerlib.SingularityDockerHandler
+
+    def placeholder_test_one(self):
+        # assert False, "force fail"
+        pass
