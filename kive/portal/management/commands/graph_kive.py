@@ -19,12 +19,15 @@ class Command(BaseCommand):
         apps.sort()
         for app in apps:
             print(app)
+            exclude_models = ['User', 'Group']
+            if app != 'metadata':
+                exclude_models.append('AccessControl')
             call_command("graph_models",
                          app,
                          pygraphviz=True,
                          group_models=True,
                          outputfile=os.path.join(docs_path, app+'.png'),
-                         exclude_models="User,Group")
+                         exclude_models=','.join(exclude_models))
 
         readme_path = os.path.join(docs_path, 'README.md')
         with open(readme_path, 'rU+') as f:

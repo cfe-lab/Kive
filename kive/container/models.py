@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 import errno
 import logging
 import os
@@ -22,7 +21,6 @@ from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 
 logger = logging.getLogger(__name__)
-
 
 
 class ContainerFamily(AccessControl):
