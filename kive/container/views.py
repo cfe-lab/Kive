@@ -8,10 +8,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
-from django.views.generic.edit import CreateView, UpdateView
+from django.views.generic.edit import CreateView, UpdateView, ModelFormMixin
 
-from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm
-from container.models import ContainerFamily, Container
+from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm, ContainerAppForm
+from container.models import ContainerFamily, Container, ContainerApp
 from file_access_utils import compute_md5
 from portal.views import admin_check, developer_check
 
@@ -139,3 +139,61 @@ class ContainerUpdate(UpdateView):
         access_limits = kwargs.setdefault('access_limits', [])
         access_limits.append(self.object.family)
         return kwargs
+
+
+class ArgumentWriterMixin(ModelFormMixin):
+    def __init__(self, *args, **kwargs):
+        super(ArgumentWriterMixin, self).__init__(*args, **kwargs)
+
+    def form_valid(self, form):
+        response = super(ArgumentWriterMixin, self).form_valid(form)
+        try:
+            form.instance.write_inputs(form.cleaned_data['inputs'])
+        except ValueError as ex:
+            form.add_error('inputs', ex.message)
+            response = super(ArgumentWriterMixin, self).form_invalid(form)
+        try:
+            form.instance.write_outputs(form.cleaned_data['outputs'])
+        except ValueError as ex:
+            form.add_error('outputs', ex.message)
+            response = super(ArgumentWriterMixin, self).form_invalid(form)
+        return response
+
+
+@method_decorator(decorators, name='dispatch')
+class ContainerAppCreate(CreateView, ArgumentWriterMixin):
+    model = ContainerApp
+    form_class = ContainerAppForm
+
+    def form_valid(self, form):
+        form.instance.container_id = self.kwargs['container_id']
+        return super(ContainerAppCreate, self).form_valid(form)
+
+    def get_success_url(self):
+        return reverse('container_update',
+                       kwargs=dict(pk=self.object.container_id))
+
+    def get_context_data(self, **kwargs):
+        context = super(ContainerAppCreate, self).get_context_data(**kwargs)
+        context['container_id'] = self.kwargs['container_id']
+        return context
+
+
+@method_decorator(decorators, name='dispatch')
+class ContainerAppUpdate(UpdateView, ArgumentWriterMixin):
+    model = ContainerApp
+    form_class = ContainerAppForm
+
+    def get_success_url(self):
+        return reverse('container_update',
+                       kwargs=dict(pk=self.object.container_id))
+
+    def get_context_data(self, **kwargs):
+        context = super(ContainerAppUpdate, self).get_context_data(**kwargs)
+        context['is_user_admin'] = admin_check(self.request.user)
+        context['container_id'] = self.object.container_id
+
+        form = context['form']
+        form.initial['inputs'] = self.object.inputs
+        form.initial['outputs'] = self.object.outputs
+        return context

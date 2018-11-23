@@ -9,8 +9,9 @@ from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from container.models import ContainerFamily, Container
-from container.serializers import ContainerFamilySerializer, ContainerSerializer
+from container.models import ContainerFamily, Container, ContainerApp
+from container.serializers import ContainerFamilySerializer, ContainerSerializer, \
+    ContainerAppSerializer
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination
 from metadata.models import AccessControl
@@ -141,3 +142,48 @@ class ContainerViewSet(CleanCreateModelMixin,
         finally:
             container.file.close()
         return response
+
+
+class ContainerAppViewSet(CleanCreateModelMixin,
+                          RemovableModelViewSet,
+                          SearchableModelMixin):
+    """ An app within a Singularity container.
+
+    Query parameters:
+
+    * is_granted - true For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to, via their
+        parent containers. For other users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=container_id&filters[n][val]=match - parent container's
+        id equals the value
+    * filters[n][key]=smart&filters[n][val]=match - app name or description
+        contains the value (case insensitive)
+    * filters[n][key]=name&filters[n][val]=match - app name contains the
+        value (case insensitive)
+    * filters[n][key]=description&filters[n][val]=match - description contains
+        the value (case insensitive)
+    """
+    queryset = ContainerApp.objects.all()
+    serializer_class = ContainerAppSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
+    filters = dict(
+        container_id=lambda queryset, value: queryset.filter(
+            container_id=value),
+        smart=lambda queryset, value: queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)),
+        name=lambda queryset, value: queryset.filter(
+            name__icontains=value),
+        description=lambda queryset, value: queryset.filter(
+            description__icontains=value))
+
+    def filter_granted(self, queryset):
+        """ Apps don't have permissions, so filter by parent containers. """
+        granted_containers = Container.filter_by_user(self.request.user)
+
+        return queryset.filter(container_id__in=granted_containers)

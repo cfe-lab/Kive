@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.fields import URLField
 
-from container.models import ContainerFamily, Container
+from container.models import ContainerFamily, Container, ContainerApp
 from kive.serializers import AccessControlSerializer
 
 
@@ -64,3 +64,31 @@ class ContainerSerializer(AccessControlSerializer,
                   'users_allowed',
                   'groups_allowed',
                   'removal_plan')
+
+
+class ContainerAppSerializer(serializers.ModelSerializer):
+    absolute_url = URLField(source='get_absolute_url', read_only=True)
+    container = serializers.HyperlinkedRelatedField(
+        view_name='container-detail',
+        lookup_field='pk',
+        queryset=Container.objects.all())
+    removal_plan = serializers.HyperlinkedIdentityField(
+        view_name='containerapp-removal-plan')
+
+    class Meta:
+        model = ContainerApp
+        fields = ('id',
+                  'url',
+                  'absolute_url',
+                  'container',
+                  'name',
+                  'description',
+                  'inputs',
+                  'outputs',
+                  'removal_plan')
+
+    def save(self, **kwargs):
+        app = super(ContainerAppSerializer, self).save(**kwargs)
+        app.write_inputs(self.initial_data.get('inputs', ''))
+        app.write_outputs(self.initial_data.get('outputs', ''))
+        return app

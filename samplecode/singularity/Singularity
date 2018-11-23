@@ -1,0 +1,19 @@
+# Generate the Singularity container to run MiCall on Kive.
+Bootstrap: docker
+From: python:2.7.15-alpine3.6
+
+%help
+    Minimal example that can run simple Python scripts under Kive.
+
+%label
+    MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
+
+%post
+    # Trim a bunch of extra features to reduce image size by about 25%.
+    cd /usr/local/lib/python2.7
+    rm -r site-packages/* ensurepip hotshot distutils curses
+    cd lib-dynload
+    rm pyexpat.so unicodedata.so _ctypes.so _tkinter.so parser.so cPickle.so \
+        _sqlite3.so _ssl.so _socket.so _curses*.so _elementtree.so \
+        zlib.so bz2.so _json.so cmath.so array.so _multibytecodec.so audioop.so \
+        _hotshot.so ossaudiodev.so _ctypes_test.so linuxaudiodev.so

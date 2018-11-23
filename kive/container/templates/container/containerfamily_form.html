@@ -21,7 +21,7 @@
         );
         var asf = new AjaxSearchFilter(table, $("#asf"));
 
-        // This adds a filter for the current CodeResource.
+        // This adds a filter for the current object.
         table.filterSet.add("family_id", {{containerfamily.id}}, true).hide();
 
         asf.reloadTable();

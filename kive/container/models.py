@@ -161,6 +161,123 @@ class Container(AccessControl):
         remove_helper(removal_plan)
 
 
+class ContainerApp(models.Model):
+    container = models.ForeignKey(Container, related_name="apps")
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH,
+                            help_text="Leave blank for default",
+                            blank=True)
+    description = models.CharField('Description',
+                                   blank=True,
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    arguments = None  # Filled in later from child table.
+    objects = None  # Filled in later by Django.
+
+    class Meta:
+        ordering = ('name',)
+
+    @property
+    def inputs(self):
+        return self._format_arguments(ContainerArgument.INPUT)
+
+    @property
+    def outputs(self):
+        return self._format_arguments(ContainerArgument.OUTPUT)
+
+    def _format_arguments(self, argument_type):
+        arguments = self.arguments.filter(type=argument_type)
+        optionals = [argument
+                     for argument in arguments
+                     if argument.position is None]
+        positionals = [argument
+                       for argument in arguments
+                       if argument.position is not None]
+        terms = [argument.formatted for argument in optionals]
+        if (argument_type == ContainerArgument.INPUT and
+                any(argument.allow_multiple for argument in optionals)):
+            terms.append('--')
+        terms.extend(argument.formatted for argument in positionals)
+        return ' '.join(terms)
+
+    def write_inputs(self, formatted):
+        self._write_arguments(ContainerArgument.INPUT, formatted)
+
+    def write_outputs(self, formatted):
+        self._write_arguments(ContainerArgument.OUTPUT, formatted)
+
+    def _write_arguments(self, argument_type, formatted):
+        self.arguments.filter(type=argument_type).delete()
+        expected_multiples = {ContainerArgument.INPUT: '*',
+                              ContainerArgument.OUTPUT: '/'}
+        for position, term in enumerate(formatted.split(), 1):
+            if term == '--':
+                continue
+            match = re.match(r'(--)?(\w+)([*/])?$', term)
+            if match is None:
+                raise ValueError('Invalid argument name: {}'.format(term))
+            if match.group(1):
+                position = None
+            if not match.group(3):
+                allow_multiple = False
+            elif match.group(3) == expected_multiples[argument_type]:
+                allow_multiple = True
+            else:
+                raise ValueError('Invalid argument name: {}'.format(term))
+            self.arguments.create(name=match.group(2),
+                                  position=position,
+                                  allow_multiple=allow_multiple,
+                                  type=argument_type)
+
+    def get_absolute_url(self):
+        return reverse('container_app_update', kwargs=dict(pk=self.pk))
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["ContainerApps"]
+        removal_plan["ContainerApps"].add(self)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+
+class ContainerArgument(models.Model):
+    INPUT = 'I'
+    OUTPUT = 'O'
+    TYPES = ((INPUT, 'Input'),
+             (OUTPUT, 'Output'))
+
+    app = models.ForeignKey(ContainerApp, related_name="arguments")
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
+    position = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text="Position in the arguments (gaps and duplicates are allowed). "
+                  "Leave position blank to pass as an option with --name.")
+    type = models.CharField(max_length=1, choices=TYPES)
+    allow_multiple = models.BooleanField(
+        default=False,
+        help_text="True for optional inputs that accept multiple datasets and "
+                  "outputs that just collect all files written to a directory")
+
+    def __repr__(self):
+        return 'ContainerArgument(name={!r})'.format(self.name)
+
+    @property
+    def formatted(self):
+        text = self.name
+        if self.position is None:
+            # noinspection PyTypeChecker
+            text = '--' + text
+        if self.allow_multiple:
+            text += '*' if self.type == ContainerArgument.INPUT else '/'
+        return text
+
+
 @receiver(models.signals.post_delete, sender=Container)
 def delete_container_file(instance, **_kwargs):
     if instance.file:
