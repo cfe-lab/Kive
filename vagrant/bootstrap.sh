@@ -100,7 +100,7 @@ python get-pip.py pip==9.0.1
 rm get-pip.py
 
 echo ========== Installing Kive ==========
-yum install -q -y python-devel libsqlite3x-devel words lsof
+yum install -q -y python-devel libsqlite3x-devel words lsof graphviz graphviz-devel
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..
