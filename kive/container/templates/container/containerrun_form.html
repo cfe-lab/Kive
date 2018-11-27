@@ -1,0 +1,43 @@
+<!-- Django template -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Run{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ form.media }}
+{% endblock %}
+
+{% block content %}
+
+<a href="/container_runs" rel="prev">return to Container Runs</a>
+
+<h2>Container Run</h2>
+
+<p>This describes a Singularity container, running under Kive.</p>
+
+<pre>
+    {{ form.non_field_errors }}
+</pre>
+
+<form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+{% endblock %}

@@ -105,8 +105,28 @@ class ContainerFileFormFieldMockTests(TestCase):
         field.clean(uploaded_file)
 
 
-@mocked_relations(ContainerApp, ContainerArgument)
+@mocked_relations(Container, ContainerApp, ContainerArgument)
 class ContainerAppMockTests(TestCase):
+    def test_display_name(self):
+        app = ContainerApp(name='reticulate')
+        app.container = Container(tag='v1.0')
+        expected_display_name = 'v1.0 / reticulate'
+
+        display_name = app.display_name
+        app_str = str(app)
+
+        self.assertEqual(expected_display_name, display_name)
+        self.assertEqual(expected_display_name, app_str)
+
+    def test_display_default(self):
+        app = ContainerApp(name='')  # default app
+        app.container = Container(tag='v1.0')
+        expected_display_name = 'v1.0'
+
+        display_name = app.display_name
+
+        self.assertEqual(expected_display_name, display_name)
+
     def test_arguments(self):
         app = ContainerApp()
         app.arguments.create(name='greetings_csv',

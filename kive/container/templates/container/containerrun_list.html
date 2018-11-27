@@ -1,0 +1,135 @@
+<!-- Django template -->
+<!-- Display container families -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Runs{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/container/ContainerRunTable.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+
+    <script type="text/javascript">
+
+    $(function(){
+        var table = new permissions.ContainerRunTable(
+            $("#containerruns"),
+            {{ is_user_admin|lower }},
+            $(".navigation_links")
+        );
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+        asf.reloadTable();
+    });
+
+    </script>
+
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to Users portal</a>
+
+<h2>Container Runs</h2>
+
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label for="search-name">Name</label><input
+                name="name"
+                id="search-name"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-description">Description</label><input
+                name="description"
+                id="search-description"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-batch">Batch Name</label><input
+                name="batch"
+                id="search-batch"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-batch-desc">Batch Desc.</label><input
+                name="batch-desc"
+                id="search-batch-desc"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="startafter">Start after</label><input
+                name="startafter"
+                id="startafter"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="startbefore">Start before</label><input
+                name="startbefore"
+                id="startbefore"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="endafter">End after</label><input
+                name="endafter"
+                id="endafter"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="endbefore">End before</label><input
+                name="endbefore"
+                id="endbefore"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="active">Is active</label><input
+                name="active"
+                id="active"
+                type="checkbox"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="user">Creator</label><input
+                name="user"
+                id="user"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
+    </form>
+</div>
+
+<div class="navigation_links"></div>
+
+<div class="dev_results">
+    <table id="containerruns"></table>
+</div>
+
+{% endblock %}

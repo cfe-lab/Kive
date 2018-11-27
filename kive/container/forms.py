@@ -1,7 +1,7 @@
 from django import forms
 from django.forms.widgets import TextInput
 
-from container.models import ContainerFamily, Container, ContainerApp
+from container.models import ContainerFamily, Container, ContainerApp, ContainerRun
 from metadata.forms import PermissionsForm
 
 
@@ -41,5 +41,14 @@ class ContainerAppForm(forms.ModelForm):
 
     class Meta(object):
         model = ContainerApp
-        fields = ['name', 'description', 'inputs', 'outputs']
+        exclude = ['container']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
+
+
+class ContainerRunForm(forms.ModelForm):
+    class Meta(object):
+        model = ContainerRun
+        exclude = ['user', 'state']
+
+    def save(self, commit=True):
+        return super(ContainerRunForm, self).save(commit)

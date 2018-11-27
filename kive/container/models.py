@@ -189,6 +189,17 @@ class ContainerApp(models.Model):
         ordering = ('name',)
 
     @property
+    def display_name(self):
+        name = self.container.tag
+        if self.name:
+            # noinspection PyTypeChecker
+            name += ' / ' + self.name
+        return name
+
+    def __str__(self):
+        return self.display_name
+
+    @property
     def inputs(self):
         return self._format_arguments(ContainerArgument.INPUT)
 
@@ -303,7 +314,7 @@ def delete_container_file(instance, **_kwargs):
 
 class Batch(AccessControl):
     name = models.CharField(
-        "Name of this batch of container instances",
+        "Name of this batch of container runs",
         max_length=maxlengths.MAX_NAME_LENGTH,
         blank=True)
     description = models.TextField(
@@ -311,7 +322,7 @@ class Batch(AccessControl):
         blank=True)
 
 
-class ContainerInstance(Stopwatch, AccessControl):
+class ContainerRun(Stopwatch, AccessControl):
     NEW = 'N'
     PENDING = 'P'
     RUNNING = 'R'
@@ -326,9 +337,9 @@ class ContainerInstance(Stopwatch, AccessControl):
               (COMPLETE, 'Complete'),
               (FAILED, 'Failed'),
               (CANCELLED, 'Cancelled'))
-    container = models.ForeignKey(Container, related_name="instances")
-    batch = models.ForeignKey(Batch, related_name="instances")
-    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
+    app = models.ForeignKey(ContainerApp, related_name="runs")
+    batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
     description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
     state = models.CharField(max_length=1, choices=STATES, default=NEW)
@@ -337,18 +348,34 @@ class ContainerInstance(Stopwatch, AccessControl):
         blank=True)
     return_code = models.IntegerField(blank=True, null=True)
     stopped_by = models.ForeignKey(User,
-                                   help_text="User that stopped this instance",
+                                   help_text="User that stopped this run",
                                    null=True,
                                    blank=True,
-                                   related_name="instances_stopped")
+                                   related_name="container_runs_stopped")
     is_redacted = models.BooleanField(
         default=False,
         help_text="True if the outputs or logs were redacted for sensitive data")
 
+    class Meta(object):
+        ordering = ('-start_time',)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["ContainerRuns"]
+        removal_plan["ContainerRuns"].add(self)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
 
 class ContainerDataset(models.Model):
-    container_instance = models.ForeignKey(ContainerInstance,
-                                           related_name="datasets")
+    run = models.ForeignKey(ContainerRun, related_name="datasets")
     argument = models.ForeignKey(ContainerArgument, related_name="datasets")
     dataset = models.ForeignKey(Dataset, related_name="containers")
     name = models.CharField(
@@ -366,8 +393,7 @@ class ContainerLog(models.Model):
     TYPES = ((STDOUT, 'stdout'),
              (STDERR, 'stderr'))
     type = models.CharField(max_length=1, choices=TYPES)
-    container_instance = models.ForeignKey(ContainerInstance,
-                                           related_name="logs")
+    run = models.ForeignKey(ContainerRun, related_name="logs")
     short_text = models.CharField(
         max_length=2000,
         blank=True,

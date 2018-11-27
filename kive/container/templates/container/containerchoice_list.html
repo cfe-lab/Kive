@@ -1,0 +1,109 @@
+<!-- Django template -->
+<!-- Display container families -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Analysis{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/container/ContainerChoiceTable.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+
+    <script type="text/javascript">
+
+    $(function(){
+        var table = new permissions.ContainerChoiceTable(
+            $("#containerchoices"),
+            {{ is_user_admin|lower }},
+            $(".navigation_links")
+        );
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+        asf.reloadTable();
+    });
+
+    </script>
+
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+{% endblock %}
+
+{% block content %}
+
+<a href="usr.html" rel="prev">Back to Users portal</a>
+
+<h2>Container Analysis</h2>
+<p>Please select a container app that you would like to run.</p>
+
+<div id="asf">
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="smart" class="asf-search-field">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            {% csrf_token %}
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>
+    <form class="asf-advanced-form">
+        <input type="button" class="advanced ctrl" value="Advanced">
+        <h4>Advanced search</h4>
+        <div class="asf-field-container">
+            <label for="search-family">Family Name</label><input
+                name="family"
+                id="search-family"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-family-desc">Family Description</label><input
+                name="family_desc"
+                id="search-family-desc"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-container">Container Name</label><input
+                name="container"
+                id="search-container"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-container-desc">Container Desc.</label><input
+                name="container_desc"
+                id="search-container-desc"
+                type="text"
+                class="asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-app">App Name</label><input
+                name="app"
+                id="search-app"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <div class="asf-field-container">
+            <label for="search-app-desc">App Description</label><input
+                name="app_desc"
+                id="search-app-desc"
+                type="text"
+                class="datetime asf-search-fixed-field">
+        </div>
+        <input type="submit" value="Filter" class="asf-search-button">
+    </form>
+</div>
+
+<div class="navigation_links"></div>
+
+<div class="dev_results">
+    <table id="containerchoices"></table>
+</div>
+
+{% endblock %}

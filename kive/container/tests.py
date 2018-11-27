@@ -8,7 +8,7 @@ from django.urls import reverse, resolve
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
-from container.models import ContainerFamily, ContainerApp, Container
+from container.models import ContainerFamily, ContainerApp, Container, ContainerRun
 from kive.tests import BaseTestCases
 
 
@@ -137,3 +137,25 @@ class ContainerAppApiTests(BaseTestCases.ApiTestCase):
 
         end_count = ContainerApp.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerRunTests(TestCase):
+    def test(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        app = ContainerApp.objects.create(container=container, name='test')
+        client = Client()
+        client.force_login(user)
+        start_count = ContainerRun.objects.count()
+        expected_count = start_count + 1
+
+        response = client.post(reverse('container_run_add'),
+                               data=dict(app=app.id))
+
+        end_count = ContainerRun.objects.count()
+
+        if response.status_code != 302:
+            self.assertEqual({}, response.context['form'].errors)
+        self.assertEqual(expected_count, end_count)

@@ -10,26 +10,21 @@ from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import CreateView, UpdateView, ModelFormMixin
 
-from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm, ContainerAppForm
-from container.models import ContainerFamily, Container, ContainerApp
+from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm, ContainerAppForm, ContainerRunForm
+from container.models import ContainerFamily, Container, ContainerApp, ContainerRun
 from file_access_utils import compute_md5
-from portal.views import admin_check, developer_check
+from portal.views import developer_check, AdminViewMixin
 
 decorators = [login_required, user_passes_test(developer_check)]
 
 
 @method_decorator(decorators, name='dispatch')
-class ContainerFamilyList(TemplateView):
+class ContainerFamilyList(TemplateView, AdminViewMixin):
     template_name = 'container/containerfamily_list.html'
-
-    def get_context_data(self, **kwargs):
-        context = super(ContainerFamilyList, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
-        return context
 
 
 @method_decorator(decorators, name='dispatch')
-class ContainerFamilyUpdate(UpdateView):
+class ContainerFamilyUpdate(UpdateView, AdminViewMixin):
     model = ContainerFamily
     form_class = ContainerFamilyForm
 
@@ -40,11 +35,6 @@ class ContainerFamilyUpdate(UpdateView):
 
     def get_success_url(self):
         return reverse('container_families')
-
-    def get_context_data(self, **kwargs):
-        context = super(ContainerFamilyUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
-        return context
 
 
 @method_decorator(decorators, name='dispatch')
@@ -63,7 +53,7 @@ class ContainerFamilyCreate(CreateView):
 
 
 @method_decorator(decorators, name='dispatch')
-class ContainerCreate(CreateView):
+class ContainerCreate(CreateView, AdminViewMixin):
     model = Container
     form_class = ContainerForm
 
@@ -97,7 +87,6 @@ class ContainerCreate(CreateView):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerCreate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['family_id'] = self.kwargs['family_id']
         return context
 
@@ -110,7 +99,7 @@ class ContainerCreate(CreateView):
 
 
 @method_decorator(decorators, name='dispatch')
-class ContainerUpdate(UpdateView):
+class ContainerUpdate(UpdateView, AdminViewMixin):
     model = Container
     form_class = ContainerUpdateForm
 
@@ -125,7 +114,6 @@ class ContainerUpdate(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['family_id'] = self.object.family_id
         context['download_url'] = reverse('container-download',
                                           kwargs=dict(pk=self.object.pk))
@@ -180,7 +168,7 @@ class ContainerAppCreate(CreateView, ArgumentWriterMixin):
 
 
 @method_decorator(decorators, name='dispatch')
-class ContainerAppUpdate(UpdateView, ArgumentWriterMixin):
+class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
     model = ContainerApp
     form_class = ContainerAppForm
 
@@ -190,10 +178,40 @@ class ContainerAppUpdate(UpdateView, ArgumentWriterMixin):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerAppUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['container_id'] = self.object.container_id
 
         form = context['form']
         form.initial['inputs'] = self.object.inputs
         form.initial['outputs'] = self.object.outputs
         return context
+
+
+@method_decorator(decorators, name='dispatch')
+class ContainerChoiceList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerchoice_list.html'
+
+    def get_context_data(self, **kwargs):
+        return super(ContainerChoiceList, self).get_context_data(**kwargs)
+
+
+@method_decorator(decorators, name='dispatch')
+class ContainerRunList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerrun_list.html'
+
+
+@method_decorator(decorators, name='dispatch')
+class ContainerRunCreate(CreateView, AdminViewMixin):
+    model = ContainerRun
+    form_class = ContainerRunForm
+
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        response = super(ContainerRunCreate, self).form_valid(form)
+        return response
+
+    def form_invalid(self, form):
+        response = super(ContainerRunCreate, self).form_invalid(form)
+        return response
+
+    def get_success_url(self):
+        return reverse('container_runs')
