@@ -674,6 +674,9 @@ class PipelineCable(models.Model):
     def is_cable(self):
         return True
 
+    def is_method(self):
+        return False
+
     def is_compatible(self, other_cable):
         """
         Cables are compatible if both are trivial, or the wiring
