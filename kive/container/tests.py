@@ -22,7 +22,7 @@ class ContainerAppTests(TestCase):
         client.force_login(user)
         response = client.post(reverse('container_app_add',
                                        kwargs=dict(container_id=container.id)),
-                               {})
+                               dict(threads=1, memory=100))
         if response.status_code != 302:
             self.assertEqual({}, response.context['form'].errors)
 
@@ -37,7 +37,9 @@ class ContainerAppTests(TestCase):
 
         response = client.post(reverse('container_app_add',
                                        kwargs=dict(container_id=container.id)),
-                               dict(inputs=expected_inputs,
+                               dict(threads=1,
+                                    memory=100,
+                                    inputs=expected_inputs,
                                     outputs=expected_outputs))
 
         if response.status_code != 302:
