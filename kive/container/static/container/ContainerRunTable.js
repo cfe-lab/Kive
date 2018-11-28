@@ -7,8 +7,8 @@
 	    this.registerColumn("Name", "name");
 	    this.registerColumn("Description", "description");
 	    this.registerColumn("App", "app_name");
-	    this.registerColumn("Start", "start_time");
-	    this.registerColumn("End", "end_time");
+	    this.registerDateTimeColumn("Start", "start_time");
+	    this.registerDateTimeColumn("End", "end_time");
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");

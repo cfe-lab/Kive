@@ -1,10 +1,12 @@
 import mimetypes
 import os
+from datetime import datetime
 from wsgiref.util import FileWrapper
 
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -17,6 +19,11 @@ from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination
 from metadata.models import AccessControl
 from portal.views import admin_check
+
+
+def parse_date_filter(text):
+    return timezone.make_aware(datetime.strptime(text, '%d %b %Y %H:%M'),
+                               timezone.get_current_timezone())
 
 
 class ContainerFamilyViewSet(CleanCreateModelMixin,
@@ -278,6 +285,14 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         the value (case insensitive)
     * filters[n][key]=user&filters[n][val]=match - username of creator contains
         the value (case insensitive)
+    * filters[n][key]=startafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started after the given date and time.
+    * filters[n][key]=startbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        started before the given date and time.
+    * filters[n][key]=endafter&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended after the given date and time.
+    * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
+        ended before the given date and time.
     """
     queryset = ContainerRun.objects.all()
     serializer_class = ContainerRunSerializer
@@ -292,4 +307,12 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         description=lambda queryset, value: queryset.filter(
             description__icontains=value),
         user=lambda queryset, value: queryset.filter(
-            user__username__icontains=value))
+            user__username__icontains=value),
+        startafter=lambda queryset, value: queryset.filter(
+            start_time__gt=parse_date_filter(value)),
+        startbefore=lambda queryset, value: queryset.filter(
+            start_time__lt=parse_date_filter(value)),
+        endafter=lambda queryset, value: queryset.filter(
+            end_time__gt=parse_date_filter(value)),
+        endbefore=lambda queryset, value: queryset.filter(
+            end_time__lt=parse_date_filter(value)))

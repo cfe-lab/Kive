@@ -14,6 +14,7 @@ from django.db import models, transaction
 from django.dispatch import receiver
 from django.forms.fields import FileField as FileFormField
 from django.urls import reverse
+from django.utils import timezone
 
 from constants import maxlengths
 from librarian.models import Dataset
@@ -358,6 +359,18 @@ class ContainerRun(Stopwatch, AccessControl):
 
     class Meta(object):
         ordering = ('-start_time',)
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk is None:
+            self.start_time = timezone.now()
+        super(ContainerRun, self).save(force_insert,
+                                       force_update,
+                                       using,
+                                       update_fields)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
