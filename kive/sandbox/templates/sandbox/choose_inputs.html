@@ -1,0 +1,193 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Analysis{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/moment.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/sandbox/choose_inputs.js"></script>
+    <script src="/static/sandbox/choose_multi_inputs.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+    <script src="/static/sandbox/jq_color_anim.min.js"></script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/sandbox/sandbox.css"/>
+    <link rel="stylesheet" href="/static/sandbox/choose_inputs.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ start_form.media }}
+{% endblock %}
+
+{% block content %}
+<div id="fixed_overlay">
+    <a href="/choose_pipeline" rel="prev">Back to pipeline selection</a>
+    <input type="hidden" id="pipeline_pk" value="{{ pipeline.pk }}"/>
+
+    <div id="errors" class="errortext">{{ input_error_msg }}</div>
+
+    <div id="above_box" class="hidden">
+
+    <div class="dataset-search-dlg">
+        <a class="close ctrl">&times;</a>
+        <h2>Search for datasets to put into <em></em></h2>
+
+        <div class="search_results">
+
+            <form class="asf-form">
+
+            <div class="asf-main-search">
+                <div class="asf-active-filters"></div>
+                <input type="text" name="smart" class="asf-search-field">
+                <input type="submit" class="asf-search-button">
+            </div>
+
+            <div class="search_filters">
+                <h4>Filter results</h4>
+                <select name="creator" id="creator" data-filter-name="user">
+                    <option value="">Creator</option>
+                </select>
+                <select name="date_added" id="date_added" data-filter-name="createdafter">
+                    <option value="">Date Added</option>
+                    <option value="day">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="year">This year</option>
+                    <option value="t-0.5h">In the last 30 minutes</option>
+                    <option value="t-1h">In the last hour</option>
+                    <option value="t-1d">In the last day</option>
+                    <option value="t-7d">In the last week</option>
+                    <option value="t-1m">In the last month</option>
+                    <option value="t-1y">In the last year</option>
+                    <!-- <option value="custom" disabled>Custom...</option> -->
+                </select>
+                <!-- <select name="date_last_run" id="date_last_run">
+                    <option value="">Date Last Run</option>
+                    <option value="day">Today</option>
+                    <option value="week">This week</option>
+                    <option value="month">This month</option>
+                    <option value="year">This year</option>
+                    <option value="t-0.5h">In the last 30 minutes</option>
+                    <option value="t-1h">In the last hour</option>
+                    <option value="t-1d">In the last day</option>
+                    <option value="t-7d">In the last week</option>
+                    <option value="t-1m">In the last month</option>
+                    <option value="t-1y">In the last year</option>
+                    <option value="custom" disabled>Custom...</option>
+                </select> -->
+            </div>
+
+            </form>
+
+
+            <!-- <a class="select-all ctrl">Select All</a> -->
+            <table>
+                <tfoot><tr><td colspan="100">
+                <div class="navigation_links"></div>
+                <div class="error results-table-error"></div>
+                </td></tr></tfoot>
+            </table>
+        </div>
+
+        <div id="insert_dataset">
+            <div id="insert_many_dataset">Menu
+            <div id="insert_many_menu">
+                <ul>
+                    <li data-action="fill-column">Fill column</li>
+                    <li data-action="auto-fill-column">Fill column &amp; enable auto-fill</li>
+                </ul>
+            </div></div>
+            <button id="insert_one_dataset">↓</button>
+        </div>
+    </div>
+
+    </div>
+
+    <div id="below_box">
+        <div id="permissions_widget">
+            {{ start_form.permissions }}
+        </div>
+        <div class="errortext">{{ startform_permissions_error }}</div>
+        <table>
+            <tr>
+                <td>
+                    {{ start_form.name.label }}
+                    <div class="helptext">{{ start_form.name.help_text }}</div>
+                    {{ start_form.name }}
+                </td>
+                <td id="run_controls">
+                    <label>Add or remove runs:</label>
+                    <span class="nobreak"><input type="button" class="add_run left-button" value="+">
+		      <input type="button" class="remove_run right-button" value="&minus;"></span>
+
+                    <div class="error row-ctrl-error"></div>
+                </td>
+                <td>
+                    <a id="permissions_ctrl" class="button">Manage Permissions</a>
+                </td>
+		<td>
+		  <label>Run Priority:</label>
+		  <select id="id_prioselect" class="button">
+		    <option value="0">         {{priolist.0}}</option>
+		    <option value="1" selected>{{priolist.1}}</option>
+		    <option value="2">         {{priolist.2}}</option>
+		  </select>
+		</td>
+		<td>
+		  <form action="run_pipeline" id="run_pipeline" method="post">
+		    {% csrf_token %}
+		    <input type="submit" id="submit" value="Start Run(s)">
+		    <div class="errortext">{{ name.errors }}</div>
+		    {{ start_form.pipeline }}
+		    <div class="errortext">{{ non_field_errors }}</div>
+		    <div class="errortext">{{ pipeline.errors }}</div>
+		    <div class="error non_field_errors"></div>
+		    <div class="error pipeline-error"></div>
+		  </form>
+		</td>
+            </tr>
+        </table>
+    </div>
+
+    <div id="progress"></div>
+    <div id="details"></div>
+</div>
+
+<div id="scroll_content">
+    <h4 id="pipeline_name">{{ pipeline }}</h4>
+    <table id="dataset_input_table">
+
+        <thead>
+            <tr>
+                <th>Run Name</th>
+            {% for input in inputs %}
+                <th>{{ input.dataset_name }}</th>
+	    {% endfor %}
+            </tr>
+        </thead>
+
+        <tbody class="single-run">
+            <tr>
+                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name" placeholder="{{ pipeline }}"></td>
+            {% for input in inputs %}
+                <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
+	    {% endfor %}
+            </tr>
+        </tbody>
+
+        <tfoot>
+            <tr>
+                <td colspan="999"><a class="add_run button"><b>+</b>&ensp;Add another row run</button></td>
+            </tr>
+        </tfoot>
+
+    </table>
+</div>
+
+{% endblock %}
