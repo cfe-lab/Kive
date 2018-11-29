@@ -2,7 +2,7 @@ $(function() {
     // "final" vars (should never change)
     // "const" keyword is not well supported otherwise it would be of use here
     var IS_USER_ADMIN = false, // Never show admin tools on this page
-        PIPELINE_PK = parseInt($("#id_pipeline").val(), 10);
+        APP_URL = $("#app_url").val();
 
     // objects (many will be extended below)
     var body = $('body'),
@@ -214,7 +214,7 @@ $(function() {
                     cell.replaceWith(
                         uiFactory.inputDatasetCell(
                             selected_val.text(),
-                            selected_val.data('id'),
+                            selected_val.data('url'),
                             receiving_cell.data()
                         )
                     );
@@ -480,11 +480,11 @@ $(function() {
             hiddenInput: function(name, value) {
                 return hidden_input.clone().attr('name', name).val(value);
             },
-            inputDatasetCell: function(name, id, extra_data) {
+            inputDatasetCell: function(name, url, extra_data) {
                 return input_dataset.clone()
                     .append($('<div>').text(name).addClass('text'))
                     .data(extra_data)
-                    .data('id', id)
+                    .data('url', url)
                 ;
             }
         };
@@ -570,7 +570,7 @@ $(function() {
 
                 last_filled_input = uiFactory.inputDatasetCell(
                     selected_val.text(),
-                    selected_val.data('id'),
+                    selected_val.data('url'),
                     $('button', next_blank_input).data()
                 );
 
@@ -703,19 +703,19 @@ $(function() {
         var serialized_data = serialize();
         if (serialized_data) {
             $.ajax(
-                '/api/runbatches/',
+                '/api/batches/',
                 {
                     method: "POST",
                     contentType: 'application/json',
                     data: JSON.stringify(serialized_data),
                     success: function(data) {
                         if (data.hasOwnProperty('id')) {
-                            window.location = '/runbatch/' + data.id;
+                            window.location = '/container_runs';
                         }
                     }
                 }
             ).fail(function(xhr) {
-		jsondct = xhr.responseJSON
+		jsondct = xhr.responseJSON;
 		// console.error("api/runbatches dicty ", jsondct);
 		for (var key in jsondct){
 		    // console.error("wow ", key, jsondct[key]);
@@ -735,19 +735,19 @@ $(function() {
             dataset_input_table.find('tr').each(function(run_index) {
                 var row = $(this);
                 var run = runs[run_index] = {
-                    pipeline: PIPELINE_PK,
+                    app: APP_URL,
                     description: '',
                     users_allowed: [],
                     groups_allowed: [],
-                    inputs: [],
+                    datasets: [],
                     name: $('.run-name', row).val(),
-		    priority: $('#id_prioselect').val()
+                    priority: $('#id_prioselect').val()
                 };
                 $('.input-dataset', row).each(function() {
                     var cell = $(this);
-                    run.inputs.push({
-                        index: cell.data('dataset-idx'),
-                        dataset: cell.data('id')
+                    run.datasets.push({
+                        argument: cell.data('argUrl'),
+                        dataset: cell.data('url')
                     });
                 });
             });
@@ -1020,7 +1020,7 @@ $(function() {
       .find('.close.ctrl')  .click      ( dataset_search_dialog.hide );
     $('#date_added')        .change     ( dateAddedFilterHandler );
     $('#id_name')           .keyup      ( setRunNamesPrefix );
-    $('#run_pipeline')      .submit     ( mainSubmitHandler );
+    $('#run_container')     .submit     ( mainSubmitHandler );
 
     /**
      * Delegated events

@@ -14,15 +14,13 @@
 })(permissions);
 
 function buildContainers($td, row) {
-    var $form = $('<form method="POST" action="container_run_add">'),
+    var $form = $('<form method="GET" action="container_inputs">'),
         $select = $('<select name="app">'),
-		$csrf = $('#asf form.asf-form input[name="csrfmiddlewaretoken"]'),
         app,
 		app_name,
 		app_count = 0,
         i, j, container, $option;
 
-    $form.append($csrf.clone());
 	for (i in row.containers) {
 		container = row.containers[i];
 		for (j in container.apps) {

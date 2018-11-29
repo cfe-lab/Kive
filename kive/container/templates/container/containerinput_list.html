@@ -7,28 +7,28 @@
     <script src="/static/portal/moment.min.js"></script>
     <script src="/static/portal/noxss.js"></script>
     <script src="/static/portal/permissions.js"></script>
-    <script src="/static/sandbox/choose_inputs.js"></script>
-    <script src="/static/sandbox/choose_multi_inputs.js"></script>
+    <script src="/static/container/choose_inputs.js"></script>
+    <script src="/static/container/choose_multi_inputs.js"></script>
     <script src="/static/portal/ajaxsearchfilter.js"></script>
     <script src="/static/portal/helptext.js"></script>
-    <script src="/static/sandbox/jq_color_anim.min.js"></script>
+    <script src="/static/container/jq_color_anim.min.js"></script>
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/sandbox/sandbox.css"/>
-    <link rel="stylesheet" href="/static/sandbox/choose_inputs.css"/>
+    <link rel="stylesheet" href="/static/container/sandbox.css"/>
+    <link rel="stylesheet" href="/static/container/choose_inputs.css"/>
     <link rel="stylesheet" href="/static/portal/search.css"/>
     <link rel="stylesheet" href="/static/portal/permissions.css"/>
 {% endblock %}
 
 {% block widget_media %}
-{{ start_form.media }}
+{{ batch_form.media }}
 {% endblock %}
 
 {% block content %}
 <div id="fixed_overlay">
-    <a href="/choose_pipeline" rel="prev">Back to pipeline selection</a>
-    <input type="hidden" id="pipeline_pk" value="{{ pipeline.pk }}"/>
+    <a href="/container_choices" rel="prev">Back to container selection</a>
+    <input type="hidden" id="app_url" value="{{ app_url }}"/>
 
     <div id="errors" class="errortext">{{ input_error_msg }}</div>
 
@@ -111,15 +111,15 @@
 
     <div id="below_box">
         <div id="permissions_widget">
-            {{ start_form.permissions }}
+            {{ batch_form.permissions }}
         </div>
         <div class="errortext">{{ startform_permissions_error }}</div>
         <table>
             <tr>
                 <td>
-                    {{ start_form.name.label }}
-                    <div class="helptext">{{ start_form.name.help_text }}</div>
-                    {{ start_form.name }}
+                    {{ batch_form.name.label }}
+                    <div class="helptext">{{ batch_form.name.help_text }}</div>
+                    {{ batch_form.name }}
                 </td>
                 <td id="run_controls">
                     <label>Add or remove runs:</label>
@@ -140,11 +140,10 @@
 		  </select>
 		</td>
 		<td>
-		  <form action="run_pipeline" id="run_pipeline" method="post">
+		  <form action="container_run_add" id="run_container" method="post">
 		    {% csrf_token %}
 		    <input type="submit" id="submit" value="Start Run(s)">
 		    <div class="errortext">{{ name.errors }}</div>
-		    {{ start_form.pipeline }}
 		    <div class="errortext">{{ non_field_errors }}</div>
 		    <div class="errortext">{{ pipeline.errors }}</div>
 		    <div class="error non_field_errors"></div>
@@ -160,23 +159,26 @@
 </div>
 
 <div id="scroll_content">
-    <h4 id="pipeline_name">{{ pipeline }}</h4>
+    <h4 id="app_name">{{app.container.family}} {{ app }}</h4>
     <table id="dataset_input_table">
 
         <thead>
             <tr>
                 <th>Run Name</th>
             {% for input in inputs %}
-                <th>{{ input.dataset_name }}</th>
+                <th>{{ input.name }}</th>
 	    {% endfor %}
             </tr>
         </thead>
 
         <tbody class="single-run">
             <tr>
-                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name" placeholder="{{ pipeline }}"></td>
+                <td><a class="remove-row ctrl"><span class="inner">&times;</span></a><input type="text" name="run_name[0]" class="run-name" placeholder="{{ app }}"></td>
             {% for input in inputs %}
-                <td class="pipeline-input"><button name="input" data-input-name="{{ input.dataset_name }}" data-dataset-idx="{{ input.dataset_idx }}" data-cdt="{{ input.compounddatatype.id }}" class="select_dataset">+</button></td>
+                <td class="pipeline-input"><button
+                        name="input"
+                        data-arg-url="{{ input.url }}"
+                        class="select_dataset">+</button></td>
 	    {% endfor %}
             </tr>
         </tbody>

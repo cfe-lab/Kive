@@ -5,13 +5,17 @@ import os
 from io import BytesIO
 
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import Http404
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
 from django.views.generic.edit import CreateView, UpdateView, ModelFormMixin
+import rest_framework.reverse
 
-from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm, ContainerAppForm, ContainerRunForm
-from container.models import ContainerFamily, Container, ContainerApp, ContainerRun
+from container.forms import ContainerFamilyForm, ContainerForm, \
+    ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
+from container.models import ContainerFamily, Container, ContainerApp, \
+    ContainerRun, ContainerArgument
 from file_access_utils import compute_md5
 from portal.views import developer_check, AdminViewMixin
 
@@ -190,8 +194,33 @@ class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
 class ContainerChoiceList(TemplateView, AdminViewMixin):
     template_name = 'container/containerchoice_list.html'
 
+
+@method_decorator(decorators, name='dispatch')
+class ContainerInputList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerinput_list.html'
+
     def get_context_data(self, **kwargs):
-        return super(ContainerChoiceList, self).get_context_data(**kwargs)
+        app_id = int(self.request.GET.get("app"))
+        visible_containers = Container.filter_by_user(self.request.user)
+        app_qs = ContainerApp.objects.filter(pk=app_id,
+                                             container__in=visible_containers)
+
+        app = app_qs.first()
+        if app is None:
+            raise Http404("ID {} is not accessible".format(app_id))
+        context = super(ContainerInputList, self).get_context_data(**kwargs)
+        context['app'] = app
+        context['app_url'] = rest_framework.reverse.reverse('containerapp-detail',
+                                                            kwargs=dict(pk=app.pk),
+                                                            request=self.request)
+        context['batch_form'] = BatchForm()
+        context['inputs'] = [
+            dict(name=arg.name, url=rest_framework.reverse.reverse('containerargument-detail',
+                                                                   kwargs=dict(pk=arg.pk),
+                                                                   request=self.request))
+            for arg in app.arguments.filter(
+                type=ContainerArgument.INPUT).order_by('position')]
+        return context
 
 
 @method_decorator(decorators, name='dispatch')

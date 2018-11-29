@@ -12,11 +12,15 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from container.models import ContainerFamily, Container, ContainerApp, ContainerRun
-from container.serializers import ContainerFamilySerializer, ContainerSerializer, \
-    ContainerAppSerializer, ContainerFamilyChoiceSerializer, ContainerRunSerializer
+from container.models import ContainerFamily, Container, ContainerApp, \
+    ContainerRun, Batch, ContainerArgument
+from container.serializers import ContainerFamilySerializer, \
+    ContainerSerializer, ContainerAppSerializer, \
+    ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
+    ContainerArgumentSerializer
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
-    SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination
+    SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination, \
+    IsGrantedReadCreate
 from metadata.models import AccessControl
 from portal.views import admin_check
 
@@ -237,6 +241,74 @@ class ContainerAppViewSet(CleanCreateModelMixin,
         granted_containers = Container.filter_by_user(self.request.user)
 
         return queryset.filter(container_id__in=granted_containers)
+
+
+class ContainerArgumentViewSet(ReadOnlyModelViewSet,
+                               CleanCreateModelMixin,
+                               SearchableModelMixin):
+    """ An argument for an app within a Singularity container.
+
+    Query parameters:
+
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=app_id&filters[n][val]=match - parent app's
+        id equals the value
+    * filters[n][key]=name&filters[n][val]=match - app name contains the
+        value (case insensitive)
+    """
+    queryset = ContainerArgument.objects.all()
+    serializer_class = ContainerArgumentSerializer
+    permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
+    pagination_class = StandardPagination
+    filters = dict(
+        app_id=lambda queryset, value: queryset.filter(
+            app_id=value),
+        name=lambda queryset, value: queryset.filter(
+            name__icontains=value))
+
+    def filter_granted(self, queryset):
+        """ Args don't have permissions, so filter by parent containers. """
+        granted_containers = Container.filter_by_user(self.request.user)
+
+        return queryset.filter(app__container_id__in=granted_containers)
+
+
+class BatchViewSet(CleanCreateModelMixin,
+                   RemovableModelViewSet,
+                   SearchableModelMixin):
+    """ A batch of container runs.
+
+    Query parameters:
+
+    * is_granted - true For administrators, this limits the list to only include
+        records that the user has been explicitly granted access to. For other
+        users, this has no effect.
+    * filters[n][key]=x&filters[n][val]=y - Apply different filters to the
+        search. n starts at 0 and increases by 1 for each added filter.
+        Some filters just have a key and ignore the val value. The possible
+        filters are listed below.
+    * filters[n][key]=smart&filters[n][val]=match - name or description
+        contains the value (case insensitive)
+    * filters[n][key]=name&filters[n][val]=match - name contains the
+        value (case insensitive)
+    * filters[n][key]=description&filters[n][val]=match - description contains
+        the value (case insensitive)
+    """
+    queryset = Batch.objects.all()
+    serializer_class = BatchSerializer
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadCreate)
+    pagination_class = StandardPagination
+    filters = dict(
+        smart=lambda queryset, value: queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)),
+        name=lambda queryset, value: queryset.filter(
+            name__icontains=value),
+        description=lambda queryset, value: queryset.filter(
+            description__icontains=value))
 
 
 class ContainerRunPermission(permissions.BasePermission):

@@ -289,6 +289,11 @@ class ContainerArgument(models.Model):
         help_text="True for optional inputs that accept multiple datasets and "
                   "outputs that just collect all files written to a directory")
 
+    objects = None  # Filled in later by Django.
+
+    class Meta(object):
+        ordering = ('app_id', 'type', 'position', 'name')
+
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
 
@@ -315,12 +320,27 @@ def delete_container_file(instance, **_kwargs):
 
 class Batch(AccessControl):
     name = models.CharField(
-        "Name of this batch of container runs",
+        "Batch Name",
         max_length=maxlengths.MAX_NAME_LENGTH,
+        help_text='Name of this batch of container runs',
         blank=True)
     description = models.TextField(
         max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
         blank=True)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Batches"]
+        removal_plan["Batches"].add(self)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
 
 
 class ContainerRun(Stopwatch, AccessControl):
@@ -394,7 +414,8 @@ class ContainerDataset(models.Model):
     name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Local file name, also used to sort multiple inputs for a "
-                  "single argument.")
+                  "single argument.",
+        blank=True)
     created = models.DateTimeField(
         auto_now_add=True,
         help_text="When this was added to Kive.")

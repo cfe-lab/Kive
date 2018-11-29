@@ -90,7 +90,7 @@
 
     function buildName($td, row) {
         var inner_div = $('<div>').text(row.name);
-        $td.append(inner_div).addClass('primary').data('id', row.id);
+        $td.append(inner_div).addClass('primary').data('url', row.url);
     }
     function buildDateCreated($td, row) {
         $td.text(permissions.formatDate(row.date_created)).addClass('date');
