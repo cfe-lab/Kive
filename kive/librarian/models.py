@@ -20,6 +20,7 @@ import shutil
 import sys
 import tempfile
 import time
+import io
 
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -595,35 +596,35 @@ class Dataset(metadata.models.AccessControl):
 
     def set_MD5(self, file_path, file_handle=None):
         """Set the MD5 hash from a file.
-        Closes the file afterwards if the file source is a string file path.
-        Does not close the file afterwards if file source is a file handle.
+
+        Closes the file after the MD5 is computed.
         :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
-        :param file file_handle: file handle of file to calculate MD5.
-                Moves file handle to beginning of file before calculating MD5.
+        :param file file_handle: file handle of file to calculate MD5.  File must be seeked to the beginning.
                 If file_handle empty, then uses file_path.
         """
-        with file_access_utils.FileReadHandler(file_path=file_path, file_handle=file_handle, access_mode="rb") as f:
-            self.MD5_checksum = file_access_utils.compute_md5(f)
+        if file_handle is None:
+            file_handle = io.open(file_path, "rb")
+        with file_handle:
+            self.MD5_checksum = file_access_utils.compute_md5(file_handle)
 
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
-        Closes the file afterwards if the file source is a string file path.
-        Does not close the file afterwards if file source is a file handle.
+
+        Closes the file afterwards.
         PRE
         This Dataset must have a DatasetStructure
         :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
-        :param file file_handle: file handle of file to calculate MD5.
-                Moves file handle to beginning of file before calculating MD5.
-                If file_handle empty, then uses file_path.
+        :param file file_handle: file handle of file to calculate MD5.  File must be opened in text mode and
+         seeked to the beginning.  If this is None, then file_path is used.
         """
         assert not self.is_raw()
 
         num_rows = -1  # skip header
         md5gen = hashlib.md5()
-        with file_access_utils.FileReadHandler(file_path=file_path,
-                                               file_handle=file_handle,
-                                               access_mode="r") as f:
-            for line in f:
+        if file_handle is None:
+            file_handle = io.open(file_path, "rt", newline="")
+        with file_handle:
+            for line in file_handle:
                 md5gen.update(line.encode())
                 num_rows += 1
 
@@ -652,14 +653,16 @@ class Dataset(metadata.models.AccessControl):
         """
         assert not bool(self.dataset_file)
 
-        with file_access_utils.FileReadHandler(file_path=file_path,
-                                               file_handle=file_handle,
-                                               access_mode="rb") as f:
+        if file_handle is None:
+            file_handle = io.open(file_path, mode="rb")
+        with file_handle:
             full_name = file_path
-            assert isinstance(full_name, six.string_types), "fname '{}' is not a string {}".format(f.name,
-                                                                                                   type(f.name))
+            assert isinstance(full_name, six.string_types), "fname '{}' is not a string {}".format(
+                file_handle.name,
+                type(file_handle.name)
+            )
             fname = os.path.basename(full_name)
-            self.dataset_file.save(fname, File(f))
+            self.dataset_file.save(fname, File(file_handle))
 
         self.clean()
         self.save()
@@ -863,86 +866,6 @@ class Dataset(metadata.models.AccessControl):
             new_dataset.save()
         return new_dataset
 
-    @classmethod
-    # FIXME what does it do for num_rows when file_path is unset?
-    def create_dataset_bulk(cls, csv_file_path, user, users_allowed=None, groups_allowed=None, csv_file_handle=None,
-                            cdt=None, keep_files=True, file_source=None, check=True):
-        """
-        Helper function to make defining multiple SDs and Datasets faster.
-        Instead of specifying datasets one by one,
-        specify multiple datasets in a CSV.
-
-        Closes the file afterwards if the file source is a string file path.
-        Does not close the file afterwards if file source is a file handle.
-
-        The CSV must have these columns, not necessarily in this order:
-        - Name
-        - Description
-        - File
-
-        make_dataset creates a Dataset from the given file path to go
-        with the SD. file_source can be a RunAtomic to register the
-        Dataset with, or None if it was uploaded by the user (or if
-        make_dataset=False). If check is True, do a ContentCheck on the
-        file.  If this fails, then a ValueError is raised and no changes
-        are made to the database.
-
-        Returns the Dataset created.
-        :rtype : object
-        :param csv_file_path:  path to csv file.  Not used if csv_file_handle supplied.
-        :param csv_file_handle:  file handle of csv.  If supplied, then does not
-            reopen file and moves handle to beginning of file. If None, then
-            uses csv_file_path.
-        :param cdt:
-        :param keep_files:
-        :param user:
-        :param file_source:
-        :param check:
-        """
-        new_datasets = []
-        if csv_file_path:
-            LOGGER.debug("Creating Datasets from csv {}".format(csv_file_path))
-        elif csv_file_handle:
-            LOGGER.debug("Creating Datasets from csv {}".format(csv_file_handle.name))
-        else:
-            raise Exception("Must supply either the csv file path or csv file handle")
-
-        with file_access_utils.FileReadHandler(
-                file_path=csv_file_path,
-                file_handle=csv_file_handle,
-                access_mode='rU') as fh_datasets:
-            # TODO:  this is a major db blocking call.  Can we break this up?
-            try:
-                with transaction.atomic():
-                    line = 0
-                    reader = csv.DictReader(fh_datasets)
-                    for row in reader:
-                        line += 1
-                        name = row['Name'].strip() if row['Name'] else ""
-                        desc = row['Description'].strip() if row['Description'] else ""
-                        file_name = row['File'].strip() if row['File'] else ""
-
-                        # check for empty entries:
-                        if not (name and desc and file_name):
-                            raise ValueError(
-                                "Line " + str(line) +
-                                " is invalid: Name, Description, File must be defined")
-
-                        new_dataset = Dataset.create_dataset(
-                            file_path=file_name, user=user, users_allowed=users_allowed,
-                            groups_allowed=groups_allowed, cdt=cdt,
-                            keep_file=keep_files, name=name, description=desc,
-                            file_source=file_source, check=check
-                        )
-
-                        new_datasets.extend([new_dataset])
-            except Exception as e:
-                message = "Error while parsing line " + str(line) + ":\n" + str(row)
-                LOGGER.exception(message)
-                six.reraise(ValueError(message + ":\n" + str(e)), None, sys.exc_info()[2])
-
-        return new_datasets
-
     # FIXME: use a transaction!
     # TODO: clean this up, end_time is set in too many places
     def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog,
@@ -964,8 +887,8 @@ class Dataset(metadata.models.AccessControl):
         this would overwrite num_rows to a potentially new value?
 
         :param str file_path_to_check:  Path to file to check. file_path_to_check not used if file_handle supplied.
-        :param file file_handle: file handle of file to check.
-                Moves file handle to beginning of file before checking.
+        :param file file_handle: file handle of file to check.  This should be opened in the form that the CSV
+                module requires for the version of Python being used, and seeked to the beginning.
                 If file_handle empty, then uses file_path_to_check.
         :param summary_path:
         :param min_row:
@@ -988,20 +911,13 @@ class Dataset(metadata.models.AccessControl):
                                if file_handle
                                else file_path_to_check)
 
-        # This may raise a VerificationMethodError; if so, then throw away the ContentCheckLog.
-        try:
-            with file_access_utils.FileReadHandler(file_path=file_path_to_check,
-                                                   file_handle=file_handle,
-                                                   access_mode="r") as f:
-                csv_summary = my_CDT.summarize_csv(f)
-        except metadata.models.VerificationMethodError:
-            self.logger.error("ContentCheckLog for file %s failed because the verification method failed",
-                              file_path_to_check)
-            ccl.delete()
-            raise
+        if file_handle is None:
+            file_handle = file_access_utils.open_for_csv(file_path_to_check)
+        with file_handle:
+            csv_summary = my_CDT.summarize_csv(file_handle)
 
         if "bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary:
-            self.logger.warn("malformed header in %r.", file_path_to_report)
+            self.logger.warning("malformed header in %r.", file_path_to_report)
             ccl.add_bad_header()
             ccl.stop(save=True, clean=True)
             return ccl
@@ -1013,19 +929,19 @@ class Dataset(metadata.models.AccessControl):
         self.structure.num_rows = csv_summary["num_rows"]
         self.structure.save()
         if max_row is not None and csv_summary["num_rows"] > max_row:
-            self.logger.warn("too many rows in %r.", file_path_to_report)
+            self.logger.warning("too many rows in %r.", file_path_to_report)
             # FIXME: Do we only create these BD objects if they don't already exist?
             ccl.add_bad_num_rows()
             csv_baddata = True
 
         if min_row is not None and csv_summary["num_rows"] < min_row:
-            self.logger.warn("too few rows in %r.", file_path_to_report)
+            self.logger.warning("too few rows in %r.", file_path_to_report)
             # FIXME: Do we only create these BD objects if they don't already exist?
             ccl.add_bad_num_rows()
             csv_baddata = True
 
         if "failing_cells" in csv_summary:
-            self.logger.warn("cells failed datatype check in %r.", file_path_to_report)
+            self.logger.warning("cells failed datatype check in %r.", file_path_to_report)
 
             if not csv_baddata:
                 bad_data = BadData.objects.create(contentchecklog=ccl)
@@ -1095,9 +1011,13 @@ class Dataset(metadata.models.AccessControl):
 
             # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
             # just that it conflicted with the existing one.
-            evil_twin = Dataset.create_dataset(file_path=new_file_path, user=checking_user, cdt=None,
-                                               description="MD5 conflictor of {}".format(self),
-                                               name="{}eviltwin".format(self))
+            evil_twin = Dataset.create_dataset(
+                file_path=new_file_path,
+                user=checking_user,
+                cdt=None,
+                description="MD5 conflictor of {}".format(self),
+                name="{}eviltwin".format(self)
+            )
 
             note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_dataset=evil_twin)
             note_of_usurping.save()

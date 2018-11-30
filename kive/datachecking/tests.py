@@ -117,7 +117,7 @@ class BlankCellNonBlankable(BlankableTestCase):
 
         run_dir = tempfile.mkdtemp(prefix="dataset{}".format(self.bad_dataset.pk))
         try:
-            self.bad_dataset.dataset_file.open("rb")
+            self.bad_dataset.dataset_file.open("r")
             self.ccl = self.bad_dataset.check_file_contents(
                 file_path_to_check=None, file_handle=self.bad_dataset.dataset_file,
                 summary_path=run_dir, min_row=None, max_row=None,

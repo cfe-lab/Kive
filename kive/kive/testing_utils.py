@@ -712,7 +712,8 @@ def create_eric_martin_test_environment(case):
 
     case.E01_21_DNA_doublet_dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "E01_21_DNA_doublet.csv"),
-        case.myUser, groups_allowed=[everyone_group()],
+        case.myUser,
+        groups_allowed=[everyone_group()],
         cdt=case.DNA_doublet_cdt,
         name="E01_21_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E01_21"
@@ -721,7 +722,8 @@ def create_eric_martin_test_environment(case):
 
     case.E21_41_DNA_doublet_dataset = Dataset.create_dataset(
         os.path.join(samplecode_path, "E21_41_DNA_doublet.csv"),
-        case.myUser, groups_allowed=[everyone_group()],
+        case.myUser,
+        groups_allowed=[everyone_group()],
         cdt=case.DNA_doublet_cdt,
         name="E21_41_DNA_doublet",
         description="DNA doublet data coming from DNA_triplet.csv but remultiplexed according to cable E21_41"
@@ -1023,7 +1025,8 @@ TTTTTTC
     two_step_seq_dataset = Dataset.create_dataset(
         file_path=two_step_seq_datafile.name,
         user=remover,
-        cdt=one_col_nuc_seq, keep_file=True,
+        cdt=one_col_nuc_seq,
+        keep_file=True,
         name="Removal test data for a two-step Pipeline",
         description="A dataset for use in the removal test case with the two-step Pipeline."
     )
@@ -1817,9 +1820,14 @@ def create_sequence_manipulation_environment(case):
     file_access_utils.configure_sandbox_permissions(case.datafile.name)
 
     # Alice uploads the data to the system.
-    case.dataset_labdata = Dataset.create_dataset(file_path=case.datafile.name, user=case.user_alice,
-                                                  cdt=case.cdt_record, keep_file=True, name="lab data",
-                                                  description="data from the lab")
+    case.dataset_labdata = Dataset.create_dataset(
+        file_path=case.datafile.name,
+        user=case.user_alice,
+        cdt=case.cdt_record,
+        keep_file=True,
+        name="lab data",
+        description="data from the lab"
+    )
 
     # A second version of the complement Pipeline which doesn't keep any output.
     case.pipeline_complement_v2 = Pipeline(family=case.pipeline_complement.family, revision_name="2",

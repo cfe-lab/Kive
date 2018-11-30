@@ -277,6 +277,8 @@ class BulkAddDatasetForm (BaseMultiDatasetAddForm):
 
         results = []
         for file_size, uploaded_file in self.cleaned_data['dataset_files']:
+            # Note that uploaded_file should be seek'd to the beginning.  It was presumably
+            # just opened so that should be OK but if this ever changes we will have to fix this.
             dataset = None
             error_str = None
             try:
@@ -291,10 +293,17 @@ class BulkAddDatasetForm (BaseMultiDatasetAddForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                dataset = Dataset.create_dataset(file_path=None, user=user,
-                                                 cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                 description=auto_description, file_source=None, check=True,
-                                                 file_handle=uploaded_file)
+                dataset = Dataset.create_dataset(
+                    file_path=None,
+                    user=user,
+                    cdt=compound_datatype_obj,
+                    keep_file=True,
+                    name=auto_name,
+                    description=auto_description,
+                    file_source=None,
+                    check=True,
+                    file_handle=uploaded_file
+                )
                 dataset.grant_from_json(self.cleaned_data["permissions"])
 
             except Exception as e:
@@ -431,6 +440,8 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
 
         results = []
         for file_size, uploaded_file in self.cleaned_data['dataset_file']:
+            # Note that uploaded_file should be seek'd to the beginning.  It was presumably
+            # just opened so that should be OK but if this ever changes we will have to fix this.
             dataset = None
             error_str = None
             try:
@@ -445,10 +456,17 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                 else:
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
-                dataset = Dataset.create_dataset(file_path=None, user=user,
-                                                 cdt=compound_datatype_obj, keep_file=True, name=auto_name,
-                                                 description=auto_description, file_source=None, check=True,
-                                                 file_handle=uploaded_file)
+                dataset = Dataset.create_dataset(
+                    file_path=None,
+                    user=user,
+                    cdt=compound_datatype_obj,
+                    keep_file=True,
+                    name=auto_name,
+                    description=auto_description,
+                    file_source=None,
+                    check=True,
+                    file_handle=uploaded_file
+                )
                 dataset.grant_from_json(self.cleaned_data["permissions"])
 
             except Exception as e:

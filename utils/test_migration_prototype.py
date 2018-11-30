@@ -29,8 +29,11 @@ false,false"""
     )
     f.seek(0)
     proto_SD = Dataset.create_dataset(
-        file_path=None, user=kive_user(), cdt=CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK),
-        name="AlwaysTruePrototype", description="Prototype for dummy Datatype",
+        file_path=None,
+        user=kive_user(),
+        cdt=CompoundDatatype.objects.get(pk=CDTs.PROTOTYPE_PK),
+        name="AlwaysTruePrototype",
+        description="Prototype for dummy Datatype",
         file_handle=f
     )
 

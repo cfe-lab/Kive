@@ -163,7 +163,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             description=validated_data["description"],
             file_source=None,
             check=True,
-            file_handle=validated_data.get("dataset_file", None),
+            file_handle=validated_data.get("dataset_file", None),  # should be freshly opened so cursor is at start
             externalfiledirectory=efd
         )
         return dataset

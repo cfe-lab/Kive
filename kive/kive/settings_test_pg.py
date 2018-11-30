@@ -4,7 +4,7 @@
 
 import os
 
-from settings import *  # @UnusedWildImport
+from kive.settings import *  # @UnusedWildImport
 
 # Avoid overwriting developer data files
 MEDIA_ROOT = os.path.join(MEDIA_ROOT, 'Testing')

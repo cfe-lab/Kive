@@ -125,9 +125,14 @@ class DatasetTests(LibrarianTestCase):
 
         self.dsname = "good data"
         self.dsdesc = "some headers and sequences"
-        self.dataset = Dataset.create_dataset(file_path=self.file_path, user=self.myUser,
-                                              cdt=self.cdt_record, keep_file=True, name=self.dsname,
-                                              description=self.dsdesc)
+        self.dataset = Dataset.create_dataset(
+            file_path=self.file_path,
+            user=self.myUser,
+            cdt=self.cdt_record,
+            keep_file=True,
+            name=self.dsname,
+            description=self.dsdesc
+        )
 
     def tearDown(self):
         super(DatasetTests, self).tearDown()
@@ -200,12 +205,18 @@ class DatasetTests(LibrarianTestCase):
         data_file = tempfile.NamedTemporaryFile()
         file_path = data_file.name
 
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(file_path, self.cdt_record)),
-                                lambda: Dataset.create_dataset(file_path=data_file.name,
-                                                               user=self.myUser, cdt=self.cdt_record,
-                                                               name="missing data", description="oops!"))
+        self.assertRaisesRegexp(
+            ValueError,
+            re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
+                      .format(file_path, self.cdt_record)),
+            lambda: Dataset.create_dataset(
+                file_path=data_file.name,
+                user=self.myUser,
+                cdt=self.cdt_record,
+                name="missing data",
+                description="oops!"
+            )
+        )
         data_file.close()
 
     def test_too_many_columns(self):

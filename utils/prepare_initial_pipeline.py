@@ -16,9 +16,14 @@ import kive.testing_utils as tools
 # This comes from the initial_user fixture.
 kive_user = User.objects.get(pk=1)
 
-test_fasta = Dataset.create_dataset("../samplecode/step_0_raw.fasta", file_path=None, user=kive_user, cdt=None,
-                                       keep_file=True, name="TestFASTA",
-                                       description="Toy FASTA file for testing pipelines")
+test_fasta = Dataset.create_dataset(
+    file_path="../samplecode/step_0_raw.fasta",
+    user=kive_user,
+    cdt=None,
+    keep_file=True,
+    name="TestFASTA",
+    description="Toy FASTA file for testing pipelines"
+)
 
 # Set up a test Pipeline.
 resource = method.models.CodeResource(name="Fasta2CSV", description="FASTA converter script", filename="Fasta2CSV.py")
