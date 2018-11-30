@@ -7,6 +7,7 @@
 	    this.registerColumn("Name", "name");
 	    this.registerColumn("Description", "description");
 	    this.registerColumn("App", "app_name");
+	    this.registerColumn("State", "state");
 	    this.registerDateTimeColumn("Start", "start_time");
 	    this.registerDateTimeColumn("End", "end_time");
         this.registerStandardColumn("user");

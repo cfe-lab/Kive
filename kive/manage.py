@@ -5,6 +5,7 @@ import sys
 if __name__ == "__main__":
     subcommand = sys.argv[1] if len(sys.argv) > 1 else None
     default_settings = {'runfleet': 'kive.settings_fleet',
+                        'runcontainer': 'kive.settings_fleet_helper',
                         'cable_helper': 'kive.settings_fleet_helper',
                         'step_helper': 'kive.settings_fleet_helper'}
     os.environ["DJANGO_SETTINGS_MODULE"] = (

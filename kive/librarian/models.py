@@ -199,6 +199,9 @@ class Dataset(metadata.models.AccessControl):
         super(Dataset, self).__init__(*args, **kwargs)
         self.logger = logging.getLogger(self.__class__.__name__)
 
+    def __repr__(self):
+        return 'Dataset(name={!r})'.format(self.name)
+
     def __str__(self):
         """
         Unicode representation of a Dataset.

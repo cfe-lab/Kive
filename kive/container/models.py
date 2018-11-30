@@ -3,7 +3,7 @@ import errno
 import logging
 import os
 import re
-from subprocess import STDOUT, CalledProcessError, check_output
+from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
@@ -328,12 +328,20 @@ class Batch(AccessControl):
         max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
         blank=True)
 
+    runs = None  # Filled in later by Django.
+
+    class Meta(object):
+        ordering = ('-id',)
+
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
         """ Make a manifest of objects to remove when removing this. """
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["Batches"]
         removal_plan["Batches"].add(self)
+
+        for run in self.runs.all():
+            run.build_removal_plan(removal_plan)
 
         return removal_plan
 
@@ -345,14 +353,14 @@ class Batch(AccessControl):
 
 class ContainerRun(Stopwatch, AccessControl):
     NEW = 'N'
-    PENDING = 'P'
+    LOADING = 'L'
     RUNNING = 'R'
     SAVING = 'S'
     COMPLETE = 'C'
     FAILED = 'F'
     CANCELLED = 'X'
     STATES = ((NEW, 'New'),
-              (PENDING, 'Pending'),
+              (LOADING, 'Loading'),
               (RUNNING, 'Running'),
               (SAVING, 'Saving'),
               (COMPLETE, 'Complete'),
@@ -364,6 +372,8 @@ class ContainerRun(Stopwatch, AccessControl):
     description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
     state = models.CharField(max_length=1, choices=STATES, default=NEW)
+    priority = models.IntegerField(default=0,
+                                   help_text='Chooses which slurm queue to use.')
     sandbox_path = models.CharField(
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH,
         blank=True)
@@ -380,6 +390,9 @@ class ContainerRun(Stopwatch, AccessControl):
     class Meta(object):
         ordering = ('-start_time',)
 
+    def __repr__(self):
+        return 'ContainerRun(id={!r})'.format(self.pk)
+
     def save(self,
              force_insert=False,
              force_update=False,
@@ -391,6 +404,10 @@ class ContainerRun(Stopwatch, AccessControl):
                                        force_update,
                                        using,
                                        update_fields)
+        transaction.on_commit(self.schedule)
+
+    def schedule(self):
+        check_call(['sbatch', 'manage.py', 'runcontainer', str(self.pk)])
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):

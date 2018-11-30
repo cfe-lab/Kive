@@ -1,3 +1,4 @@
+from __future__ import print_function
 from datetime import datetime
 import json
 from operator import itemgetter
@@ -16,6 +17,7 @@ from django.conf import settings
 
 import archive.models
 import datachecking.models
+from container.models import ContainerFamily, ContainerArgument, Container
 from file_access_utils import compute_md5
 import kive.testing_utils as tools
 from librarian.models import Dataset
@@ -25,13 +27,15 @@ from method.models import CodeResource, MethodFamily, Method,\
     CodeResourceRevision
 import pipeline.models
 from pipeline.models import PipelineFamily
-import portal.models
 import sandbox.tests
 from fleet.workers import Manager
 from fleet.tests_slurmscheduler import execute_simple_run, execute_nested_run
 
 
 class FixtureBuilder(object):
+    def __init__(self):
+        self.next_output_num = self.next_step_num = 1
+
     def get_name(self):
         """ Return the fixture file's name. """
         raise NotImplementedError()
@@ -41,9 +45,9 @@ class FixtureBuilder(object):
         raise NotImplementedError()
 
     def run(self):
-        print "--------"
-        print self.get_name()
-        print "--------"
+        print("--------")
+        print(self.get_name())
+        print("--------")
         call_command('reset')
 
         settings.FLEET_POLLING_INTERVAL = 0.1  # Make short steps run faster.
@@ -171,7 +175,7 @@ class FixtureBuilder(object):
         date_map = {}  # {old_date: new_date}
         field_names = set()
         for dump_object in dump_objects:
-            for field, value in dump_object['fields'].iteritems():
+            for field, value in dump_object['fields'].items():
                 if value is not None and (field.endswith('time') or
                                           field.startswith('date') or
                                           field.endswith('DateTime') or
@@ -190,7 +194,7 @@ class FixtureBuilder(object):
             date_map[old_date] = rounded.isoformat() + 'Z'
 
         for dump_object in dump_objects:
-            for field, value in dump_object['fields'].iteritems():
+            for field, value in dump_object['fields'].items():
                 if value is not None and field in field_names:
                     dump_object['fields'][field] = date_map[value]
 
@@ -226,6 +230,7 @@ class FixtureBuilder(object):
     def create_step(self, pipeline, method, input_source):
         """ Create a pipeline step.
 
+        @param pipeline: the pipeline that will contain the step
         @param method: the method for the step to run
         @param input_source: either a pipeline input or another step that this
         step will use for its input.
@@ -240,7 +245,7 @@ class FixtureBuilder(object):
 
     def create_method_from_string(self, name, source, user,
                                   input_names, output_names,
-                                  dep_lst=[], init_code_resource=None):
+                                  dep_lst=(), init_code_resource=None):
         """ Create a method and code_resource_revision from source code held in a string.
 
         @param name: the name of the method as it will appear in Kive.
@@ -647,7 +652,7 @@ class DemoBuilder(FixtureBuilder):
                                              source_step=src_stepnum,
                                              dest=dst_input)
         except AttributeError:
-            print "Connecting to a destination step failed "
+            print("Connecting to a destination step failed ")
             raise
 
         return cable
@@ -1249,6 +1254,43 @@ class FindDatasetsBuilder(FixtureBuilder):
         self.pipeline_noop.create_outputs()
 
 
+class ContainerRunBuilder(FixtureBuilder):
+    """For testing the tools that find datasets in a sandbox."""
+
+    def get_name(self):
+        return "container_run.json"
+
+    def build(self):
+        user = User.objects.first()
+        assert user is not None
+        input_path = os.path.abspath(os.path.join(
+            __file__,
+            '../../../../../samplecode/singularity/host_input/example_names.csv'))
+        family = ContainerFamily.objects.create(name='fixture family', user=user)
+        container = family.containers.create(
+            tag='vFixture',
+            user=user,
+            file='CodeResources/kive-default.simg')
+        app = container.apps.create()
+        arg1 = app.arguments.create(type=ContainerArgument.INPUT,
+                                    name='names_csv',
+                                    position=1)
+        app.arguments.create(type=ContainerArgument.OUTPUT,
+                             name='greetings_csv',
+                             position=2)
+        dataset = Dataset.create_dataset(input_path,
+                                         name='names.csv',
+                                         user=user)
+        run = app.runs.create(name='fixture run', user=user)
+        run.datasets.create(argument=arg1, dataset=dataset)
+
+        upload_path = os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR)
+        readme_path = os.path.join(upload_path, 'README.md')
+        os.makedirs(upload_path)
+        with open(readme_path, 'w') as f:
+            f.write('Just a placeholder to create the folder for containrs.')
+
+
 class Command(BaseCommand):
     help = "Update test fixtures by running scripts and dumping test data."
 
@@ -1269,5 +1311,6 @@ class Command(BaseCommand):
         FindDatasetsBuilder().run()
         RestoreReusableDatasetBuilder().run()
         DemoBuilder().run()
+        ContainerRunBuilder().run()
 
         self.stdout.write('Done.')

@@ -1,0 +1,113 @@
+[
+    {
+        "fields": {
+            "container": 1, 
+            "description": "", 
+            "memory": 6000, 
+            "name": "", 
+            "threads": 1
+        }, 
+        "model": "container.containerapp", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "allow_multiple": false, 
+            "app": 1, 
+            "name": "names_csv", 
+            "position": 1, 
+            "type": "I"
+        }, 
+        "model": "container.containerargument", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "allow_multiple": false, 
+            "app": 1, 
+            "name": "greetings_csv", 
+            "position": 2, 
+            "type": "O"
+        }, 
+        "model": "container.containerargument", 
+        "pk": 2
+    }, 
+    {
+        "fields": {
+            "argument": 1, 
+            "created": "2018-11-30T23:17:02.789Z", 
+            "dataset": 1, 
+            "name": "", 
+            "run": 1
+        }, 
+        "model": "container.containerdataset", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "description": "", 
+            "git": "", 
+            "groups_allowed": [], 
+            "name": "fixture family", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "container.containerfamily", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "created": "2018-11-30T23:17:02.764Z", 
+            "description": "", 
+            "family": 1, 
+            "file": "CodeResources/kive-default.simg", 
+            "groups_allowed": [], 
+            "md5": "", 
+            "tag": "vFixture", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "container.container", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "app": 1, 
+            "batch": null, 
+            "description": "", 
+            "end_time": null, 
+            "groups_allowed": [], 
+            "is_redacted": false, 
+            "name": "fixture run", 
+            "priority": 0, 
+            "return_code": null, 
+            "sandbox_path": "", 
+            "start_time": "2000-01-01T00:00:00Z", 
+            "state": "N", 
+            "stopped_by": null, 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "container.containerrun", 
+        "pk": 1
+    }, 
+    {
+        "fields": {
+            "MD5_checksum": "06f7204f2679744fd76e6b111dc506ba", 
+            "_redacted": false, 
+            "dataset_file": "Datasets/2018_11/example_names.csv", 
+            "date_created": "2000-01-01T00:00:00Z", 
+            "description": "", 
+            "external_path": "", 
+            "externalfiledirectory": null, 
+            "file_source": null, 
+            "groups_allowed": [], 
+            "last_time_checked": "2018-11-30T23:17:02.771Z", 
+            "name": "names.csv", 
+            "user": 1, 
+            "users_allowed": []
+        }, 
+        "model": "librarian.dataset", 
+        "pk": 1
+    }
+]

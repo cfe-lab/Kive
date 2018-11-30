@@ -4,8 +4,11 @@ from __future__ import unicode_literals
 import os
 from io import BytesIO
 
+import errno
+from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import Http404
+from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
@@ -124,6 +127,13 @@ class ContainerUpdate(UpdateView, AdminViewMixin):
         context['file_name'] = self.object.file and os.path.relpath(
             self.object.file.name,
             Container.UPLOAD_DIR)
+        try:
+            file_size = filesizeformat(self.object.file.size)
+        except OSError as ex:
+            if ex.errno != errno.ENOENT:
+                raise
+            file_size = 'missing'
+        context['file_size'] = file_size
         return context
 
     def get_form_kwargs(self):
@@ -220,6 +230,7 @@ class ContainerInputList(TemplateView, AdminViewMixin):
                                                                    request=self.request))
             for arg in app.arguments.filter(
                 type=ContainerArgument.INPUT).order_by('position')]
+        context['priolist'] = [t[0] for t in settings.SLURM_QUEUES]
         return context
 
 
