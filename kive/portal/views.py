@@ -21,7 +21,11 @@ class AdminViewMixin(ContextMixin):
     def get_context_data(self, **kwargs):
         context = super(AdminViewMixin, self).get_context_data(**kwargs)
         # noinspection PyUnresolvedReferences
-        context['is_user_admin'] = admin_check(self.request.user)
+        request_user = self.request.user
+        context['is_user_admin'] = admin_check(request_user)
+        object = context.get('object')
+        owner = getattr(object, 'user', None)
+        context['is_owner'] = owner == request_user
         return context
 
 

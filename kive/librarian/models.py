@@ -478,6 +478,9 @@ class Dataset(metadata.models.AccessControl):
         """
         return reverse('dataset_download', kwargs={"dataset_id": self.id})
 
+    def get_view_url(self):
+        return reverse('dataset_view', kwargs={"dataset_id": self.id})
+
     def get_filesize(self):
         """
         :return int: size of dataset_file in bytes or None if the file handle

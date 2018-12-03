@@ -13,7 +13,7 @@ $(function() {
         });
     }
 
-    (function showEditReadonly() {
+    function showEditReadonly() {
         var img_path = "lock-locked-2x.png";
         var hide = ".edit";
         var show = ".readonly";
@@ -25,5 +25,7 @@ $(function() {
         $("#lock img").attr("src", lock_icon_path + img_path);
         $(hide).hide();
         $(show).show();
-    })();// trigger once immediately
+    }
+
+    showEditReadonly();// trigger once immediately
 });

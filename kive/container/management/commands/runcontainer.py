@@ -25,7 +25,6 @@ class Command(BaseCommand):
             help='ContainerRun to execute')
 
     def handle(self, run_id, **kwargs):
-        logger.info('Starting run id %d.', run_id)
         self.update_state(run_id, ContainerRun.NEW, ContainerRun.LOADING)
         run = ContainerRun.objects.get(id=run_id)
 
@@ -37,25 +36,20 @@ class Command(BaseCommand):
 
         self.save_outputs(run)
         run.save()
-        logger.info('Finished run id %d.', run_id)
 
     def update_state(self, run_id, old_state, new_state):
         rows_updated = ContainerRun.objects.filter(
             id=run_id, state=old_state).update(state=new_state)
         if rows_updated == 0:
-            run = ContainerRun.objects.get(run_id)
-            raise CommandError('Expected state {} for run id {}, but was {}.',
-                               old_state,
-                               run_id,
-                               run.state)
+            run = ContainerRun.objects.get(id=run_id)
+            raise CommandError(
+                'Expected state {} for run id {}, but was {}.'.format(
+                    old_state,
+                    run_id,
+                    run.state))
 
     def create_sandbox(self, run):
         sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
-        try:
-            os.mkdir(sandbox_root)
-        except OSError as ex:
-            if ex.errno != errno.EEXIST:
-                raise
         prefix = 'user{}_run{}_'.format(run.user.username, run.pk)
         run.sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
 

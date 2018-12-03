@@ -5,6 +5,7 @@ import os
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
@@ -148,28 +149,6 @@ class ContainerAppApiTests(BaseTestCases.ApiTestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class ContainerRunTests(TestCase):
-    def test(self):
-        user = User.objects.first()
-        family = ContainerFamily.objects.create(user=user)
-        container = Container.objects.create(family=family, user=user)
-        app = ContainerApp.objects.create(container=container, name='test')
-        client = Client()
-        client.force_login(user)
-        start_count = ContainerRun.objects.count()
-        expected_count = start_count + 1
-
-        response = client.post(reverse('container_run_add'),
-                               data=dict(app=app.id))
-
-        end_count = ContainerRun.objects.count()
-
-        if response.status_code != 302:
-            self.assertEqual({}, response.context['form'].errors)
-        self.assertEqual(expected_count, end_count)
-
-
-@skipIfDBFeature('is_mocked')
 class ContainerRunApiTests(BaseTestCases.ApiTestCase):
     def setUp(self):
         super(ContainerRunApiTests, self).setUp()
@@ -309,7 +288,7 @@ class RunContainerTests(TestCase):
         super(RunContainerTests, self).setUp()
         install_fixture_files('container_run')
 
-    def test(self):
+    def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
 
         call_command('runcontainer', str(run.id))
@@ -325,3 +304,17 @@ class RunContainerTests(TestCase):
         self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
+
+    def test_already_started(self):
+        """ Pretend that another instance of the command already started. """
+        run = ContainerRun.objects.get(name='fixture run')
+        run.state = ContainerRun.LOADING
+        run.save()
+
+        with self.assertRaisesRegexp(
+                CommandError,
+                r'Expected state N for run id \d+, but was L'):
+            call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+        self.assertEqual('', run.sandbox_path)

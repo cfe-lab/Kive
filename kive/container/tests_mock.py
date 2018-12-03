@@ -110,7 +110,8 @@ class ContainerAppMockTests(TestCase):
     def test_display_name(self):
         app = ContainerApp(name='reticulate')
         app.container = Container(tag='v1.0')
-        expected_display_name = 'v1.0 / reticulate'
+        app.container.family = ContainerFamily(name='Splines')
+        expected_display_name = 'Splines:v1.0 / reticulate'
 
         display_name = app.display_name
         app_str = str(app)
@@ -121,7 +122,8 @@ class ContainerAppMockTests(TestCase):
     def test_display_default(self):
         app = ContainerApp(name='')  # default app
         app.container = Container(tag='v1.0')
-        expected_display_name = 'v1.0'
+        app.container.family = ContainerFamily(name='Splines')
+        expected_display_name = 'Splines:v1.0'
 
         display_name = app.display_name
 

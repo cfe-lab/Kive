@@ -3,8 +3,7 @@
 	permissions.ContainerRunTable = function($table, is_user_admin, $navigation_links) {
 	    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
 	    this.list_url = "api/containerruns/";
-	    // this.registerLinkColumn("Name", "", "name", "absolute_url");
-	    this.registerColumn("Name", "name");
+	    this.registerLinkColumn("Name", "", "name", "absolute_url");
 	    this.registerColumn("Description", "description");
 	    this.registerColumn("App", "app_name");
 	    this.registerColumn("State", "state");

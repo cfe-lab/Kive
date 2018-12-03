@@ -116,6 +116,11 @@ def dataset_view(request, dataset_id):
         addable_users.exclude(pk=generating_run.user_id)
         addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
         addable_groups.exclude(pk__in=generating_run.groups_allowed.values_list("pk", flat=True))
+    container_dataset = dataset.containers.filter(argument__type='O').first()  # Output from which runs?
+    if container_dataset is None:
+        container_run = None
+    else:
+        container_run = container_dataset.run
 
     if request.method == "POST":
         # We are going to try and update this Dataset.
@@ -152,7 +157,8 @@ def dataset_view(request, dataset_id):
         "dataset": dataset,
         "return": return_url,
         "dataset_form": dataset_form,
-        "generating_run": generating_run
+        "generating_run": generating_run,
+        "container_run": container_run
     }
 
     rendered_response = None

@@ -211,14 +211,15 @@ class ContainerRunSerializer(AccessControlSerializer,
         source='app',
         slug_field='display_name',
         read_only=True)
-    # batch = serializers.HyperlinkedRelatedField(
-    #     source='batch',
-    #     view_name='containerapp-detail',
-    #     lookup_field='pk',
-    #     queryset=ContainerApp.objects.all())
-    # batch_name = serializers.SlugRelatedField(
-    #     slug_field='batch',
-    #     read_only=True)
+    batch = serializers.HyperlinkedRelatedField(
+        view_name='batch-detail',
+        lookup_field='pk',
+        queryset=Batch.objects.all(),
+        required=False)
+    batch_name = serializers.SlugRelatedField(
+        source='batch',
+        slug_field='name',
+        read_only=True)
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerrun-removal-plan')
 
@@ -229,6 +230,8 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'absolute_url',
                   'name',
                   'description',
+                  'batch',
+                  'batch_name',
                   'app',
                   'app_name',
                   'state',

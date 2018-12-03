@@ -22,15 +22,15 @@ from container.models import ContainerFamily, Container, ContainerApp, \
 from file_access_utils import compute_md5
 from portal.views import developer_check, AdminViewMixin
 
-decorators = [login_required, user_passes_test(developer_check)]
+dev_decorators = [login_required, user_passes_test(developer_check)]
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerFamilyList(TemplateView, AdminViewMixin):
     template_name = 'container/containerfamily_list.html'
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerFamilyUpdate(UpdateView, AdminViewMixin):
     model = ContainerFamily
     form_class = ContainerFamilyForm
@@ -44,7 +44,7 @@ class ContainerFamilyUpdate(UpdateView, AdminViewMixin):
         return reverse('container_families')
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerFamilyCreate(CreateView):
     model = ContainerFamily
     form_class = ContainerFamilyForm
@@ -59,7 +59,7 @@ class ContainerFamilyCreate(CreateView):
         return reverse('container_families')
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerCreate(CreateView, AdminViewMixin):
     model = Container
     form_class = ContainerForm
@@ -105,7 +105,7 @@ class ContainerCreate(CreateView, AdminViewMixin):
         return kwargs
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerUpdate(UpdateView, AdminViewMixin):
     model = Container
     form_class = ContainerUpdateForm
@@ -162,7 +162,7 @@ class ArgumentWriterMixin(ModelFormMixin):
         return response
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerAppCreate(CreateView, ArgumentWriterMixin):
     model = ContainerApp
     form_class = ContainerAppForm
@@ -181,7 +181,7 @@ class ContainerAppCreate(CreateView, ArgumentWriterMixin):
         return context
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
     model = ContainerApp
     form_class = ContainerAppForm
@@ -200,12 +200,12 @@ class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
         return context
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(login_required, name='dispatch')
 class ContainerChoiceList(TemplateView, AdminViewMixin):
     template_name = 'container/containerchoice_list.html'
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(login_required, name='dispatch')
 class ContainerInputList(TemplateView, AdminViewMixin):
     template_name = 'container/containerinput_list.html'
 
@@ -234,24 +234,22 @@ class ContainerInputList(TemplateView, AdminViewMixin):
         return context
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(login_required, name='dispatch')
 class ContainerRunList(TemplateView, AdminViewMixin):
     template_name = 'container/containerrun_list.html'
 
 
-@method_decorator(decorators, name='dispatch')
-class ContainerRunCreate(CreateView, AdminViewMixin):
+@method_decorator(login_required, name='dispatch')
+class ContainerRunUpdate(UpdateView, AdminViewMixin):
     model = ContainerRun
     form_class = ContainerRunForm
 
-    def form_valid(self, form):
-        form.instance.user = self.request.user
-        response = super(ContainerRunCreate, self).form_valid(form)
-        return response
-
-    def form_invalid(self, form):
-        response = super(ContainerRunCreate, self).form_invalid(form)
-        return response
+    def get_context_data(self, **kwargs):
+        context = super(ContainerRunUpdate, self).get_context_data(**kwargs)
+        context['is_dev'] = developer_check(self.request.user)
+        state_names = dict(ContainerRun.STATES)
+        context['state_name'] = state_names.get(self.object.state)
+        return context
 
     def get_success_url(self):
         return reverse('container_runs')

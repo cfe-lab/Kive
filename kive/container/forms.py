@@ -71,4 +71,5 @@ class BatchForm(forms.ModelForm):
 class ContainerRunForm(forms.ModelForm):
     class Meta(object):
         model = ContainerRun
-        exclude = ['user', 'state']
+        fields = ['name', 'description']
+        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))

@@ -191,7 +191,7 @@ class ContainerApp(models.Model):
 
     @property
     def display_name(self):
-        name = self.container.tag
+        name = str(self.container)
         if self.name:
             # noinspection PyTypeChecker
             name += ' / ' + self.name
@@ -393,6 +393,9 @@ class ContainerRun(Stopwatch, AccessControl):
     def __repr__(self):
         return 'ContainerRun(id={!r})'.format(self.pk)
 
+    def get_absolute_url(self):
+        return reverse('container_run_detail', kwargs=dict(pk=self.pk))
+
     def save(self,
              force_insert=False,
              force_update=False,
@@ -404,10 +407,28 @@ class ContainerRun(Stopwatch, AccessControl):
                                        force_update,
                                        using,
                                        update_fields)
-        transaction.on_commit(self.schedule)
+        if self.state == self.NEW:
+            transaction.on_commit(self.schedule)
 
     def schedule(self):
-        check_call(['sbatch', 'manage.py', 'runcontainer', str(self.pk)])
+        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        try:
+            os.mkdir(sandbox_root)
+        except OSError as ex:
+            if ex.errno != errno.EEXIST:
+                raise
+
+        sandbox_prefix = os.path.join(sandbox_root,
+                                      self.get_sandbox_prefix())
+        slurm_prefix = sandbox_prefix + '_job%J_node%N_'
+
+        check_call(['sbatch',
+                    '--output', slurm_prefix + 'stdout.txt',
+                    '--error', slurm_prefix + 'stderr.txt',
+                    'manage.py', 'runcontainer', str(self.pk)])
+
+    def get_sandbox_prefix(self):
+        return 'user{}_run{}_'.format(self.user.username, self.pk)
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
