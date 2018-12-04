@@ -602,10 +602,16 @@ class Dataset(metadata.models.AccessControl):
         :param file file_handle: file handle of file to calculate MD5.  File must be seeked to the beginning.
                 If file_handle empty, then uses file_path.
         """
+        opened_file_ourselves = False
         if file_handle is None:
             file_handle = io.open(file_path, "rb")
-        with file_handle:
+            opened_file_ourselves = True
+
+        try:
             self.MD5_checksum = file_access_utils.compute_md5(file_handle)
+        finally:
+            if opened_file_ourselves:
+                file_handle.close()
 
     def set_MD5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
@@ -621,12 +627,19 @@ class Dataset(metadata.models.AccessControl):
 
         num_rows = -1  # skip header
         md5gen = hashlib.md5()
+
+        opened_file_ourselves = False
         if file_handle is None:
             file_handle = io.open(file_path, "rt", newline="")
-        with file_handle:
+            opened_file_ourselves = True
+
+        try:
             for line in file_handle:
                 md5gen.update(line.encode())
                 num_rows += 1
+        finally:
+            if opened_file_ourselves:
+                file_handle.close()
 
         self.structure.num_rows = num_rows
         self.MD5_checksum = md5gen.hexdigest()
@@ -653,9 +666,12 @@ class Dataset(metadata.models.AccessControl):
         """
         assert not bool(self.dataset_file)
 
+        opened_file_ourselves = False
         if file_handle is None:
             file_handle = io.open(file_path, mode="rb")
-        with file_handle:
+            opened_file_ourselves = True
+
+        try:
             full_name = file_path
             assert isinstance(full_name, six.string_types), "fname '{}' is not a string {}".format(
                 file_handle.name,
@@ -663,6 +679,9 @@ class Dataset(metadata.models.AccessControl):
             )
             fname = os.path.basename(full_name)
             self.dataset_file.save(fname, File(file_handle))
+        finally:
+            if opened_file_ourselves:
+                file_handle.close()
 
         self.clean()
         self.save()
@@ -813,6 +832,8 @@ class Dataset(metadata.models.AccessControl):
                 new_dataset.set_MD5(file_name, file_handle)
             else:
                 new_dataset.set_MD5_and_count_rows(file_name, file_handle)
+            if file_handle is not None:
+                file_handle.seek(0)
 
             if cdt is not None and check:
                 run_dir = tempfile.mkdtemp(
@@ -911,10 +932,16 @@ class Dataset(metadata.models.AccessControl):
                                if file_handle
                                else file_path_to_check)
 
+        opened_file_ourselves = False
         if file_handle is None:
             file_handle = file_access_utils.open_for_csv(file_path_to_check)
-        with file_handle:
+            opened_file_ourselves = True
+
+        try:
             csv_summary = my_CDT.summarize_csv(file_handle)
+        finally:
+            if opened_file_ourselves:
+                file_handle.close()
 
         if "bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary:
             self.logger.warning("malformed header in %r.", file_path_to_report)

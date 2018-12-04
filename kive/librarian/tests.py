@@ -12,7 +12,7 @@ import logging
 import json
 import shutil
 import stat
-import six
+import django.utils.six as dsix
 
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
@@ -148,23 +148,28 @@ class DatasetTests(LibrarianTestCase):
         logging.getLogger('Dataset').setLevel(logging.CRITICAL)
         logging.getLogger('CompoundDatatype').setLevel(logging.CRITICAL)
 
-        tmpfile = tempfile.NamedTemporaryFile(delete=False)
-        tmpfile.file.write("Random stuff".encode())
-        tmpfile.file.flush()  # flush python buffer to os buffer
-        os.fsync(tmpfile.file.fileno())  # flush os buffer to disk
-        tmpfile.file.seek(0)  # go to beginning of file before calculating expected md5
+        with tempfile.NamedTemporaryFile(delete=True) as tmpfile:
+            tmpfile.file.write("Random stuff".encode())
+            tmpfile.file.flush()  # flush python buffer to os buffer
+            os.fsync(tmpfile.file.fileno())  # flush os buffer to disk
+            tmpfile.file.seek(0)  # go to beginning of file before calculating expected md5
 
-        expected_md5 = file_access_utils.compute_md5(tmpfile)
+            expected_md5 = file_access_utils.compute_md5(tmpfile)
+            tmpfile.file.seek(0)  # return to beginning before creating a Dataset
 
-        raw_datatype = None  # raw compound datatype
-        name = "Test file handle" + str(dt.microsecond)
-        desc = "Test create dataset with file handle"
-        dataset = Dataset.create_dataset(file_path=None, user=self.myUser, cdt=raw_datatype,
-                                         keep_file=True, name=name, description=desc, check=True,
-                                         file_handle=tmpfile)
-
-        tmpfile.close()
-        os.remove(tmpfile.name)
+            raw_datatype = None  # raw compound datatype
+            name = "Test file handle" + str(dt.microsecond)
+            desc = "Test create dataset with file handle"
+            dataset = Dataset.create_dataset(
+                file_path=None,
+                user=self.myUser,
+                cdt=raw_datatype,
+                keep_file=True,
+                name=name,
+                description=desc,
+                check=True,
+                file_handle=tmpfile
+            )
 
         self.assertIsNotNone(Dataset.objects.filter(name=name).get(),
                              msg="Can't find Dataset in DB for name=" + name)
@@ -268,7 +273,7 @@ foo,bar
                                          column_idx=2)
         compound_datatype.clean()
 
-        data_file = six.StringIO("""\
+        data_file = dsix.StringIO("""\
 name,count
 Bob,tw3nty
 """)
@@ -301,41 +306,6 @@ Bob,tw3nty
         self.assertEqual(self.dataset.file_source, None)
         self.assertEqual(os.path.basename(self.dataset.dataset_file.path), os.path.basename(self.file_path))
         self.data_file.close()
-
-    def test_dataset_bulk_created(self):
-        """
-        Test coherence of the Dataset created alongsite a Dataset.
-        """
-        bulk_dataset_csv = tempfile.NamedTemporaryFile(suffix="csv", mode="w")
-        bulk_dataset_csv.write("Name,Description,File")
-        dsname = "tempdataset"
-        dsdesc = "some headers and sequences"
-        file_paths = []
-        data_files = []
-        for i in range(2):
-            data_files.append(tempfile.NamedTemporaryFile(mode="w"))
-            data_files[-1].write(self.header + "\n" + self.data)
-            file_path = data_files[-1].name
-            file_paths.extend([file_path])
-            bulk_dataset_csv.write("\n" + dsname+str(i) + "," + dsdesc+str(i) + "," + file_path)
-
-        datasets = Dataset.create_dataset_bulk(csv_file_path=bulk_dataset_csv.name,
-                                               user=self.myUser, cdt=self.cdt_record, keep_files=True,
-                                               check=True)
-        for f in data_files:
-            f.close()
-        bulk_dataset_csv.close()
-        # noinspection PyTypeChecker
-        for i, dataset in enumerate(datasets):
-
-            self.assertEqual(dataset.clean(), None)
-            self.assertEqual(dataset.user, self.myUser)
-            self.assertEqual(dataset.name, dsname+str(i))
-            self.assertEqual(dataset.description, dsdesc+str(i))
-            self.assertEqual(dataset.date_created.date(), timezone.now().date())
-            self.assertEqual(dataset.date_created < timezone.now(), True)
-            self.assertEqual(dataset.file_source, None)
-            self.assertEqual(os.path.basename(dataset.dataset_file.path), os.path.basename(file_paths[i]))
 
     def test_dataset_increase_permissions_from_json(self):
         """
@@ -1529,7 +1499,7 @@ class DatasetSerializerTests(TestCase):
         )
         self.kive_CDT.full_clean()
 
-        self.kive_file_contents = b"""col1
+        self.kive_file_contents = """col1
 foo
 bar
 baz
@@ -1554,6 +1524,10 @@ baz
         _, self.ext_fn = tempfile.mkstemp(dir=self.working_dir)
         with open(self.ext_fn, "wb") as f:
             f.write(self.raw_file_contents)
+
+        self.csv_file_temp_open_mode = "w+t"
+        if dsix.PY2:
+            self.csv_file_temp_open_mode = "w+b"
 
     def tearDown(self):
         shutil.rmtree(self.working_dir)
@@ -1612,7 +1586,7 @@ baz
         """
         Test validating a Dataset with a CDT.
         """
-        with tempfile.TemporaryFile() as f:
+        with tempfile.TemporaryFile(self.csv_file_temp_open_mode) as f:
             f.write(self.kive_file_contents)
             f.seek(0)
 
@@ -1629,7 +1603,7 @@ baz
         """
         Test validating a Dataset with a CDT that the user doesn't have access to.
         """
-        with tempfile.TemporaryFile() as f:
+        with tempfile.TemporaryFile(self.csv_file_temp_open_mode) as f:
             f.write(self.kive_file_contents)
             f.seek(0)
 
@@ -1760,7 +1734,7 @@ baz
         """
         Test creating a Dataset with a CDT.
         """
-        with tempfile.TemporaryFile() as f:
+        with tempfile.TemporaryFile(mode="w+t") as f:
             f.write(self.kive_file_contents)
             f.seek(0)
 
