@@ -256,9 +256,9 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
         for run_dataset in self.object.datasets.all():
             data_entries.append(dict(
                 type=type_names[run_dataset.argument.type],
-                url=run_dataset.dataset.get_view_url,
+                url=run_dataset.dataset.get_view_url(),
                 name=run_dataset.argument.name,
-                size=run_dataset.dataset.get_formatted_filesize,
+                size=run_dataset.dataset.get_formatted_filesize(),
                 created=run_dataset.dataset.date_created))
             if run_dataset.argument.type == ContainerArgument.INPUT:
                 input_count += 1
@@ -268,7 +268,7 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
                 type='Log',
                 url=log.get_absolute_url(),
                 name=log_names[log.type],
-                size=len(log.short_text),
+                size=filesizeformat(len(log.short_text)),
                 created=self.object.end_time))
         context['data_entries'] = data_entries
         return context

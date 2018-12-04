@@ -1,4 +1,5 @@
 import os
+from argparse import Namespace
 from io import BytesIO
 
 from django.contrib.auth.models import User
@@ -10,8 +11,9 @@ from django_mock_queries.mocks import mocked_relations
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
+from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerFileFormField
+    ContainerArgument, ContainerFileFormField, ContainerRun
 from kive.tests import BaseTestCases
 from metadata.models import KiveUser
 
@@ -385,3 +387,146 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals({u'detail': u'Unknown filter key: bogus'},
                           response.data)
+
+
+@mocked_relations(ContainerRun, ContainerApp, ContainerArgument)
+class ContainerRunMockTests(TestCase):
+    def test_slurm_command_default_app(self):
+        run = ContainerRun(pk=99)
+        run.user = User(username='bob')
+        run.app = ContainerApp()
+        run.app.container = Container()
+        run.app.container.family = ContainerFamily(name='my container')
+        sandbox_root = '/Sandboxes'
+        expected_command = [
+            'sbatch',
+            '-J', 'r99 my container',
+            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
+            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '-c', '1',
+            '--mem', '6000',
+            'manage.py',
+            'runcontainer',
+            '99']
+
+        command = run.build_slurm_command(sandbox_root)
+
+        self.assertListEqual(expected_command, command)
+
+    def test_slurm_command_named_app(self):
+        run = ContainerRun(pk=99)
+        run.user = User(username='bob')
+        run.app = ContainerApp(name='my_app')
+        run.app.container = Container()
+        run.app.container.family = ContainerFamily(name='my container')
+        sandbox_root = '/Sandboxes'
+        expected_command = [
+            'sbatch',
+            '-J', 'r99 my_app',
+            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
+            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '-c', '1',
+            '--mem', '6000',
+            'manage.py',
+            'runcontainer',
+            '99']
+
+        command = run.build_slurm_command(sandbox_root)
+
+        self.assertListEqual(expected_command, command)
+
+    def test_slurm_command_custom_memory(self):
+        run = ContainerRun(pk=99)
+        run.user = User(username='bob')
+        run.app = ContainerApp(threads=3, memory=100)
+        run.app.container = Container()
+        run.app.container.family = ContainerFamily(name='my container')
+        sandbox_root = '/Sandboxes'
+        expected_command = [
+            'sbatch',
+            '-J', 'r99 my container',
+            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
+            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '-c', '3',
+            '--mem', '100',
+            'manage.py',
+            'runcontainer',
+            '99']
+
+        command = run.build_slurm_command(sandbox_root)
+
+        self.assertListEqual(expected_command, command)
+
+    def test_slurm_command_priority(self):
+        run = ContainerRun(pk=99)
+        run.user = User(username='bob')
+        run.app = ContainerApp()
+        run.app.container = Container()
+        run.app.container.family = ContainerFamily(name='my container')
+        slurm_queues = (('low', 'kive-low'),
+                        ('medium', 'kive-medium'),
+                        ('high', 'kive-high'))
+        run.priority = 2
+        sandbox_root = '/Sandboxes'
+        expected_command = [
+            'sbatch',
+            '-J', 'r99 my container',
+            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
+            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '-c', '1',
+            '--mem', '6000',
+            '-p', 'kive-high',
+            'manage.py',
+            'runcontainer',
+            '99']
+
+        command = run.build_slurm_command(sandbox_root, slurm_queues)
+
+        self.assertListEqual(expected_command, command)
+
+
+@mocked_relations(ContainerRun, ContainerApp, ContainerArgument)
+class RunContainerMockTests(TestCase):
+    def build_run(self):
+        run = ContainerRun()
+        run.app = ContainerApp()
+        run.app.container = Container()
+        run.app.container.file = Namespace(path='/tmp/foo.simg')
+        run.sandbox_path = '/tmp/box23'
+        run.app.arguments.create(type=ContainerArgument.INPUT, name='in_csv')
+        run.app.arguments.create(type=ContainerArgument.OUTPUT, name='out_csv')
+        return run
+
+    def test_default_app(self):
+        run = self.build_run()
+        handler = runcontainer.Command()
+        expected_command = [
+            'singularity',
+            'run',
+            '--contain',
+            '-B', '/tmp/box23/input:/mnt/input,/tmp/box23/output:/mnt/output',
+            '/tmp/foo.simg',
+            '/mnt/input/in_csv',
+            '/mnt/output/out_csv']
+
+        command = handler.build_command(run)
+
+        self.assertListEqual(expected_command, command)
+
+    def test_named_app(self):
+        run = self.build_run()
+        run.app.name = 'other_app'
+        handler = runcontainer.Command()
+        expected_command = [
+            'singularity',
+            'run',
+            '--contain',
+            '-B', '/tmp/box23/input:/mnt/input,/tmp/box23/output:/mnt/output',
+            '--app', 'other_app',
+            '/tmp/foo.simg',
+            '/mnt/input/in_csv',
+            '/mnt/output/out_csv']
+
+        command = handler.build_command(run)
+
+        self.assertListEqual(expected_command, command)

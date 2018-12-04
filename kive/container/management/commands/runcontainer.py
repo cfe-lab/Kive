@@ -72,28 +72,36 @@ class Command(BaseCommand):
         run.state = ContainerRun.RUNNING
 
     def run_container(self, run):
-        container_path = run.app.container.file.path
         logs_path = os.path.join(run.sandbox_path, 'logs')
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
+        command = self.build_command(run)
+        with open(stdout_path, 'w') as stdout, open(stderr_path, 'w') as stderr:
+            run.return_code = call(command, stdout=stdout, stderr=stderr)
+
+        run.state = ContainerRun.SAVING
+
+    def build_command(self, run):
+        container_path = run.app.container.file.path
         input_path = os.path.join(run.sandbox_path, 'input')
         output_path = os.path.join(run.sandbox_path, 'output')
         command = ['singularity',
                    'run',
+                   '--contain',
                    '-B',
                    '{}:/mnt/input,{}:/mnt/output'.format(input_path,
-                                                         output_path),
-                   container_path]
+                                                         output_path)]
+        if run.app.name:
+            command.append('--app')
+            command.append(run.app.name)
+        command.append(container_path)
         for argument in run.app.arguments.all():
             if argument.type == ContainerArgument.INPUT:
                 folder = '/mnt/input'
             else:
                 folder = '/mnt/output'
             command.append(os.path.join(folder, argument.name))
-        with open(stdout_path, 'w') as stdout, open(stderr_path, 'w') as stderr:
-            run.return_code = call(command, stdout=stdout, stderr=stderr)
-
-        run.state = ContainerRun.SAVING
+        return command
 
     def save_outputs(self, run):
         output_path = os.path.join(run.sandbox_path, 'output')

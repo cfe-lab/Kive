@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import os
+from datetime import datetime
 
 from django.contrib.auth.models import User
 from django.core.management import call_command
@@ -9,11 +10,13 @@ from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
+from django.utils.timezone import make_aware, utc
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
-from container.models import ContainerFamily, ContainerApp, Container, ContainerRun, ContainerArgument, Batch
+from container.models import ContainerFamily, ContainerApp, Container, \
+    ContainerRun, ContainerArgument, Batch, ContainerLog
 from kive.tests import BaseTestCases, install_fixture_files
 from librarian.models import Dataset
 
@@ -191,6 +194,58 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
 
         end_count = ContainerRun.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerRunTests(TestCase):
+    fixtures = ['container_run']
+
+    def test_no_outputs(self):
+        run = ContainerRun.objects.get(id=1)
+        expected_entries = [dict(created=make_aware(datetime(2000, 1, 1), utc),
+                                 name='names_csv',
+                                 size='30\xa0bytes',
+                                 type='Input',
+                                 url='/dataset_view/1')]
+        client = Client()
+        client.force_login(run.user)
+        response = client.get(reverse('container_run_detail',
+                                      kwargs=dict(pk=run.pk)))
+
+        self.assertEqual('New', response.context['state_name'])
+        self.assertListEqual(expected_entries, response.context['data_entries'])
+
+    def test_outputs(self):
+        run = ContainerRun.objects.get(id=1)
+        run.state = ContainerRun.COMPLETE
+        run.end_time = make_aware(datetime(2000, 1, 2), utc)
+        run.save()
+        dataset = Dataset.objects.first()
+        argument = run.app.arguments.get(name='greetings_csv')
+        run.datasets.create(argument=argument, dataset=dataset)
+        log = run.logs.create(short_text='Job completed.', type=ContainerLog.STDERR)
+        expected_entries = [dict(created=make_aware(datetime(2000, 1, 1), utc),
+                                 name='names_csv',
+                                 size='30\xa0bytes',
+                                 type='Input',
+                                 url='/dataset_view/1'),
+                            dict(created=make_aware(datetime(2000, 1, 2), utc),
+                                 name='stderr',
+                                 size='14\xa0bytes',
+                                 type='Log',
+                                 url='/container_logs/{}/'.format(log.id)),
+                            dict(created=make_aware(datetime(2000, 1, 1), utc),
+                                 name='greetings_csv',
+                                 size='30\xa0bytes',
+                                 type='Output',
+                                 url='/dataset_view/1')]
+        client = Client()
+        client.force_login(run.user)
+        response = client.get(reverse('container_run_detail',
+                                      kwargs=dict(pk=run.pk)))
+
+        self.assertEqual('Complete', response.context['state_name'])
+        self.assertListEqual(expected_entries, response.context['data_entries'])
 
 
 @skipIfDBFeature('is_mocked')

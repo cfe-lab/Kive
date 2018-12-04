@@ -418,14 +418,27 @@ class ContainerRun(Stopwatch, AccessControl):
             if ex.errno != errno.EEXIST:
                 raise
 
+        check_call(self.build_slurm_command(sandbox_root,
+                                            settings.SLURM_QUEUES))
+
+    def build_slurm_command(self, sandbox_root, slurm_queues=None):
         sandbox_prefix = os.path.join(sandbox_root,
                                       self.get_sandbox_prefix())
         slurm_prefix = sandbox_prefix + '_job%J_node%N_'
-
-        check_call(['sbatch',
-                    '--output', slurm_prefix + 'stdout.txt',
-                    '--error', slurm_prefix + 'stderr.txt',
-                    'manage.py', 'runcontainer', str(self.pk)])
+        job_name = 'r{} {}'.format(self.pk,
+                                   self.app.name or
+                                   self.app.container.family.name)
+        command = ['sbatch',
+                   '-J', job_name,
+                   '--output', slurm_prefix + 'stdout.txt',
+                   '--error', slurm_prefix + 'stderr.txt',
+                   '-c', str(self.app.threads),
+                   '--mem', str(self.app.memory)]
+        if slurm_queues is not None:
+            kive_name, slurm_name = slurm_queues[self.priority]
+            command.extend(['-p', slurm_name])
+        command.extend(['manage.py', 'runcontainer', str(self.pk)])
+        return command
 
     def get_sandbox_prefix(self):
         return 'user{}_run{}_'.format(self.user.username, self.pk)

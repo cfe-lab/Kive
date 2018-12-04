@@ -17,7 +17,7 @@
 
 {% block content %}
 
-<a href="/container_update/{{ container_id }}" rel="prev">return to family</a>
+<a href="/container_update/{{ container_id }}" rel="prev">return to container</a>
 
 <h2>Container App</h2>
 
@@ -39,5 +39,7 @@
 
     <input type="submit" value="Submit" />
 </form>
+
+<p><a href="/container_inputs?app={{ object.id }}">Launch this app</a></p>
 
 {% endblock %}
