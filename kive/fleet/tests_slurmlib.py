@@ -16,7 +16,7 @@ import six
 import fleet.slurmlib as slurmlib
 from django.conf import settings
 
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 
 # NOTE: Here, select which SlurmScheduler to test.
 # we select the DummySlurmScheduler by default, so that the automatic tests
@@ -87,6 +87,7 @@ def get_accounting_info(jhandles=None, sched_cls=None):
     return curstates
 
 
+@skipIfDBFeature('is_mocked')  # Doesn't use the database, but this test is slow.
 class SlurmDummyTests(TestCase):
     def setUp(self):
         self.addTypeEqualityFunc(str, self.assertMultiLineEqual)

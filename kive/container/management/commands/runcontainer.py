@@ -1,15 +1,17 @@
 from __future__ import print_function
+
+import errno
 import logging
 import os
 import shutil
 from subprocess import call
 from tempfile import mkdtemp
 
-import errno
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
-from container.models import ContainerRun, ContainerArgument
+from container.models import ContainerRun, ContainerArgument, ContainerLog
 from librarian.models import Dataset
 
 logger = logging.getLogger(__name__)
@@ -50,6 +52,11 @@ class Command(BaseCommand):
 
     def create_sandbox(self, run):
         sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        try:
+            os.mkdir(sandbox_root)
+        except OSError as ex:
+            if ex.errno != errno.EEXIST:
+                raise
         prefix = 'user{}_run{}_'.format(run.user.username, run.pk)
         run.sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
 
@@ -97,5 +104,16 @@ class Command(BaseCommand):
                                              user=run.user)
             run.datasets.create(dataset=dataset,
                                 argument=argument)
+        logs_path = os.path.join(run.sandbox_path, 'logs')
+        for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
+                                    ('stderr.txt', ContainerLog.STDERR)):
+            # noinspection PyUnresolvedReferences,PyProtectedMember
+            chunk_size = ContainerLog._meta.get_field('short_text').max_length
+            with open(os.path.join(logs_path, file_name)) as f:
+                chunk = f.read(chunk_size)
+            run.logs.create(type=log_type, short_text=chunk)
 
-        run.state = ContainerRun.COMPLETE
+        run.state = (ContainerRun.COMPLETE
+                     if run.return_code == 0
+                     else ContainerRun.FAILED)
+        run.end_time = timezone.now()

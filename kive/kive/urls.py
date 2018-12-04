@@ -108,6 +108,9 @@ urlpatterns = [
     url(r'^container_runs/(?P<pk>\d+)/$',
         container.views.ContainerRunUpdate.as_view(),
         name='container_run_detail'),
+    url(r'^container_logs/(?P<pk>\d+)/$',
+        container.views.ContainerLogDetail.as_view(),
+        name='container_log_detail'),
 
     url(r'^datatypes$', metadata.views.datatypes, name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', metadata.views.datatype_detail, name='datatype_detail'),

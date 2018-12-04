@@ -156,11 +156,11 @@
         <th>Size</th>
         <th>Date</th>
     </tr>
-{% for run_dataset in object.datasets.all %}
-    <tr><td>{{ run_dataset.argument.type }}</td>
-        <td><a href="{{run_dataset.dataset.get_view_url}}">{{ run_dataset.argument.name }}</a></td>
-        <td>{{ run_dataset.dataset.get_formatted_filesize }}</td>
-        <td>{{ run_dataset.dataset.date_created }}</td>
+{% for data_entry in data_entries %}
+    <tr><td>{{ data_entry.type }}</td>
+        <td><a href="{{ data_entry.url }}">{{ data_entry.name }}</a></td>
+        <td>{{ data_entry.size }}</td>
+        <td>{{ data_entry.created }}</td>
     </tr>
 {% endfor %}
 </table>

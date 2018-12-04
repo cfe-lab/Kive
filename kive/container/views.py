@@ -12,13 +12,14 @@ from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
+from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, UpdateView, ModelFormMixin
 import rest_framework.reverse
 
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument
+    ContainerRun, ContainerArgument, ContainerLog
 from file_access_utils import compute_md5
 from portal.views import developer_check, AdminViewMixin
 
@@ -249,7 +250,33 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
         context['is_dev'] = developer_check(self.request.user)
         state_names = dict(ContainerRun.STATES)
         context['state_name'] = state_names.get(self.object.state)
+        data_entries = []
+        type_names = dict(ContainerArgument.TYPES)
+        input_count = 0
+        for run_dataset in self.object.datasets.all():
+            data_entries.append(dict(
+                type=type_names[run_dataset.argument.type],
+                url=run_dataset.dataset.get_view_url,
+                name=run_dataset.argument.name,
+                size=run_dataset.dataset.get_formatted_filesize,
+                created=run_dataset.dataset.date_created))
+            if run_dataset.argument.type == ContainerArgument.INPUT:
+                input_count += 1
+        log_names = dict(ContainerLog.TYPES)
+        for log in self.object.logs.order_by('type'):
+            data_entries.insert(input_count, dict(
+                type='Log',
+                url=log.get_absolute_url(),
+                name=log_names[log.type],
+                size=len(log.short_text),
+                created=self.object.end_time))
+        context['data_entries'] = data_entries
         return context
 
     def get_success_url(self):
         return reverse('container_runs')
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerLogDetail(DetailView):
+    model = ContainerLog

@@ -472,3 +472,6 @@ class ContainerLog(models.Model):
         help_text="Holds the log text if it's shorter than the max length.")
     long_text = models.FileField(
         help_text="Holds the log text if it's longer than the max length.")
+
+    def get_absolute_url(self):
+        return reverse('container_log_detail', kwargs=dict(pk=self.pk))
