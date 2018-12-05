@@ -107,11 +107,15 @@ class Command(BaseCommand):
         output_path = os.path.join(run.sandbox_path, 'output')
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
             argument_path = os.path.join(output_path, argument.name)
-            dataset = Dataset.create_dataset(argument_path,
-                                             name=argument.name,
-                                             user=run.user)
-            run.datasets.create(dataset=dataset,
-                                argument=argument)
+            try:
+                dataset = Dataset.create_dataset(argument_path,
+                                                 name=argument.name,
+                                                 user=run.user)
+                run.datasets.create(dataset=dataset,
+                                    argument=argument)
+            except IOError as ex:
+                if ex.errno != errno.ENOENT:
+                    raise
         logs_path = os.path.join(run.sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):

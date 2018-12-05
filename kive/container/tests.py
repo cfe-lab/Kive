@@ -199,6 +199,10 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
 @skipIfDBFeature('is_mocked')
 class ContainerRunTests(TestCase):
     fixtures = ['container_run']
+    
+    def setUp(self):
+        super(ContainerRunTests, self).setUp()
+        install_fixture_files('container_run')
 
     def test_no_outputs(self):
         run = ContainerRun.objects.get(id=1)
@@ -373,3 +377,18 @@ class RunContainerTests(TestCase):
 
         run.refresh_from_db()
         self.assertEqual('', run.sandbox_path)
+
+    def test_missing_output(self):
+        """ Configure an extra output that the image doesn't know about. """
+        run = ContainerRun.objects.get(name='fixture run')
+        dataset = Dataset.objects.first()
+        extra_arg = run.app.arguments.create(name='extra_csv')
+        run.datasets.create(argument=extra_arg, dataset=dataset)
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.FAILED, run.state)
+
+        self.assertEqual(2, run.datasets.count())

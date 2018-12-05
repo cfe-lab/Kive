@@ -40,6 +40,8 @@
     <input type="submit" value="Submit" />
 </form>
 
+{% if object.id %}
 <p><a href="/container_inputs?app={{ object.id }}">Launch this app</a></p>
+{% endif %}
 
 {% endblock %}
