@@ -78,6 +78,8 @@ class ContainerAppSerializer(serializers.ModelSerializer):
         queryset=Container.objects.all())
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerapp-removal-plan')
+    argument_list = serializers.HyperlinkedIdentityField(
+        view_name='containerapp-argument-list')
 
     class Meta:
         model = ContainerApp
@@ -91,6 +93,7 @@ class ContainerAppSerializer(serializers.ModelSerializer):
                   'memory',
                   'inputs',
                   'outputs',
+                  'argument_list',
                   'removal_plan')
 
     def save(self, **kwargs):
@@ -201,7 +204,11 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
 
 class ContainerRunSerializer(AccessControlSerializer,
                              serializers.ModelSerializer):
-    datasets = ContainerDatasetSerializer(many=True, required=False)
+    datasets = ContainerDatasetSerializer(many=True,
+                                          required=False,
+                                          write_only=True)
+    dataset_list = serializers.HyperlinkedIdentityField(
+        view_name='containerrun-dataset-list')
     absolute_url = URLField(source='get_absolute_url', read_only=True)
     app = serializers.HyperlinkedRelatedField(
         view_name='containerapp-detail',
@@ -245,6 +252,7 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'users_allowed',
                   'groups_allowed',
                   'removal_plan',
+                  'dataset_list',
                   'datasets')
 
     def create(self, validated_data):

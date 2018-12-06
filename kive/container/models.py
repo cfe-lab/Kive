@@ -471,6 +471,8 @@ class ContainerDataset(models.Model):
         auto_now_add=True,
         help_text="When this was added to Kive.")
 
+    objects = None  # Filled in later by Django.
+
 
 class ContainerLog(models.Model):
     STDOUT = 'O'

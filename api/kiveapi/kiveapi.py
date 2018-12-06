@@ -4,8 +4,11 @@ RESTful API.
 
 """
 import logging
+from itertools import chain
 
+# noinspection PyPackageRequirements
 import requests
+# noinspection PyPackageRequirements
 from requests import Session
 
 from .dataset import Dataset
@@ -139,6 +142,7 @@ class KiveAPI(Session):
                         message += '; '.join(field_error_messages)
                     raise KiveMalformedDataException(message)
                 if is_json and 'detail' in json_data:
+                    # noinspection PyTypeChecker
                     message += ': ' + json_data['detail']
                 raise KiveClientException(message)
 
@@ -158,6 +162,19 @@ class KiveAPI(Session):
 
         return self._validate_response(super(KiveAPI, self).get(*nargs, **kwargs),
                                        is_json=is_json)
+
+    def filter(self, url, *args, **kwargs):
+        filters = []
+        pairs = iter(args)
+        for i, (name, value) in enumerate(zip(pairs, pairs)):
+            filters.append('filters[{}][key]={}'.format(i, name))
+            filters.append('filters[{}][val]={}'.format(i, value))
+        if '?' in url:
+            url += '&'
+        else:
+            url += '?'
+        url += '&'.join(filters)
+        return self.get(url, **kwargs)
 
     def post(self, *args, **kwargs):
         nargs = list(args)
@@ -221,11 +238,8 @@ class KiveAPI(Session):
         filters = dict(kwargs)
         if cdt is not None:
             filters['cdt'] = cdt.cdt_id
-        filter_text = '&'.join(
-            'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
-            for i, (key, val) in enumerate(filters.items()))
-        datasets = self.get('@api_find_datasets',
-                            context={'filters': filter_text}).json()
+        filter_args = chain.from_iterable(filters.items())
+        datasets = self.filter('/api/datasets/', *filter_args).json()
         return [Dataset(d, self) for d in datasets]
 
     def get_pipeline_families(self):
@@ -454,6 +468,7 @@ class KiveAPI(Session):
                         is_json=True).json()
         return RunBatch(run)
 
+    # noinspection PyShadowingBuiltins
     def get_run(self, id):
         """ Get a RunStatus object for the given id.
 

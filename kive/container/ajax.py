@@ -13,11 +13,11 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, Batch, ContainerArgument
+    ContainerRun, Batch, ContainerArgument, ContainerDataset
 from container.serializers import ContainerFamilySerializer, \
     ContainerSerializer, ContainerAppSerializer, \
     ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
-    ContainerArgumentSerializer
+    ContainerArgumentSerializer, ContainerDatasetSerializer
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination, \
     IsGrantedReadCreate
@@ -242,6 +242,14 @@ class ContainerAppViewSet(CleanCreateModelMixin,
 
         return queryset.filter(container_id__in=granted_containers)
 
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Arguments')
+    def argument_list(self, request, pk=None):
+        arguments = self.get_object().arguments.all()
+        return Response(ContainerArgumentSerializer(arguments,
+                                                    context=dict(request=request),
+                                                    many=True).data)
+
 
 class ContainerArgumentViewSet(ReadOnlyModelViewSet,
                                CleanCreateModelMixin,
@@ -365,6 +373,8 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         ended after the given date and time.
     * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         ended before the given date and time.
+    * filters[n][key]=input_id&filters[n][val]=match - runs that used an input
+        dataset with the given id.
     """
     queryset = ContainerRun.objects.all()
     serializer_class = ContainerRunSerializer
@@ -387,4 +397,16 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         endafter=lambda queryset, value: queryset.filter(
             end_time__gt=parse_date_filter(value)),
         endbefore=lambda queryset, value: queryset.filter(
-            end_time__lt=parse_date_filter(value)))
+            end_time__lt=parse_date_filter(value)),
+        input_id=lambda queryset, value: queryset.filter(
+            id__in=ContainerDataset.objects.filter(
+                dataset_id=value,
+                argument__type=ContainerArgument.INPUT).values_list('run_id')))
+
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Datasets')
+    def dataset_list(self, request, pk=None):
+        datasets = self.get_object().datasets.all()
+        return Response(ContainerDatasetSerializer(datasets,
+                                                   context=dict(request=request),
+                                                   many=True).data)
