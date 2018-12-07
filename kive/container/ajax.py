@@ -197,6 +197,14 @@ class ContainerViewSet(CleanCreateModelMixin,
             container.file.close()
         return response
 
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Apps')
+    def app_list(self, request, pk=None):
+        apps = self.get_object().apps.all()
+        return Response(ContainerAppSerializer(apps,
+                                               context=dict(request=request),
+                                               many=True).data)
+
 
 class ContainerAppViewSet(CleanCreateModelMixin,
                           RemovableModelViewSet,
@@ -373,6 +381,8 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         ended after the given date and time.
     * filters[n][key]=endbefore&filters[n][val]=DD+Mon+YYYY+HH:MM - runs that
         ended before the given date and time.
+    * filters[n][key]=app_id&filters[n][val]=match - runs that used a container
+        with the given id.
     * filters[n][key]=input_id&filters[n][val]=match - runs that used an input
         dataset with the given id.
     """
@@ -398,6 +408,8 @@ class ContainerRunViewSet(CleanCreateModelMixin,
             end_time__gt=parse_date_filter(value)),
         endbefore=lambda queryset, value: queryset.filter(
             end_time__lt=parse_date_filter(value)),
+        app_id=lambda queryset, value: queryset.filter(
+            app_id=value),
         input_id=lambda queryset, value: queryset.filter(
             id__in=ContainerDataset.objects.filter(
                 dataset_id=value,

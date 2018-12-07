@@ -29,6 +29,8 @@ script:
   - cd kive
   - ./manage.py test --setting kive.settings_mocked
   - coverage run manage.py test --setting kive.settings_test_pg
+  - cd ../api
+  - coverage run --source=kiveapi -m pytest
   - set +e
 after_success:
     - pip install codecov

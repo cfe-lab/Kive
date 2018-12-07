@@ -11,6 +11,7 @@ import requests
 # noinspection PyPackageRequirements
 from requests import Session
 
+from .endpoint_manager import EndpointManager
 from .dataset import Dataset
 from .datatype import CompoundDatatype
 from .errors import KiveMalformedDataException, KiveAuthException,\
@@ -63,6 +64,37 @@ class KiveAPI(Session):
         super(KiveAPI, self).__init__()
         self.verify = verify
         self.csrf_token = None
+
+    @property
+    def endpoints(self):
+        """ An open-ended interface to the API.
+
+        You can access endpoints through named properties, and you don't need
+        a new library version when Kive adds new endpoints or filters.
+        For example, you can get a specific Dataset like this:
+
+        >>> import kiveapi
+        >>> session = kiveapi.KiveAPI('https://localhost:8000')
+        >>> session.login('joe', 'secret')
+        >>> ds = session.endpoints.datasets.get(109)
+        >>> ds['name'], ds['url']
+        (u'greetings_csv', u'https://localhost:8000/api/datasets/109/')
+
+        You can create a new batch with a call to post().
+
+        >>> batch = session.endpoints.batches.post(json=dict(name='Chocolate Cookies'))
+        >>> batch['name'], batch['id']
+        (u'Chocolate Cookies', 52)
+
+        You can search for batches with a call to filter(). This example looks
+        for any batches with 'cookies' in the name. You can add more filters
+        by adding more pairs of arguments.
+
+        >>> batches = session.endpoints.batches.filter('name', 'cookies')
+        >>> [(batch['name'], batch['id']) for batch in batches]
+        [(u'Chocolate Cookies', 52), (u'Sugar Cookies', 51)]
+        """
+        return EndpointManager(self)
 
     def login(self, username, password):
         self.fetch_csrf_token()  # for the login request
@@ -164,6 +196,16 @@ class KiveAPI(Session):
                                        is_json=is_json)
 
     def filter(self, url, *args, **kwargs):
+        """ Filter a get request with name/value pairs.
+
+        For example, session.filter('/api/datasets',
+                                    'name', 'titles.csv',
+                                    'user', 'joe')
+        is equivalent to session.get(
+            '/api/datasets?'
+            'filters[0][key]=name&filters[0][val]=titles.csv&'
+            'filters[1][key]=user&filters[1][val]=joe')
+        """
         filters = []
         pairs = iter(args)
         for i, (name, value) in enumerate(zip(pairs, pairs)):

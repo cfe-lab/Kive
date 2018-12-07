@@ -99,33 +99,92 @@ def test_find_datasets_filter(mocked_api):
     assert len(datasets) == 1
     assert datasets[0].name == 'items'
     # noinspection PyUnresolvedReferences
-    Session.get.assert_called_with('http://localhost/api/datasets/?'
-                                   'filters[0][key]=name&filters[0][val]=item&'
-                                   'filters[1][key]=user&filters[1][val]=joe')
+    Session.get.assert_called_once_with(
+        'http://localhost/api/datasets/?'
+        'filters[0][key]=name&filters[0][val]=item&'
+        'filters[1][key]=user&filters[1][val]=joe')
 
 
 def test_filter(mocked_api):
-    mocked_api.filter('/api/foos',
-                      'name', 'item',
-                      'name', 'big',
-                      'user', 'joe')
+    # noinspection PyUnresolvedReferences
+    expected_response = Session.get.return_value
+    response = mocked_api.filter('/api/foos',
+                                 'name', 'item',
+                                 'name', 'big',
+                                 'user', 'joe')
 
     # noinspection PyUnresolvedReferences
-    Session.get.assert_called_with('http://localhost/api/foos?'
-                                   'filters[0][key]=name&filters[0][val]=item&'
-                                   'filters[1][key]=name&filters[1][val]=big&'
-                                   'filters[2][key]=user&filters[2][val]=joe')
+    Session.get.assert_called_once_with(
+        'http://localhost/api/foos?'
+        'filters[0][key]=name&filters[0][val]=item&'
+        'filters[1][key]=name&filters[1][val]=big&'
+        'filters[2][key]=user&filters[2][val]=joe')
+    assert expected_response == response
 
 
-def test(mocked_api):
+def test_filter_extra(mocked_api):
     mocked_api.filter('/api/foos?is_granted=true',
                       'name', 'item',
                       'name', 'big',
                       'user', 'joe')
 
     # noinspection PyUnresolvedReferences
-    Session.get.assert_called_with('http://localhost/api/foos?'
-                                   'is_granted=true&'
-                                   'filters[0][key]=name&filters[0][val]=item&'
-                                   'filters[1][key]=name&filters[1][val]=big&'
-                                   'filters[2][key]=user&filters[2][val]=joe')
+    Session.get.assert_called_once_with(
+        'http://localhost/api/foos?'
+        'is_granted=true&'
+        'filters[0][key]=name&filters[0][val]=item&'
+        'filters[1][key]=name&filters[1][val]=big&'
+        'filters[2][key]=user&filters[2][val]=joe')
+
+
+def test_endpoint_get(mocked_api):
+    expected_foos = ['foo1', 'foo2']
+    # noinspection PyUnresolvedReferences
+    Session.get.return_value.json.return_value = expected_foos
+
+    foos = mocked_api.endpoints.foos.get()
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with('http://localhost/api/foos/')
+    assert expected_foos == foos
+
+
+def test_endpoint_get_id(mocked_api):
+    mocked_api.endpoints.bars.get(42)
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with('http://localhost/api/bars/42')
+
+
+def test_endpoint_post(mocked_api):
+    params = dict(name='bob', age=43)
+    expected_data = dict(name='bob', age=43, id=99)
+    # noinspection PyUnresolvedReferences
+    Session.post.return_value.json.return_value = expected_data
+
+    data = mocked_api.endpoints.foos.post(json=params)
+
+    # noinspection PyUnresolvedReferences
+    Session.post.assert_called_once_with(
+        'http://localhost/api/foos/',
+        headers={'Content-Type': 'application/json',
+                 'referer': 'http://localhost/api/foos/',
+                 'X-CSRFToken': None},
+        json=params)
+    assert expected_data == data
+
+
+def test_endpoint_filter(mocked_api):
+    expected_bars = ['bar1', 'bar2']
+    # noinspection PyUnresolvedReferences
+    Session.get.return_value.json.return_value = expected_bars
+
+    bars = mocked_api.endpoints.bars.filter('name', 'bob', 'age', 23)
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with(
+        'http://localhost/api/bars/?'
+        'filters[0][key]=name&filters[0][val]=bob&'
+        'filters[1][key]=age&filters[1][val]=23')
+
+    assert expected_bars == bars

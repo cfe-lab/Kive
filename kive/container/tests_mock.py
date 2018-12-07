@@ -293,7 +293,7 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         self.mock_viewset(ContainerAppViewSet)
         super(ContainerAppApiMockTests, self).setUp()
 
-        patcher = mocked_relations(Container)
+        patcher = mocked_relations(Container, ContainerFamily)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.list_path = reverse("containerapp-list")
@@ -319,6 +319,7 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         KiveUser.objects.add(other_kive_user)
 
         my_container = Container.objects.create(id=100, user=my_kive_user)
+        my_container.family = ContainerFamily.objects.create()
         other_container = Container.objects.create(id=101, user=other_kive_user)
         archive = ContainerApp(pk=42, name='archive', description='impressive')
         compress = ContainerApp(pk=43, name='compress')

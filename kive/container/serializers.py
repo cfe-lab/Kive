@@ -36,17 +36,19 @@ class ContainerFamilySerializer(AccessControlSerializer,
 class ContainerSerializer(AccessControlSerializer,
                           serializers.ModelSerializer):
     absolute_url = URLField(source='get_absolute_url', read_only=True)
-    family = serializers.SlugRelatedField(
-        slug_field='name',
-        queryset=ContainerFamily.objects.all())
-    family_url = serializers.HyperlinkedRelatedField(
-        source='family',
+    family = serializers.HyperlinkedRelatedField(
         view_name='containerfamily-detail',
         lookup_field='pk',
+        queryset=ContainerFamily.objects.all())
+    family_name = serializers.SlugRelatedField(
+        source='family',
+        slug_field='name',
         read_only=True)
     download_url = serializers.HyperlinkedIdentityField(
         view_name='container-download')
     num_apps = serializers.IntegerField()
+    app_list = serializers.HyperlinkedIdentityField(
+        view_name='container-app-list')
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='container-removal-plan')
 
@@ -57,7 +59,7 @@ class ContainerSerializer(AccessControlSerializer,
                   'download_url',
                   'absolute_url',
                   'family',
-                  'family_url',
+                  'family_name',
                   'file',
                   'tag',
                   'description',
@@ -67,6 +69,7 @@ class ContainerSerializer(AccessControlSerializer,
                   'user',
                   'users_allowed',
                   'groups_allowed',
+                  'app_list',
                   'removal_plan')
 
 
@@ -76,6 +79,10 @@ class ContainerAppSerializer(serializers.ModelSerializer):
         view_name='container-detail',
         lookup_field='pk',
         queryset=Container.objects.all())
+    container_name = serializers.SlugRelatedField(
+        source='container',
+        slug_field='display_name',
+        read_only=True)
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerapp-removal-plan')
     argument_list = serializers.HyperlinkedIdentityField(
@@ -87,6 +94,7 @@ class ContainerAppSerializer(serializers.ModelSerializer):
                   'url',
                   'absolute_url',
                   'container',
+                  'container_name',
                   'name',
                   'description',
                   'threads',
@@ -182,6 +190,10 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
         view_name='dataset-detail',
         lookup_field='pk',
         queryset=Dataset.objects.all())
+    dataset_purged = serializers.SlugRelatedField(
+        source='dataset',
+        slug_field='is_purged',
+        read_only=True)
     argument_name = serializers.SlugRelatedField(
         source='argument',
         slug_field='name',
@@ -198,6 +210,7 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
                   'argument_name',
                   'argument_type',
                   'dataset',
+                  'dataset_purged',
                   'name',
                   'created')
 

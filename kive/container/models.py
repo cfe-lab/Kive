@@ -135,11 +135,15 @@ class Container(AccessControl):
     # Related model gets set later.
     methods = None
 
+    @property
+    def display_name(self):
+        return '{}:{}'.format(self.family.name, self.tag)
+
     class Meta:
         ordering = ['family__name', '-tag']
 
     def __str__(self):
-        return '{}:{}'.format(self.family.name, self.tag)
+        return self.display_name
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
@@ -191,7 +195,7 @@ class ContainerApp(models.Model):
 
     @property
     def display_name(self):
-        name = str(self.container)
+        name = self.container.display_name
         if self.name:
             # noinspection PyTypeChecker
             name += ' / ' + self.name

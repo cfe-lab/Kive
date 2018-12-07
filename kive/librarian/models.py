@@ -215,6 +215,10 @@ class Dataset(metadata.models.AccessControl):
 
         return "{} (created by {} on {})".format(display_name, self.user, self.date_created)
 
+    @property
+    def is_purged(self):
+        return not (self.dataset_file or self.external_path)
+
     def external_absolute_path(self):
         if not self.external_path:
             return None

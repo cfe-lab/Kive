@@ -317,8 +317,6 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         resp_run = resp_batch['runs'][0]
         self.assertEquals(resp_run['name'], 'my run')
 
-        self.assertEquals(len(resp_run['datasets']), 1)
-
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
