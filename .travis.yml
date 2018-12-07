@@ -35,3 +35,5 @@ script:
 after_success:
     - pip install codecov
     - codecov
+    - cd ../kive
+    - codecov
