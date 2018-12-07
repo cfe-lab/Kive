@@ -93,6 +93,8 @@ class KiveAPI(Session):
         >>> batches = session.endpoints.batches.filter('name', 'cookies')
         >>> [(batch['name'], batch['id']) for batch in batches]
         [(u'Chocolate Cookies', 52), (u'Sugar Cookies', 51)]
+
+        There are also methods for delete, patch, and head.
         """
         return EndpointManager(self)
 
@@ -223,6 +225,11 @@ class KiveAPI(Session):
         url = self._prep_url(nargs[0])
         nargs[0] = url
         is_json = kwargs.pop('is_json', True)
+        self._prep_headers(kwargs, url)
+        return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
+                                       is_json=is_json)
+
+    def _prep_headers(self, kwargs, url):
         headers = kwargs.get('headers', {})
         kwargs['headers'] = headers
         headers.setdefault('referer', url)
@@ -230,18 +237,19 @@ class KiveAPI(Session):
             headers.setdefault('Content-Type', 'application/json')
         if hasattr(self, 'csrf_token'):
             headers.setdefault('X-CSRFToken', self.csrf_token)
-        return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
-                                       is_json=is_json)
 
-    def put(self, *args, **kwargs):
+    def patch(self, *args, **kwargs):
         nargs = list(args)
         nargs[0] = self._prep_url(nargs[0])
-        return self._validate_response(super(KiveAPI, self).put(*nargs, **kwargs))
+        self._prep_headers(kwargs, nargs[0])
+        return self._validate_response(super(KiveAPI, self).patch(*nargs, **kwargs))
 
     def delete(self, *args, **kwargs):
         nargs = list(args)
         nargs[0] = self._prep_url(nargs[0])
-        return self._validate_response(super(KiveAPI, self).delete(*nargs, **kwargs))
+        self._prep_headers(kwargs, nargs[0])
+        return self._validate_response(super(KiveAPI, self).delete(*nargs, **kwargs),
+                                       is_json=False)
 
     def head(self, *args, **kwargs):
         newargs = list(args)
