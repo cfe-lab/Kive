@@ -172,7 +172,7 @@ class Transformation(metadata.models.AccessControl):
 
         my_xputs = itertools.chain(self.inputs.order_by("dataset_idx"), self.outputs.order_by("dataset_idx"))
         other_xputs = itertools.chain(other.inputs.order_by("dataset_idx"), other.outputs.order_by("dataset_idx"))
-        for my_xput, other_xput in itertools.izip_longest(my_xputs, other_xputs, fillvalue=None):
+        for my_xput, other_xput in itertools.zip_longest(my_xputs, other_xputs, fillvalue=None):
             if my_xput is None or other_xput is None or not my_xput.is_identical(other_xput):
                 return False
         return True

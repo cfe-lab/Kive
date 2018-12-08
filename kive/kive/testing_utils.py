@@ -40,11 +40,14 @@ def get_open_fds():
     Warning: will only work on UNIX-like operating systems.
     """
     pid = os.getpid()
-    procs = subprocess.check_output(
-        ["lsof", '-w', '-Ff', "-p", str(pid)])
-
-    nprocs = len(filter(lambda s: s and s[0] == 'f' and s[1:].isdigit(),
-                        procs.split('\n')))
+    procs = subprocess.check_output(["lsof", '-w', '-Ff', "-p", str(pid)])
+    procs_list = list(
+        filter(
+            lambda s: s and s[0] == 'f' and s[1:].isdigit(),
+            procs.decode(encoding="utf-8").split('\n')
+        )
+    )
+    nprocs = len(procs_list)
     return nprocs
 
 
@@ -1648,8 +1651,8 @@ def create_method_test_environment(case):
         os.close(fd)
     case.noop_indata = "word\nhello\nworld"
 
-    with open(case.noop_infile, "w") as handle:
-        handle.write(case.noop_indata.encode())
+    with open(case.noop_infile, "wt") as handle:
+        handle.write(case.noop_indata)
 
     file_access_utils.configure_sandbox_permissions(case.noop_infile)
     file_access_utils.configure_sandbox_permissions(case.noop_outfile)

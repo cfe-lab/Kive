@@ -329,7 +329,7 @@ class XputStructureForm (forms.Form):
         self.fields['compounddatatype'].choices = [('', '--------'), ('__raw__', 'Unstructured')] + more_choices
 
 
-class MethodFamilyForm (forms.ModelForm):
+class MethodFamilyForm(forms.ModelForm):
     """Form used in creating a new MethodFamily."""
     permissions = PermissionsField(
         label="Users and groups allowed",

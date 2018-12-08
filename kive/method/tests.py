@@ -17,6 +17,7 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 from django.core.urlresolvers import resolve
 from django.db import transaction
+import django.utils.six as dsix
 
 from django.test import TestCase, skipIfDBFeature
 from django_mock_queries.mocks import mocked_relations
@@ -241,11 +242,11 @@ class CodeResourceTests(MethodTestCase):
                                     'and the characters -._(), '
                                     'and cannot start with a space')
 
-    def test_unicode(self):
+    def test_str(self):
         """
-        unicode should return the codeResource name.
+        String representation is the codeResource name.
         """
-        self.assertEquals(unicode(self.comp_cr), "complement")
+        self.assertEquals(str(self.comp_cr), "complement")
 
     def test_valid_name_clean_good(self):
         """
@@ -315,23 +316,23 @@ class CodeResourceTests(MethodTestCase):
 
 class CodeResourceRevisionTests(MethodTestCase):
 
-    def test_unicode(self):
+    def test_str(self):
         """
-        CodeResourceRevision.unicode() should return it's code resource
+        String representation of a CodeResourceRevision is its code resource
         revision name.
 
         Or, if no CodeResource has been linked, should display a placeholder.
         """
         # Valid crRev should return it's cr.name and crRev.revision_name
-        self.assertEquals(unicode(self.compv1_crRev), "complement:1 (v1)")
+        self.assertEquals(str(self.compv1_crRev), "complement:1 (v1)")
 
         # Define a crRev without a linking cr, or a revision_name
         no_cr_set = CodeResourceRevision()
-        self.assertEquals(unicode(no_cr_set), "[no code resource name]:[no revision number] ([no revision name])")
+        self.assertEquals(str(no_cr_set), "[no code resource name]:[no revision number] ([no revision name])")
 
         # Define a crRev without a linking cr, with a revision_name of foo
         no_cr_set.revision_name = "foo"
-        self.assertEquals(unicode(no_cr_set), "[no code resource name]:[no revision number] (foo)")
+        self.assertEquals(str(no_cr_set), "[no code resource name]:[no revision number] (foo)")
 
     def test_clean_valid_MD5(self):
         """
@@ -368,9 +369,9 @@ class MethodDependencyTests(MethodTestCase):
         # v2 is a revision of comp_cr such that revision_name = v2.
         self.v2 = self.comp_cr.revisions.get(revision_name="v2")
 
-    def test_unicode(self):
+    def test_str(self):
         """
-        Unicode of MethodDependency should return:
+        String representation of a of MethodDependency should look like:
         <self.method> requires <referenced CRR> as <filePath>
         """
         # Define a fake dependency where the method requires v2 in subdir/foo.py
@@ -381,8 +382,9 @@ class MethodDependencyTests(MethodTestCase):
 
         # Display unicode for this dependency under valid conditions
         self.assertEquals(
-            unicode(test_dep),
-            "DNAcomplement DNAcomplement:1 (v1) requires complement complement:2 (v2) as subdir/foo.py")
+            str(test_dep),
+            "DNAcomplement DNAcomplement:1 (v1) requires complement complement:2 (v2) as subdir/foo.py"
+        )
 
     def test_invalid_dotdot_path_clean(self):
         """
@@ -704,12 +706,11 @@ class MethodTests(MethodTestCase):
 
 class MethodFamilyTests(MethodTestCase):
 
-    def test_unicode(self):
+    def test_str(self):
         """
-        unicode() for MethodFamily should display it's name.
+        String representation of a MethodFamily is its name.
         """
-
-        self.assertEqual(unicode(self.DNAcomp_mf), "DNAcomplement")
+        self.assertEqual(str(self.DNAcomp_mf), "DNAcomplement")
 
 
 @skipIfDBFeature('is_mocked')
@@ -864,9 +865,8 @@ with open(outfile, "wb") as f:
 
         # A data file to add to the database.
         self.numbers = "number\n1\n2\n3\n4\n"
-        datafile = tempfile.NamedTemporaryFile(delete=False)
-        datafile.write(self.numbers)
-        datafile.close()
+        with tempfile.NamedTemporaryFile(mode="wt", delete=False) as datafile:
+            datafile.write(self.numbers)
 
         # Alice uploads the data to the system.
         self.numbers_dataset = librarian.models.Dataset.create_dataset(
@@ -1178,7 +1178,8 @@ echo "Hello World"
     file_prefix = os.path.join(settings.MEDIA_ROOT,
                                CodeResourceRevision.UPLOAD_DIR,
                                'hello')
-    with tempfile.NamedTemporaryFile(prefix=file_prefix,
+    with tempfile.NamedTemporaryFile(mode="w+t",
+                                     prefix=file_prefix,
                                      suffix='.sh',
                                      delete=False) as f:
         case.hello_world_filename = f.name
@@ -1279,7 +1280,10 @@ class CodeResourceRevisionApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.remover)
         response = self.list_view(request, pk=None)
 
-        self.assertItemsEqual(
+        tester = self.assertCountEqual
+        if dsix.PY2:
+            tester = self.assertItemsEqual
+        tester(
             [x.pk for x in CodeResourceRevision.filter_by_user(user=self.remover)],
             [x["id"] for x in response.data]
         )

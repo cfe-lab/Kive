@@ -27,21 +27,21 @@ from kive.mock_setup import convert_to_pks
 
 @mocked_relations(Method, Transformation, TransformationXput, TransformationInput, TransformationOutput)
 class MethodMockTests(TestCase):
-    def test_with_family_unicode(self):
+    def test_with_family_str(self):
         """ expect "Method revision name and family name" """
 
         family = MethodFamily(name="Example")
         method = Method(revision_name="rounded", revision_number=3, family=family)
-        self.assertEqual(unicode(method),
+        self.assertEqual(str(method),
                          "Example:3 (rounded)")
 
-    def test_without_family_unicode(self):
+    def test_without_family_str(self):
         """
-        unicode() for Test unicode representation when family is unset.
+        Test unicode representation when family is unset.
         """
         nofamily = Method(revision_name="foo")
 
-        self.assertEqual(unicode(nofamily),
+        self.assertEqual(str(nofamily),
                          "[family unset]:None (foo)")
 
     def test_display_name(self):
@@ -724,7 +724,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
 
     def test_resource_add_post(self):
         filename = "added.txt"
-        upload_file = SimpleUploadedFile(filename, "Hello, World!")
+        upload_file = SimpleUploadedFile(filename, "Hello, World!".encode(encoding="utf-8"))
         response = self.client.post(
             reverse('resource_add'),
             data=dict(resource_name='hello.txt',
@@ -742,7 +742,7 @@ class CodeResourceViewMockTests(ViewMockTestCase):
 
     def test_resource_revision_add_post(self):
         filename = "added1.txt"
-        upload_file = SimpleUploadedFile(filename, "Hello, World!")
+        upload_file = SimpleUploadedFile(filename, "Hello, World!".encode(encoding="utf-8"))
         response = self.client.post(
             reverse('resource_revision_add', kwargs=dict(pk='199')),
             data=dict(content_file=upload_file))
