@@ -530,6 +530,9 @@ var permissions = (function() {
         var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
             date = new Date(text),
             min = date.getMinutes();
+        if (text === null) {
+            return "-";
+        }
         if (Number.isNaN(min)) {
             return null;
         }

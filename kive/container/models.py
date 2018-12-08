@@ -3,19 +3,23 @@ import errno
 import logging
 import os
 import re
-from subprocess import STDOUT, CalledProcessError, check_output
+from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import RegexValidator, MinValueValidator
 from django.db import models, transaction
 from django.dispatch import receiver
 from django.forms.fields import FileField as FileFormField
 from django.urls import reverse
+from django.utils import timezone
 
 from constants import maxlengths
+from librarian.models import Dataset
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
+from stopwatch.models import Stopwatch
 
 logger = logging.getLogger(__name__)
 
@@ -131,11 +135,15 @@ class Container(AccessControl):
     # Related model gets set later.
     methods = None
 
+    @property
+    def display_name(self):
+        return '{}:{}'.format(self.family.name, self.tag)
+
     class Meta:
         ordering = ['family__name', '-tag']
 
     def __str__(self):
-        return '{}:{}'.format(self.family.name, self.tag)
+        return self.display_name
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
@@ -169,11 +177,32 @@ class ContainerApp(models.Model):
     description = models.CharField('Description',
                                    blank=True,
                                    max_length=maxlengths.MAX_DESCRIPTION_LENGTH)
+    threads = models.PositiveIntegerField(
+        "Number of threads",
+        help_text="How many threads does this app use during execution?",
+        default=1,
+        validators=[MinValueValidator(1)])
+    memory = models.PositiveIntegerField(
+        "Memory required (MB)",
+        help_text="Megabytes of memory Slurm will allocate for this app "
+                  "(0 allocates all memory)",
+        default=6000)
     arguments = None  # Filled in later from child table.
     objects = None  # Filled in later by Django.
 
     class Meta:
         ordering = ('name',)
+
+    @property
+    def display_name(self):
+        name = self.container.display_name
+        if self.name:
+            # noinspection PyTypeChecker
+            name += ' / ' + self.name
+        return name
+
+    def __str__(self):
+        return self.display_name
 
     @property
     def inputs(self):
@@ -264,6 +293,11 @@ class ContainerArgument(models.Model):
         help_text="True for optional inputs that accept multiple datasets and "
                   "outputs that just collect all files written to a directory")
 
+    objects = None  # Filled in later by Django.
+
+    class Meta(object):
+        ordering = ('app_id', 'type', 'position', 'name')
+
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
 
@@ -286,3 +320,177 @@ def delete_container_file(instance, **_kwargs):
         except OSError as ex:
             if ex.errno != errno.ENOENT:
                 raise
+
+
+class Batch(AccessControl):
+    name = models.CharField(
+        "Batch Name",
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        help_text='Name of this batch of container runs',
+        blank=True)
+    description = models.TextField(
+        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+        blank=True)
+
+    runs = None  # Filled in later by Django.
+
+    class Meta(object):
+        ordering = ('-id',)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["Batches"]
+        removal_plan["Batches"].add(self)
+
+        for run in self.runs.all():
+            run.build_removal_plan(removal_plan)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+
+class ContainerRun(Stopwatch, AccessControl):
+    NEW = 'N'
+    LOADING = 'L'
+    RUNNING = 'R'
+    SAVING = 'S'
+    COMPLETE = 'C'
+    FAILED = 'F'
+    CANCELLED = 'X'
+    STATES = ((NEW, 'New'),
+              (LOADING, 'Loading'),
+              (RUNNING, 'Running'),
+              (SAVING, 'Saving'),
+              (COMPLETE, 'Complete'),
+              (FAILED, 'Failed'),
+              (CANCELLED, 'Cancelled'))
+    app = models.ForeignKey(ContainerApp, related_name="runs")
+    batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
+    name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
+    description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+                                   blank=True)
+    state = models.CharField(max_length=1, choices=STATES, default=NEW)
+    priority = models.IntegerField(default=0,
+                                   help_text='Chooses which slurm queue to use.')
+    sandbox_path = models.CharField(
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH,
+        blank=True)
+    return_code = models.IntegerField(blank=True, null=True)
+    stopped_by = models.ForeignKey(User,
+                                   help_text="User that stopped this run",
+                                   null=True,
+                                   blank=True,
+                                   related_name="container_runs_stopped")
+    is_redacted = models.BooleanField(
+        default=False,
+        help_text="True if the outputs or logs were redacted for sensitive data")
+
+    class Meta(object):
+        ordering = ('-start_time',)
+
+    def __repr__(self):
+        return 'ContainerRun(id={!r})'.format(self.pk)
+
+    def get_absolute_url(self):
+        return reverse('container_run_detail', kwargs=dict(pk=self.pk))
+
+    def save(self,
+             force_insert=False,
+             force_update=False,
+             using=None,
+             update_fields=None):
+        if self.pk is None:
+            self.start_time = timezone.now()
+        super(ContainerRun, self).save(force_insert,
+                                       force_update,
+                                       using,
+                                       update_fields)
+        if self.state == self.NEW:
+            transaction.on_commit(self.schedule)
+
+    def schedule(self):
+        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        try:
+            os.mkdir(sandbox_root)
+        except OSError as ex:
+            if ex.errno != errno.EEXIST:
+                raise
+
+        check_call(self.build_slurm_command(sandbox_root,
+                                            settings.SLURM_QUEUES))
+
+    def build_slurm_command(self, sandbox_root, slurm_queues=None):
+        sandbox_prefix = os.path.join(sandbox_root,
+                                      self.get_sandbox_prefix())
+        slurm_prefix = sandbox_prefix + '_job%J_node%N_'
+        job_name = 'r{} {}'.format(self.pk,
+                                   self.app.name or
+                                   self.app.container.family.name)
+        command = ['sbatch',
+                   '-J', job_name,
+                   '--output', slurm_prefix + 'stdout.txt',
+                   '--error', slurm_prefix + 'stderr.txt',
+                   '-c', str(self.app.threads),
+                   '--mem', str(self.app.memory)]
+        if slurm_queues is not None:
+            kive_name, slurm_name = slurm_queues[self.priority]
+            command.extend(['-p', slurm_name])
+        command.extend(['manage.py', 'runcontainer', str(self.pk)])
+        return command
+
+    def get_sandbox_prefix(self):
+        return 'user{}_run{}_'.format(self.user.username, self.pk)
+
+    @transaction.atomic
+    def build_removal_plan(self, removal_accumulator=None):
+        """ Make a manifest of objects to remove when removing this. """
+        removal_plan = removal_accumulator or empty_removal_plan()
+        assert self not in removal_plan["ContainerRuns"]
+        removal_plan["ContainerRuns"].add(self)
+
+        return removal_plan
+
+    @transaction.atomic
+    def remove(self):
+        removal_plan = self.build_removal_plan()
+        remove_helper(removal_plan)
+
+
+class ContainerDataset(models.Model):
+    run = models.ForeignKey(ContainerRun, related_name="datasets")
+    argument = models.ForeignKey(ContainerArgument, related_name="datasets")
+    dataset = models.ForeignKey(Dataset, related_name="containers")
+    name = models.CharField(
+        max_length=maxlengths.MAX_NAME_LENGTH,
+        help_text="Local file name, also used to sort multiple inputs for a "
+                  "single argument.",
+        blank=True)
+    created = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When this was added to Kive.")
+
+    objects = None  # Filled in later by Django.
+
+
+class ContainerLog(models.Model):
+    STDOUT = 'O'
+    STDERR = 'E'
+    TYPES = ((STDOUT, 'stdout'),
+             (STDERR, 'stderr'))
+    type = models.CharField(max_length=1, choices=TYPES)
+    run = models.ForeignKey(ContainerRun, related_name="logs")
+    short_text = models.CharField(
+        max_length=2000,
+        blank=True,
+        help_text="Holds the log text if it's shorter than the max length.")
+    long_text = models.FileField(
+        help_text="Holds the log text if it's longer than the max length.")
+
+    def get_absolute_url(self):
+        return reverse('container_log_detail', kwargs=dict(pk=self.pk))

@@ -4,10 +4,14 @@ RESTful API.
 
 """
 import logging
+from itertools import chain
 
+# noinspection PyPackageRequirements
 import requests
+# noinspection PyPackageRequirements
 from requests import Session
 
+from .endpoint_manager import EndpointManager
 from .dataset import Dataset
 from .datatype import CompoundDatatype
 from .errors import KiveMalformedDataException, KiveAuthException,\
@@ -60,6 +64,39 @@ class KiveAPI(Session):
         super(KiveAPI, self).__init__()
         self.verify = verify
         self.csrf_token = None
+
+    @property
+    def endpoints(self):
+        """ An open-ended interface to the API.
+
+        You can access endpoints through named properties, and you don't need
+        a new library version when Kive adds new endpoints or filters.
+        For example, you can get a specific Dataset like this:
+
+        >>> import kiveapi
+        >>> session = kiveapi.KiveAPI('https://localhost:8000')
+        >>> session.login('joe', 'secret')
+        >>> ds = session.endpoints.datasets.get(109)
+        >>> ds['name'], ds['url']
+        (u'greetings_csv', u'https://localhost:8000/api/datasets/109/')
+
+        You can create a new batch with a call to post().
+
+        >>> batch = session.endpoints.batches.post(json=dict(name='Chocolate Cookies'))
+        >>> batch['name'], batch['id']
+        (u'Chocolate Cookies', 52)
+
+        You can search for batches with a call to filter(). This example looks
+        for any batches with 'cookies' in the name. You can add more filters
+        by adding more pairs of arguments.
+
+        >>> batches = session.endpoints.batches.filter('name', 'cookies')
+        >>> [(batch['name'], batch['id']) for batch in batches]
+        [(u'Chocolate Cookies', 52), (u'Sugar Cookies', 51)]
+
+        There are also methods for delete, patch, and head.
+        """
+        return EndpointManager(self)
 
     def login(self, username, password):
         self.fetch_csrf_token()  # for the login request
@@ -139,6 +176,7 @@ class KiveAPI(Session):
                         message += '; '.join(field_error_messages)
                     raise KiveMalformedDataException(message)
                 if is_json and 'detail' in json_data:
+                    # noinspection PyTypeChecker
                     message += ': ' + json_data['detail']
                 raise KiveClientException(message)
 
@@ -159,11 +197,39 @@ class KiveAPI(Session):
         return self._validate_response(super(KiveAPI, self).get(*nargs, **kwargs),
                                        is_json=is_json)
 
+    def filter(self, url, *args, **kwargs):
+        """ Filter a get request with name/value pairs.
+
+        For example, session.filter('/api/datasets',
+                                    'name', 'titles.csv',
+                                    'user', 'joe')
+        is equivalent to session.get(
+            '/api/datasets?'
+            'filters[0][key]=name&filters[0][val]=titles.csv&'
+            'filters[1][key]=user&filters[1][val]=joe')
+        """
+        filters = []
+        pairs = iter(args)
+        for i, (name, value) in enumerate(zip(pairs, pairs)):
+            filters.append('filters[{}][key]={}'.format(i, name))
+            filters.append('filters[{}][val]={}'.format(i, value))
+        if '?' in url:
+            url += '&'
+        else:
+            url += '?'
+        url += '&'.join(filters)
+        return self.get(url, **kwargs)
+
     def post(self, *args, **kwargs):
         nargs = list(args)
         url = self._prep_url(nargs[0])
         nargs[0] = url
         is_json = kwargs.pop('is_json', True)
+        self._prep_headers(kwargs, url)
+        return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
+                                       is_json=is_json)
+
+    def _prep_headers(self, kwargs, url):
         headers = kwargs.get('headers', {})
         kwargs['headers'] = headers
         headers.setdefault('referer', url)
@@ -171,18 +237,19 @@ class KiveAPI(Session):
             headers.setdefault('Content-Type', 'application/json')
         if hasattr(self, 'csrf_token'):
             headers.setdefault('X-CSRFToken', self.csrf_token)
-        return self._validate_response(super(KiveAPI, self).post(*nargs, **kwargs),
-                                       is_json=is_json)
 
-    def put(self, *args, **kwargs):
+    def patch(self, *args, **kwargs):
         nargs = list(args)
         nargs[0] = self._prep_url(nargs[0])
-        return self._validate_response(super(KiveAPI, self).put(*nargs, **kwargs))
+        self._prep_headers(kwargs, nargs[0])
+        return self._validate_response(super(KiveAPI, self).patch(*nargs, **kwargs))
 
     def delete(self, *args, **kwargs):
         nargs = list(args)
         nargs[0] = self._prep_url(nargs[0])
-        return self._validate_response(super(KiveAPI, self).delete(*nargs, **kwargs))
+        self._prep_headers(kwargs, nargs[0])
+        return self._validate_response(super(KiveAPI, self).delete(*nargs, **kwargs),
+                                       is_json=False)
 
     def head(self, *args, **kwargs):
         newargs = list(args)
@@ -221,11 +288,8 @@ class KiveAPI(Session):
         filters = dict(kwargs)
         if cdt is not None:
             filters['cdt'] = cdt.cdt_id
-        filter_text = '&'.join(
-            'filters[{}][key]={}&filters[{}][val]={}'.format(i, key, i, val)
-            for i, (key, val) in enumerate(filters.items()))
-        datasets = self.get('@api_find_datasets',
-                            context={'filters': filter_text}).json()
+        filter_args = chain.from_iterable(filters.items())
+        datasets = self.filter('/api/datasets/', *filter_args).json()
         return [Dataset(d, self) for d in datasets]
 
     def get_pipeline_families(self):
@@ -454,6 +518,7 @@ class KiveAPI(Session):
                         is_json=True).json()
         return RunBatch(run)
 
+    # noinspection PyShadowingBuiltins
     def get_run(self, id):
         """ Get a RunStatus object for the given id.
 

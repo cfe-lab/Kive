@@ -17,7 +17,7 @@
 
 {% block content %}
 
-<a href="/container_update/{{ container_id }}" rel="prev">return to family</a>
+<a href="/container_update/{{ container_id }}" rel="prev">return to container</a>
 
 <h2>Container App</h2>
 
@@ -30,10 +30,18 @@
 <form action="" method="post" enctype="multipart/form-data">
     {% csrf_token %}
     <table>
+    <tr>
+        <th>Container:</th>
+        <td>{{ object.container }}</td>
+    </tr>
         {{ form.as_table }}
     </table>
 
     <input type="submit" value="Submit" />
 </form>
+
+{% if object.id %}
+<p><a href="/container_inputs?app={{ object.id }}">Launch this app</a></p>
+{% endif %}
 
 {% endblock %}

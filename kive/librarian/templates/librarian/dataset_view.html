@@ -1,5 +1,4 @@
 <!-- Django template -->
-<!-- Display contents of Methods as a HTML table -->
 
 {% extends "portal/base.html" %}
 
@@ -38,7 +37,7 @@
 <h2>{{ dataset.name }}</h2>
 
 {% if not is_owner and is_admin %}
-    <div id="lock"><img src=""/></div>
+    <div id="lock"><a href="javascript:void(0);"><img src=""/></a></div>
 {% endif %}
 
 {% if is_owner or is_admin %}
@@ -75,6 +74,13 @@
             <td>Source:</td>
             <td><a href="{% url 'view_results' generating_run.id %}">
                 {{ generating_run.display_name }}</a></td>
+        </tr>
+    {% endif %}
+    {% if container_run %}
+        <tr>
+            <td>Source:</td>
+            <td><a href="{{ container_run.get_absolute_url }}">
+                {{ container_run.name | default:"[link]" }}</a></td>
         </tr>
     {% endif %}
     <tr>

@@ -5,8 +5,23 @@ From: python:2.7.15-alpine3.6
 %help
     Minimal example that can run simple Python scripts under Kive.
 
-%label
+    Build it with a command like this:
+
+        sudo singularity build python2-alpine-trimmed.simg Singularity
+
+    Run it with a command like this:
+
+        singularity run -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
+
+    The main app generates "Hello, World!" messages for a list of names.
+
+%labels
     MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
+    KIVE_INPUTS names_csv
+    KIVE_OUTPUTS greetings_csv
+
+%files
+    *.py /usr/local/share
 
 %post
     # Trim a bunch of extra features to reduce image size by about 25%.
@@ -17,3 +32,20 @@ From: python:2.7.15-alpine3.6
         _sqlite3.so _ssl.so _socket.so _curses*.so _elementtree.so \
         zlib.so bz2.so _json.so cmath.so array.so _multibytecodec.so audioop.so \
         _hotshot.so ossaudiodev.so _ctypes_test.so linuxaudiodev.so
+
+%runscript
+    /usr/local/bin/python /usr/local/share/greetings.py "$@"
+
+%apphelp sums_and_products
+    Read pairs of numbers, then report their sums and products.
+
+    Run it with a command like this:
+
+        singularity run --app sums_and_products -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
+
+%applabels sums_and_products
+    KIVE_INPUTS input_csv
+    KIVE_OUTPUTS output_csv
+
+%apprun sums_and_products
+    /usr/local/bin/python /usr/local/share/sums_and_products.py "$@"

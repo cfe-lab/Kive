@@ -2,7 +2,8 @@ from django.conf.urls import url, include
 import django.contrib.auth.views
 
 from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
-from container.ajax import ContainerFamilyViewSet, ContainerViewSet, ContainerAppViewSet
+from container.ajax import ContainerFamilyViewSet, ContainerViewSet, ContainerAppViewSet, ContainerChoiceViewSet, \
+    ContainerRunViewSet, BatchViewSet, ContainerArgumentViewSet
 from librarian.ajax import DatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
@@ -26,12 +27,16 @@ from django.contrib import admin
 admin.autodiscover()
 
 router = KiveRouter()
+router.register(r'batches', BatchViewSet)
 router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
 router.register(r'containerfamilies', ContainerFamilyViewSet)
+router.register(r'containerchoices', ContainerChoiceViewSet)
 router.register(r'containers', ContainerViewSet)
 router.register(r'containerapps', ContainerAppViewSet)
+router.register(r'containerargs', ContainerArgumentViewSet)
+router.register(r'containerruns', ContainerRunViewSet)
 router.register(r'dockerimages', DockerImageViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'externalfiledirectories', ExternalFileDirectoryViewSet)
@@ -90,6 +95,22 @@ urlpatterns = [
     url(r'^container_app_update/(?P<pk>\d+)/$',
         container.views.ContainerAppUpdate.as_view(),
         name='container_app_update'),
+
+    url(r'^container_choices$',
+        container.views.ContainerChoiceList.as_view(),
+        name='container_choices'),
+    url(r'^container_inputs$',
+        container.views.ContainerInputList.as_view(),
+        name='container_inputs'),
+    url(r'^container_runs$',
+        container.views.ContainerRunList.as_view(),
+        name='container_runs'),
+    url(r'^container_runs/(?P<pk>\d+)/$',
+        container.views.ContainerRunUpdate.as_view(),
+        name='container_run_detail'),
+    url(r'^container_logs/(?P<pk>\d+)/$',
+        container.views.ContainerLogDetail.as_view(),
+        name='container_log_detail'),
 
     url(r'^datatypes$', metadata.views.datatypes, name='datatypes'),
     url(r'^datatypes/(?P<id>\d+)/$', metadata.views.datatype_detail, name='datatype_detail'),

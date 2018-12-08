@@ -63,6 +63,64 @@ command line like this:
 You can write your script to expect the absolute file path to each input or
 output file.
 
+## Singularity Images ##
+There's a full example of a Singularity image in the [`samplecode/singularity`]
+folder. Read the [Singularity documentation] for all the details, but here are
+the key features that Kive cares about:
+
+* `%runscript` - defines the command that will run for this container's default
+    app. You probably want to include `"$@"` in the command arguments to pass
+    along the paths to the input and output files.
+* `%apprun` - defines the command that will run for another app. Use these to
+    define more than one app that runs in the same container.
+
+### Building a Singularity Image ###
+Once you've written the `Singularity` file, build the image with a command like
+this:
+
+    sudo rm -f my_app.simg && sudo singularity build my_app.simg Singularity
+
+That removes any existing image file before starting the build. Otherwise,
+Singularity tries to add on to the existing image file. 
+
+### Testing a Singularity Image ###
+If you want to test the image before uploading it to Kive, run it with
+commands like this:
+
+    mkdir input
+    mkdir output
+    cp input_data.csv input
+    singularity run my_app.simg --contain -B input:/mnt/input,output:/mnt/output \
+        /mnt/input/input_data.csv /mnt/output/output_data.csv
+    cat output/output_data.csv
+
+### Uploading a Singularity Image ###
+1. If this is the first version of your container, you'll need to create a new
+    container family. Fill in the name, and assign users or groups who are
+    allowed to use it.
+2. Click on the container family, and click the button to create a new
+    container.
+  * Choose the Singularity image file you just built.
+  * If your scripts are in a version control tool like git, tag the version you
+    built from, and record that tag here. Otherwise, just make up a tag name
+    for this version.
+  * Assign users or groups who are allowed to use this container.
+3. Click on the container after you upload it, and create one or more new apps.
+    This configuration will eventually be read from labels in the Singularity
+    file, but for now it has to be set up manually.
+    * Leave the name blank for the default app, otherwise use the name from the
+        `%apprun` entry in the `Singularity` file.
+    * Configure the number of threads and memory, so Slurm can avoid overloading
+        the server. If an app uses more than this amount of memory, then Slurm
+        will kill it.
+    * Define the inputs and outputs. For now, these are just names to tell Kive
+        how many input and output files your command expects. Separate them
+        with spaces.
+4. Upload some input datasets to Kive, then try launching your container.
+
+[`samplecode/singularity`]: https://github.com/cfe-lab/Kive/tree/master/samplecode/singularity
+[Singularity documentation]: https://www.sylabs.io/guides/2.5/user-guide/
+
 ### Kive Nomenclature
 
 * **Pipeline** <a name="pipeline-def"></a>

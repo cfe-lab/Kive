@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(name='kiveapi',
-      version='0.10',
+      version='0.11',
       description="A front-end Python client for interfacing with Kive's RESTful API.",
       author='Joshua Horacsek',
       author_email='',

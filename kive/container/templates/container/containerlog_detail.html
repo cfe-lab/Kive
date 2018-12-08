@@ -1,0 +1,39 @@
+<!-- Django template -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Log{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/librarian/dataset_view.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ form.media }}
+{% endblock %}
+
+{% block content %}
+
+<a href="{{ object.run.get_absolute_url }}" rel="prev">return to Container Run</a>
+
+<h2>Container Log -
+{% if object.type == 'E' %}
+    stderr
+{% else %}
+    stdout
+{% endif %}
+</h2>
+
+<div class="dataset_contents">
+<pre>
+{{ object.short_text }}
+</pre>
+</div>
+
+{% endblock %}

@@ -4,6 +4,7 @@ portal.views
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.generic.base import ContextMixin
 
 from constants import groups
 
@@ -14,6 +15,18 @@ def developer_check(user):
 
 def admin_check(user):
     return user.is_staff
+
+
+class AdminViewMixin(ContextMixin):
+    def get_context_data(self, **kwargs):
+        context = super(AdminViewMixin, self).get_context_data(**kwargs)
+        # noinspection PyUnresolvedReferences
+        request_user = self.request.user
+        context['is_user_admin'] = admin_check(request_user)
+        object = context.get('object')
+        owner = getattr(object, 'user', None)
+        context['is_owner'] = owner == request_user
+        return context
 
 
 @login_required

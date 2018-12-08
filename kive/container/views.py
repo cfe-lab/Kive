@@ -4,32 +4,35 @@ from __future__ import unicode_literals
 import os
 from io import BytesIO
 
+import errno
+from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import Http404
+from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic.base import TemplateView
+from django.views.generic.detail import DetailView
 from django.views.generic.edit import CreateView, UpdateView, ModelFormMixin
+import rest_framework.reverse
 
-from container.forms import ContainerFamilyForm, ContainerForm, ContainerUpdateForm, ContainerAppForm
-from container.models import ContainerFamily, Container, ContainerApp
+from container.forms import ContainerFamilyForm, ContainerForm, \
+    ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
+from container.models import ContainerFamily, Container, ContainerApp, \
+    ContainerRun, ContainerArgument, ContainerLog
 from file_access_utils import compute_md5
-from portal.views import admin_check, developer_check
+from portal.views import developer_check, AdminViewMixin
 
-decorators = [login_required, user_passes_test(developer_check)]
+dev_decorators = [login_required, user_passes_test(developer_check)]
 
 
-@method_decorator(decorators, name='dispatch')
-class ContainerFamilyList(TemplateView):
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerFamilyList(TemplateView, AdminViewMixin):
     template_name = 'container/containerfamily_list.html'
 
-    def get_context_data(self, **kwargs):
-        context = super(ContainerFamilyList, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
-        return context
 
-
-@method_decorator(decorators, name='dispatch')
-class ContainerFamilyUpdate(UpdateView):
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerFamilyUpdate(UpdateView, AdminViewMixin):
     model = ContainerFamily
     form_class = ContainerFamilyForm
 
@@ -41,13 +44,8 @@ class ContainerFamilyUpdate(UpdateView):
     def get_success_url(self):
         return reverse('container_families')
 
-    def get_context_data(self, **kwargs):
-        context = super(ContainerFamilyUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
-        return context
 
-
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerFamilyCreate(CreateView):
     model = ContainerFamily
     form_class = ContainerFamilyForm
@@ -62,8 +60,8 @@ class ContainerFamilyCreate(CreateView):
         return reverse('container_families')
 
 
-@method_decorator(decorators, name='dispatch')
-class ContainerCreate(CreateView):
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerCreate(CreateView, AdminViewMixin):
     model = Container
     form_class = ContainerForm
 
@@ -97,7 +95,6 @@ class ContainerCreate(CreateView):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerCreate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['family_id'] = self.kwargs['family_id']
         return context
 
@@ -109,8 +106,8 @@ class ContainerCreate(CreateView):
         return kwargs
 
 
-@method_decorator(decorators, name='dispatch')
-class ContainerUpdate(UpdateView):
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerUpdate(UpdateView, AdminViewMixin):
     model = Container
     form_class = ContainerUpdateForm
 
@@ -125,13 +122,19 @@ class ContainerUpdate(UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['family_id'] = self.object.family_id
         context['download_url'] = reverse('container-download',
                                           kwargs=dict(pk=self.object.pk))
         context['file_name'] = self.object.file and os.path.relpath(
             self.object.file.name,
             Container.UPLOAD_DIR)
+        try:
+            file_size = filesizeformat(self.object.file.size)
+        except OSError as ex:
+            if ex.errno != errno.ENOENT:
+                raise
+            file_size = 'missing'
+        context['file_size'] = file_size
         return context
 
     def get_form_kwargs(self):
@@ -160,7 +163,7 @@ class ArgumentWriterMixin(ModelFormMixin):
         return response
 
 
-@method_decorator(decorators, name='dispatch')
+@method_decorator(dev_decorators, name='dispatch')
 class ContainerAppCreate(CreateView, ArgumentWriterMixin):
     model = ContainerApp
     form_class = ContainerAppForm
@@ -179,8 +182,8 @@ class ContainerAppCreate(CreateView, ArgumentWriterMixin):
         return context
 
 
-@method_decorator(decorators, name='dispatch')
-class ContainerAppUpdate(UpdateView, ArgumentWriterMixin):
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
     model = ContainerApp
     form_class = ContainerAppForm
 
@@ -190,10 +193,90 @@ class ContainerAppUpdate(UpdateView, ArgumentWriterMixin):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerAppUpdate, self).get_context_data(**kwargs)
-        context['is_user_admin'] = admin_check(self.request.user)
         context['container_id'] = self.object.container_id
 
         form = context['form']
         form.initial['inputs'] = self.object.inputs
         form.initial['outputs'] = self.object.outputs
         return context
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerChoiceList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerchoice_list.html'
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerInputList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerinput_list.html'
+
+    def get_context_data(self, **kwargs):
+        app_id = int(self.request.GET.get("app"))
+        visible_containers = Container.filter_by_user(self.request.user)
+        app_qs = ContainerApp.objects.filter(pk=app_id,
+                                             container__in=visible_containers)
+
+        app = app_qs.first()
+        if app is None:
+            raise Http404("ID {} is not accessible".format(app_id))
+        context = super(ContainerInputList, self).get_context_data(**kwargs)
+        context['app'] = app
+        context['app_url'] = rest_framework.reverse.reverse('containerapp-detail',
+                                                            kwargs=dict(pk=app.pk),
+                                                            request=self.request)
+        context['batch_form'] = BatchForm()
+        context['inputs'] = [
+            dict(name=arg.name, url=rest_framework.reverse.reverse('containerargument-detail',
+                                                                   kwargs=dict(pk=arg.pk),
+                                                                   request=self.request))
+            for arg in app.arguments.filter(
+                type=ContainerArgument.INPUT).order_by('position')]
+        context['priolist'] = [t[0] for t in settings.SLURM_QUEUES]
+        return context
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerRunList(TemplateView, AdminViewMixin):
+    template_name = 'container/containerrun_list.html'
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerRunUpdate(UpdateView, AdminViewMixin):
+    model = ContainerRun
+    form_class = ContainerRunForm
+
+    def get_context_data(self, **kwargs):
+        context = super(ContainerRunUpdate, self).get_context_data(**kwargs)
+        context['is_dev'] = developer_check(self.request.user)
+        state_names = dict(ContainerRun.STATES)
+        context['state_name'] = state_names.get(self.object.state)
+        data_entries = []
+        type_names = dict(ContainerArgument.TYPES)
+        input_count = 0
+        for run_dataset in self.object.datasets.all():
+            data_entries.append(dict(
+                type=type_names[run_dataset.argument.type],
+                url=run_dataset.dataset.get_view_url(),
+                name=run_dataset.argument.name,
+                size=run_dataset.dataset.get_formatted_filesize(),
+                created=run_dataset.dataset.date_created))
+            if run_dataset.argument.type == ContainerArgument.INPUT:
+                input_count += 1
+        log_names = dict(ContainerLog.TYPES)
+        for log in self.object.logs.order_by('type'):
+            data_entries.insert(input_count, dict(
+                type='Log',
+                url=log.get_absolute_url(),
+                name=log_names[log.type],
+                size=filesizeformat(len(log.short_text)),
+                created=self.object.end_time))
+        context['data_entries'] = data_entries
+        return context
+
+    def get_success_url(self):
+        return reverse('container_runs')
+
+
+@method_decorator(login_required, name='dispatch')
+class ContainerLogDetail(DetailView):
+    model = ContainerLog

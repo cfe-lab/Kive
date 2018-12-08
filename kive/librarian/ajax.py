@@ -130,7 +130,10 @@ class DatasetViewSet(RemovableModelViewSet,
         if key == "user":
             return queryset.filter(user__username__icontains=value)
         if key == 'uploaded':
-            return queryset.filter(file_source=None).filter(usurps__isnull=True)
+            container_outputs = Dataset.objects.filter(containers__argument__type='O')
+            return queryset.filter(
+                file_source=None, usurps__isnull=True).exclude(
+                id__in=container_outputs)
         if key == 'cdt':
             if value == '':
                 return queryset.filter(structure__isnull=True)

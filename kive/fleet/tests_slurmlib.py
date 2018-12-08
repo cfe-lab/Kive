@@ -16,7 +16,7 @@ import six
 import fleet.slurmlib as slurmlib
 from django.conf import settings
 
-from django.test import TestCase
+from django.test import TestCase, skipIfDBFeature
 
 # NOTE: Here, select which SlurmScheduler to test.
 # we select the DummySlurmScheduler by default, so that the automatic tests
@@ -87,6 +87,7 @@ def get_accounting_info(jhandles=None, sched_cls=None):
     return curstates
 
 
+@skipIfDBFeature('is_mocked')  # Doesn't use the database, but this test is slow.
 class SlurmDummyTests(TestCase):
     def setUp(self):
         self.addTypeEqualityFunc(str, self.assertMultiLineEqual)
@@ -415,9 +416,9 @@ class SlurmDummyTests(TestCase):
         state_03 = curstate[jobid_03.job_id][ACC_STATE]
         if lverb:
             print("state after loop:", [curstate[jid][ACC_STATE] for jid in jobidlst])
-        assert state_01 == self.sched_cls.FAILED, "unexpected state 01"
-        assert state_02 == self.sched_cls.COMPLETED, "unexpected state 02"
-        assert state_03 in self.sched_cls.RUNNING_STATES, "unexpected state 03"
+        assert state_01 == self.sched_cls.FAILED, "unexpected state 01: " + state_01
+        assert state_02 == self.sched_cls.COMPLETED, "unexpected state 02: " + state_02
+        assert state_03 in self.sched_cls.RUNNING_STATES, "unexpected state 03: " + state_03
         if lverb:
             print("--test_dep_jobs01_multi SUCCESS")
 
