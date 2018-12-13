@@ -197,6 +197,30 @@ class KiveAPI(Session):
         return self._validate_response(super(KiveAPI, self).get(*nargs, **kwargs),
                                        is_json=is_json)
 
+    def download(self, *args, **kwargs):
+        """ Send a download request for a URL.
+
+        :return: a response object
+        """
+        kwargs.update(is_json=False, stream=True)
+        return self.get(*args, **kwargs)
+
+    def download_file(self, handle, *args, **kwargs):
+        """ Downloads from a URL and streams it into handle
+
+        :param handle: A file handle
+        """
+
+        for block in self.download(*args, **kwargs).iter_content(1024):
+            handle.write(block)
+
+    def download_lines(self, *args, **kwargs):
+        """ Returns an iterator to lines in the response, including newlines.
+        """
+
+        for line in self.download(*args, **kwargs).iter_lines(decode_unicode=True):
+            yield line + '\n'
+
     def filter(self, url, *args, **kwargs):
         """ Filter a get request with name/value pairs.
 

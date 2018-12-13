@@ -224,7 +224,7 @@ class Dataset(metadata.models.AccessControl):
             return None
         return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
 
-    def get_open_file_handle(self, mode="rb"):
+    def get_open_file_handle(self, mode="rb", raise_errors=False):
         """
         Retrieves an open Django file with which to access the data.
 
@@ -240,18 +240,23 @@ class Dataset(metadata.models.AccessControl):
             try:
                 self.dataset_file.open(mode)
             except IOError as e:
+                if raise_errors:
+                    raise
                 self.logger.warn('error accessing dataset file: %s', e)
                 return None
             return self.dataset_file
         elif self.external_path:
             abs_path = self.external_absolute_path()
-            if os.path.exists(abs_path) and os.access(abs_path, os.R_OK):
-                try:
-                    fhandle = open(abs_path, mode)
-                except IOError as e:
-                    self.logger.warn('error accessing external file: %s', e)
-                    return None
-                return File(fhandle, name=abs_path)
+            try:
+                fhandle = open(abs_path, mode)
+            except IOError as e:
+                if raise_errors:
+                    raise
+                self.logger.warn('error accessing external file: %s', e)
+                return None
+            return File(fhandle, name=abs_path)
+        if raise_errors:
+            raise ValueError('Dataset has no dataset_file or external_path.')
         return None
 
     def all_rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):

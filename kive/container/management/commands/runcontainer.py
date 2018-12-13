@@ -29,15 +29,19 @@ class Command(BaseCommand):
     def handle(self, run_id, **kwargs):
         self.update_state(run_id, ContainerRun.NEW, ContainerRun.LOADING)
         run = ContainerRun.objects.get(id=run_id)
+        try:
+            self.create_sandbox(run)
+            run.save()
 
-        self.create_sandbox(run)
-        run.save()
+            self.run_container(run)
+            run.save()
 
-        self.run_container(run)
-        run.save()
-
-        self.save_outputs(run)
-        run.save()
+            self.save_outputs(run)
+            run.save()
+        except Exception:
+            run.state = ContainerRun.FAILED
+            run.save()
+            raise
 
     def update_state(self, run_id, old_state, new_state):
         rows_updated = ContainerRun.objects.filter(
@@ -64,8 +68,9 @@ class Command(BaseCommand):
         os.mkdir(input_path)
         for dataset in run.datasets.all():
             target_path = os.path.join(input_path, dataset.argument.name)
-            source_path = dataset.dataset.dataset_file.path
-            shutil.copyfile(source_path, target_path)
+            source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
+            with source_file, open(target_path, 'wb') as target_file:
+                shutil.copyfileobj(source_file, target_file)
         os.mkdir(os.path.join(run.sandbox_path, 'output'))
         os.mkdir(os.path.join(run.sandbox_path, 'logs'))
 

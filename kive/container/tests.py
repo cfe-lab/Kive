@@ -18,7 +18,7 @@ from rest_framework.test import force_authenticate
 from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
 from kive.tests import BaseTestCases, install_fixture_files
-from librarian.models import Dataset
+from librarian.models import Dataset, ExternalFileDirectory
 
 
 @skipIfDBFeature('is_mocked')
@@ -390,3 +390,53 @@ class RunContainerTests(TestCase):
         self.assertEqual(ContainerRun.FAILED, run.state)
 
         self.assertEqual(2, run.datasets.count())
+
+    def test_external_dataset(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        external_path = os.path.abspath(os.path.join(__file__,
+                                                     '../../../samplecode'))
+        external_directory = ExternalFileDirectory.objects.create(
+            name='samplecode',
+            path=external_path)
+        dataset = Dataset.objects.get(name='names.csv')
+        dataset.dataset_file = ''
+        dataset.external_path = 'singularity/host_input/example_names.csv'
+        dataset.externalfiledirectory = external_directory
+        dataset.save()
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        sandbox_path = run.sandbox_path
+        self.assertTrue(sandbox_path)
+        input_path = os.path.join(sandbox_path, 'input/names_csv')
+        self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
+        output_path = os.path.join(sandbox_path, 'output/greetings_csv')
+        self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
+
+        self.assertEqual(2, run.datasets.count())
+
+    def test_external_dataset_missing(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        external_path = os.path.abspath(os.path.join(__file__,
+                                                     '../../../samplecode'))
+        external_directory = ExternalFileDirectory.objects.create(
+            name='samplecode',
+            path=external_path)
+        dataset = Dataset.objects.get(name='names.csv')
+        dataset.dataset_file = ''
+        dataset.external_path = 'singularity/host_input/missing_file.csv'
+        dataset.externalfiledirectory = external_directory
+        dataset.save()
+        self.assertIsNone(dataset.get_open_file_handle())
+
+        with self.assertRaisesRegexp(
+                IOError,
+                r"No such file or directory: .*missing_file\.csv"):
+            call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.FAILED, run.state)

@@ -191,7 +191,7 @@ class ContainerApp(models.Model):
     objects = None  # Filled in later by Django.
 
     class Meta:
-        ordering = ('name',)
+        ordering = ('-container_id', 'name',)
 
     @property
     def display_name(self):
