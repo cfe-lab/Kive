@@ -16,8 +16,9 @@ import mock
 from mock import PropertyMock, Mock, patch
 
 from constants import datatypes, runcomponentstates, users
+from container.models import ContainerRun, ContainerArgument, ContainerDataset
 from datachecking.models import BadData, CellError, ContentCheckLog
-from kive.tests import dummy_file
+from kive.tests import dummy_file, strip_removal_plan
 from kive.tests import ViewMockTestCase
 from librarian.models import Dataset, ExecRecord, ExecRecordOut, ExecRecordIn, DatasetStructure
 from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype, kive_user, KiveUser
@@ -29,7 +30,12 @@ from transformation.models import TransformationOutput, XputStructure, Transform
     Transformation
 
 
-@mocked_relations(Dataset, ContentCheckLog, BadData)
+@mocked_relations(Dataset,
+                  ContentCheckLog,
+                  BadData,
+                  ContainerRun,
+                  ContainerArgument,
+                  ContainerDataset)
 class DatasetMockTests(TestCase):
     def test_rows_with_no_errors(self):
         data_file = dummy_file("""\
@@ -247,6 +253,51 @@ Dave,40
         dataset.usurps = Dataset(name='original.txt')
 
         self.assertFalse(dataset.uploaded)
+
+    def test_removal_plan(self):
+        dataset = Dataset(id=42)
+        expected_plan = {'Datasets': {dataset}}
+
+        plan = dataset.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_remove_input_runs(self):
+        dataset = Dataset(id=42)
+        run = ContainerRun(id=43)
+        argument = ContainerArgument(type=ContainerArgument.INPUT)
+        dataset.containers.create(run=run, argument=argument)
+        expected_plan = {'ContainerRuns': {run},
+                         'Datasets': {dataset}}
+
+        plan = dataset.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_skips_output_runs(self):
+        dataset = Dataset(id=42)
+        run = ContainerRun(id=43)
+        argument = ContainerArgument(type=ContainerArgument.OUTPUT)
+        dataset.containers.create(run=run, argument=argument)
+        expected_plan = {'Datasets': {dataset}}
+
+        plan = dataset.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_remove_duplicate_inputs(self):
+        dataset = Dataset(id=42)
+        run = ContainerRun(id=43)
+        argument1 = ContainerArgument(type=ContainerArgument.INPUT)
+        argument2 = ContainerArgument(type=ContainerArgument.INPUT)
+        dataset.containers.create(run=run, argument=argument1)
+        dataset.containers.create(run=run, argument=argument2)
+        expected_plan = {'Datasets': {dataset},
+                         'ContainerRuns': {run}}
+
+        plan = dataset.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
 class DatasetViewMockTests(ViewMockTestCase):
@@ -688,7 +739,7 @@ class ExecRecordMockTests(TestCase):
 
         self.assertRaisesRegexp(
             ValidationError,
-            'Dataset "S99" \(raw\) cannot feed source "3: ages" \(non-raw\)',
+            r'Dataset "S99" \(raw\) cannot feed source "3: ages" \(non-raw\)',
             execrecordin.clean)
 
     def test_execrecordin_cdt_raw(self):
@@ -704,7 +755,7 @@ class ExecRecordMockTests(TestCase):
 
         self.assertRaisesRegexp(
             ValidationError,
-            'Dataset "S99" \(non-raw\) cannot feed source "3: ages" \(raw\)',
+            r'Dataset "S99" \(non-raw\) cannot feed source "3: ages" \(raw\)',
             execrecordin.clean)
 
     def test_execrecordin_cdt_cdt(self):

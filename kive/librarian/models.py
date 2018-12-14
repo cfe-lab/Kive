@@ -1301,6 +1301,12 @@ class Dataset(metadata.models.AccessControl):
         assert self not in removal_plan["Datasets"]
         removal_plan["Datasets"].add(self)
 
+        for run_dataset in self.containers.all():
+            run = run_dataset.run
+            if (run_dataset.argument.type == 'I' and
+                    run not in removal_plan['ContainerRuns']):
+                run.build_removal_plan(removal_plan)
+
         # Make a special note if this Dataset is associated with an external file.
         if self.external_path:
             removal_plan["ExternalFiles"].add(self)

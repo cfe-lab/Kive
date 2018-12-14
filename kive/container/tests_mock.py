@@ -13,8 +13,9 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerFileFormField, ContainerRun
-from kive.tests import BaseTestCases
+    ContainerArgument, ContainerFileFormField, ContainerRun, ContainerDataset
+from kive.tests import BaseTestCases, strip_removal_plan
+from librarian.models import Dataset
 from metadata.models import KiveUser
 
 
@@ -302,11 +303,8 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         self.detail_pk = 43
         self.detail_path = reverse("containerapp-detail",
                                    kwargs={'pk': self.detail_pk})
-        self.removal_path = reverse("containerapp-removal-plan",
-                                    kwargs={'pk': self.detail_pk})
 
         self.detail_view, _, _ = resolve(self.detail_path)
-        self.removal_view, _, _ = resolve(self.removal_path)
 
         self.my_user = User(pk=1000)
         User.objects.add(self.my_user)
@@ -390,7 +388,11 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
                           response.data)
 
 
-@mocked_relations(ContainerRun, ContainerApp, ContainerArgument)
+@mocked_relations(ContainerRun,
+                  ContainerApp,
+                  ContainerArgument,
+                  ContainerDataset,
+                  Dataset)
 class ContainerRunMockTests(TestCase):
     def test_slurm_command_default_app(self):
         run = ContainerRun(pk=99)
@@ -484,6 +486,39 @@ class ContainerRunMockTests(TestCase):
         command = run.build_slurm_command(sandbox_root, slurm_queues)
 
         self.assertListEqual(expected_command, command)
+
+    def test_removal(self):
+        run = ContainerRun(id=42)
+        expected_plan = {'ContainerRuns': {run}}
+
+        plan = run.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_remove_outputs(self):
+        run = ContainerRun(id=42)
+        dataset = Dataset(id=43)
+        argument = ContainerArgument(type=ContainerArgument.OUTPUT)
+        run.datasets.create(dataset=dataset,
+                            argument=argument)
+        expected_plan = {'ContainerRuns': {run},
+                         'Datasets': {dataset}}
+
+        plan = run.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_skips_inputs(self):
+        run = ContainerRun(id=42)
+        dataset = Dataset(id=43)
+        argument = ContainerArgument(type=ContainerArgument.INPUT)
+        run.datasets.create(dataset=dataset,
+                            argument=argument)
+        expected_plan = {'ContainerRuns': {run}}
+
+        plan = run.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
 @mocked_relations(ContainerRun, ContainerApp, ContainerArgument)

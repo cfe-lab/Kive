@@ -391,6 +391,8 @@ class ContainerRun(Stopwatch, AccessControl):
         default=False,
         help_text="True if the outputs or logs were redacted for sensitive data")
 
+    datasets = None  # Filled in later by Django.
+
     class Meta(object):
         ordering = ('-start_time',)
 
@@ -454,6 +456,10 @@ class ContainerRun(Stopwatch, AccessControl):
         assert self not in removal_plan["ContainerRuns"]
         removal_plan["ContainerRuns"].add(self)
 
+        for run_dataset in self.datasets.all():
+            if run_dataset.argument.type == ContainerArgument.OUTPUT:
+                run_dataset.dataset.build_removal_plan(removal_plan)
+
         return removal_plan
 
     @transaction.atomic
@@ -476,6 +482,12 @@ class ContainerDataset(models.Model):
         help_text="When this was added to Kive.")
 
     objects = None  # Filled in later by Django.
+
+    class Meta(object):
+        ordering = ('run',
+                    'argument__type',
+                    'argument__position',
+                    'argument__name')
 
 
 class ContainerLog(models.Model):
