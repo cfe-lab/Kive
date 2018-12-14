@@ -240,6 +240,13 @@ class ContainerRunSerializer(AccessControlSerializer,
         source='batch',
         slug_field='name',
         read_only=True)
+    batch_absolute_url = serializers.SlugRelatedField(
+        source='batch',
+        slug_field='absolute_url',
+        read_only=True)
+    stopped_by = serializers.SlugRelatedField(
+        slug_field='username',
+        read_only=True)
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerrun-removal-plan')
 
@@ -252,10 +259,12 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'description',
                   'batch',
                   'batch_name',
+                  'batch_absolute_url',
                   'app',
                   'app_name',
                   'state',
                   'priority',
+                  'slurm_job_id',
                   'return_code',
                   'stopped_by',
                   'is_redacted',

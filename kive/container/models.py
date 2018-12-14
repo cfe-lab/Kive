@@ -337,6 +337,10 @@ class Batch(AccessControl):
     class Meta(object):
         ordering = ('-id',)
 
+    @property
+    def absolute_url(self):
+        return reverse('batch_update', kwargs=dict(pk=self.pk))
+
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
         """ Make a manifest of objects to remove when removing this. """
@@ -381,6 +385,7 @@ class ContainerRun(Stopwatch, AccessControl):
     sandbox_path = models.CharField(
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH,
         blank=True)
+    slurm_job_id = models.IntegerField(blank=True, null=True)
     return_code = models.IntegerField(blank=True, null=True)
     stopped_by = models.ForeignKey(User,
                                    help_text="User that stopped this run",
@@ -448,6 +453,21 @@ class ContainerRun(Stopwatch, AccessControl):
 
     def get_sandbox_prefix(self):
         return 'user{}_run{}_'.format(self.user.username, self.pk)
+
+    def request_stop(self, user):
+        end_time = timezone.now()
+        rows_updated = ContainerRun.objects.filter(
+            pk=self.pk,
+            state=ContainerRun.NEW).update(state=ContainerRun.CANCELLED,
+                                           stopped_by=user,
+                                           end_time=end_time)
+        if rows_updated == 0:
+            # Run has already started. Must call scancel.
+            check_call(['scancel', '-f', str(self.slurm_job_id)])
+            self.state = ContainerRun.CANCELLED
+            self.stopped_by = user
+            self.end_time = end_time
+            self.save()
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):

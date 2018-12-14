@@ -11,6 +11,7 @@ from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
 from django.utils.timezone import make_aware, utc
+from mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
 from rest_framework.test import force_authenticate
@@ -250,6 +251,37 @@ class ContainerRunTests(TestCase):
 
         self.assertEqual('Complete', response.context['state_name'])
         self.assertListEqual(expected_entries, response.context['data_entries'])
+
+    @patch('container.models.check_call')
+    def test(self, mock_check_call):
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        user = run.user
+
+        run.request_stop(user)
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.CANCELLED, run.state)
+        self.assertEqual(user, run.stopped_by)
+        self.assertIsNotNone(run.end_time)
+        self.assertEqual(0, mock_check_call.call_count)
+
+    @patch('container.models.check_call')
+    def test_cancel_running(self, mock_check_call):
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        run.state = ContainerRun.RUNNING
+        run.slurm_job_id = 42
+        run.save()
+        user = run.user
+
+        run.request_stop(user)
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.CANCELLED, run.state)
+        self.assertEqual(user, run.stopped_by)
+        self.assertIsNotNone(run.end_time)
+        mock_check_call.assert_called_with(['scancel', '-f', '42'])
 
 
 @skipIfDBFeature('is_mocked')

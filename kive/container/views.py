@@ -19,11 +19,25 @@ import rest_framework.reverse
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument, ContainerLog
+    ContainerRun, ContainerArgument, ContainerLog, Batch
 from file_access_utils import compute_md5
 from portal.views import developer_check, AdminViewMixin
 
 dev_decorators = [login_required, user_passes_test(developer_check)]
+
+
+@method_decorator(login_required, name='dispatch')
+class BatchUpdate(UpdateView, AdminViewMixin):
+    model = Batch
+    form_class = BatchForm
+
+    def form_valid(self, form):
+        response = super(BatchUpdate, self).form_valid(form)
+        self.object.grant_from_json(form.cleaned_data["permissions"])
+        return response
+
+    def get_success_url(self):
+        return reverse('container_runs')
 
 
 @method_decorator(dev_decorators, name='dispatch')

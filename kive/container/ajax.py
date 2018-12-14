@@ -9,6 +9,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
@@ -385,6 +386,12 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         with the given id.
     * filters[n][key]=input_id&filters[n][val]=match - runs that used an input
         dataset with the given id.
+    * filters[n][key]=batch_id&filters[n][val]=match - runs in a batch with the
+        given id.
+
+    Parameter for a PATCH:
+
+    * is_stop_requested(=true) - the Run is marked for stopping.
     """
     queryset = ContainerRun.objects.all()
     serializer_class = ContainerRunSerializer
@@ -410,6 +417,8 @@ class ContainerRunViewSet(CleanCreateModelMixin,
             end_time__lt=parse_date_filter(value)),
         app_id=lambda queryset, value: queryset.filter(
             app_id=value),
+        batch_id=lambda queryset, value: queryset.filter(
+            batch_id=value),
         input_id=lambda queryset, value: queryset.filter(
             id__in=ContainerDataset.objects.filter(
                 dataset_id=value,
@@ -422,3 +431,24 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         return Response(ContainerDatasetSerializer(datasets,
                                                    context=dict(request=request),
                                                    many=True).data)
+
+    # noinspection PyUnusedLocal
+    def patch_object(self, request, pk=None):
+        return Response(ContainerRunSerializer(self.get_object(),
+                                               context={'request': request}).data)
+
+    def partial_update(self, request, pk=None):
+        """
+        Add PATCH functionality to this view.
+
+        This is used for stopping runs.
+        """
+        is_stop_requested = request.data.get("is_stop_requested", False)
+        if is_stop_requested:
+            run = self.get_object()
+
+            if request.user != run.user and not admin_check(request.user):
+                raise PermissionDenied
+            run.request_stop(request.user)
+
+        return self.patch_object(request, pk)

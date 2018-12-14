@@ -27,8 +27,7 @@ class Command(BaseCommand):
             help='ContainerRun to execute')
 
     def handle(self, run_id, **kwargs):
-        self.update_state(run_id, ContainerRun.NEW, ContainerRun.LOADING)
-        run = ContainerRun.objects.get(id=run_id)
+        run = self.record_start(run_id)
         try:
             self.create_sandbox(run)
             run.save()
@@ -43,16 +42,24 @@ class Command(BaseCommand):
             run.save()
             raise
 
-    def update_state(self, run_id, old_state, new_state):
+    def record_start(self, run_id):
+        old_state = ContainerRun.NEW
+        new_state = ContainerRun.LOADING
+        slurm_job_id = os.environ.get('SLURM_JOB_ID')
         rows_updated = ContainerRun.objects.filter(
-            id=run_id, state=old_state).update(state=new_state)
+            id=run_id, state=old_state).update(state=new_state,
+                                               slurm_job_id=slurm_job_id)
+
+        # Defer the stopped_by field so we don't overwrite it when another
+        # process tries to stop this job.
+        run = ContainerRun.objects.defer('stopped_by').get(id=run_id)
         if rows_updated == 0:
-            run = ContainerRun.objects.get(id=run_id)
             raise CommandError(
                 'Expected state {} for run id {}, but was {}.'.format(
                     old_state,
                     run_id,
                     run.state))
+        return run
 
     def create_sandbox(self, run):
         sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)

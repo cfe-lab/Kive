@@ -8,6 +8,13 @@ from container.models import ContainerFamily, Container, ContainerApp, Container
 from metadata.forms import PermissionsForm
 
 
+class BatchForm(PermissionsForm):
+    class Meta(object):
+        model = Batch
+        fields = ['name', 'description', 'permissions']
+        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
+
+
 class ContainerFamilyForm(PermissionsForm):
     class Meta(object):
         model = ContainerFamily
@@ -46,26 +53,6 @@ class ContainerAppForm(forms.ModelForm):
         model = ContainerApp
         exclude = ['container']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
-
-
-class BatchForm(forms.ModelForm):
-    permissions = metadata.forms.PermissionsField(
-        label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this batch of runs?",
-        required=False)
-
-    class Meta(object):
-        model = Batch
-        exclude = ['user']
-
-    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
-        super(BatchForm, self).__init__(data, *args, **kwargs)
-
-        # We can't simply use "users_allowed or User.objects.all()" because we may specify
-        # an empty QuerySet, and that's falsy.
-        users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
-        groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
-        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
 
 
 class ContainerRunForm(forms.ModelForm):
