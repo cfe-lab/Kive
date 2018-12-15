@@ -30,11 +30,11 @@ class IdleTaskTests(TestCase):
         self.man.slurm_sched_class.shutdown()
 
     def test_manager_ok(self):
-        """ Make sure we have  a manager class """
+        """ Make sure we have a manager class."""
         self.assertIsNotNone(self.man)
 
     def test_add_idletask01(self):
-        """Adding a non-generator should raise and exception"""
+        """Adding a non-generator should raise and exception."""
         def test_func(myargs):
             return myargs+1000.0
 

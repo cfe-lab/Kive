@@ -5,6 +5,10 @@ import os
 import re
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
+import shutil
+import datetime
+import itertools
+import glob
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -355,6 +359,10 @@ class Batch(AccessControl):
         remove_helper(removal_plan)
 
 
+class SandboxMissingException(Exception):
+    pass
+
+
 class ContainerRun(Stopwatch, AccessControl):
     NEW = 'N'
     LOADING = 'L'
@@ -390,6 +398,17 @@ class ContainerRun(Stopwatch, AccessControl):
     is_redacted = models.BooleanField(
         default=False,
         help_text="True if the outputs or logs were redacted for sensitive data")
+
+    sandbox_size = models.BigIntegerField(
+        blank=True,
+        null=True,
+        help_text="Size of the sandbox in bytes.  If null, this has not been computed yet."
+    )
+
+    sandbox_purged = models.BooleanField(
+        default=False,
+        help_text="True if the sandbox has already been purged, False otherwise."
+    )
 
     class Meta(object):
         ordering = ('-start_time',)
@@ -460,6 +479,131 @@ class ContainerRun(Stopwatch, AccessControl):
     def remove(self):
         removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
+
+    def calculate_sandbox_size(self):
+        """
+        Compute the size of this ContainerRun's sandbox.
+        :return:
+        """
+        assert not self.purged
+        size_accumulator = 0
+        for root, _, files in os.walk(self.sandbox_path):
+            for file_name in files:
+                size_accumulator += os.path.getsize(os.path.join(root, file_name))
+        return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
+
+    def set_sandbox_size(self):
+        """
+        Record the sandbox size.
+        :return:
+        """
+        self.sandbox_size = self.calculate_sandbox_size()
+        self.save()
+
+    def delete_sandbox(self):
+        """
+        Delete the sandbox.
+
+        Note that this does *not* set self.purged to True.
+        :return:
+        """
+        assert not self.purged
+        shutil.rmtree(self.sandbox_path)
+
+        # We also need to remove the log files.
+        sandbox_basepath = os.path.dirname(self.sandbox_path)
+        stdout_log_path = os.path.join(
+            sandbox_basepath,
+            self.get_sandbox_prefix() + "_job*_node*_" + "stdout.txt"
+        )
+        stdout_logs = glob.glob(stdout_log_path)
+        for stdout_log in stdout_logs:  # there could be more than one in case of a requeuing?
+            os.remove(stdout_log)
+
+        stderr_log_path = os.path.join(
+            sandbox_basepath,
+            self.get_sandbox_prefix() + "_job*_node*_" + "stderr.txt"
+        )
+        stderr_logs = glob.glob(stderr_log_path)
+        for stderr_log in stderr_logs:
+            os.remove(stderr_log)
+
+    @classmethod
+    def purge_sandboxes(cls, cutoff, keep_most_recent):
+        """
+        Purge sandboxes (i.e. delete the sandbox directories and Slurm logs).
+
+        :param cutoff: a datetime object.  Anything newer than this is not purged.
+        :param keep_most_recent: an integer.  Retain the most recent Sandboxes for
+        each ContainerApp up to this number.
+        :return:
+        """
+        # Next, look for finished jobs to clean up.
+        logger.debug("Checking for old sandboxes to clean up....")
+
+        purge_candidates = cls.objects.filter(
+            end_time__isnull=False,
+            end_time__lte=cutoff,
+            purged=False
+        )
+
+        # Retain the most recent ones for each ContainerApp.
+        apps_represented = purge_candidates.values_list("app")
+
+        ready_to_purge = []
+        for app in set(apps_represented):
+            # Look for the oldest ones.
+            curr_candidates = purge_candidates.filter(app=app).order_by("end_time")
+            num_remaining = curr_candidates.count()
+
+            ready_to_purge = itertools.chain(
+                ready_to_purge,
+                curr_candidates[:max(num_remaining - keep_most_recent, 0)]
+            )
+
+        for rtp in ready_to_purge:
+            logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
+            try:
+                rtp.delete_sandbox()
+            except OSError:
+                logger.error(
+                    'Failed to purge sandbox at %r.',
+                    rtp.sandbox_path,
+                    exc_info=True
+                )
+            rtp.purged = True  # Don't try to purge it again.
+            rtp.save()
+
+    @classmethod
+    def scan_for_unaccounted_sandboxes_and_logs(cls):
+        """
+        Clean up any unaccounted sandboxes and logs in the sandbox directory.
+        :return:
+        """
+        logger.debug("Checking for orphaned sandbox directories and logs to clean up....")
+
+        sandbox_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        sandbox_log_glob = "user*_run*_*"
+        user_run_pattern = "user(.+)_run([0-9]+)"
+        for putative_sandbox_log in glob.glob(os.path.join(sandbox_path, sandbox_log_glob)):
+            psl_basename = os.path.basename(putative_sandbox_log)
+            user_run_match = re.match(user_run_pattern, psl_basename)
+            if user_run_match is None:
+                # No idea what this is, so skip it.
+                continue
+            user_pk, run_pk = user_run_match.groups()
+
+            # Remove this file if there is no ContainerRun that is on record as having used it.
+            matching_runs = cls.objects.filter(user__pk=user_pk, pk=run_pk)
+            if not matching_runs.exists():
+                try:
+                    path_to_rm = os.path.join(sandbox_path, putative_sandbox_log)
+                    if os.path.isdir(path_to_rm):
+                        shutil.rmtree(path_to_rm)
+                    else:
+                        os.remove(path_to_rm)
+                except OSError as e:
+                    logger.warning(e)
 
 
 class ContainerDataset(models.Model):
