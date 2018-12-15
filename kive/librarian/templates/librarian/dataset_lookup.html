@@ -21,8 +21,6 @@
 	  <thead><th>Item</th> <th>Value</th></thead>
 	  <tr><td>md5 checksum</td> <td> {{ md5 }} </td></tr>
 	  <tr><td>file size</td> <td> {{ file_size|filesizeformat }} </td></tr>
-	  <tr><td>number of output matches</td> <td> {{ num_datasets }} </td></tr>
-	  <tr><td>number of input matches</td> <td> {{ num_runinputs }} </td></tr>
 	</table>
 	{% if file_is_empty %}
 	<div class="errortext">Warning: The size of {{ search_term }} is zero. This means that you are searching for all empty files in the system.</div>
@@ -30,7 +28,7 @@
 	{% if file_is_small %}
 	<div class="errortext" >Warning: {{ search_term }} is a small file. This means that you could find many similar files.</div>
 	{% endif %}
-        <h3>Runs with this dataset as an output:</h3>
+        <h3>Matching datasets:</h3>
 	{% if toomany_datasets %}
 	<div class="errortext">Warning: Too many matches to display found. Showing the most recent {{ display_limit_num }} matches.</div>
 	{% endif %}
@@ -39,76 +37,16 @@
         {% for d in datasets %}
 	{% if forloop.first %}
 	            <thead>
-                <th>Run ID</th>
-                <th>Output dataset name</th>
-                <th>Family</th>
-                <th>Pipeline name</th>
-                <th>Pipeline revision</th>
-                <th></th>
+                <th>Dataset name</th>
+                <th>Date created</th>
             </thead>
         {% endif %}
             <tr>
-                <td>{{ d.file_source.parent_run.id }}</td>
                 <td> <a href="/dataset_view/{{d.id}}"> {{ d.name }} </a> </td>
-                <td>{{ d.file_source.parent_run.pipeline.family }} </td>
-                <td>
-                    {% if  d.file_source.parent_run.pipeline.revision_name|length <= 0 %}
-                        {{ d.file_source.parent_run.pipeline.family }}
-                    {% else %}
-                        {{ d.file_source.parent_run.pipeline.revision_name }}
-                    {% endif %}
-                </td>
-                <td>
-                    {{ d.file_source.parent_run.pipeline.revision_number }}
-                </td>
-                <td>
-                    {% if d.file_source == None %}
-                        This was an upload
-                    {% else %}
-                        <a href="/view_run/{{ d.file_source.parent_run.id }}/{{md5}}">View run</a>
-                    {% endif %}
-                </td>
+                <td>{{ d.date_created}} </td>
             </tr>
 	{% empty %}
-	    <h3>No runs found</h3>
-        {% endfor %}
-        </table>
-        <h3>Runs with this dataset as an input:</h3>
-        <table>
-	{% if toomany_runinputs %}
-	<div class="errortext">Warning: Too many matches to display found. Showing the most recent {{ display_limit_num }} matches.</div>
-	{% endif %}
-        {% for ri in runinputs %}
-             {% if forloop.first %}
-	     <thead>
-                <th>Run ID</th>
-                <th>Input dataset name</th>
-                <th>Family</th>
-                <th>Pipeline name</th>
-                <th>Pipeline revision</th>
-                <th></th>
-             </thead>
-	     {% endif %}
-            <tr>
-                <td>{{ ri.run.id }}</td>
-                <td> <a href="/dataset_view/{{ri.dataset.id}}"> {{ ri.dataset.name }} </a> </td>
-                <td>{{ ri.run.pipeline.family }} </td>
-                <td>
-                    {% if  ri.run.pipeline.revision_name|length <= 0 %}
-                        {{ ri.run.pipeline.family }}
-                    {% else %}
-                        {{ ri.run.pipeline.revision_name }}
-                    {% endif %}
-                </td>
-                <td>
-                    {{ ri.run.pipeline.revision_number }}
-                </td>
-                <td>
-                    <a href="/view_run/{{ ri.run.id }}/{{md5}}">View run</a>
-                </td>
-            </tr>
-	{% empty %}
-	    <h3>No runs found.</h3>
+	    <h3>No datasets found</h3>
         {% endfor %}
         </table>
 

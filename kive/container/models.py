@@ -474,6 +474,11 @@ class ContainerRun(Stopwatch, AccessControl):
         """ Make a manifest of objects to remove when removing this. """
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["ContainerRuns"]
+        if self.state not in (ContainerRun.COMPLETE,
+                              ContainerRun.FAILED,
+                              ContainerRun.CANCELLED):
+            raise ValueError(
+                'ContainerRun id {} is still active.'.format(self.pk))
         removal_plan["ContainerRuns"].add(self)
 
         for run_dataset in self.datasets.all():

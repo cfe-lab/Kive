@@ -121,6 +121,8 @@ def dataset_view(request, dataset_id):
         container_run = None
     else:
         container_run = container_dataset.run
+    inputs_count = dataset.containers.filter(
+        argument__type='I').values('run_id').distinct().count()
 
     if request.method == "POST":
         # We are going to try and update this Dataset.
@@ -158,6 +160,7 @@ def dataset_view(request, dataset_id):
         "return": return_url,
         "dataset_form": dataset_form,
         "generating_run": generating_run,
+        "inputs_count": inputs_count,
         "container_run": container_run
     }
 
@@ -504,28 +507,16 @@ def dataset_lookup(request, filename=None, filesize=None, md5_checksum=None):
     ONE_KB = 1024
     if filename is None or filesize is None or md5_checksum is None:
         raise RuntimeError("filename or md5_sum is missing")
-    try:
-        filesize_int = int(filesize)
-    except Exception:
-        raise RuntimeError("integer conversion error")
-    filename = unquote(filename)
+    filesize_int = int(filesize)
     dataset_query = librarian.models.Dataset.filter_by_user(request.user).filter(
-        MD5_checksum=md5_checksum).exclude(file_source=None).order_by('-date_created')
+        MD5_checksum=md5_checksum).order_by('-date_created')
     num_datasets = dataset_query.count()
     datasets = list(dataset_query[:DISPLAY_LIMIT])
 
-    q_set_a = RunInput.objects.filter(dataset__user=request.user)
-    runinput_query = q_set_a.filter(dataset__MD5_checksum=md5_checksum).order_by('-dataset__date_created')
-
-    num_runinputs = len(runinput_query)
-    runinputs = list(runinput_query[:DISPLAY_LIMIT])
     t = loader.get_template('librarian/dataset_lookup.html')
     c = {'datasets': datasets,
          'num_datasets': num_datasets,
          'toomany_datasets': num_datasets > DISPLAY_LIMIT,
-         'runinputs': runinputs,
-         'num_runinputs': num_runinputs,
-         'toomany_runinputs': num_runinputs > DISPLAY_LIMIT,
          'md5': md5_checksum,
          'search_term': filename,
          'display_limit_num': DISPLAY_LIMIT,

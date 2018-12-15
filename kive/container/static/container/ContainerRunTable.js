@@ -4,6 +4,8 @@
 	    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         var runsTable = this;
 	    this.list_url = "/api/containerruns/";
+        this.session_filters_key = "containerrunFilters";
+        this.session_page_key = "containerrunPage";
 	    this.registerLinkColumn("Name", "", "name", "absolute_url");
 	    this.registerColumn("Description", "description");
 	    this.registerLinkColumn("Batch", "", "batch_name", "batch_absolute_url");

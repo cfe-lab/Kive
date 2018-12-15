@@ -21,7 +21,11 @@
             {{ is_user_admin|lower }},
             $(".navigation_links")
         );
-        var asf = new AjaxSearchFilter(table, $("#asf"));
+        var asf = new AjaxSearchFilter(table, $("#asf")),
+            pairs = sessionStorage.getItem(table.session_filters_key),
+            storedPage = parseInt(sessionStorage.getItem(table.session_page_key), 10);
+        table.filterSet.setFromPairs(pairs);
+        table.page = storedPage || 1;
         asf.reloadTable();
     });
 

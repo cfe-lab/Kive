@@ -264,7 +264,7 @@ Dave,40
 
     def test_remove_input_runs(self):
         dataset = Dataset(id=42)
-        run = ContainerRun(id=43)
+        run = ContainerRun(id=43, state=ContainerRun.COMPLETE)
         argument = ContainerArgument(type=ContainerArgument.INPUT)
         dataset.containers.create(run=run, argument=argument)
         expected_plan = {'ContainerRuns': {run},
@@ -287,7 +287,7 @@ Dave,40
 
     def test_remove_duplicate_inputs(self):
         dataset = Dataset(id=42)
-        run = ContainerRun(id=43)
+        run = ContainerRun(id=43, state=ContainerRun.COMPLETE)
         argument1 = ContainerArgument(type=ContainerArgument.INPUT)
         argument2 = ContainerArgument(type=ContainerArgument.INPUT)
         dataset.containers.create(run=run, argument=argument1)

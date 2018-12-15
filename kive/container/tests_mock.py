@@ -488,7 +488,7 @@ class ContainerRunMockTests(TestCase):
         self.assertListEqual(expected_command, command)
 
     def test_removal(self):
-        run = ContainerRun(id=42)
+        run = ContainerRun(id=42, state=ContainerRun.COMPLETE)
         expected_plan = {'ContainerRuns': {run}}
 
         plan = run.build_removal_plan()
@@ -496,7 +496,7 @@ class ContainerRunMockTests(TestCase):
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
     def test_remove_outputs(self):
-        run = ContainerRun(id=42)
+        run = ContainerRun(id=42, state=ContainerRun.COMPLETE)
         dataset = Dataset(id=43)
         argument = ContainerArgument(type=ContainerArgument.OUTPUT)
         run.datasets.create(dataset=dataset,
@@ -509,7 +509,7 @@ class ContainerRunMockTests(TestCase):
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
     def test_removal_skips_inputs(self):
-        run = ContainerRun(id=42)
+        run = ContainerRun(id=42, state=ContainerRun.COMPLETE)
         dataset = Dataset(id=43)
         argument = ContainerArgument(type=ContainerArgument.INPUT)
         run.datasets.create(dataset=dataset,
@@ -519,6 +519,13 @@ class ContainerRunMockTests(TestCase):
         plan = run.build_removal_plan()
 
         self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_remove_running(self):
+        run = ContainerRun(id=42, state=ContainerRun.RUNNING)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     r'ContainerRun id 42 is still active.'):
+            run.build_removal_plan()
 
 
 @mocked_relations(ContainerRun, ContainerApp, ContainerArgument)
