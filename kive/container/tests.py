@@ -179,6 +179,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.removal_view, _, _ = resolve(self.removal_path)
 
     def test_removal_plan(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
@@ -186,6 +188,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         start_count = ContainerRun.objects.all().count()
 
         request = self.factory.delete(self.detail_path)
@@ -350,6 +354,8 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(resp_run['name'], 'my run')
 
     def test_removal_plan(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
@@ -358,6 +364,8 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         start_count = Batch.objects.all().count()
 
         request = self.factory.delete(self.detail_path)

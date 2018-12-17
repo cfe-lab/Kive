@@ -75,6 +75,13 @@
             <input type="button" class="advanced ctrl" value="Advanced">
             <h4>Advanced search</h4>
             <div class="asf-field-container">
+                <label for="search-name">Name</label><input
+                    name="name"
+                    id="search-name"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
                 <label for="search-description">Description</label><input
                     name="description"
                     id="search-description"
@@ -82,10 +89,52 @@
                     class="asf-search-fixed-field">
             </div>
             <div class="asf-field-container">
-                <label for="search-tag">Tag</label><input
-                    name="tag"
-                    id="search-tag"
+                <label for="startafter">Start after</label><input
+                    name="startafter"
+                    id="startafter"
                     type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="startbefore">Start before</label><input
+                    name="startbefore"
+                    id="startbefore"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="endafter">End after</label><input
+                    name="endafter"
+                    id="endafter"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="endbefore">End before</label><input
+                    name="endbefore"
+                    id="endbefore"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="user">States</label><input
+                    name="states"
+                    id="states"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="user">Creator</label><input
+                    name="user"
+                    id="user"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="active">Is active</label><input
+                    name="active"
+                    id="active"
+                    type="checkbox"
                     class="asf-search-fixed-field">
             </div>
             <input type="submit" value="Filter" class="asf-search-button">
@@ -94,7 +143,7 @@
 
     <div class="navigation_links"></div>
 
-    <div class="dev_results">
+    <div class="results">
         <table id="runs"></table>
     </div>
 {% endif %}

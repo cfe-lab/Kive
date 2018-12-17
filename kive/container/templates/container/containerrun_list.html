@@ -79,7 +79,7 @@
         </div>
         <div class="asf-field-container">
             <label for="search-batch-desc">Batch Desc.</label><input
-                name="batch-desc"
+                name="batchdesc"
                 id="search-batch-desc"
                 type="text"
                 class="asf-search-fixed-field">
@@ -113,10 +113,10 @@
                 class="datetime asf-search-fixed-field">
         </div>
         <div class="asf-field-container">
-            <label for="active">Is active</label><input
-                name="active"
-                id="active"
-                type="checkbox"
+            <label for="user">States</label><input
+                name="states"
+                id="states"
+                type="text"
                 class="asf-search-fixed-field">
         </div>
         <div class="asf-field-container">
@@ -126,13 +126,20 @@
                 type="text"
                 class="asf-search-fixed-field">
         </div>
+        <div class="asf-field-container">
+            <label for="active">Is active</label><input
+                name="active"
+                id="active"
+                type="checkbox"
+                class="asf-search-fixed-field">
+        </div>
         <input type="submit" value="Filter" class="asf-search-button">
     </form>
 </div>
 
 <div class="navigation_links"></div>
 
-<div class="dev_results">
+<div class="results">
     <table id="containerruns"></table>
 </div>
 

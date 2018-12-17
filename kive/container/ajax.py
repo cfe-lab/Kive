@@ -1,6 +1,6 @@
 import mimetypes
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from wsgiref.util import FileWrapper
 
 from django.db.models import Q
@@ -366,6 +366,7 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         search. n starts at 0 and increases by 1 for each added filter.
         Some filters just have a key and ignore the val value. The possible
         filters are listed below.
+    * filters[n][key]=active - runs that are still running or recently finished.
     * filters[n][key]=smart&filters[n][val]=match - name or description
         contains the value (case insensitive)
     * filters[n][key]=name&filters[n][val]=match - name contains the value (case
@@ -388,6 +389,13 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         dataset with the given id.
     * filters[n][key]=batch_id&filters[n][val]=match - runs in a batch with the
         given id.
+    * filters[n][key]=batch&filters[n][val]=match - runs with a batch name that
+        contains the given value.
+    * filters[n][key]=batchdesc&filters[n][val]=match - runs with a batch
+        description that contains the given value.
+    * filters[n][key]=states&filters[n][val]=match - runs with a state in the
+        list of states. For example CFX would match complete, failed, and
+        cancelled runs.
 
     Parameter for a PATCH:
 
@@ -401,6 +409,9 @@ class ContainerRunViewSet(CleanCreateModelMixin,
         smart=lambda queryset, value: queryset.filter(
             Q(name__icontains=value) |
             Q(description__icontains=value)),
+        active=lambda queryset, value: queryset.filter(
+            Q(end_time=None) |
+            Q(end_time__gte=timezone.now() - timedelta(minutes=5))),
         name=lambda queryset, value: queryset.filter(
             name__icontains=value),
         description=lambda queryset, value: queryset.filter(
@@ -419,6 +430,12 @@ class ContainerRunViewSet(CleanCreateModelMixin,
             app_id=value),
         batch_id=lambda queryset, value: queryset.filter(
             batch_id=value),
+        batch=lambda queryset, value: queryset.filter(
+            batch__name__icontains=value),
+        batchdesc=lambda queryset, value: queryset.filter(
+            batch__description__icontains=value),
+        states=lambda queryset, value: queryset.filter(
+            state__in=value.upper()),
         input_id=lambda queryset, value: queryset.filter(
             id__in=ContainerDataset.objects.filter(
                 dataset_id=value,

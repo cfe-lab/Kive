@@ -256,6 +256,9 @@ class ContainerApp(models.Model):
                                   allow_multiple=allow_multiple,
                                   type=argument_type)
 
+    def can_be_accessed(self, user):
+        return self.container.can_be_accessed(user)
+
     def get_absolute_url(self):
         return reverse('container_app_update', kwargs=dict(pk=self.pk))
 

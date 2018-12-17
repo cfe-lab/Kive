@@ -7,7 +7,6 @@
         this.session_filters_key = "containerrunFilters";
         this.session_page_key = "containerrunPage";
 	    this.registerLinkColumn("Name", "", "name", "absolute_url");
-	    this.registerColumn("Description", "description");
 	    this.registerLinkColumn("Batch", "", "batch_name", "batch_absolute_url");
 	    this.registerColumn("State", "state");
 	    this.registerDateTimeColumn("Start", "start_time");
@@ -68,7 +67,7 @@
                         detail = (
                             response ?
                             response.detail :
-                            "Failed to redact"
+                            "Failed to stop the run."
                         );
                     window.alert(detail);
                 });
