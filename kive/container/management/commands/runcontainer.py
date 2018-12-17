@@ -8,6 +8,7 @@ from subprocess import call
 from tempfile import mkdtemp
 
 from django.conf import settings
+from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -128,14 +129,23 @@ class Command(BaseCommand):
             except IOError as ex:
                 if ex.errno != errno.ENOENT:
                     raise
+        # noinspection PyUnresolvedReferences,PyProtectedMember
+        short_size = ContainerLog._meta.get_field('short_text').max_length
         logs_path = os.path.join(run.sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
-            # noinspection PyUnresolvedReferences,PyProtectedMember
-            chunk_size = ContainerLog._meta.get_field('short_text').max_length
-            with open(os.path.join(logs_path, file_name)) as f:
-                chunk = f.read(chunk_size)
-            run.logs.create(type=log_type, short_text=chunk)
+            file_path = os.path.join(logs_path, file_name)
+            file_size = os.lstat(file_path).st_size
+            with open(file_path) as f:
+                if file_size <= short_size:
+                    long_text = None
+                    short_text = f.read(short_size)
+                else:
+                    short_text = ''
+                    long_text = File(f)
+                run.logs.create(type=log_type,
+                                short_text=short_text,
+                                long_text=long_text)
 
         run.state = (ContainerRun.COMPLETE
                      if run.return_code == 0

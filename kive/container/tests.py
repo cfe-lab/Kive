@@ -384,6 +384,16 @@ class RunContainerTests(TestCase):
     def setUp(self):
         super(RunContainerTests, self).setUp()
         install_fixture_files('container_run')
+        self.called_command = None
+        self.call_stdout = ''
+        self.call_stderr = ''
+        self.call_return_code = 0
+
+    def dummy_call(self, command, stdout, stderr):
+        self.called_command = command
+        stdout.write(self.call_stdout)
+        stderr.write(self.call_stderr)
+        return self.call_return_code
 
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
@@ -480,3 +490,39 @@ class RunContainerTests(TestCase):
         run.refresh_from_db()
 
         self.assertEqual(ContainerRun.FAILED, run.state)
+
+    @patch('container.management.commands.runcontainer.call')
+    def test_short_stdout(self, mocked_call):
+        mocked_call.side_effect = self.dummy_call
+        self.call_stdout = expected_stdout = 'This should be written to stdout.'
+        self.call_stderr = expected_stderr = 'Look for this on stderr.'
+
+        run = ContainerRun.objects.get(name='fixture run')
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        stdout = run.logs.get(type=ContainerLog.STDOUT)
+        stderr = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stdout, stdout.short_text)
+        self.assertEqual(expected_stderr, stderr.short_text)
+
+    @patch('container.management.commands.runcontainer.call')
+    def test_long_stderr(self, mocked_call):
+        mocked_call.side_effect = self.dummy_call
+        self.call_stdout = expected_stdout = 'This should be written to stdout.'
+        self.call_stderr = expected_stderr = 'Look for this on stderr. ' * 81
+
+        run = ContainerRun.objects.get(name='fixture run')
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        stdout = run.logs.get(type=ContainerLog.STDOUT)
+        stderr = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stdout, stdout.short_text)
+        self.assertEqual(expected_stderr, stderr.long_text.read())
