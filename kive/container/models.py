@@ -383,6 +383,9 @@ class ContainerRun(Stopwatch, AccessControl):
     description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
     state = models.CharField(max_length=1, choices=STATES, default=NEW)
+    submit_time = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When this job was put in the queue.')
     priority = models.IntegerField(default=0,
                                    help_text='Chooses which slurm queue to use.')
     sandbox_path = models.CharField(
@@ -402,7 +405,7 @@ class ContainerRun(Stopwatch, AccessControl):
     datasets = None  # Filled in later by Django.
 
     class Meta(object):
-        ordering = ('-start_time',)
+        ordering = ('-submit_time',)
 
     def __repr__(self):
         return 'ContainerRun(id={!r})'.format(self.pk)
@@ -415,8 +418,6 @@ class ContainerRun(Stopwatch, AccessControl):
              force_update=False,
              using=None,
              update_fields=None):
-        if self.pk is None:
-            self.start_time = timezone.now()
         super(ContainerRun, self).save(force_insert,
                                        force_update,
                                        using,

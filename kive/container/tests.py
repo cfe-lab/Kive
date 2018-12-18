@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 import os
 from datetime import datetime
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature
@@ -397,6 +397,9 @@ class RunContainerTests(TestCase):
 
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
+        everyone = Group.objects.get(name='Everyone')
+        run.groups_allowed.clear()
+        run.groups_allowed.add(everyone)
 
         call_command('runcontainer', str(run.id))
 
@@ -411,6 +414,16 @@ class RunContainerTests(TestCase):
         self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
+        self.assertIsNotNone(run.submit_time)
+        self.assertIsNotNone(run.start_time)
+        self.assertIsNotNone(run.end_time)
+        self.assertLessEqual(run.submit_time, run.start_time)
+        self.assertLessEqual(run.start_time, run.end_time)
+        output_dataset = run.datasets.get(
+            argument__type=ContainerArgument.OUTPUT).dataset
+        expected_groups = [('Everyone', )]
+        dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
+        self.assertEqual(expected_groups, dataset_groups)
 
     def test_already_started(self):
         """ Pretend that another instance of the command already started. """

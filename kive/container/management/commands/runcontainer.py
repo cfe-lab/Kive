@@ -49,6 +49,7 @@ class Command(BaseCommand):
         slurm_job_id = os.environ.get('SLURM_JOB_ID')
         rows_updated = ContainerRun.objects.filter(
             id=run_id, state=old_state).update(state=new_state,
+                                               start_time=timezone.now(),
                                                slurm_job_id=slurm_job_id)
 
         # Defer the stopped_by field so we don't overwrite it when another
@@ -124,6 +125,7 @@ class Command(BaseCommand):
                 dataset = Dataset.create_dataset(argument_path,
                                                  name=argument.name,
                                                  user=run.user)
+                dataset.copy_permissions(run)
                 run.datasets.create(dataset=dataset,
                                     argument=argument)
             except IOError as ex:
