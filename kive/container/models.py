@@ -433,8 +433,12 @@ class ContainerRun(Stopwatch, AccessControl):
             if ex.errno != errno.EEXIST:
                 raise
 
+        child_env = dict(os.environ)
+        child_env['PYTHONPATH'] = os.path.abspath(os.path.join(__file__,
+                                                               '../..'))
         check_call(self.build_slurm_command(sandbox_root,
-                                            settings.SLURM_QUEUES))
+                                            settings.SLURM_QUEUES),
+                   env=child_env)
 
     def build_slurm_command(self, sandbox_root, slurm_queues=None):
         sandbox_prefix = os.path.join(sandbox_root,
@@ -447,12 +451,15 @@ class ContainerRun(Stopwatch, AccessControl):
                    '-J', job_name,
                    '--output', slurm_prefix + 'stdout.txt',
                    '--error', slurm_prefix + 'stderr.txt',
+                   '--export', 'all',
                    '-c', str(self.app.threads),
                    '--mem', str(self.app.memory)]
         if slurm_queues is not None:
             kive_name, slurm_name = slurm_queues[self.priority]
             command.extend(['-p', slurm_name])
-        command.extend(['manage.py', 'runcontainer', str(self.pk)])
+        manage_path = os.path.abspath(os.path.join(__file__,
+                                                   '../../manage.py'))
+        command.extend([manage_path, 'runcontainer', str(self.pk)])
         return command
 
     def get_sandbox_prefix(self):
@@ -535,3 +542,13 @@ class ContainerLog(models.Model):
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
+
+    def read(self, size=None):
+        if self.long_text:
+            self.long_text.open('r')
+            try:
+                return self.long_text.read(size or -1)
+            finally:
+                self.long_text.close()
+
+        return self.short_text[:size]

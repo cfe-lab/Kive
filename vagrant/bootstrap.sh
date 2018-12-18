@@ -39,7 +39,7 @@ yum install -q -y docker-ce
 systemctl enable docker
 systemctl start docker
 
-echo ========== Installing MySQL/MariaDB ==========
+echo ========== Installing MySQL/MariaDB for Slurm ==========
 yum install -q -y mariadb-server mariadb-devel
 systemctl enable mariadb
 systemctl start mariadb

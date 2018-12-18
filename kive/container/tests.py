@@ -539,3 +539,7 @@ class RunContainerTests(TestCase):
         stderr = run.logs.get(type=ContainerLog.STDERR)
         self.assertEqual(expected_stdout, stdout.short_text)
         self.assertEqual(expected_stderr, stderr.long_text.read())
+        self.assertEqual(expected_stdout, stdout.read())
+        self.assertEqual(expected_stderr, stderr.read())
+        self.assertEqual(expected_stdout[:10], stdout.read(10))
+        self.assertEqual(expected_stderr[:10], stderr.read(10))

@@ -278,11 +278,15 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
                 input_count += 1
         log_names = dict(ContainerLog.TYPES)
         for log in self.object.logs.order_by('type'):
+            if log.long_text:
+                log_size = log.long_text.size
+            else:
+                log_size = len(log.short_text)
             data_entries.insert(input_count, dict(
                 type='Log',
                 url=log.get_absolute_url(),
                 name=log_names[log.type],
-                size=filesizeformat(len(log.short_text)),
+                size=filesizeformat(log_size),
                 created=self.object.end_time))
         context['data_entries'] = data_entries
         return context

@@ -19,6 +19,10 @@ from librarian.models import Dataset
 from metadata.models import KiveUser
 
 
+EXPECTED_MANAGE_PATH = os.path.abspath(os.path.join(__file__,
+                                                    '../../manage.py'))
+
+
 @mocked_relations(Container, ContainerFamily)
 class ContainerMockTests(TestCase):
     def test_str(self):
@@ -406,9 +410,10 @@ class ContainerRunMockTests(TestCase):
             '-J', 'r99 my container',
             '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
             '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--export', 'all',
             '-c', '1',
             '--mem', '6000',
-            'manage.py',
+            EXPECTED_MANAGE_PATH,
             'runcontainer',
             '99']
 
@@ -428,9 +433,10 @@ class ContainerRunMockTests(TestCase):
             '-J', 'r99 my_app',
             '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
             '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--export', 'all',
             '-c', '1',
             '--mem', '6000',
-            'manage.py',
+            EXPECTED_MANAGE_PATH,
             'runcontainer',
             '99']
 
@@ -450,9 +456,10 @@ class ContainerRunMockTests(TestCase):
             '-J', 'r99 my container',
             '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
             '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--export', 'all',
             '-c', '3',
             '--mem', '100',
-            'manage.py',
+            EXPECTED_MANAGE_PATH,
             'runcontainer',
             '99']
 
@@ -476,10 +483,11 @@ class ContainerRunMockTests(TestCase):
             '-J', 'r99 my container',
             '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
             '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--export', 'all',
             '-c', '1',
             '--mem', '6000',
             '-p', 'kive-high',
-            'manage.py',
+            EXPECTED_MANAGE_PATH,
             'runcontainer',
             '99']
 
