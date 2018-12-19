@@ -7,10 +7,8 @@ import sys
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 import shutil
-import datetime
 import itertools
 import glob
-from operator import itemgetter
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -23,7 +21,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from constants import maxlengths
-from librarian.models import Dataset
+# from librarian.models import Dataset
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import file_access_utils
@@ -661,7 +659,7 @@ class ContainerRun(Stopwatch, AccessControl):
 class ContainerDataset(models.Model):
     run = models.ForeignKey(ContainerRun, related_name="datasets")
     argument = models.ForeignKey(ContainerArgument, related_name="datasets")
-    dataset = models.ForeignKey(Dataset, related_name="containers")
+    dataset = models.ForeignKey("librarian.Dataset", related_name="containers")
     name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Local file name, also used to sort multiple inputs for a "
