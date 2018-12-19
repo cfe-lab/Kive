@@ -172,6 +172,8 @@ INSTALLED_APPS = (
     'rest_framework',
 )
 
+LOG_FILE = os.environ.get('KIVE_LOG', os.path.join(MEDIA_ROOT, 'Logs/kive.log'))
+
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
 LOGGING = {
@@ -205,7 +207,7 @@ LOGGING = {
         'file': {
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'kive.log',
+            'filename': LOG_FILE,
             'formatter': 'debug',
             'maxBytes': 1024*1024*15,  # 15MB
             'backupCount': 10
