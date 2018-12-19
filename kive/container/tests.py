@@ -4,13 +4,14 @@ from __future__ import unicode_literals
 import os
 from datetime import datetime
 
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
 from django.utils.timezone import make_aware, utc
+from mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
 from rest_framework.test import force_authenticate
@@ -18,7 +19,7 @@ from rest_framework.test import force_authenticate
 from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
 from kive.tests import BaseTestCases, install_fixture_files
-from librarian.models import Dataset
+from librarian.models import Dataset, ExternalFileDirectory
 
 
 @skipIfDBFeature('is_mocked')
@@ -178,6 +179,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.removal_view, _, _ = resolve(self.removal_path)
 
     def test_removal_plan(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
@@ -185,6 +188,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         start_count = ContainerRun.objects.all().count()
 
         request = self.factory.delete(self.detail_path)
@@ -250,6 +255,37 @@ class ContainerRunTests(TestCase):
 
         self.assertEqual('Complete', response.context['state_name'])
         self.assertListEqual(expected_entries, response.context['data_entries'])
+
+    @patch('container.models.check_call')
+    def test(self, mock_check_call):
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        user = run.user
+
+        run.request_stop(user)
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.CANCELLED, run.state)
+        self.assertEqual(user, run.stopped_by)
+        self.assertIsNotNone(run.end_time)
+        self.assertEqual(0, mock_check_call.call_count)
+
+    @patch('container.models.check_call')
+    def test_cancel_running(self, mock_check_call):
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        run.state = ContainerRun.RUNNING
+        run.slurm_job_id = 42
+        run.save()
+        user = run.user
+
+        run.request_stop(user)
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.CANCELLED, run.state)
+        self.assertEqual(user, run.stopped_by)
+        self.assertIsNotNone(run.end_time)
+        mock_check_call.assert_called_with(['scancel', '-f', '42'])
 
 
 @skipIfDBFeature('is_mocked')
@@ -318,6 +354,8 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(resp_run['name'], 'my run')
 
     def test_removal_plan(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
@@ -326,6 +364,8 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.save()
         start_count = Batch.objects.all().count()
 
         request = self.factory.delete(self.detail_path)
@@ -344,9 +384,22 @@ class RunContainerTests(TestCase):
     def setUp(self):
         super(RunContainerTests, self).setUp()
         install_fixture_files('container_run')
+        self.called_command = None
+        self.call_stdout = ''
+        self.call_stderr = ''
+        self.call_return_code = 0
+
+    def dummy_call(self, command, stdout, stderr):
+        self.called_command = command
+        stdout.write(self.call_stdout)
+        stderr.write(self.call_stderr)
+        return self.call_return_code
 
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
+        everyone = Group.objects.get(name='Everyone')
+        run.groups_allowed.clear()
+        run.groups_allowed.add(everyone)
 
         call_command('runcontainer', str(run.id))
 
@@ -361,6 +414,16 @@ class RunContainerTests(TestCase):
         self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
+        self.assertIsNotNone(run.submit_time)
+        self.assertIsNotNone(run.start_time)
+        self.assertIsNotNone(run.end_time)
+        self.assertLessEqual(run.submit_time, run.start_time)
+        self.assertLessEqual(run.start_time, run.end_time)
+        output_dataset = run.datasets.get(
+            argument__type=ContainerArgument.OUTPUT).dataset
+        expected_groups = [('Everyone', )]
+        dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
+        self.assertEqual(expected_groups, dataset_groups)
 
     def test_already_started(self):
         """ Pretend that another instance of the command already started. """
@@ -390,3 +453,93 @@ class RunContainerTests(TestCase):
         self.assertEqual(ContainerRun.FAILED, run.state)
 
         self.assertEqual(2, run.datasets.count())
+
+    def test_external_dataset(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        external_path = os.path.abspath(os.path.join(__file__,
+                                                     '../../../samplecode'))
+        external_directory = ExternalFileDirectory.objects.create(
+            name='samplecode',
+            path=external_path)
+        dataset = Dataset.objects.get(name='names.csv')
+        dataset.dataset_file = ''
+        dataset.external_path = 'singularity/host_input/example_names.csv'
+        dataset.externalfiledirectory = external_directory
+        dataset.save()
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        sandbox_path = run.sandbox_path
+        self.assertTrue(sandbox_path)
+        input_path = os.path.join(sandbox_path, 'input/names_csv')
+        self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
+        output_path = os.path.join(sandbox_path, 'output/greetings_csv')
+        self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
+
+        self.assertEqual(2, run.datasets.count())
+
+    def test_external_dataset_missing(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        external_path = os.path.abspath(os.path.join(__file__,
+                                                     '../../../samplecode'))
+        external_directory = ExternalFileDirectory.objects.create(
+            name='samplecode',
+            path=external_path)
+        dataset = Dataset.objects.get(name='names.csv')
+        dataset.dataset_file = ''
+        dataset.external_path = 'singularity/host_input/missing_file.csv'
+        dataset.externalfiledirectory = external_directory
+        dataset.save()
+        self.assertIsNone(dataset.get_open_file_handle())
+
+        with self.assertRaisesRegexp(
+                IOError,
+                r"No such file or directory: .*missing_file\.csv"):
+            call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.FAILED, run.state)
+
+    @patch('container.management.commands.runcontainer.call')
+    def test_short_stdout(self, mocked_call):
+        mocked_call.side_effect = self.dummy_call
+        self.call_stdout = expected_stdout = 'This should be written to stdout.'
+        self.call_stderr = expected_stderr = 'Look for this on stderr.'
+
+        run = ContainerRun.objects.get(name='fixture run')
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        stdout = run.logs.get(type=ContainerLog.STDOUT)
+        stderr = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stdout, stdout.short_text)
+        self.assertEqual(expected_stderr, stderr.short_text)
+
+    @patch('container.management.commands.runcontainer.call')
+    def test_long_stderr(self, mocked_call):
+        mocked_call.side_effect = self.dummy_call
+        self.call_stdout = expected_stdout = 'This should be written to stdout.'
+        self.call_stderr = expected_stderr = 'Look for this on stderr. ' * 81
+
+        run = ContainerRun.objects.get(name='fixture run')
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        stdout = run.logs.get(type=ContainerLog.STDOUT)
+        stderr = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stdout, stdout.short_text)
+        self.assertEqual(expected_stderr, stderr.long_text.read())
+        self.assertEqual(expected_stdout, stdout.read())
+        self.assertEqual(expected_stderr, stderr.read())
+        self.assertEqual(expected_stdout[:10], stdout.read(10))
+        self.assertEqual(expected_stderr[:10], stderr.read(10))

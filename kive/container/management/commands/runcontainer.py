@@ -8,6 +8,7 @@ from subprocess import call
 from tempfile import mkdtemp
 
 from django.conf import settings
+from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -27,28 +28,40 @@ class Command(BaseCommand):
             help='ContainerRun to execute')
 
     def handle(self, run_id, **kwargs):
-        self.update_state(run_id, ContainerRun.NEW, ContainerRun.LOADING)
-        run = ContainerRun.objects.get(id=run_id)
+        run = self.record_start(run_id)
+        try:
+            self.create_sandbox(run)
+            run.save()
 
-        self.create_sandbox(run)
-        run.save()
+            self.run_container(run)
+            run.save()
 
-        self.run_container(run)
-        run.save()
+            self.save_outputs(run)
+            run.save()
+        except Exception:
+            run.state = ContainerRun.FAILED
+            run.save()
+            raise
 
-        self.save_outputs(run)
-        run.save()
-
-    def update_state(self, run_id, old_state, new_state):
+    def record_start(self, run_id):
+        old_state = ContainerRun.NEW
+        new_state = ContainerRun.LOADING
+        slurm_job_id = os.environ.get('SLURM_JOB_ID')
         rows_updated = ContainerRun.objects.filter(
-            id=run_id, state=old_state).update(state=new_state)
+            id=run_id, state=old_state).update(state=new_state,
+                                               start_time=timezone.now(),
+                                               slurm_job_id=slurm_job_id)
+
+        # Defer the stopped_by field so we don't overwrite it when another
+        # process tries to stop this job.
+        run = ContainerRun.objects.defer('stopped_by').get(id=run_id)
         if rows_updated == 0:
-            run = ContainerRun.objects.get(id=run_id)
             raise CommandError(
                 'Expected state {} for run id {}, but was {}.'.format(
                     old_state,
                     run_id,
                     run.state))
+        return run
 
     def create_sandbox(self, run):
         sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
@@ -64,8 +77,9 @@ class Command(BaseCommand):
         os.mkdir(input_path)
         for dataset in run.datasets.all():
             target_path = os.path.join(input_path, dataset.argument.name)
-            source_path = dataset.dataset.dataset_file.path
-            shutil.copyfile(source_path, target_path)
+            source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
+            with source_file, open(target_path, 'wb') as target_file:
+                shutil.copyfileobj(source_file, target_file)
         os.mkdir(os.path.join(run.sandbox_path, 'output'))
         os.mkdir(os.path.join(run.sandbox_path, 'logs'))
 
@@ -88,6 +102,7 @@ class Command(BaseCommand):
         command = ['singularity',
                    'run',
                    '--contain',
+                   '--cleanenv',
                    '-B',
                    '{}:/mnt/input,{}:/mnt/output'.format(input_path,
                                                          output_path)]
@@ -111,19 +126,29 @@ class Command(BaseCommand):
                 dataset = Dataset.create_dataset(argument_path,
                                                  name=argument.name,
                                                  user=run.user)
+                dataset.copy_permissions(run)
                 run.datasets.create(dataset=dataset,
                                     argument=argument)
             except IOError as ex:
                 if ex.errno != errno.ENOENT:
                     raise
+        # noinspection PyUnresolvedReferences,PyProtectedMember
+        short_size = ContainerLog._meta.get_field('short_text').max_length
         logs_path = os.path.join(run.sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
-            # noinspection PyUnresolvedReferences,PyProtectedMember
-            chunk_size = ContainerLog._meta.get_field('short_text').max_length
-            with open(os.path.join(logs_path, file_name)) as f:
-                chunk = f.read(chunk_size)
-            run.logs.create(type=log_type, short_text=chunk)
+            file_path = os.path.join(logs_path, file_name)
+            file_size = os.lstat(file_path).st_size
+            with open(file_path) as f:
+                if file_size <= short_size:
+                    long_text = None
+                    short_text = f.read(short_size)
+                else:
+                    short_text = ''
+                    long_text = File(f)
+                run.logs.create(type=log_type,
+                                short_text=short_text,
+                                long_text=long_text)
 
         run.state = (ContainerRun.COMPLETE
                      if run.return_code == 0

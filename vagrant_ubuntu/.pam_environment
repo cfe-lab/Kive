@@ -1,0 +1,6 @@
+export KIVE_DB_USER=vagrant
+export KIVE_MEDIA_ROOT=/var/kive/media_root
+export KIVE_STATIC_ROOT=/var/www/html/kive/static
+export KIVE_LOG=/var/kive/media_root/Logs/kive_other.log
+
+# TODO: KIVE_SECRET_KEY=???

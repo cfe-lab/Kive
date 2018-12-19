@@ -72,6 +72,9 @@ urlpatterns = [
     url(r'^dev.html$', portal.views.dev, name='dev'),
     url(r'^usr.html$', portal.views.usr, name='usr'),
 
+    url(r'^batch_update/(?P<pk>\d+)/$',
+        container.views.BatchUpdate.as_view(),
+        name='batch_update'),
     url(r'^container_families$',
         container.views.ContainerFamilyList.as_view(),
         name='container_families'),

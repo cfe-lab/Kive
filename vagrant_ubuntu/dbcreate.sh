@@ -19,6 +19,6 @@ if [ -e media_root_backup/CodeResources ] ;then
     rsync -a media_root_backup/CodeResources /var/kive/media_root
 fi
 
-../kive/manage.py migrate --settings kive.settings_vagrant
+/opt/venv_kive/bin/python ../kive/manage.py migrate
 
 echo "Created kive database."

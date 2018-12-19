@@ -146,13 +146,20 @@ var permissions = (function() {
         label_field = label_field || "name";
         url_field = url_field || "id";
         this.registerColumn(header, function($td, item) {
-            var label_text = item[label_field];
-            if ( ! /\w/.test(label_text)) {
-                label_text += ' [link]';
+            var label_text = item[label_field],
+                url = item[url_field];
+            if (url === null) {
+                if (label_text !== null) {
+                    $td.text(label_text);
+                }
+            } else {
+                if ( ! /\w/.test(label_text)) {
+                    label_text += ' [link]';
+                }
+                $('<a>').text(label_text)
+                    .attr('href', base_url + url)
+                    .appendTo($td);
             }
-            $('<a>').text(label_text)
-                .attr('href', base_url + item[url_field])
-                .appendTo($td);
         });
     };
     

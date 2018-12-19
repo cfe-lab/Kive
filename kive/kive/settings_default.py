@@ -10,7 +10,7 @@
 # EMAIL_{HOST|PORT|HOST_USER|HOST_PASSWORD|USE_TLS|USE_SSL|TIMEOUT|SSL_KEYFILE|SSL_CERTFILE}:
 #    settings used for sending logged error messages via email to the administrators
 # ADMINS: system administrators
-
+import os
 
 DEBUG = True
 
@@ -40,10 +40,10 @@ DATABASES = {
     'default': {
         # Engine can be 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': '[YOUR DB NAME HERE]',  # Or path to db file if using sqlite3.
+        'NAME': os.environ.get('KIVE_DB_NAME', 'kive'),  # Or path to db file if using sqlite3.
         # The following settings are not used with sqlite3:
-        'USER': '[YOUR DB USER NAME HERE]',
-        'PASSWORD': '[YOUR DB USER PASSWORD HERE]',
+        'USER': os.environ.get('KIVE_DB_USER', ''),
+        'PASSWORD': os.environ.get('KIVE_DB_PASSWORD', ''),
         # Blank host for localhost through domain sockets,
         # or '127.0.0.1' for localhost through TCP.
         'HOST': '',
@@ -80,7 +80,7 @@ USE_TZ = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = ''
+MEDIA_ROOT = os.environ.get('KIVE_MEDIA_ROOT', os.path.expanduser('~/data/kive'))
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
@@ -91,7 +91,10 @@ MEDIA_URL = ''
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/var/www/example.com/static/"
-STATIC_ROOT = ''
+STATIC_ROOT = os.environ.get(
+    'KIVE_STATIC_ROOT',
+    os.path.abspath(os.path.join(__file__,
+                                 '../../../static_root')))
 
 # URL prefix for static files.
 # Example: "http://example.com/static/", "http://static.example.com/"
@@ -169,6 +172,35 @@ INSTALLED_APPS = (
     'rest_framework',
 )
 
+LOG_HANDLERS = {
+    'mail_admins': {
+        'level': 'ERROR',
+        'filters': ['require_debug_false', 'rate_limit'],
+        'class': 'django.utils.log.AdminEmailHandler'
+    },
+    'console': {
+        'level': 'DEBUG',
+        'class': 'logging.StreamHandler',
+        'formatter': 'debug'
+    }
+}
+LOG_HANDLER_NAMES = []
+LOG_FILE = os.environ.get('KIVE_LOG')
+if LOG_FILE:
+    LOG_HANDLER_NAMES.append('file')
+    LOG_HANDLERS['file'] = {
+        'level': 'DEBUG',
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': LOG_FILE,
+        'formatter': 'debug',
+        'maxBytes': 1024*1024*15,  # 15MB
+        'backupCount': 10
+    }
+else:
+    LOG_HANDLER_NAMES.append('console')
+if ADMINS:
+    LOG_HANDLER_NAMES.append('mail_admins')
+
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
 LOGGING = {
@@ -188,29 +220,10 @@ LOGGING = {
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
-    'handlers': {
-        'mail_admins': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false', 'rate_limit'],
-            'class': 'django.utils.log.AdminEmailHandler'
-        },
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'debug'
-        },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'kive.log',
-            'formatter': 'debug',
-            'maxBytes': 1024*1024*15,  # 15MB
-            'backupCount': 10
-        }
-    },
+    'handlers': LOG_HANDLERS,
     'root': {
         # This is the default logger.
-        'handlers': ['console', 'file', 'mail_admins'],
+        'handlers': LOG_HANDLER_NAMES,
         'level': 'WARN'
     },
     'loggers': {
@@ -333,7 +346,7 @@ SLURM_QUEUES = [
 # Number of seconds between checking Slurm for job information.
 DEFAULT_SLURM_CHECK_INTERVAL = 5
 
-KIVE_HOME = "/usr/local/share/Kive/kive"
+KIVE_HOME = os.path.abspath(os.path.join(__file__, '../..'))
 STEP_HELPER_COMMAND = "step_helper"
 CABLE_HELPER_COMMAND = "cable_helper"
 
@@ -373,8 +386,8 @@ FLEET_SETTINGS = None
 
 # The keyword used by the system's sinfo command to retrieve a queue's priority,
 # and the name of the corresponding column returned.
-SLURM_PRIO_KEYWORD = "priority"
-SLURM_PRIO_COLNAME = "PRIORITY"
+SLURM_PRIO_KEYWORD = os.environ.get('KIVE_PRIO_KEYWORD', "priority")
+SLURM_PRIO_COLNAME = os.environ.get('KIVE_PRIO_COLNAME', "PRIORITY")
 
 # Attempt to run the system tests that use Slurm.
 RUN_SLURM_TESTS = False

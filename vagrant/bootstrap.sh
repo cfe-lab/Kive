@@ -39,7 +39,7 @@ yum install -q -y docker-ce
 systemctl enable docker
 systemctl start docker
 
-echo ========== Installing MySQL/MariaDB ==========
+echo ========== Installing MySQL/MariaDB for Slurm ==========
 yum install -q -y mariadb-server mariadb-devel
 systemctl enable mariadb
 systemctl start mariadb
@@ -94,6 +94,26 @@ sacctmgr -i add cluster localhost
 systemctl restart slurmdbd
 systemctl restart slurmctld
 
+echo ========== Installing Apache ==========
+# httpd is already installed.
+yum install -q -y mod_wsgi
+
+cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
+sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd
+chmod g-r,o-r /etc/sysconfig/httpd
+sed -e 's/Listen 80$/Listen 8080/' \
+    -e 's/User apache$/User vagrant/' \
+    -e 's/Group apache$/Group vagrant/' -i /etc/httpd/conf/httpd.conf
+systemctl enable httpd
+systemctl start httpd
+
+echo ========== Installing virtualenv ==========
+curl --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
+tar xfz virtualenv-15.1.0.tar.gz
+python pypa-virtualenv-bcc2a4c/virtualenv.py /opt/venv_kive
+rm -r pypa-virtualenv-bcc2a4c/ virtualenv-15.1.0.tar.gz
+. /opt/venv_kive/bin/activate
+
 echo ========== Installing pip ==========
 wget -q https://bootstrap.pypa.io/get-pip.py
 python get-pip.py pip==9.0.1
@@ -114,20 +134,17 @@ ln -s /usr/local/share/Kive/vagrant_ubuntu/media_root_backup/* \
     /var/kive/media_root/
 ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r requirements-dev.txt
-sed -e 's/\[YOUR DB NAME HERE\]/kive/' \
-    -e 's/\[YOUR DB USER NAME HERE\]/vagrant/' \
-    -e 's/\[YOUR DB USER PASSWORD HERE\]//' \
-    -e "s|MEDIA_ROOT = ''|MEDIA_ROOT = '/var/kive/media_root'|" \
-    -e 's/SLURM_PRIO_KEYWORD = "priority"/SLURM_PRIO_KEYWORD = "prioritytier"/' \
-    -e 's/SLURM_PRIO_COLNAME = "PRIORITY"/SLURM_PRIO_COLNAME = "PRIO_TIER"/' \
-    kive/kive/settings_default.py > kive/kive/settings_vagrant.py
 if [ ! -f kive/kive/settings.py ]; then
-    cp kive/kive/settings_vagrant.py kive/kive/settings.py
+    cp kive/kive/settings_default.py kive/kive/settings.py
 fi
 
-cd vagrant_ubuntu
+. vagrant_ubuntu/.pam_environment
+cd kive
+./manage.py collectstatic
+cd ../vagrant_ubuntu
 sudo -u vagrant ./dbcreate.sh
 
-# Launch server like this:
+# Apache should be active on port 8080.
+# Launch development server on port 8000 like this:
 # cd /usr/local/share/Kive/kive
 # ./manage.py runserver 0.0.0.0:8000

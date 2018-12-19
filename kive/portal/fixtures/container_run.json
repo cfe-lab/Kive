@@ -35,7 +35,7 @@
     {
         "fields": {
             "argument": 1, 
-            "created": "2018-11-30T23:17:02.789Z", 
+            "created": "2018-12-17T23:10:06.517Z", 
             "dataset": 1, 
             "name": "", 
             "run": 1
@@ -57,7 +57,7 @@
     }, 
     {
         "fields": {
-            "created": "2018-11-30T23:17:02.764Z", 
+            "created": "2018-12-17T23:10:06.474Z", 
             "description": "", 
             "family": 1, 
             "file": "CodeResources/kive-default.simg", 
@@ -82,9 +82,11 @@
             "priority": 0, 
             "return_code": null, 
             "sandbox_path": "", 
-            "start_time": "2000-01-01T00:00:00Z", 
+            "slurm_job_id": null, 
+            "start_time": null, 
             "state": "N", 
             "stopped_by": null, 
+            "submit_time": "2000-01-01T00:00:00Z", 
             "user": 1, 
             "users_allowed": []
         }, 
@@ -95,14 +97,14 @@
         "fields": {
             "MD5_checksum": "06f7204f2679744fd76e6b111dc506ba", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2018_11/example_names.csv", 
+            "dataset_file": "Datasets/2018_12/example_names.csv", 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "", 
             "external_path": "", 
             "externalfiledirectory": null, 
             "file_source": null, 
             "groups_allowed": [], 
-            "last_time_checked": "2018-11-30T23:17:02.771Z", 
+            "last_time_checked": "2018-12-17T23:10:06.482Z", 
             "name": "names.csv", 
             "user": 1, 
             "users_allowed": []

@@ -267,3 +267,10 @@ def remove_fixture_files():
     for dirname in os.listdir(settings.MEDIA_ROOT):
         target_path = os.path.join(settings.MEDIA_ROOT, dirname)
         shutil.rmtree(target_path)
+
+
+def strip_removal_plan(plan):
+    plan_not_blanks = {key: value
+                       for key, value in plan.items()
+                       if value}
+    return plan_not_blanks

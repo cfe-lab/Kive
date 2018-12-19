@@ -1,0 +1,151 @@
+<!-- Django template -->
+
+{% extends "portal/base.html" %}
+
+{% block title %}Container Run Batch{% endblock %}
+
+{% block javascript %}
+    <script src="/static/portal/jquery-2.0.3.min.js"></script>
+    <script src="/static/portal/noxss.js"></script>
+    <script src="/static/portal/permissions.js"></script>
+    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="/static/portal/helptext.js"></script>
+    <script src="/static/container/ContainerRunTable.js"></script>
+    <script type="text/javascript">
+
+    $(function(){
+        var table = new permissions.ContainerRunTable(
+            $("#runs"),
+            {{ is_user_admin|lower }},
+            $(".navigation_links")
+        );
+        var asf = new AjaxSearchFilter(table, $("#asf"));
+
+        // This adds a filter for the current object.
+        table.filterSet.add("batch_id", {{object.id}}, true).hide();
+
+        asf.reloadTable();
+    });
+    </script>
+{% endblock %}
+
+{% block stylesheets %}
+    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="/static/portal/search.css"/>
+{% endblock %}
+
+{% block widget_media %}
+{{ form.media }}
+{% endblock %}
+
+{% block content %}
+
+<a href="/container_runs" rel="prev">return to container runs</a>
+
+<h2>Container Run Batch</h2>
+
+<p>This describes a set of container runs that are grouped into a batch.</p>
+
+<pre>
+    {{ form.non_field_errors }}
+</pre>
+
+<form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+
+    <input type="submit" value="Submit" />
+</form>
+
+{% if object %}
+    <h3>Container Runs:</h3>
+
+    <div id="asf">
+        <form class="asf-form">
+            <div class="asf-main-search">
+                <div class="asf-active-filters"></div>
+                <input type="text" name="smart" class="asf-search-field">
+                <input type="button" class="advanced ctrl" value="Advanced">
+                <input type="submit" value="Filter" class="asf-search-button">
+            </div>
+        </form>
+        <form class="asf-advanced-form">
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <h4>Advanced search</h4>
+            <div class="asf-field-container">
+                <label for="search-name">Name</label><input
+                    name="name"
+                    id="search-name"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="search-description">Description</label><input
+                    name="description"
+                    id="search-description"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="startafter">Start after</label><input
+                    name="startafter"
+                    id="startafter"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="startbefore">Start before</label><input
+                    name="startbefore"
+                    id="startbefore"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="endafter">End after</label><input
+                    name="endafter"
+                    id="endafter"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="endbefore">End before</label><input
+                    name="endbefore"
+                    id="endbefore"
+                    type="text"
+                    class="datetime asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="user">States</label><input
+                    name="states"
+                    id="states"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="user">Creator</label><input
+                    name="user"
+                    id="user"
+                    type="text"
+                    class="asf-search-fixed-field">
+            </div>
+            <div class="asf-field-container">
+                <label for="active">Is active</label><input
+                    name="active"
+                    id="active"
+                    type="checkbox"
+                    class="asf-search-fixed-field">
+            </div>
+            <input type="submit" value="Filter" class="asf-search-button">
+        </form>
+    </div>
+
+    <div class="navigation_links"></div>
+
+    <div class="results">
+        <table id="runs"></table>
+    </div>
+{% endif %}
+
+{% endblock %}

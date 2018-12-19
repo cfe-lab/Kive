@@ -3,6 +3,7 @@ import errno
 import logging
 import os
 import re
+import sys
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 import shutil
@@ -197,7 +198,7 @@ class ContainerApp(models.Model):
     objects = None  # Filled in later by Django.
 
     class Meta:
-        ordering = ('name',)
+        ordering = ('-container_id', 'name',)
 
     @property
     def display_name(self):
@@ -261,6 +262,9 @@ class ContainerApp(models.Model):
                                   position=position,
                                   allow_multiple=allow_multiple,
                                   type=argument_type)
+
+    def can_be_accessed(self, user):
+        return self.container.can_be_accessed(user)
 
     def get_absolute_url(self):
         return reverse('container_app_update', kwargs=dict(pk=self.pk))
@@ -343,6 +347,10 @@ class Batch(AccessControl):
     class Meta(object):
         ordering = ('-id',)
 
+    @property
+    def absolute_url(self):
+        return reverse('batch_update', kwargs=dict(pk=self.pk))
+
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
         """ Make a manifest of objects to remove when removing this. """
@@ -394,11 +402,15 @@ class ContainerRun(Stopwatch, AccessControl):
     description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
     state = models.CharField(max_length=1, choices=STATES, default=NEW)
+    submit_time = models.DateTimeField(
+        auto_now_add=True,
+        help_text='When this job was put in the queue.')
     priority = models.IntegerField(default=0,
                                    help_text='Chooses which slurm queue to use.')
     sandbox_path = models.CharField(
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH,
         blank=True)
+    slurm_job_id = models.IntegerField(blank=True, null=True)
     return_code = models.IntegerField(blank=True, null=True)
     stopped_by = models.ForeignKey(User,
                                    help_text="User that stopped this run",
@@ -408,6 +420,8 @@ class ContainerRun(Stopwatch, AccessControl):
     is_redacted = models.BooleanField(
         default=False,
         help_text="True if the outputs or logs were redacted for sensitive data")
+
+    datasets = None  # Filled in later by Django.
 
     sandbox_size = models.BigIntegerField(
         blank=True,
@@ -421,7 +435,7 @@ class ContainerRun(Stopwatch, AccessControl):
     )
 
     class Meta(object):
-        ordering = ('-start_time',)
+        ordering = ('-submit_time',)
 
     def __repr__(self):
         return 'ContainerRun(id={!r})'.format(self.pk)
@@ -434,8 +448,6 @@ class ContainerRun(Stopwatch, AccessControl):
              force_update=False,
              using=None,
              update_fields=None):
-        if self.pk is None:
-            self.start_time = timezone.now()
         super(ContainerRun, self).save(force_insert,
                                        force_update,
                                        using,
@@ -451,8 +463,11 @@ class ContainerRun(Stopwatch, AccessControl):
             if ex.errno != errno.EEXIST:
                 raise
 
+        child_env = dict(os.environ)
+        child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         check_call(self.build_slurm_command(sandbox_root,
-                                            settings.SLURM_QUEUES))
+                                            settings.SLURM_QUEUES),
+                   env=child_env)
 
     def build_slurm_command(self, sandbox_root, slurm_queues=None):
         sandbox_prefix = os.path.join(sandbox_root,
@@ -465,23 +480,50 @@ class ContainerRun(Stopwatch, AccessControl):
                    '-J', job_name,
                    '--output', slurm_prefix + 'stdout.txt',
                    '--error', slurm_prefix + 'stderr.txt',
+                   '--export', 'all',
                    '-c', str(self.app.threads),
                    '--mem', str(self.app.memory)]
         if slurm_queues is not None:
             kive_name, slurm_name = slurm_queues[self.priority]
             command.extend(['-p', slurm_name])
-        command.extend(['manage.py', 'runcontainer', str(self.pk)])
+        manage_path = os.path.abspath(os.path.join(__file__,
+                                                   '../../manage.py'))
+        command.extend([manage_path, 'runcontainer', str(self.pk)])
         return command
 
     def get_sandbox_prefix(self):
         return 'user{}_run{}_'.format(self.user.username, self.pk)
+
+    def request_stop(self, user):
+        end_time = timezone.now()
+        rows_updated = ContainerRun.objects.filter(
+            pk=self.pk,
+            state=ContainerRun.NEW).update(state=ContainerRun.CANCELLED,
+                                           stopped_by=user,
+                                           end_time=end_time)
+        if rows_updated == 0:
+            # Run has already started. Must call scancel.
+            check_call(['scancel', '-f', str(self.slurm_job_id)])
+            self.state = ContainerRun.CANCELLED
+            self.stopped_by = user
+            self.end_time = end_time
+            self.save()
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
         """ Make a manifest of objects to remove when removing this. """
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["ContainerRuns"]
+        if self.state not in (ContainerRun.COMPLETE,
+                              ContainerRun.FAILED,
+                              ContainerRun.CANCELLED):
+            raise ValueError(
+                'ContainerRun id {} is still active.'.format(self.pk))
         removal_plan["ContainerRuns"].add(self)
+
+        for run_dataset in self.datasets.all():
+            if run_dataset.argument.type == ContainerArgument.OUTPUT:
+                run_dataset.dataset.build_removal_plan(removal_plan)
 
         return removal_plan
 
@@ -631,6 +673,12 @@ class ContainerDataset(models.Model):
 
     objects = None  # Filled in later by Django.
 
+    class Meta(object):
+        ordering = ('run',
+                    'argument__type',
+                    'argument__position',
+                    'argument__name')
+
 
 class ContainerLog(models.Model):
     STDOUT = 'O'
@@ -648,6 +696,16 @@ class ContainerLog(models.Model):
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
+
+    def read(self, size=None):
+        if self.long_text:
+            self.long_text.open('r')
+            try:
+                return self.long_text.read(size or -1)
+            finally:
+                self.long_text.close()
+
+        return self.short_text[:size]
 
     @classmethod
     def total_storage_used(cls):
@@ -716,3 +774,4 @@ class ContainerLog(models.Model):
             bytes_to_purge=bytes_to_purge,
             date_cutoff=date_cutoff
         )
+

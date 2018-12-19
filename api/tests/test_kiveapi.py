@@ -232,6 +232,53 @@ def test_dataset_download(mocked_api):
     assert expected_download == destination.getvalue()
 
 
+def test_download(mocked_api):
+    # noinspection PyUnresolvedReferences
+    expected_response = Session.get.return_value
+
+    response = mocked_api.download("@api_dataset_dl",
+                                   context={'dataset-id': 42})
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with(
+        'http://localhost/api/datasets/42/download/',
+        stream=True)
+    assert expected_response == response
+
+
+def test_download_file(mocked_api):
+    # noinspection PyUnresolvedReferences
+    Session.get.return_value.iter_content.return_value = [u'line 1\n', u'line 2\n']
+    destination = StringIO()
+    expected_download = 'line 1\nline 2\n'
+
+    mocked_api.download_file(destination,
+                             "@api_dataset_dl",
+                             context={'dataset-id': 42})
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with(
+        'http://localhost/api/datasets/42/download/',
+        stream=True)
+    assert expected_download == destination.getvalue()
+
+
+def test_download_lines(mocked_api):
+    # noinspection PyUnresolvedReferences
+    Session.get.return_value.iter_lines.return_value = iter([u'line 1',
+                                                             u'line 2'])
+    expected_lines = [u'line 1\n', u'line 2\n']
+
+    lines = list(mocked_api.download_lines("@api_dataset_dl",
+                                           context={'dataset-id': 42}))
+
+    # noinspection PyUnresolvedReferences
+    Session.get.assert_called_once_with(
+        'http://localhost/api/datasets/42/download/',
+        stream=True)
+    assert expected_lines == lines
+
+
 def test_endpoint_get(mocked_api):
     expected_foos = ['foo1', 'foo2']
     # noinspection PyUnresolvedReferences

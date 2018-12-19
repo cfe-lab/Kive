@@ -11,7 +11,16 @@
     <script src="/static/portal/noxss.js"></script>
     <script>
     var is_owner = {{ is_owner|lower }},
-        is_admin = {{ is_admin|lower }};
+        is_admin = {{ is_admin|lower }},
+        dataset_id = {{dataset.id}};
+    $(function () {
+        // This runs when the document has finished loading.
+        $("#input_runs").click(function () {
+            sessionStorage.setItem(
+                "containerrunFilters",
+                "input_id=" + dataset_id);
+        });
+    });
     </script>
     <script src="/static/portal/edit_details.js"></script>
     {% block data_specific_js %}
@@ -83,6 +92,17 @@
                 {{ container_run.name | default:"[link]" }}</a></td>
         </tr>
     {% endif %}
+    <tr>
+        <td>Input to:</td>
+        <td>
+            {% if inputs_count %}
+                <a href="/container_runs" id="input_runs">{{ inputs_count }}
+                    container runs</a>
+            {% else %}
+                no container runs
+            {% endif %}
+        </td>
+    </tr>
     <tr>
         <td>Permissions:</td>
         <td>
