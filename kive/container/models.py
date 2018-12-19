@@ -3,6 +3,7 @@ import errno
 import logging
 import os
 import re
+import sys
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 
@@ -434,8 +435,7 @@ class ContainerRun(Stopwatch, AccessControl):
                 raise
 
         child_env = dict(os.environ)
-        child_env['PYTHONPATH'] = os.path.abspath(os.path.join(__file__,
-                                                               '../..'))
+        child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         check_call(self.build_slurm_command(sandbox_root,
                                             settings.SLURM_QUEUES),
                    env=child_env)

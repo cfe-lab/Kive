@@ -102,6 +102,7 @@ class Command(BaseCommand):
         command = ['singularity',
                    'run',
                    '--contain',
+                   '--cleanenv',
                    '-B',
                    '{}:/mnt/input,{}:/mnt/output'.format(input_path,
                                                          output_path)]

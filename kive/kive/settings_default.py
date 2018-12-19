@@ -172,7 +172,34 @@ INSTALLED_APPS = (
     'rest_framework',
 )
 
-LOG_FILE = os.environ.get('KIVE_LOG', os.path.join(MEDIA_ROOT, 'Logs/kive.log'))
+LOG_HANDLERS = {
+    'mail_admins': {
+        'level': 'ERROR',
+        'filters': ['require_debug_false', 'rate_limit'],
+        'class': 'django.utils.log.AdminEmailHandler'
+    },
+    'console': {
+        'level': 'DEBUG',
+        'class': 'logging.StreamHandler',
+        'formatter': 'debug'
+    }
+}
+LOG_HANDLER_NAMES = []
+LOG_FILE = os.environ.get('KIVE_LOG')
+if LOG_FILE:
+    LOG_HANDLER_NAMES.append('file')
+    LOG_HANDLERS['file'] = {
+        'level': 'DEBUG',
+        'class': 'logging.handlers.RotatingFileHandler',
+        'filename': LOG_FILE,
+        'formatter': 'debug',
+        'maxBytes': 1024*1024*15,  # 15MB
+        'backupCount': 10
+    }
+else:
+    LOG_HANDLER_NAMES.append('console')
+if ADMINS:
+    LOG_HANDLER_NAMES.append('mail_admins')
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
@@ -193,29 +220,10 @@ LOGGING = {
             'datefmt': '%Y-%m-%d %H:%M:%S'
         }
     },
-    'handlers': {
-        'mail_admins': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false', 'rate_limit'],
-            'class': 'django.utils.log.AdminEmailHandler'
-        },
-        'console': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'debug'
-        },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_FILE,
-            'formatter': 'debug',
-            'maxBytes': 1024*1024*15,  # 15MB
-            'backupCount': 10
-        }
-    },
+    'handlers': LOG_HANDLERS,
     'root': {
         # This is the default logger.
-        'handlers': ['console', 'file', 'mail_admins'],
+        'handlers': LOG_HANDLER_NAMES,
         'level': 'WARN'
     },
     'loggers': {

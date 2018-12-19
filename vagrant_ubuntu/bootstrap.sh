@@ -64,6 +64,13 @@ cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/apache2/envvars
 . /usr/local/share/Kive/vagrant_ubuntu/envvars.conf
 systemctl restart apache2
 
+echo ========== Installing virtualenv ==========
+curl --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
+tar xfz virtualenv-15.1.0.tar.gz
+python pypa-virtualenv-bcc2a4c/virtualenv.py /opt/venv_kive
+rm -r pypa-virtualenv-bcc2a4c/ virtualenv-15.1.0.tar.gz
+. /opt/venv_kive/bin/activate
+
 echo ========== Installing pip ==========
 apt-get install -qq wget
 wget -q https://bootstrap.pypa.io/get-pip.py
@@ -94,6 +101,7 @@ cd kive
 cd ../vagrant_ubuntu
 sudo -u vagrant ./dbcreate.sh
 
-# Launch server like this:
+# Apache should be active on port 8080.
+# Launch development server on port 8000 like this:
 # cd /usr/local/share/Kive/kive
 # ./manage.py runserver 0.0.0.0:8000
