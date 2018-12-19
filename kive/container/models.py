@@ -9,6 +9,7 @@ import shutil
 import datetime
 import itertools
 import glob
+from operator import itemgetter
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -24,6 +25,7 @@ from constants import maxlengths
 from librarian.models import Dataset
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
+import file_access_utils
 
 logger = logging.getLogger(__name__)
 
@@ -378,6 +380,14 @@ class ContainerRun(Stopwatch, AccessControl):
               (COMPLETE, 'Complete'),
               (FAILED, 'Failed'),
               (CANCELLED, 'Cancelled'))
+
+    ACTIVE_STATES = [
+        NEW,
+        LOADING,
+        RUNNING,
+        SAVING
+    ]
+
     app = models.ForeignKey(ContainerApp, related_name="runs")
     batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
@@ -538,7 +548,7 @@ class ContainerRun(Stopwatch, AccessControl):
         each ContainerApp up to this number.
         :return:
         """
-        # Next, look for finished jobs to clean up.
+        # Look for finished jobs to clean up.
         logger.debug("Checking for old sandboxes to clean up....")
 
         purge_candidates = cls.objects.filter(
@@ -638,3 +648,71 @@ class ContainerLog(models.Model):
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
+
+    @classmethod
+    def total_storage_used(cls):
+        """
+        Return the number of bytes used by all ContainerLogs.
+        :return:
+        """
+        return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
+
+    @staticmethod
+    def _currently_used_by_container():
+        """
+        A generator that produces the ContainerLogs being used by all active ContainerRuns.
+        :return:
+        """
+        active_runs = ContainerRun.objects.filter(state__in=ContainerRun.ACTIVE_STATES)
+        for run in active_runs:
+            for cr in run.logs.all():
+                yield cr
+
+    def currently_being_used(self):
+        """
+        Returns True if this is currently in use by an active ContainerRun; False otherwise.
+        :return:
+        """
+        return self.run.state in ContainerRun.ACTIVE_STATES
+
+    @classmethod
+    def purge_registered_logs(cls, bytes_to_purge, date_cutoff=None):
+        """
+        Purge ContainerLogs in chronological order until the target number of bytes is achieved.
+
+        If date_cutoff is specified, retain files newer than this.
+
+        :param bytes_to_purge:
+        :param date_cutoff: a datetime object
+        :return:
+        """
+        # Exclude Datasets that are currently in use or have no file (i.e. had short logs or their log was already
+        # purged).
+        expendable_logs = cls.objects.exclude(
+            run__state__in=ContainerRun.ACTIVE_STATES,
+            long_text__isnull=True
+        )
+        if date_cutoff is not None:
+            expendable_logs = expendable_logs.exclude(run__end_time__gte=date_cutoff)
+
+        return file_access_utils.purge_registered_files(expendable_logs, "long_text", bytes_to_purge)
+
+    @classmethod
+    def purge_unregistered_logs(cls, bytes_to_purge=None, date_cutoff=None):
+        """
+        Clean up files in the ContainerLog folder that do not belong to any known ContainerLogs.
+
+        Files are removed in order from oldest to newest.  If date_cutoff is specified then
+        anything newer than it is not deleted.
+
+        :param bytes_to_purge: a target number of bytes to remove.  If this is None, just remove everything.
+        :param date_cutoff: a datetime object.
+        :return:
+        """
+        return file_access_utils.purge_unregistered_files(
+            os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR),
+            cls,
+            "long_text",
+            bytes_to_purge=bytes_to_purge,
+            date_cutoff=date_cutoff
+        )

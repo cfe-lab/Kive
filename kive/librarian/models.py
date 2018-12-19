@@ -48,6 +48,9 @@ import librarian.filewalker as filewalker
 import six
 from container.models import ContainerRun
 
+import file_access_utils
+
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -1306,14 +1309,7 @@ class Dataset(metadata.models.AccessControl):
         A generator that produces the Datasets being used by all active ContainerRuns.
         :return:
         """
-        active_runs = ContainerRun.objects.filter(
-            state__in=[
-                ContainerRun.NEW,
-                ContainerRun.LOADING,
-                ContainerRun.RUNNING,
-                ContainerRun.SAVING
-            ]
-        )
+        active_runs = ContainerRun.objects.filter(state__in=ContainerRun.ACTIVE_STATES)
         for run in active_runs:
             for cd in run.datasets.all():  # these are ContainerDatasets
                 yield cd.dataset
@@ -1323,14 +1319,7 @@ class Dataset(metadata.models.AccessControl):
         Returns True if this is currently in use by an active ContainerRun; False otherwise.
         :return:
         """
-        active_containers = self.containers.filter(
-            state__in=[
-                ContainerRun.NEW,
-                ContainerRun.LOADING,
-                ContainerRun.RUNNING,
-                ContainerRun.SAVING
-            ]
-        )
+        active_containers = self.containers.filter(state__in=ContainerRun.ACTIVE_STATES)
         return active_containers.exists()
 
     @classmethod
@@ -1339,20 +1328,17 @@ class Dataset(metadata.models.AccessControl):
         Return the number of bytes used by all Datasets.
         :return:
         """
-        total_storage = 0
-        datasets_directory = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
-        for directory, _, filenames in os.walk(datasets_directory):
-            for filename in filenames:
-                absolute_path = os.path.join(directory, filename)
-                total_storage += os.path.getsize(absolute_path)
-        return total_storage
+        return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
 
     @classmethod
-    def purge_registered_datasets(cls, bytes_to_purge):
+    def purge_registered_datasets(cls, bytes_to_purge, date_cutoff=None):
         """
         Purge Datasets in chronological order until the target number of bytes is achieved.
 
+        If date_cutoff is specified, then anything newer than it is not deleted.
+
         :param bytes_to_purge:
+        :param date_cutoff:
         :return:
         """
         # Exclude Datasets that are currently in use, that are uploaded, or have no file (i.e. already purged).
@@ -1361,25 +1347,18 @@ class Dataset(metadata.models.AccessControl):
             file_source=None,
             dataset_file=None
         )
+        if date_cutoff is not None:
+            expendable_datasets = expendable_datasets.exclude(date_created__gte=date_cutoff)
 
-        bytes_purged = 0
-        files_purged = 0
-        for ds in expendable_datasets:
-            # Do this in a transaction so we can make sure that this is still eligible to be removed.
-            current_size = ds.dataset_file.size
-            with transaction.atomic():
-                if ds.currently_being_used():
-                    continue
-                ds.dataset_file.delete(save=True)
-            bytes_purged += current_size
-            files_purged += 1
-            if bytes_purged >= bytes_to_purge:
-                break
-
-        return bytes_purged, files_purged
+        return file_access_utils.purge_registered_files(
+            expendable_datasets,
+            "dataset_file",
+            bytes_to_purge,
+            date_cutoff=date_cutoff
+        )
 
     @classmethod
-    def collect_garbage(cls, bytes_to_purge=None, date_cutoff=None):
+    def purge_unregistered_datasets(cls, bytes_to_purge=None, date_cutoff=None):
         """
         Clean up files in the Dataset folder that do not belong to any known Datasets.
 
@@ -1390,42 +1369,13 @@ class Dataset(metadata.models.AccessControl):
         :param date_cutoff: a datetime object.
         :return:
         """
-        all_files = []
-
-        datasets_directory = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
-        for directory, _, filenames in os.walk(datasets_directory):
-            for filename in filenames:
-                absolute_path = os.path.join(directory, filename)
-                mod_time = os.path.getmtime(absolute_path)
-                size = os.path.getsize(absolute_path)
-                relative_path = os.path.relpath(absolute_path, settings.MEDIA_ROOT)
-                all_files.append((absolute_path, mod_time, size, relative_path))
-
-        all_files = sorted(all_files, key=itemgetter(1))
-
-        bytes_purged = 0
-        files_purged = 0
-        known_files = 0
-        still_new = 0
-        for absolute_path, mod_time, size, relative_path in all_files:
-            dataset = Dataset.objects.filter(dataset_file=relative_path).first()
-            if dataset is not None:
-                # This is a known Dataset, skip it.
-                known_files += 1
-                continue
-
-            if date_cutoff is not None and mod_time < date_cutoff:
-                # This is old, delete it.
-                os.remove(absolute_path)
-                bytes_purged += size
-                files_purged += 1
-            else:
-                still_new += 1
-
-            if bytes_to_purge is not None and bytes_purged > bytes_to_purge:
-                break
-
-        return bytes_purged, files_purged, known_files, still_new
+        return file_access_utils.purge_unregistered_files(
+            os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR),
+            cls,
+            "dataset_file",
+            bytes_to_purge=bytes_to_purge,
+            date_cutoff=date_cutoff
+        )
 
     @classmethod
     def idle_dataset_purge(cls,
