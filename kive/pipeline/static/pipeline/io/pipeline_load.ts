@@ -118,9 +118,9 @@ export class Pipeline {
     private buildInputs(pipeline: PipelineFromApi) {
         let [ x_ratio, y_ratio ] = this.canvasState.getAspectRatio();
 
-        // TODO: Not sure why this is set to true? I'm sure it's
-        // important but I'd like an explanation
-        this.canvasState.dragging = true;
+        // Not sure why this was true, but I set it to false so the inputs
+        // wouldn't get reordered until the user starts dragging them around.
+        this.canvasState.dragging = false;
 
         for (let node of pipeline.inputs) {
 

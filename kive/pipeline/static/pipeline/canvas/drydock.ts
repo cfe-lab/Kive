@@ -898,7 +898,9 @@ export class CanvasState {
             this.testExecutionOrder();
         } else if (CanvasState.isInputNode(shape)) {
             this.inputs.push(shape);
-            this.inputs.sort(Geometry.isometricSort);
+            if (this.dragging) {
+                this.inputs.sort(Geometry.isometricSort);
+            }
         } else if (CanvasState.isOutputNode(shape)) {
             this.outputs.push(shape);
         }
