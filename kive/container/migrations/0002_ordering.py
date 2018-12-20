@@ -24,6 +24,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='container',
             name='file',
-            field=container.models.ContainerFileField(help_text=b'Singularity container file', upload_to=b'CodeResources', verbose_name=b'Container file'),
+            field=container.models.ContainerFileField(help_text='Singularity container file', upload_to=b'CodeResources', verbose_name=b'Container file'),
         ),
     ]

@@ -4,12 +4,14 @@ from __future__ import unicode_literals
 
 from django.db import migrations, models
 import django.utils.timezone
-from django.db.models.expressions import F
+from django.db.models.functions import Coalesce
 
 
 def set_submit_time(apps, schema_editor):
     ContainerRun = apps.get_model('container', 'ContainerRun')
-    ContainerRun.objects.update(submit_time=F('start_time'))
+    ContainerRun.objects.update(submit_time=Coalesce('start_time',
+                                                     'end_time',
+                                                     'submit_time'))
 
 
 def unset_submit_time(apps, schema_editor):
@@ -26,7 +28,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerrun',
             name='submit_time',
-            field=models.DateTimeField(auto_now_add=True, default=django.utils.timezone.now, help_text=b'When this job was put in the queue.'),
+            field=models.DateTimeField(auto_now_add=True, default=django.utils.timezone.now, help_text='When this job was put in the queue.'),
             preserve_default=False,
         ),
         migrations.AlterModelOptions(

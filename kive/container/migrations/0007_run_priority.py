@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerrun',
             name='priority',
-            field=models.IntegerField(default=0, help_text=b'Chooses which slurm queue to use.'),
+            field=models.IntegerField(default=0, help_text='Chooses which slurm queue to use.'),
         ),
         migrations.AlterField(
             model_name='containerrun',

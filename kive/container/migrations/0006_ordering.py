@@ -23,11 +23,11 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='batch',
             name='name',
-            field=models.CharField(blank=True, help_text=b'Name of this batch of container runs', max_length=60, verbose_name=b'Batch Name'),
+            field=models.CharField(blank=True, help_text='Name of this batch of container runs', max_length=60, verbose_name=b'Batch Name'),
         ),
         migrations.AlterField(
             model_name='containerdataset',
             name='name',
-            field=models.CharField(blank=True, help_text=b'Local file name, also used to sort multiple inputs for a single argument.', max_length=60),
+            field=models.CharField(blank=True, help_text='Local file name, also used to sort multiple inputs for a single argument.', max_length=60),
         ),
     ]

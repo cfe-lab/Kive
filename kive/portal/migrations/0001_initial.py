@@ -16,9 +16,9 @@ class Migration(migrations.Migration):
             name='StagedFile',
             fields=[
                 ('id', models.AutoField(verbose_name='ID', serialize=False, auto_created=True, primary_key=True)),
-                ('uploaded_file', models.FileField(help_text=b'Uploaded file held for further server-side processing', upload_to=b'StagedFiles', verbose_name=b'Uploaded file')),
-                ('date_uploaded', models.DateTimeField(help_text=b'Date and time of upload', verbose_name=b'Upload date', auto_now_add=True)),
-                ('user', models.ForeignKey(help_text=b'User that uploaded this file', to=settings.AUTH_USER_MODEL)),
+                ('uploaded_file', models.FileField(help_text='Uploaded file held for further server-side processing', upload_to=b'StagedFiles', verbose_name=b'Uploaded file')),
+                ('date_uploaded', models.DateTimeField(help_text='Date and time of upload', verbose_name=b'Upload date', auto_now_add=True)),
+                ('user', models.ForeignKey(help_text='User that uploaded this file', to=settings.AUTH_USER_MODEL)),
             ],
             options={
             },

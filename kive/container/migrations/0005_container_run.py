@@ -36,8 +36,8 @@ class Migration(migrations.Migration):
             name='ContainerDataset',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(help_text=b'Local file name, also used to sort multiple inputs for a single argument.', max_length=60)),
-                ('created', models.DateTimeField(auto_now_add=True, help_text=b'When this was added to Kive.')),
+                ('name', models.CharField(help_text='Local file name, also used to sort multiple inputs for a single argument.', max_length=60)),
+                ('created', models.DateTimeField(auto_now_add=True, help_text='When this was added to Kive.')),
                 ('argument', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='datasets', to='container.ContainerArgument')),
                 ('dataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='containers', to='librarian.Dataset')),
             ],
@@ -47,8 +47,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('type', models.CharField(choices=[(b'O', b'stdout'), (b'E', b'stderr')], max_length=1)),
-                ('short_text', models.CharField(blank=True, help_text=b"Holds the log text if it's shorter than the max length.", max_length=2000)),
-                ('long_text', models.FileField(help_text=b"Holds the log text if it's longer than the max length.", upload_to=b'')),
+                ('short_text', models.CharField(blank=True, help_text="Holds the log text if it's shorter than the max length.", max_length=2000)),
+                ('long_text', models.FileField(help_text="Holds the log text if it's longer than the max length.", upload_to=b'')),
             ],
         ),
         migrations.CreateModel(
@@ -62,7 +62,7 @@ class Migration(migrations.Migration):
                 ('state', models.CharField(choices=[(b'N', b'New'), (b'P', b'Pending'), (b'R', b'Running'), (b'S', b'Saving'), (b'C', b'Complete'), (b'F', b'Failed'), (b'X', b'Cancelled')], default=b'N', max_length=1)),
                 ('sandbox_path', models.CharField(blank=True, max_length=4096)),
                 ('return_code', models.IntegerField(blank=True, null=True)),
-                ('is_redacted', models.BooleanField(default=False, help_text=b'True if the outputs or logs were redacted for sensitive data')),
+                ('is_redacted', models.BooleanField(default=False, help_text='True if the outputs or logs were redacted for sensitive data')),
             ],
             options={
                 'abstract': False,
@@ -71,12 +71,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerapp',
             name='memory',
-            field=models.PositiveIntegerField(default=6000, help_text=b'Megabytes of memory Slurm will allocate for this app (0 allocates all memory)', verbose_name=b'Memory required (MB)'),
+            field=models.PositiveIntegerField(default=6000, help_text='Megabytes of memory Slurm will allocate for this app (0 allocates all memory)', verbose_name=b'Memory required (MB)'),
         ),
         migrations.AddField(
             model_name='containerapp',
             name='threads',
-            field=models.PositiveIntegerField(default=1, help_text=b'How many threads does this app use during execution?', validators=[django.core.validators.MinValueValidator(1)], verbose_name=b'Number of threads'),
+            field=models.PositiveIntegerField(default=1, help_text='How many threads does this app use during execution?', validators=[django.core.validators.MinValueValidator(1)], verbose_name=b'Number of threads'),
         ),
         migrations.AddField(
             model_name='containerrun',
@@ -96,7 +96,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerrun',
             name='stopped_by',
-            field=models.ForeignKey(blank=True, help_text=b'User that stopped this run', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='container_runs_stopped', to=settings.AUTH_USER_MODEL),
+            field=models.ForeignKey(blank=True, help_text='User that stopped this run', null=True, on_delete=django.db.models.deletion.CASCADE, related_name='container_runs_stopped', to=settings.AUTH_USER_MODEL),
         ),
         migrations.AddField(
             model_name='containerrun',
