@@ -368,8 +368,8 @@ def open_for_csv(file_path):
     they should be opened "rt" with newline="".
     """
     if dsix.PY2:
-        return io.open(file_path, access_mode="rb")
-    return io.open(file_path, "rt", newline="")
+        return io.open(file_path, mode="rb")
+    return io.open(file_path, mode="rt", newline="")
 
 
 def total_storage_used(directory_to_scan):

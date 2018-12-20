@@ -624,6 +624,8 @@ class ContainerRun(Stopwatch, AccessControl):
             rtp.purged = True  # Don't try to purge it again.
             rtp.save()
 
+        return ready_to_purge
+
     @classmethod
     def scan_for_unaccounted_sandboxes_and_logs(cls):
         """
@@ -635,6 +637,8 @@ class ContainerRun(Stopwatch, AccessControl):
         sandbox_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
         sandbox_log_glob = "user*_run*_*"
         user_run_pattern = "user(.+)_run([0-9]+)"
+
+        paths_removed = []
         for putative_sandbox_log in glob.glob(os.path.join(sandbox_path, sandbox_log_glob)):
             psl_basename = os.path.basename(putative_sandbox_log)
             user_run_match = re.match(user_run_pattern, psl_basename)
@@ -652,8 +656,11 @@ class ContainerRun(Stopwatch, AccessControl):
                         shutil.rmtree(path_to_rm)
                     else:
                         os.remove(path_to_rm)
+                    paths_removed.append(path_to_rm)
                 except OSError as e:
                     logger.warning(e)
+
+        return paths_removed
 
 
 class ContainerDataset(models.Model):

@@ -11,12 +11,19 @@ from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, MaxValueValidator, validate_slug
 from django.db import transaction
 from django.utils.encoding import python_2_unicode_compatible
+import django.utils.six as dsix
 
 import metadata.models
 
 from constants import maxlengths
 
 import itertools
+
+zipper = None
+if dsix.PY2:
+    zipper = itertools.izip_longest
+else:
+    zipper = itertools.zip_longest
 
 
 @python_2_unicode_compatible
@@ -172,7 +179,7 @@ class Transformation(metadata.models.AccessControl):
 
         my_xputs = itertools.chain(self.inputs.order_by("dataset_idx"), self.outputs.order_by("dataset_idx"))
         other_xputs = itertools.chain(other.inputs.order_by("dataset_idx"), other.outputs.order_by("dataset_idx"))
-        for my_xput, other_xput in itertools.zip_longest(my_xputs, other_xputs, fillvalue=None):
+        for my_xput, other_xput in zipper(my_xputs, other_xputs, fillvalue=None):
             if my_xput is None or other_xput is None or not my_xput.is_identical(other_xput):
                 return False
         return True
