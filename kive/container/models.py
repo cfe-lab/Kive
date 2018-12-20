@@ -699,6 +699,12 @@ class ContainerLog(models.Model):
         help_text="Holds the log text if it's shorter than the max length.")
     long_text = models.FileField(
         help_text="Holds the log text if it's longer than the max length.")
+    log_size = models.BigIntegerField(
+        blank=True,
+        null=True,
+        help_text="Size of the log file in bytes.  If null, this has not been computed yet, or the log is short"
+                  "and not stored in a file."
+    )
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
@@ -720,6 +726,35 @@ class ContainerLog(models.Model):
         :return:
         """
         return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
+
+    @classmethod
+    def set_log_sizes(cls):
+        """
+        Scan through all logs that do not have their log sizes set and set them.
+        :return:
+        """
+        logs_to_set = cls.objects.filter(
+            long_text__isnull=False,
+            log_size__isnull=True
+        )
+        for log in logs_to_set:
+            with transaction.atomic():
+                try:
+                    log.log_size = log.long_text.size
+                    log.save()
+                except ValueError:
+                    # This has somehow disappeared in the interim, so pass.
+                    pass
+
+    @classmethod
+    def known_storage_used(cls):
+        """
+        Get the total amount of storage used by all ContainerLogs.
+        :return:
+        """
+        return cls.objects.filter(long_text__isnull=False, log_size__isnull=False).aggregate(
+            total_bytes=models.Sum("log_size")
+        )["total_bytes"]
 
     @staticmethod
     def _currently_used_by_container():

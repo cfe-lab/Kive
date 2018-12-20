@@ -198,6 +198,13 @@ class Dataset(metadata.models.AccessControl):
                                              help_text="Date-time of last (external) dataset existence check.",
                                              null=True)
 
+    dataset_size = models.BigIntegerField(
+        blank=True,
+        null=True,
+        help_text="Size of the dataset file in bytes.  If null, this has not been computed yet or there is no "
+                  "internally stored file."
+    )
+
     class Meta:
         ordering = ["-date_created", "name"]
 
@@ -1340,6 +1347,35 @@ class Dataset(metadata.models.AccessControl):
         :return:
         """
         return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
+
+    @classmethod
+    def known_storage_used(cls):
+        """
+        Get the total amount of storage used by all Datasets.
+        :return:
+        """
+        return cls.objects.filter(dataset_file__isnull=False, dataset_size__isnull=False).aggregate(
+            total_bytes=models.Sum("dataset_size")
+        )["total_bytes"]
+
+    @classmethod
+    def set_dataset_sizes(cls):
+        """
+        Scan through all Datasets that do not have their sizes set and set them.
+        :return:
+        """
+        datasets_to_set = cls.objects.filter(
+            dataset_file__isnull=False,
+            dataset_size__isnull=True
+        )
+        for ds in datasets_to_set:
+            with transaction.atomic():
+                try:
+                    ds.dataset_size = ds.dataset_file.size
+                    ds.save()
+                except ValueError:
+                    # This has somehow disappeared in the interim, so pass.
+                    pass
 
     @classmethod
     def purge_registered_datasets(cls, bytes_to_purge, date_cutoff=None):
