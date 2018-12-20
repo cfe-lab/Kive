@@ -60,12 +60,23 @@ class Command(BaseCommand):
                     print("- {}".format(path))
 
         if options["registered"]:
-            registered_bytes_purged, registered_files_purged = ContainerLog.purge_registered_datasets(
-                remove_this_many_bytes - stray_bytes_purged
-            )
-            print(
-                "Registered files: {} files removed ({} bytes)".format(
-                    registered_files_purged,
-                    registered_bytes_purged
-                )
-            )
+            runs_purged = ContainerRun.purge_sandboxes(remove_older_than, keep_most_recent=settings.SANDBOX_KEEP_RECENT)
+            if len(runs_purged) == 0:
+                print("No sandboxes were purged.")
+
+            else:
+                print("Removed {} sandboxes:".format(len(runs_purged)))
+                total_bytes_removed = 0
+                for run in runs_purged:
+                    bytes_removed_string = "size was unknown"
+                    if run.sandbox_size is not None:
+                        bytes_removed_string = "{} bytes removed".format(run.sandbox_size)
+                        total_bytes_removed += run.sandbox_size
+                    print(
+                        "Run {} ({}): {}".format(
+                            run.pk,
+                            bytes_removed_string,
+                            run.sandbox_path
+                        )
+                    )
+                print("Total bytes belonging to known runs removed: {}".format(total_bytes_removed))
