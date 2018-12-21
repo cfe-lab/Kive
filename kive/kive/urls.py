@@ -31,8 +31,10 @@ router.register(r'batches', BatchViewSet)
 router.register(r'coderesourcerevisions', CodeResourceRevisionViewSet)
 router.register(r'coderesources', CodeResourceViewSet)
 router.register(r'compounddatatypes', CompoundDatatypeViewSet)
-router.register(r'containerfamilies', ContainerFamilyViewSet)
+# ContainerChoice before ContainerFamily, so ContainerFamily gets used for all
+# URL's.
 router.register(r'containerchoices', ContainerChoiceViewSet)
+router.register(r'containerfamilies', ContainerFamilyViewSet)
 router.register(r'containers', ContainerViewSet)
 router.register(r'containerapps', ContainerAppViewSet)
 router.register(r'containerargs', ContainerArgumentViewSet)

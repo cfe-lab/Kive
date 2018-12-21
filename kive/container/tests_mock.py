@@ -17,13 +17,34 @@ from container.models import Container, ContainerFamily, ContainerApp, \
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
-
+from method.models import Method
 
 EXPECTED_MANAGE_PATH = os.path.abspath(os.path.join(__file__,
                                                     '../../manage.py'))
 
 
 @mocked_relations(Container, ContainerFamily)
+class ContainerFamilyMockTests(TestCase):
+    def test_removal(self):
+        family = ContainerFamily(id=42)
+        expected_plan = {'ContainerFamilies': {family}}
+
+        plan = family.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_with_app(self):
+        family = ContainerFamily(id=42)
+        container = family.containers.create(id=43)
+        expected_plan = {'ContainerFamilies': {family},
+                         'Containers': {container}}
+
+        plan = family.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+
+@mocked_relations(Container, ContainerFamily, ContainerApp, Method)
 class ContainerMockTests(TestCase):
     def test_str(self):
         family = ContainerFamily(name='Spline Reticulator')
@@ -32,6 +53,34 @@ class ContainerMockTests(TestCase):
         s = str(container)
 
         self.assertEqual("Spline Reticulator:v1.0.7", s)
+
+    def test_removal(self):
+        container = Container(id=42)
+        expected_plan = {'Containers': {container}}
+
+        plan = container.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_with_app(self):
+        container = Container(id=42)
+        app = container.apps.create(id=43)
+        expected_plan = {'Containers': {container},
+                         'ContainerApps': {app}}
+
+        plan = container.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_with_method(self):
+        container = Container(id=42)
+        method = container.methods.create(transformation_ptr_id=43)
+        expected_plan = {'Containers': {container},
+                         'Methods': {method}}
+
+        plan = container.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
 class ContainerFileFormFieldMockTests(TestCase):
@@ -112,7 +161,12 @@ class ContainerFileFormFieldMockTests(TestCase):
         field.clean(uploaded_file)
 
 
-@mocked_relations(Container, ContainerApp, ContainerArgument)
+@mocked_relations(Container,
+                  ContainerApp,
+                  ContainerArgument,
+                  ContainerRun,
+                  ContainerDataset,
+                  Dataset)
 class ContainerAppMockTests(TestCase):
     def test_display_name(self):
         app = ContainerApp(name='reticulate')
@@ -291,6 +345,50 @@ class ContainerAppMockTests(TestCase):
         inputs = app.inputs
 
         self.assertEqual(expected_inputs, inputs)
+
+    def test_removal(self):
+        app = ContainerApp(id=42)
+        expected_plan = {'ContainerApps': {app}}
+
+        plan = app.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_with_run(self):
+        app = ContainerApp(id=42)
+        run = app.runs.create(id=43, state=ContainerRun.COMPLETE)
+        expected_plan = {'ContainerApps': {app},
+                         'ContainerRuns': {run}}
+
+        plan = app.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+    def test_removal_with_linked_runs(self):
+        """ One run's output is used as another's input, watch for dups. """
+        app = ContainerApp(id=42)
+        run1 = app.runs.create(id=43, state=ContainerRun.COMPLETE)
+        dataset = Dataset.objects.create(id=44)
+        run_dataset1 = run1.datasets.create(
+            id=45,
+            run=run1,
+            dataset=dataset,
+            argument=ContainerArgument(type=ContainerArgument.OUTPUT))
+        run2 = app.runs.create(id=46, state=ContainerRun.COMPLETE)
+        run_dataset2 = run2.datasets.create(
+            id=47,
+            run=run2,
+            dataset=dataset,
+            argument=ContainerArgument(type=ContainerArgument.INPUT))
+        dataset.containers.add(run_dataset1)
+        dataset.containers.add(run_dataset2)
+        expected_plan = {'ContainerApps': {app},
+                         'ContainerRuns': {run1, run2},
+                         'Datasets': {dataset}}
+
+        plan = app.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
 class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):

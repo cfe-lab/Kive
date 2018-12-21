@@ -22,7 +22,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from constants import maxlengths
-# from librarian.models import Dataset
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import file_access_utils
@@ -109,6 +108,7 @@ class ContainerFileFormField(FileFormField):
 
 class ContainerFileField(models.FileField):
     def formfield(self, **kwargs):
+        # noinspection PyTypeChecker
         kwargs.setdefault('form_class', ContainerFileFormField)
         return super(ContainerFileField, self).formfield(**kwargs)
 
@@ -138,8 +138,9 @@ class Container(AccessControl):
         auto_now_add=True,
         help_text="When this was added to Kive.")
 
-    # Related model gets set later.
+    # Related models get set later.
     methods = None
+    apps = None
 
     @property
     def display_name(self):
@@ -150,6 +151,9 @@ class Container(AccessControl):
 
     def __str__(self):
         return self.display_name
+
+    def __repr__(self):
+        return 'Container(id={})'.format(self.pk)
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
@@ -166,6 +170,9 @@ class Container(AccessControl):
 
         for method in self.methods.all():
             method.build_removal_plan(removal_plan)
+
+        for app in self.apps.all():
+            app.build_removal_plan(removal_plan)
 
         return removal_plan
 
@@ -194,6 +201,7 @@ class ContainerApp(models.Model):
                   "(0 allocates all memory)",
         default=6000)
     arguments = None  # Filled in later from child table.
+    runs = None  # Filled in later from child table.
     objects = None  # Filled in later by Django.
 
     class Meta:
@@ -209,6 +217,9 @@ class ContainerApp(models.Model):
 
     def __str__(self):
         return self.display_name
+
+    def __repr__(self):
+        return 'ContainerApp(id={})'.format(self.pk)
 
     @property
     def inputs(self):
@@ -274,6 +285,10 @@ class ContainerApp(models.Model):
         removal_plan = removal_accumulator or empty_removal_plan()
         assert self not in removal_plan["ContainerApps"]
         removal_plan["ContainerApps"].add(self)
+
+        for run in self.runs.all():
+            if run not in removal_plan['ContainerRuns']:
+                run.build_removal_plan(removal_plan)
 
         return removal_plan
 
@@ -408,7 +423,7 @@ class ContainerRun(Stopwatch, AccessControl):
                                    help_text='Chooses which slurm queue to use.')
     sandbox_path = models.CharField(
         max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH,
-        blank=True)
+        blank=True)  # type: str
     slurm_job_id = models.IntegerField(blank=True, null=True)
     return_code = models.IntegerField(blank=True, null=True)
     stopped_by = models.ForeignKey(User,
@@ -536,7 +551,7 @@ class ContainerRun(Stopwatch, AccessControl):
         Compute the size of this ContainerRun's sandbox.
         :return:
         """
-        assert not self.purged
+        assert not self.sandbox_purged
         size_accumulator = 0
         for root, _, files in os.walk(self.sandbox_path):
             for file_name in files:
@@ -558,7 +573,7 @@ class ContainerRun(Stopwatch, AccessControl):
         Note that this does *not* set self.purged to True.
         :return:
         """
-        assert not self.purged
+        assert not self.sandbox_purged
         shutil.rmtree(self.sandbox_path)
 
         # We also need to remove the log files.
@@ -706,6 +721,8 @@ class ContainerLog(models.Model):
                   "and not stored in a file."
     )
 
+    objects = None  # Filled in later by Django.
+
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
 
@@ -815,4 +832,3 @@ class ContainerLog(models.Model):
             bytes_to_purge=bytes_to_purge,
             date_cutoff=date_cutoff
         )
-
