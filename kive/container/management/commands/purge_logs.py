@@ -52,7 +52,7 @@ class Command(BaseCommand):
         # First remove unregistered datasets if requested, followed by registered.
         stray_bytes_purged = 0
         if options["unregistered"]:
-            stray_bytes_purged, stray_files_purged, known_files, still_new = ContainerLog.purge_unregistered_datasets(
+            stray_bytes_purged, stray_files_purged, known_files, still_new = ContainerLog.purge_unregistered_logs(
                 bytes_to_purge=remove_this_many_bytes,
                 date_cutoff=remove_older_than
             )
@@ -66,7 +66,7 @@ class Command(BaseCommand):
             )
 
         if options["registered"]:
-            registered_bytes_purged, registered_files_purged = ContainerLog.purge_registered_datasets(
+            registered_bytes_purged, registered_files_purged = ContainerLog.purge_registered_logs(
                 remove_this_many_bytes - stray_bytes_purged
             )
             print(

@@ -1321,23 +1321,12 @@ class Dataset(metadata.models.AccessControl):
                     for ero in execrecord.execrecordouts.all():
                         yield ero.dataset
 
-    @staticmethod
-    def _currently_used_by_container():
-        """
-        A generator that produces the Datasets being used by all active ContainerRuns.
-        :return:
-        """
-        active_runs = ContainerRun.objects.filter(state__in=ContainerRun.ACTIVE_STATES)
-        for run in active_runs:
-            for cd in run.datasets.all():  # these are ContainerDatasets
-                yield cd.dataset
-
     def currently_being_used(self):
         """
         Returns True if this is currently in use by an active ContainerRun; False otherwise.
         :return:
         """
-        active_containers = self.containers.filter(state__in=ContainerRun.ACTIVE_STATES)
+        active_containers = self.containers.filter(run__state__in=ContainerRun.ACTIVE_STATES)
         return active_containers.exists()
 
     @classmethod
@@ -1354,7 +1343,9 @@ class Dataset(metadata.models.AccessControl):
         Get the total amount of storage used by all Datasets.
         :return:
         """
-        return cls.objects.filter(dataset_file__isnull=False, dataset_size__isnull=False).aggregate(
+        return cls.objects.exclude(dataset_file='').filter(
+            dataset_file__isnull=False,
+            dataset_size__isnull=False).aggregate(
             total_bytes=models.Sum("dataset_size")
         )["total_bytes"]
 
@@ -1388,21 +1379,25 @@ class Dataset(metadata.models.AccessControl):
         :param date_cutoff:
         :return:
         """
-        # Exclude Datasets that are currently in use, that are uploaded, or have no file (i.e. already purged).
-        expendable_datasets = cls.objects.exclude(
-            pk__in=cls._currently_used_by_container(),
-            file_source=None,
-            dataset_file=None
-        )
+        # Exclude Datasets that are currently in use
+        active_runs = ContainerRun.objects.filter(
+            state__in=ContainerRun.ACTIVE_STATES)
+        active_datasets = cls.objects.filter(containers__run__in=active_runs)
+
+        expendable_datasets = cls.objects.exclude(pk__in=active_datasets)
+        # Exclude datasets that are uploaded
+        expendable_datasets = expendable_datasets.exclude(containers=None,
+                                                          file_source=None)
+        # Exclude datasets that have no file (i.e. already purged).
+        expendable_datasets = expendable_datasets.exclude(dataset_file=None)
         if date_cutoff is not None:
             expendable_datasets = expendable_datasets.exclude(date_created__gte=date_cutoff)
+        expendable_datasets = expendable_datasets.order_by('date_created')
 
         return file_access_utils.purge_registered_files(
             expendable_datasets,
             "dataset_file",
-            bytes_to_purge,
-            date_cutoff=date_cutoff
-        )
+            bytes_to_purge)
 
     @classmethod
     def purge_unregistered_datasets(cls, bytes_to_purge=None, date_cutoff=None):
