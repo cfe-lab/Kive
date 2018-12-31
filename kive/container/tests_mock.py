@@ -4,6 +4,8 @@ from argparse import Namespace
 from datetime import timedelta
 from io import BytesIO, StringIO
 
+import errno
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
@@ -644,6 +646,12 @@ class ContainerRunMockTests(TestCase):
         :param int size: number of bytes to write in the sandbox folder
         :return ContainerRun: the new run object
         """
+        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        try:
+            os.makedirs(sandbox_root)
+        except OSError as ex:
+            if ex.errno != errno.EEXIST:
+                raise
         now = timezone.now()
         user = User(username='joe')
         run_command = runcontainer.Command()
