@@ -1,17 +1,20 @@
+import logging
 import os
 from argparse import Namespace
-from io import BytesIO
+from datetime import timedelta
+from io import BytesIO, StringIO
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from django.test import TestCase
 from django.urls import reverse, resolve
+from django.utils import timezone
 from django_mock_queries.mocks import mocked_relations
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
-from container.management.commands import runcontainer
+from container.management.commands import runcontainer, purge_sandboxes
 from container.models import Container, ContainerFamily, ContainerApp, \
     ContainerArgument, ContainerFileFormField, ContainerRun, ContainerDataset
 from kive.tests import BaseTestCases, strip_removal_plan
@@ -632,6 +635,93 @@ class ContainerRunMockTests(TestCase):
         with self.assertRaisesRegexp(ValueError,
                                      r'ContainerRun id 42 is still active.'):
             run.build_removal_plan()
+
+    def create_sandbox(self, run_id, age=timedelta(0), size=1):
+        """ Create a run and its sandbox.
+
+        :param int run_id: id number
+        :param timedelta age: how long ago the run ended
+        :param int size: number of bytes to write in the sandbox folder
+        :return ContainerRun: the new run object
+        """
+        now = timezone.now()
+        user = User(username='joe')
+        run_command = runcontainer.Command()
+        run = ContainerRun.objects.create(id=run_id, user=user, app_id=100)
+        run_command.create_sandbox(run)
+        self.assertTrue(os.path.exists(run.sandbox_path))
+        run.end_time = now - age
+        with open(os.path.join(run.sandbox_path, 'contents.txt'), 'w') as f:
+            f.write('.' * size)
+        return run
+
+    def test_too_new(self):
+        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+
+        purge_sandboxes.Command().handle(delay=timedelta(minutes=11),
+                                         unregistered=False)
+
+        self.assertFalse(run.sandbox_purged)
+        self.assertTrue(os.path.exists(run.sandbox_path))
+        self.assertEqual(100, run.sandbox_size)
+
+    def test_purge_folder(self):
+        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+
+        purge_sandboxes.Command().handle(delay=timedelta(minutes=10),
+                                         unregistered=False)
+
+        self.assertTrue(run.sandbox_purged)
+        self.assertFalse(os.path.exists(run.sandbox_path))
+        self.assertEqual(100, run.sandbox_size)
+
+    def test_info_logging(self):
+        self.create_sandbox(42, age=timedelta(minutes=11), size=100)
+        self.create_sandbox(43, age=timedelta(minutes=10), size=200)
+        self.create_sandbox(44, age=timedelta(minutes=9), size=400)
+        expected_messages = u"""\
+Removed 2 sandboxes containing 300\xa0bytes.
+"""
+        mocked_stderr = StringIO()
+        stream_handler = logging.StreamHandler(mocked_stderr)
+        logger = logging.getLogger('container.management.commands.purge_sandboxes')
+        logger.addHandler(stream_handler)
+        old_level = logger.level
+        logger.level = logging.INFO
+        try:
+            purge_sandboxes.Command().handle(delay=timedelta(minutes=9.5),
+                                             unregistered=False)
+        finally:
+            logger.removeHandler(stream_handler)
+            logger.level = old_level
+
+        log_messages = mocked_stderr.getvalue()
+        self.assertEqual(expected_messages, log_messages)
+
+    def test_debug_logging(self):
+        self.create_sandbox(42, age=timedelta(minutes=11), size=100)
+        self.create_sandbox(43, age=timedelta(minutes=10), size=200)
+        self.create_sandbox(44, age=timedelta(minutes=9), size=400)
+        expected_messages = u"""\
+Run 42 contained 100\xa0bytes.
+Run 43 contained 200\xa0bytes.
+Removed 2 sandboxes containing 300\xa0bytes.
+"""
+        mocked_stderr = StringIO()
+        stream_handler = logging.StreamHandler(mocked_stderr)
+        logger = logging.getLogger('container.management.commands.purge_sandboxes')
+        logger.addHandler(stream_handler)
+        old_level = logger.level
+        logger.level = logging.DEBUG
+        try:
+            purge_sandboxes.Command().handle(delay=timedelta(minutes=9.5),
+                                             unregistered=False)
+        finally:
+            logger.removeHandler(stream_handler)
+            logger.level = old_level
+
+        log_messages = mocked_stderr.getvalue()
+        self.assertEqual(expected_messages, log_messages)
 
 
 @mocked_relations(ContainerRun, ContainerApp, ContainerArgument)

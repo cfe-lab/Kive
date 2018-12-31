@@ -8,7 +8,6 @@ import sys
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 import shutil
-import itertools
 import glob
 
 from django.conf import settings
@@ -610,22 +609,19 @@ class ContainerRun(Stopwatch, AccessControl):
         purge_candidates = cls.objects.filter(
             end_time__isnull=False,
             end_time__lte=cutoff,
-            purged=False
-        )
+            sandbox_purged=False)
 
         # Retain the most recent ones for each ContainerApp.
-        apps_represented = purge_candidates.values_list("app")
+        apps_represented = purge_candidates.values_list("app_id")
 
         ready_to_purge = []
-        for app in set(apps_represented):
+        for app_id, in set(apps_represented):
             # Look for the oldest ones.
-            curr_candidates = purge_candidates.filter(app=app).order_by("end_time")
+            curr_candidates = purge_candidates.filter(app_id=app_id).order_by("end_time")
             num_remaining = curr_candidates.count()
 
-            ready_to_purge = itertools.chain(
-                ready_to_purge,
-                curr_candidates[:max(num_remaining - keep_most_recent, 0)]
-            )
+            ready_to_purge.extend(
+                curr_candidates[:max(num_remaining - keep_most_recent, 0)])
 
         for rtp in ready_to_purge:
             logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
@@ -637,7 +633,7 @@ class ContainerRun(Stopwatch, AccessControl):
                     rtp.sandbox_path,
                     exc_info=True
                 )
-            rtp.purged = True  # Don't try to purge it again.
+            rtp.sandbox_purged = True  # Don't try to purge it again.
             rtp.save()
 
         return ready_to_purge
