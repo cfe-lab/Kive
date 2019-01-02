@@ -655,7 +655,10 @@ class PurgeSandboxesMockTests(TestCase):
     @classmethod
     def setUpClass(cls):
         super(PurgeSandboxesMockTests, cls).setUpClass()
-        cls.sandbox_root = mkdtemp(dir=settings.MEDIA_ROOT,
+        media_root = settings.MEDIA_ROOT
+        if not os.path.exists(media_root):
+            os.makedirs(media_root)
+        cls.sandbox_root = mkdtemp(dir=media_root,
                                    prefix='SandboxesTest_')
         cls.sandbox_patcher = patch('django.conf.settings.SANDBOX_PATH',
                                     new=os.path.basename(cls.sandbox_root))
