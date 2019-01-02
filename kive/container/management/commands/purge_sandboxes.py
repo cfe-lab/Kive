@@ -52,7 +52,11 @@ class Command(BaseCommand):
                 for path in paths_removed:
                     print("- {}".format(path))
         else:
-            for run in ContainerRun.objects.filter(sandbox_size__isnull=True, sandbox_purged=False):
+            need_sizing = ContainerRun.objects.filter(
+                end_time__isnull=False,
+                sandbox_size__isnull=True,
+                sandbox_purged=False).exclude(sandbox_path='')
+            for run in need_sizing:
                 run.set_sandbox_size()
 
             runs_purged = ContainerRun.purge_sandboxes(remove_older_than, keep_most_recent=keep_recent)

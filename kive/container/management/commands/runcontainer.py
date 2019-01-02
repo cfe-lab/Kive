@@ -40,6 +40,7 @@ class Command(BaseCommand):
             run.save()
         except Exception:
             run.state = ContainerRun.FAILED
+            run.end_time = timezone.now()
             run.save()
             raise
 

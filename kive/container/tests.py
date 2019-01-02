@@ -503,6 +503,7 @@ class RunContainerTests(TestCase):
         run.refresh_from_db()
 
         self.assertEqual(ContainerRun.FAILED, run.state)
+        self.assertIsNotNone(run.end_time)
 
     @patch('container.management.commands.runcontainer.call')
     def test_short_stdout(self, mocked_call):

@@ -663,7 +663,18 @@ class ContainerRunMockTests(TestCase):
             f.write('.' * size)
         return run
 
-    def test_too_new(self):
+    def test_purge_incomplete(self):
+        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+        run.end_time = None
+
+        purge_sandboxes.Command().handle(delay=timedelta(minutes=2),
+                                         unregistered=False)
+
+        self.assertFalse(run.sandbox_purged)
+        self.assertTrue(os.path.exists(run.sandbox_path))
+        self.assertIsNone(run.sandbox_size)
+
+    def test_purge_too_new(self):
         run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
 
         purge_sandboxes.Command().handle(delay=timedelta(minutes=11),
@@ -672,6 +683,17 @@ class ContainerRunMockTests(TestCase):
         self.assertFalse(run.sandbox_purged)
         self.assertTrue(os.path.exists(run.sandbox_path))
         self.assertEqual(100, run.sandbox_size)
+
+    def test_purge_no_sandbox(self):
+        """ Sometimes a sandbox doesn't get created, and the path is blank. """
+        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+        run.sandbox_path = ''
+
+        purge_sandboxes.Command().handle(delay=timedelta(minutes=10),
+                                         unregistered=False)
+
+        self.assertFalse(run.sandbox_purged)
+        self.assertIsNone(run.sandbox_size)
 
     def test_purge_folder(self):
         run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
@@ -683,7 +705,7 @@ class ContainerRunMockTests(TestCase):
         self.assertFalse(os.path.exists(run.sandbox_path))
         self.assertEqual(100, run.sandbox_size)
 
-    def test_info_logging(self):
+    def test_purge_info_logging(self):
         self.create_sandbox(42, age=timedelta(minutes=11), size=100)
         self.create_sandbox(43, age=timedelta(minutes=10), size=200)
         self.create_sandbox(44, age=timedelta(minutes=9), size=400)
@@ -706,7 +728,7 @@ Removed 2 sandboxes containing 300\xa0bytes.
         log_messages = mocked_stderr.getvalue()
         self.assertEqual(expected_messages, log_messages)
 
-    def test_debug_logging(self):
+    def test_purge_debug_logging(self):
         self.create_sandbox(42, age=timedelta(minutes=11), size=100)
         self.create_sandbox(43, age=timedelta(minutes=10), size=200)
         self.create_sandbox(44, age=timedelta(minutes=9), size=400)

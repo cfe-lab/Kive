@@ -609,7 +609,7 @@ class ContainerRun(Stopwatch, AccessControl):
         purge_candidates = cls.objects.filter(
             end_time__isnull=False,
             end_time__lte=cutoff,
-            sandbox_purged=False)
+            sandbox_purged=False).exclude(sandbox_path='')
 
         # Retain the most recent ones for each ContainerApp.
         apps_represented = purge_candidates.values_list("app_id")
@@ -629,7 +629,8 @@ class ContainerRun(Stopwatch, AccessControl):
                 rtp.delete_sandbox()
             except OSError:
                 logger.error(
-                    'Failed to purge sandbox at %r.',
+                    "Failed to purge run %d's sandbox at %r.",
+                    rtp.id,
                     rtp.sandbox_path,
                     exc_info=True
                 )
