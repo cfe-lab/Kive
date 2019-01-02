@@ -40,17 +40,23 @@ class Command(BaseCommand):
     def handle(self, delay, unregistered=False, keep_recent=0, **options):
         remove_older_than = timezone.now() - delay
 
-        # Order of operations:
-        # compute Sandbox sizes
-        # remove unregistered Sandboxes
-        # remove registered Sandboxes
-
         if unregistered:
-            paths_removed = sorted(ContainerRun.scan_for_unaccounted_sandboxes_and_logs())
-            if len(paths_removed) > 0:
-                print("The following paths are unaccounted for and were removed:")
-                for path in paths_removed:
-                    print("- {}".format(path))
+            names_removed = sorted(
+                ContainerRun.scan_for_unaccounted_sandboxes_and_logs(
+                    remove_older_than))
+            if names_removed:
+                total_size = 0
+                for name_removed, size_removed in names_removed:
+                    total_size += size_removed
+                    logger.warning(
+                        'Purged unregistered sandbox file %r containing %s.',
+                        name_removed,
+                        filesizeformat(size_removed))
+
+                logger.error(
+                    'Purged %d unregistered sandbox files containing %s.',
+                    len(names_removed),
+                    filesizeformat(total_size))
         else:
             need_sizing = ContainerRun.objects.filter(
                 end_time__isnull=False,
@@ -70,7 +76,9 @@ class Command(BaseCommand):
                     if run.sandbox_size is not None:
                         bytes_removed_string = filesizeformat(run.sandbox_size)
                         total_bytes_removed += run.sandbox_size
-                    logger.debug("Run %d contained %s.", run.pk, bytes_removed_string)
-                logger.info("Removed %d sandboxes containing %s.",
+                    logger.debug("Purged sandbox for run %d containing %s.",
+                                 run.pk,
+                                 bytes_removed_string)
+                logger.info("Purged %d sandboxes containing %s.",
                             len(runs_purged),
                             filesizeformat(total_bytes_removed))

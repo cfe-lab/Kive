@@ -5,6 +5,8 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime
+from itertools import chain
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
 import shutil
@@ -547,14 +549,16 @@ class ContainerRun(Stopwatch, AccessControl):
 
     def calculate_sandbox_size(self):
         """
-        Compute the size of this ContainerRun's sandbox.
-        :return:
+        Compute the size of this ContainerRun's sandbox and Slurm logs.
+        :return int: size
         """
         assert not self.sandbox_purged
         size_accumulator = 0
-        for root, _, files in os.walk(self.sandbox_path):
-            for file_name in files:
-                size_accumulator += os.path.getsize(os.path.join(root, file_name))
+        sandbox_files = (os.path.join(root, file_name)
+                         for root, _, files in os.walk(self.sandbox_path)
+                         for file_name in files)
+        for file_path in chain(sandbox_files, self.find_slurm_logs()):
+            size_accumulator += os.path.getsize(file_path)
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
     def set_sandbox_size(self):
@@ -575,23 +579,23 @@ class ContainerRun(Stopwatch, AccessControl):
         assert not self.sandbox_purged
         shutil.rmtree(self.sandbox_path)
 
-        # We also need to remove the log files.
+        for log_path in self.find_slurm_logs():
+            os.remove(log_path)
+
+    def find_slurm_logs(self):
+        """ Find the Slurm log files that are outside the sandbox folder. """
         sandbox_basepath = os.path.dirname(self.sandbox_path)
         stdout_log_path = os.path.join(
             sandbox_basepath,
-            self.get_sandbox_prefix() + "_job*_node*_" + "stdout.txt"
-        )
+            self.get_sandbox_prefix() + "_job*_node*_stdout.txt")
         stdout_logs = glob.glob(stdout_log_path)
-        for stdout_log in stdout_logs:  # there could be more than one in case of a requeuing?
-            os.remove(stdout_log)
 
         stderr_log_path = os.path.join(
             sandbox_basepath,
-            self.get_sandbox_prefix() + "_job*_node*_" + "stderr.txt"
-        )
+            self.get_sandbox_prefix() + "_job*_node*_stderr.txt")
         stderr_logs = glob.glob(stderr_log_path)
-        for stderr_log in stderr_logs:
-            os.remove(stderr_log)
+
+        return stdout_logs + stderr_logs
 
     @classmethod
     def purge_sandboxes(cls, cutoff, keep_most_recent):
@@ -640,38 +644,46 @@ class ContainerRun(Stopwatch, AccessControl):
         return ready_to_purge
 
     @classmethod
-    def scan_for_unaccounted_sandboxes_and_logs(cls):
+    def scan_for_unaccounted_sandboxes_and_logs(cls, cutoff_date):
         """
         Clean up any unaccounted sandboxes and logs in the sandbox directory.
-        :return:
+
+        :param datetime cutoff_date: the most recent modified date that can be
+            purged.
+        :return: [(file_name, file_size)] for all purged files and folders
         """
         logger.debug("Checking for orphaned sandbox directories and logs to clean up....")
 
-        sandbox_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
-        sandbox_log_glob = "user*_run*_*"
-        user_run_pattern = "user(.+)_run([0-9]+)"
+        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
 
         paths_removed = []
-        for putative_sandbox_log in glob.glob(os.path.join(sandbox_path, sandbox_log_glob)):
-            psl_basename = os.path.basename(putative_sandbox_log)
-            user_run_match = re.match(user_run_pattern, psl_basename)
-            if user_run_match is None:
-                # No idea what this is, so skip it.
+        for file_name in sorted(os.listdir(sandbox_root)):
+            file_path = os.path.join(sandbox_root, file_name)
+            modification_time = datetime.fromtimestamp(
+                os.stat(file_path).st_mtime,
+                timezone.get_current_timezone())
+            if modification_time > cutoff_date:
                 continue
-            user_pk, run_pk = user_run_match.groups()
-
-            # Remove this file if there is no ContainerRun that is on record as having used it.
-            matching_runs = cls.objects.filter(user__pk=user_pk, pk=run_pk)
-            if not matching_runs.exists():
-                try:
-                    path_to_rm = os.path.join(sandbox_path, putative_sandbox_log)
-                    if os.path.isdir(path_to_rm):
-                        shutil.rmtree(path_to_rm)
-                    else:
-                        os.remove(path_to_rm)
-                    paths_removed.append(path_to_rm)
-                except OSError as e:
-                    logger.warning(e)
+            if os.path.isdir(file_path):
+                if cls.objects.filter(sandbox_path=file_path).exists():
+                    continue
+                file_size = 0
+                for child_path, _, content_names in os.walk(file_path):
+                    for content_name in content_names:
+                        content_path = os.path.join(child_path, content_name)
+                        file_size += os.stat(content_path).st_size
+                shutil.rmtree(file_path)
+            else:
+                match = re.match(r'user\w+_run\d+', file_name)
+                if match:
+                    prefix = match.group(0)
+                    path_prefix = os.path.join(sandbox_root, prefix)
+                    if cls.objects.filter(sandbox_path__startswith=path_prefix,
+                                          sandbox_purged=False).exists():
+                        continue
+                file_size = os.stat(file_path).st_size
+                os.unlink(file_path)
+            paths_removed.append((file_name, file_size))
 
         return paths_removed
 
