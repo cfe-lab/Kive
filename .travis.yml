@@ -5,6 +5,9 @@ sudo: required
 services:
   - postgresql
   - docker
+env:
+  global:
+    - KIVE_DB_USER=postgres
 before_install:
     - sudo apt-get install -y -q nodejs dh-autoreconf build-essential libarchive-dev squashfs-tools
 install:
@@ -22,7 +25,7 @@ install:
     - sudo make install
     - cd ..
 before_script:
-    - sed -f travis_settings_modification.sed kive/kive/settings_default.py > kive/kive/settings.py
+    - cp kive/kive/settings_default.py kive/kive/settings.py
 script:
   - set -e
   - npm run test:travis

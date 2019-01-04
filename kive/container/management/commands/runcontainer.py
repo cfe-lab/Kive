@@ -65,7 +65,7 @@ class Command(BaseCommand):
         return run
 
     def create_sandbox(self, run):
-        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        sandbox_root = ContainerRun.SANDBOX_ROOT
         try:
             os.mkdir(sandbox_root)
         except OSError as ex:

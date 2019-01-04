@@ -410,6 +410,7 @@ class ContainerRun(Stopwatch, AccessControl):
         RUNNING,
         SAVING
     ]
+    SANDBOX_ROOT = os.path.join(settings.MEDIA_ROOT, 'Containers')
 
     app = models.ForeignKey(ContainerApp, related_name="runs")
     batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
@@ -471,16 +472,15 @@ class ContainerRun(Stopwatch, AccessControl):
             transaction.on_commit(self.schedule)
 
     def schedule(self):
-        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
         try:
-            os.mkdir(sandbox_root)
+            os.mkdir(self.SANDBOX_ROOT)
         except OSError as ex:
             if ex.errno != errno.EEXIST:
                 raise
 
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-        check_call(self.build_slurm_command(sandbox_root,
+        check_call(self.build_slurm_command(self.SANDBOX_ROOT,
                                             settings.SLURM_QUEUES),
                    env=child_env)
 
@@ -654,7 +654,7 @@ class ContainerRun(Stopwatch, AccessControl):
         """
         logger.debug("Checking for orphaned sandbox directories and logs to clean up....")
 
-        sandbox_root = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
+        sandbox_root = ContainerRun.SANDBOX_ROOT
 
         paths_removed = []
         for file_name in sorted(os.listdir(sandbox_root)):

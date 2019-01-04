@@ -21,7 +21,7 @@ from mock import patch
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
-from container.management.commands import runcontainer, purge_sandboxes
+from container.management.commands import runcontainer, purge
 from container.models import Container, ContainerFamily, ContainerApp, \
     ContainerArgument, ContainerFileFormField, ContainerRun, ContainerDataset
 from kive.tests import BaseTestCases, strip_removal_plan
@@ -649,32 +649,32 @@ class ContainerRunMockTests(TestCase):
                   ContainerArgument,
                   ContainerDataset,
                   Dataset)
-class PurgeSandboxesMockTests(TestCase):
+class PurgeMockTests(TestCase):
     sandbox_root = sandbox_patcher = None
 
     @classmethod
     def setUpClass(cls):
-        super(PurgeSandboxesMockTests, cls).setUpClass()
+        super(PurgeMockTests, cls).setUpClass()
         media_root = settings.MEDIA_ROOT
         if not os.path.exists(media_root):
             os.makedirs(media_root)
         cls.sandbox_root = mkdtemp(dir=media_root,
-                                   prefix='SandboxesTest_')
-        cls.sandbox_patcher = patch('django.conf.settings.SANDBOX_PATH',
-                                    new=os.path.basename(cls.sandbox_root))
+                                   prefix='ContainersTest_')
+        cls.sandbox_patcher = patch('container.models.ContainerRun.SANDBOX_ROOT',
+                                    new=cls.sandbox_root)
         cls.sandbox_patcher.start()
 
     @classmethod
     def tearDownClass(cls):
         try:
             if not (cls.sandbox_root.startswith(settings.MEDIA_ROOT) and
-                    ('SandboxesTest' in cls.sandbox_root)):
+                    ('ContainersTest' in cls.sandbox_root)):
                 raise RuntimeError(
                     'Sandbox root folder looks wrong. Not cleaning up.')
             rmtree(cls.sandbox_root)
         finally:
             cls.sandbox_patcher.stop()
-            super(PurgeSandboxesMockTests, cls).tearDownClass()
+            super(PurgeMockTests, cls).tearDownClass()
 
     def create_sandbox(self, run_id, age=timedelta(0), size=1):
         """ Create a run and its sandbox.
@@ -699,76 +699,93 @@ class PurgeSandboxesMockTests(TestCase):
         run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
         run.end_time = None
 
-        purge_sandboxes.Command().handle(delay=timedelta(minutes=2),
-                                         unregistered=False)
+        purge.Command().handle(start=50, stop=50)
 
         self.assertFalse(run.sandbox_purged)
         self.assertTrue(os.path.exists(run.sandbox_path))
         self.assertIsNone(run.sandbox_size)
 
-    def test_purge_too_new(self):
-        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+    def test_purge_too_small(self):
+        run1 = self.create_sandbox(42, age=timedelta(minutes=20), size=100)
+        run2 = self.create_sandbox(43, age=timedelta(minutes=10), size=200)
 
-        purge_sandboxes.Command().handle(delay=timedelta(minutes=11),
-                                         unregistered=False)
+        purge.Command().handle(start=400, stop=400)
 
-        self.assertFalse(run.sandbox_purged)
-        self.assertTrue(os.path.exists(run.sandbox_path))
-        self.assertEqual(100, run.sandbox_size)
+        self.assertFalse(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+        self.assertTrue(os.path.exists(run1.sandbox_path))
+        self.assertEqual(100, run1.sandbox_size)
 
     def test_purge_no_sandbox(self):
         """ Sometimes a sandbox doesn't get created, and the path is blank. """
-        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+        run = self.create_sandbox(42, size=500)
         run.sandbox_path = ''
 
-        purge_sandboxes.Command().handle(delay=timedelta(minutes=10),
-                                         unregistered=False)
+        purge.Command().handle(start=400, stop=400)
 
         self.assertFalse(run.sandbox_purged)
         self.assertIsNone(run.sandbox_size)
 
     def test_purge_folder(self):
-        run = self.create_sandbox(42, age=timedelta(minutes=10), size=100)
+        run1 = self.create_sandbox(42, age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(43, age=timedelta(minutes=10), size=400)
 
-        purge_sandboxes.Command().handle(delay=timedelta(minutes=10),
-                                         unregistered=False)
+        purge.Command().handle(start=400, stop=400)
 
-        self.assertTrue(run.sandbox_purged)
-        self.assertFalse(os.path.exists(run.sandbox_path))
-        self.assertEqual(100, run.sandbox_size)
+        self.assertTrue(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+        self.assertFalse(os.path.exists(run1.sandbox_path))
+        self.assertTrue(os.path.exists(run2.sandbox_path))
+        self.assertEqual(200, run1.sandbox_size)
+
+    def test_purge_start(self):
+        run1 = self.create_sandbox(42, age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(43, age=timedelta(minutes=10), size=400)
+
+        purge.Command().handle(start=600, stop=400)
+
+        self.assertFalse(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+
+    def test_purge_stop(self):
+        run1 = self.create_sandbox(42, age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(43, age=timedelta(minutes=10), size=400)
+
+        purge.Command().handle(start=400, stop=199)
+
+        self.assertTrue(run1.sandbox_purged)
+        self.assertTrue(run2.sandbox_purged)
 
     def test_slurm_log(self):
-        run = self.create_sandbox(42, age=timedelta(minutes=10), size=200)
+        run = self.create_sandbox(42, size=300)
         log_path = os.path.join(self.sandbox_root,
                                 'userjoe_run42__job1234_nodefoo_stdout.txt')
         with open(log_path, 'w') as f:
-            f.write('.' * 100)
+            f.write('.' * 200)
 
-        purge_sandboxes.Command().handle(delay=timedelta(minutes=10),
-                                         unregistered=False)
+        purge.Command().handle(start=400, stop=400)
 
         self.assertTrue(run.sandbox_purged)
         self.assertFalse(os.path.exists(run.sandbox_path))
         self.assertFalse(os.path.exists(log_path))
-        self.assertEqual(300, run.sandbox_size)
+        self.assertEqual(500, run.sandbox_size)
 
     def test_unregistered_folder(self):
-        run = self.create_sandbox(42, age=timedelta(seconds=0), size=100)
+        run = self.create_sandbox(42, size=500)
 
         left_overs_path = os.path.join(self.sandbox_root, 'left_overs')
         os.mkdir(left_overs_path)
         with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
             f.write('.' * 100)
 
-        purge_sandboxes.Command().handle(delay=timedelta(seconds=0),
-                                         unregistered=True)
+        purge.Command().handle(start=400, stop=400, synch=True)
 
         self.assertFalse(run.sandbox_purged)  # registered sandboxes skipped
         self.assertFalse(os.path.exists(left_overs_path))
         self.assertTrue(os.path.exists(run.sandbox_path))
 
     def test_unregistered_file(self):
-        self.create_sandbox(42, age=timedelta(seconds=0), size=100)
+        self.create_sandbox(42, size=500)
         log_path = os.path.join(self.sandbox_root,
                                 'userjoe_run42__job1234_nodefoo_stdout.txt')
         with open(log_path, 'w') as f:
@@ -778,8 +795,7 @@ class PurgeSandboxesMockTests(TestCase):
         with open(left_overs_path, 'w') as f:
             f.write('.' * 100)
 
-        purge_sandboxes.Command().handle(delay=timedelta(seconds=0),
-                                         unregistered=True)
+        purge.Command().handle(start=400, stop=400, synch=True)
 
         self.assertFalse(os.path.exists(left_overs_path))
         self.assertTrue(os.path.exists(log_path))
@@ -794,8 +810,7 @@ class PurgeSandboxesMockTests(TestCase):
         with open(file_path, 'w') as f:
             f.write('.' * 100)
 
-        purge_sandboxes.Command().handle(delay=timedelta(seconds=30),
-                                         unregistered=True)
+        purge.Command().handle(wait=timedelta(seconds=30), synch=True)
 
         self.assertTrue(os.path.exists(folder_path))
         self.assertTrue(os.path.exists(file_path))
@@ -804,7 +819,7 @@ class PurgeSandboxesMockTests(TestCase):
     def capture_log_stream(self, log_level):
         mocked_stderr = StringIO()
         stream_handler = logging.StreamHandler(mocked_stderr)
-        logger = logging.getLogger('container.management.commands.purge_sandboxes')
+        logger = logging.getLogger('container.management.commands.purge')
         logger.addHandler(stream_handler)
         old_level = logger.level
         logger.level = log_level
@@ -822,8 +837,7 @@ class PurgeSandboxesMockTests(TestCase):
 Purged 2 sandboxes containing 300\xa0bytes.
 """
         with self.capture_log_stream(logging.INFO) as mocked_stderr:
-            purge_sandboxes.Command().handle(delay=timedelta(minutes=9.5),
-                                             unregistered=False)
+            purge.Command().handle(start=400, stop=400)
             log_messages = mocked_stderr.getvalue()
 
         self.assertEqual(expected_messages, log_messages)
@@ -838,13 +852,12 @@ Purged sandbox for run 43 containing 200\xa0bytes.
 Purged 2 sandboxes containing 300\xa0bytes.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
-            purge_sandboxes.Command().handle(delay=timedelta(minutes=9.5),
-                                             unregistered=False)
+            purge.Command().handle(start=400, stop=400)
             log_messages = mocked_stderr.getvalue()
 
         self.assertEqual(expected_messages, log_messages)
 
-    def test_error_logging_unregistered(self):
+    def test_error_logging_synch(self):
         # Clean up any files from other tests.
         for file_name in os.listdir(self.sandbox_root):
             file_path = os.path.join(self.sandbox_root, file_name)
@@ -864,13 +877,12 @@ Purged 2 sandboxes containing 300\xa0bytes.
 Purged 2 unregistered sandbox files containing 300\xa0bytes.
 """
         with self.capture_log_stream(logging.ERROR) as mocked_stderr:
-            purge_sandboxes.Command().handle(delay=timedelta(seconds=0),
-                                             unregistered=True)
+            purge.Command().handle(synch=True)
             log_messages = mocked_stderr.getvalue()
 
         self.assertEqual(expected_messages, log_messages)
 
-    def test(self):
+    def test_warn_logging_synch(self):
         # Clean up any files from other tests.
         for file_name in os.listdir(self.sandbox_root):
             file_path = os.path.join(self.sandbox_root, file_name)
@@ -892,8 +904,7 @@ Purged unregistered sandbox file 'left_overs' containing 100\xa0bytes.
 Purged 2 unregistered sandbox files containing 300\xa0bytes.
 """
         with self.capture_log_stream(logging.WARN) as mocked_stderr:
-            purge_sandboxes.Command().handle(delay=timedelta(seconds=0),
-                                             unregistered=True)
+            purge.Command().handle(synch=True)
             log_messages = mocked_stderr.getvalue()
 
         self.assertEqual(expected_messages, log_messages)

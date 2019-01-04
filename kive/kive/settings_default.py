@@ -12,6 +12,8 @@
 # ADMINS: system administrators
 import os
 
+from django.core.management.utils import get_random_secret_key
+
 DEBUG = True
 
 ADMINS = (
@@ -115,8 +117,12 @@ STATICFILES_FINDERS = (
     # 'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
 
-# Make this unique, and don't share it with anybody.
-SECRET_KEY = 'CHANGE ME! No seriously, go read INSTALL.md.'
+# Make this unique, and don't share it with anybody. Call
+# get_random_secret_key() to generate a new one, then set environment variable.
+SECRET_KEY = os.environ.get('KIVE_SECRET_KEY')
+IS_RANDOM_KEY = SECRET_KEY is None
+if IS_RANDOM_KEY:
+    SECRET_KEY = get_random_secret_key()
 
 TEMPLATES = [
     {
@@ -166,7 +172,7 @@ INSTALLED_APPS = (
     'transformation',
     'datachecking',
     'sandbox',
-    'portal',
+    'portal.apps.PortalConfig',
     'stopwatch',
     'fleet',
     'rest_framework',
@@ -200,6 +206,7 @@ else:
     LOG_HANDLER_NAMES.append('console')
 if ADMINS:
     LOG_HANDLER_NAMES.append('mail_admins')
+LOG_LEVEL = os.environ.get('KIVE_LOG_LEVEL', 'WARN')
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.
@@ -224,7 +231,7 @@ LOGGING = {
     'root': {
         # This is the default logger.
         'handlers': LOG_HANDLER_NAMES,
-        'level': 'WARN'
+        'level': LOG_LEVEL
     },
     'loggers': {
         # Change the logging level for an individual logger.
@@ -276,7 +283,19 @@ LOGIN_REDIRECT_URL = "home"
 # exactly this path.
 SANDBOX_PATH = "Sandboxes"
 
-# Here you specify the time that sandboxes should exist after finishing
+# Settings for the purge task. How much storage triggers a purge, and how much
+# will stop the purge.
+PURGE_START = os.environ.get('KIVE_PURGE_START', '20 GB')
+PURGE_STOP = os.environ.get('KIVE_PURGE_STOP', '15 GB')
+# How fast the different types of storage get purged. Higher aging gets purged faster.
+PURGE_DATASET_AGING = os.environ.get('KIVE_PURGE_DATASET_AGING', '1.0')
+PURGE_LOG_AGING = os.environ.get('KIVE_PURGE_LOG_AGING', '10.0')
+PURGE_CONTAINER_AGING = os.environ.get('KIVE_PURGE_CONTAINER_AGING', '10.0')
+# How long to wait before purging a file with no entry in the database.
+# This gets parsed by django.utils.dateparse.parse_duration().
+PURGE_WAIT = os.environ.get('KIVE_PURGE_WAIT', '0 days, 1:00')
+
+# Here you specify the time that sandboxes should be left after finishing
 # before being automatically purged. (They may still be manually purged
 # sooner than this.)  These quantities get added up.
 SANDBOX_PURGE_DAYS = 1
@@ -386,11 +405,11 @@ FLEET_SETTINGS = None
 
 # The keyword used by the system's sinfo command to retrieve a queue's priority,
 # and the name of the corresponding column returned.
-SLURM_PRIO_KEYWORD = os.environ.get('KIVE_PRIO_KEYWORD', "priority")
-SLURM_PRIO_COLNAME = os.environ.get('KIVE_PRIO_COLNAME', "PRIORITY")
+SLURM_PRIO_KEYWORD = os.environ.get('KIVE_PRIO_KEYWORD', "prioritytier")
+SLURM_PRIO_COLNAME = os.environ.get('KIVE_PRIO_COLNAME', "PRIO_TIER")
 
 # Attempt to run the system tests that use Slurm.
-RUN_SLURM_TESTS = False
+RUN_SLURM_TESTS = os.environ.get('KIVE_RUN_SLURM_TESTS', 'False').lower() != 'false'
 
 # The number of times to retry a slurm command such as sbatch or sacct,
 # and the interval in seconds to wait between retries.
@@ -402,14 +421,16 @@ SLURM_COMMAND_RETRY_SLEEP_SECS = 10
 NODE_FAIL_TIME_OUT_SECS = 5*60
 
 # Attempt to run the system tests that use Docker.
-RUN_DOCKER_TESTS = False
+RUN_DOCKER_TESTS = os.environ.get('KIVE_RUN_DOCKER_TESTS', 'False').lower() != 'false'
 
 DOCK_DOCKER_COMMAND = "/usr/bin/docker"
 DOCK_BZIP2_COMMAND = "/bin/bzip2"
 
 # Attempt to run the system tests that use singularity
 # NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
-RUN_SINGULARITY_TESTS = RUN_DOCKER_TESTS and False
+RUN_SINGULARITY_TESTS = (
+        RUN_DOCKER_TESTS and
+        os.environ.get('KIVE_RUN_SINGULARITY_TESTS', 'False').lower() != 'false')
 
 # Container file in CodeResources folder
 DEFAULT_CONTAINER = 'kive-default.simg'
