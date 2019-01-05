@@ -11,14 +11,18 @@
 #    settings used for sending logged error messages via email to the administrators
 # ADMINS: system administrators
 import os
+import json
 
 from django.core.management.utils import get_random_secret_key
 
-DEBUG = True
+DEBUG = os.environ.get("KIVE_DEBUG", True)
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
 )
+raw_admins = os.environ.get("KIVE_ADMINS")
+if raw_admins is not None:
+    ADMINS = json.loads(raw_admins)
 
 # These are the default values; customize for your installation.
 # EMAIL_HOST = "localhost"
@@ -33,6 +37,10 @@ ADMINS = (
 # EMAIL_SSL_CERTFILE = None
 # EMAIL_SSL_KEYFILE = None
 # EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+
+EMAIL_HOST = os.environ.get("KIVE_EMAIL_HOST", "localhost")
+SERVER_EMAIL = os.environ.get("KIVE_SERVER_EMAIL", "")
+EMAIL_SUBJECT_PREFIX = os.environ.get("KIVE_SUBJECT_PREFIX", "[Kive] ")
 
 AUTH_USER_MODEL = "auth.User"
 
@@ -56,6 +64,9 @@ DATABASES = {
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.7/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = []
+raw_allowed_hosts = os.environ.get("KIVE_ALLOWED_HOSTS")  # this must be a JSON list string
+if raw_allowed_hosts is not None:
+    ALLOWED_HOSTS = json.loads(raw_allowed_hosts)
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -348,7 +359,7 @@ KIVE_SANDBOX_WORKER_ACCOUNT = ""
 
 # The system group that contains both the user that launches the fleet and
 # the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
-KIVE_PROCESSING_GROUP = ""
+KIVE_PROCESSING_GROUP = os.environ.get("KIVE_PROCESSING_GROUP", "")
 
 # Number of rows to display on the View Dataset page.
 DATASET_DISPLAY_MAX = 100
