@@ -148,3 +148,16 @@ sudo -u vagrant ./dbcreate.sh
 # Launch development server on port 8000 like this:
 # cd /usr/local/share/Kive/kive
 # ./manage.py runserver 0.0.0.0:8000
+
+echo ========== Installing Kive purge tasks ==========
+cd /etc/systemd/system
+cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes.service .
+cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes.timer .
+cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes_synch.service .
+cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes_synch.timer .
+systemctl enable kive_purge_sandboxes.service
+systemctl enable kive_purge_sandboxes.timer
+systemctl start kive_purge_sandboxes.timer
+systemctl enable kive_purge_sandboxes_synch.service
+systemctl enable kive_purge_sandboxes_synch.timer
+systemctl start kive_purge_sandboxes_synch.timer
