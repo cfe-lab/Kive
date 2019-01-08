@@ -67,7 +67,7 @@ class Command(BaseCommand):
                             default=settings.PURGE_WAIT,
                             type=parse_duration)
         parser.add_argument("--batch_size",
-                            help="Number of files to synchronize at a time.",
+                            help="Number of files to check at a time.",
                             default=settings.PURGE_BATCH_SIZE,
                             type=int)
 
@@ -128,42 +128,47 @@ class Command(BaseCommand):
             min_purge_dates = {}
             purge_entries = sandbox_ages.union(dataset_ages,
                                                all=True).order_by('-age')
-            for entry_type, entry_id, age in purge_entries:
-                if entry_type == 'r':
-                    run = ContainerRun.objects.get(id=entry_id)
-                    entry_size = run.sandbox_size
-                    sandbox_total -= run.sandbox_size
-                    entry_date = run.end_time
-                    logger.debug("Purged container run %d containing %s.",
-                                 run.pk,
-                                 filesizeformat(entry_size))
-                    try:
-                        run.delete_sandbox()
-                    except OSError:
-                        logger.error(u"Failed to purge container run %d at %r.",
-                                     run.id,
-                                     run.sandbox_path,
-                                     exc_info=True)
-                    run.sandbox_purged = True  # Don't try to purge it again.
-                    run.save()
-                else:
-                    assert entry_type == 'd'
-                    dataset = Dataset.objects.get(id=entry_id)
-                    entry_size = dataset.dataset_size
-                    dataset_total -= dataset.dataset_size
-                    entry_date = dataset.date_created
-                    logger.debug("Purged dataset %d containing %s.",
-                                 dataset.pk,
-                                 filesizeformat(entry_size))
-                    dataset.dataset_file.delete()
-                purge_counts[entry_type] += 1
-                purge_counts[entry_type + ' bytes'] += entry_size
-                min_purge_dates[entry_type] = min(entry_date,
-                                                  min_purge_dates.get(entry_type, entry_date))
-                max_purge_dates[entry_type] = max(entry_date,
-                                                  max_purge_dates.get(entry_type, entry_date))
-                remaining_storage -= entry_size
-                if remaining_storage <= stop:
+            while remaining_storage > stop:
+                entry_count = 0
+                for entry_type, entry_id, age in purge_entries[:batch_size]:
+                    entry_count += 1
+                    if entry_type == 'r':
+                        run = ContainerRun.objects.get(id=entry_id)
+                        entry_size = run.sandbox_size
+                        sandbox_total -= run.sandbox_size
+                        entry_date = run.end_time
+                        logger.debug("Purged container run %d containing %s.",
+                                     run.pk,
+                                     filesizeformat(entry_size))
+                        try:
+                            run.delete_sandbox()
+                        except OSError:
+                            logger.error(u"Failed to purge container run %d at %r.",
+                                         run.id,
+                                         run.sandbox_path,
+                                         exc_info=True)
+                        run.sandbox_purged = True  # Don't try to purge it again.
+                        run.save()
+                    else:
+                        assert entry_type == 'd'
+                        dataset = Dataset.objects.get(id=entry_id)
+                        entry_size = dataset.dataset_size
+                        dataset_total -= dataset.dataset_size
+                        entry_date = dataset.date_created
+                        logger.debug("Purged dataset %d containing %s.",
+                                     dataset.pk,
+                                     filesizeformat(entry_size))
+                        dataset.dataset_file.delete()
+                    purge_counts[entry_type] += 1
+                    purge_counts[entry_type + ' bytes'] += entry_size
+                    min_purge_dates[entry_type] = min(entry_date,
+                                                      min_purge_dates.get(entry_type, entry_date))
+                    max_purge_dates[entry_type] = max(entry_date,
+                                                      max_purge_dates.get(entry_type, entry_date))
+                    remaining_storage -= entry_size
+                    if remaining_storage <= stop:
+                        break
+                if entry_count == 0:
                     break
             for entry_type, entry_name in (('r', 'container run'), ('d', 'dataset')):
                 purged_count = purge_counts[entry_type]

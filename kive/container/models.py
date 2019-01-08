@@ -652,6 +652,7 @@ class ContainerDataset(models.Model):
 
 
 class ContainerLog(models.Model):
+    UPLOAD_DIR = 'ContainerLogs'
     STDOUT = 'O'
     STDERR = 'E'
     TYPES = ((STDOUT, 'stdout'),
@@ -663,6 +664,7 @@ class ContainerLog(models.Model):
         blank=True,
         help_text="Holds the log text if it's shorter than the max length.")
     long_text = models.FileField(
+        upload_to=UPLOAD_DIR,
         help_text="Holds the log text if it's longer than the max length.")
     log_size = models.BigIntegerField(
         blank=True,

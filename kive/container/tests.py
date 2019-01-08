@@ -551,6 +551,8 @@ class RunContainerTests(TestCase):
         self.assertEqual(expected_stderr, stderr.read())
         self.assertEqual(expected_stdout[:10], stdout.read(10))
         self.assertEqual(expected_stderr[:10], stderr.read(10))
+        upload_length = len(ContainerLog.UPLOAD_DIR)
+        self.assertEqual(ContainerLog.UPLOAD_DIR, stderr.long_text.name[:upload_length])
 
 
 @skipIfDBFeature('is_mocked')
@@ -920,7 +922,7 @@ Purged container run <id> containing 300 bytes.
 Purged dataset <id> containing 100 bytes.
 Purged 1 container run containing 300 bytes from a minute ago to a minute ago.
 Purged 1 dataset containing 100 bytes from a minute ago to a minute ago.
-Cannot reduce storage to 500 bytes: 1.0 KB of datasets.
+Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
             purge.Command().handle(start=500, stop=500)
@@ -970,7 +972,7 @@ Purged 1 unregistered dataset file containing 100 bytes.
 
         self.assertLogStreamEqual(expected_messages, log_messages)
 
-    def test_purge_empty_folder(self):
+    def test_synch_empty_folder(self):
         left_overs_path = os.path.join(settings.MEDIA_ROOT,
                                        Dataset.UPLOAD_DIR,
                                        '2018_06',
@@ -982,3 +984,17 @@ Purged 1 unregistered dataset file containing 100 bytes.
         self.assertFalse(os.path.exists(left_overs_path))
         # Parent will get purged next time.
         self.assertTrue(os.path.exists(os.path.dirname(left_overs_path)))
+
+    def test_purge_batch(self):
+        for i in range(12):
+            self.create_sandbox(age=timedelta(minutes=i+1), size=100)
+        expected_messages = u"""\
+Purged 11 container runs containing 1.1 KB from 12 minutes ago to 2 minutes ago.
+"""
+        with self.capture_log_stream(logging.INFO) as mocked_stderr:
+            purge.Command().handle(start=self.existing_storage+100,
+                                   stop=self.existing_storage+100,
+                                   batch_size=10)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)

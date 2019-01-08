@@ -148,9 +148,10 @@ class Command(BaseCommand):
                 else:
                     short_text = ''
                     long_text = File(f)
-                run.logs.create(type=log_type,
-                                short_text=short_text,
-                                long_text=long_text)
+                log = run.logs.create(type=log_type, short_text=short_text)
+                if long_text is not None:
+                    upload_name = 'run_{}_{}'.format(run.id, file_name)
+                    log.long_text.save(upload_name, long_text)
 
         run.state = (ContainerRun.COMPLETE
                      if run.return_code == 0

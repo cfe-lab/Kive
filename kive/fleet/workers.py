@@ -341,7 +341,6 @@ class Manager(object):
 
             if time_to_purge is None or poll_until > time_to_purge:
                 self.purge_sandboxes()
-                Dataset.purge()
                 time_to_purge = poll_until + settings.FLEET_PURGING_INTERVAL
 
             # Some jobs in the queue have been started:
