@@ -56,7 +56,7 @@ DATABASES = {
         'PASSWORD': os.environ.get('KIVE_DB_PASSWORD', ''),
         # Blank host for localhost through domain sockets,
         # or '127.0.0.1' for localhost through TCP.
-        'HOST': '',
+        'HOST': os.environ.get("KIVE_DB_HOST", ''),
         'PORT': ''  # Set to empty string for default.
     }
 }
