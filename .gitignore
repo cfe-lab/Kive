@@ -1,23 +1,11 @@
 # Ignore .pyc files
 *.pyc
-# Ignore the database file
-db/kive.db
 .pytest_cache
 # Don't get the settings.py or hostfile files that have been customized
 kive/kive/hostfile
 # active settings
 kive/kive/settings.py
-# recommended settings for vagrant
-/kive/kive/settings_vagrant.py
-# backup of settings for dev workstation
-/kive/kive/settings_localhost.py
 # Ignore the temporary stuff created during testing
-kive/CodeResources
-kive/VerificationScripts
-kive/Datasets
-kive/Logs
-kive/Sandboxes
-kive/kive.log*
 kive/testreport.xml
 kive/timing.dat
 kive/timing.dot

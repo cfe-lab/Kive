@@ -72,22 +72,23 @@ class Command(BaseCommand):
             if ex.errno != errno.EEXIST:
                 raise
         prefix = 'user{}_run{}_'.format(run.user.username, run.pk)
-        run.sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
+        full_sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
+        run.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
 
-        input_path = os.path.join(run.sandbox_path, 'input')
+        input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
         for dataset in run.datasets.all():
             target_path = os.path.join(input_path, dataset.argument.name)
             source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
-        os.mkdir(os.path.join(run.sandbox_path, 'output'))
-        os.mkdir(os.path.join(run.sandbox_path, 'logs'))
+        os.mkdir(os.path.join(run.full_sandbox_path, 'output'))
+        os.mkdir(os.path.join(run.full_sandbox_path, 'logs'))
 
         run.state = ContainerRun.RUNNING
 
     def run_container(self, run):
-        logs_path = os.path.join(run.sandbox_path, 'logs')
+        logs_path = os.path.join(run.full_sandbox_path, 'logs')
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
         command = self.build_command(run)
@@ -98,8 +99,8 @@ class Command(BaseCommand):
 
     def build_command(self, run):
         container_path = run.app.container.file.path
-        input_path = os.path.join(run.sandbox_path, 'input')
-        output_path = os.path.join(run.sandbox_path, 'output')
+        input_path = os.path.join(run.full_sandbox_path, 'input')
+        output_path = os.path.join(run.full_sandbox_path, 'output')
         command = ['singularity',
                    'run',
                    '--contain',
@@ -120,7 +121,7 @@ class Command(BaseCommand):
         return command
 
     def save_outputs(self, run):
-        output_path = os.path.join(run.sandbox_path, 'output')
+        output_path = os.path.join(run.full_sandbox_path, 'output')
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
             argument_path = os.path.join(output_path, argument.name)
             try:
@@ -135,7 +136,7 @@ class Command(BaseCommand):
                     raise
         # noinspection PyUnresolvedReferences,PyProtectedMember
         short_size = ContainerLog._meta.get_field('short_text').max_length
-        logs_path = os.path.join(run.sandbox_path, 'logs')
+        logs_path = os.path.join(run.full_sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
             file_path = os.path.join(logs_path, file_name)

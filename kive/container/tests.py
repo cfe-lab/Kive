@@ -1,24 +1,31 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import logging
 import os
-from datetime import datetime
+import re
+from contextlib import contextmanager
+from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.db.models import Sum
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
+from django.utils import timezone
 from django.utils.timezone import make_aware, utc
 from mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
 from rest_framework.test import force_authenticate
 
+from container.management.commands import purge, runcontainer
 from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
-from kive.tests import BaseTestCases, install_fixture_files
+from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory
 
 
@@ -406,7 +413,7 @@ class RunContainerTests(TestCase):
         run.refresh_from_db()
 
         self.assertEqual(ContainerRun.COMPLETE, run.state)
-        sandbox_path = run.sandbox_path
+        sandbox_path = run.full_sandbox_path
         self.assertTrue(sandbox_path)
         input_path = os.path.join(sandbox_path, 'input/names_csv')
         self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
@@ -437,7 +444,7 @@ class RunContainerTests(TestCase):
             call_command('runcontainer', str(run.id))
 
         run.refresh_from_db()
-        self.assertEqual('', run.sandbox_path)
+        self.assertEqual('', run.full_sandbox_path)
 
     def test_missing_output(self):
         """ Configure an extra output that the image doesn't know about. """
@@ -472,7 +479,7 @@ class RunContainerTests(TestCase):
         run.refresh_from_db()
 
         self.assertEqual(ContainerRun.COMPLETE, run.state)
-        sandbox_path = run.sandbox_path
+        sandbox_path = run.full_sandbox_path
         self.assertTrue(sandbox_path)
         input_path = os.path.join(sandbox_path, 'input/names_csv')
         self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
@@ -544,3 +551,434 @@ class RunContainerTests(TestCase):
         self.assertEqual(expected_stderr, stderr.read())
         self.assertEqual(expected_stdout[:10], stdout.read(10))
         self.assertEqual(expected_stderr[:10], stderr.read(10))
+
+
+@skipIfDBFeature('is_mocked')
+class PurgeTests(TestCase):
+    fixtures = ['container_run']
+
+    def setUp(self):
+        super(PurgeTests, self).setUp()
+        install_fixture_files('container_run')
+        os.mkdir(ContainerRun.SANDBOX_ROOT)
+        Dataset.set_dataset_sizes()
+        self.existing_storage = Dataset.objects.aggregate(
+                Sum('dataset_size'))['dataset_size__sum'] or 0
+
+    def create_sandbox(self, age=timedelta(0), size=1):
+        """ Create a run and its sandbox.
+
+        :param timedelta age: how long ago the run ended
+        :param int size: number of bytes to write in the sandbox folder
+        :return ContainerRun: the new run object
+        """
+        now = timezone.now()
+        user = User.objects.get(username='kive')
+        run_command = runcontainer.Command()
+        app = ContainerApp.objects.first()
+        run = ContainerRun.objects.create(user=user, app=app)
+        run_command.create_sandbox(run)
+        self.assertTrue(os.path.exists(run.full_sandbox_path))
+        run.end_time = now - age
+        with open(os.path.join(run.full_sandbox_path, 'contents.txt'),
+                  'w') as f:
+            f.write(b'.' * size)
+        run.save()
+        return run
+
+    def create_outputs(self,
+                       run,
+                       output_size=0,
+                       stdout_size=0,
+                       stderr_size=0,
+                       age=timedelta(seconds=0)):
+        output_path = os.path.join(run.full_sandbox_path,
+                                   'output',
+                                   'greetings_csv')
+        with open(output_path, 'w') as f:
+            f.write(b'.' * output_size)
+        with open(os.path.join(run.full_sandbox_path, 'logs', 'stdout.txt'),
+                  'w') as f:
+            f.write(b'.' * stdout_size)
+        with open(os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt'),
+                  'w') as f:
+            f.write(b'.' * stderr_size)
+        runcontainer.Command().save_outputs(run)
+        for run_dataset in run.datasets.filter(argument__type='O'):
+            dataset = run_dataset.dataset
+            dataset.date_created = timezone.now() - age
+            dataset.save()
+        for log in run.logs.all():
+            log.date_created = timezone.now() - age
+            log.save()
+
+    def test_purge_incomplete(self):
+        run = self.create_sandbox(age=timedelta(minutes=10), size=100)
+        run.end_time = None
+        run.save()
+
+        purge.Command().handle(start=50, stop=50)
+
+        run.refresh_from_db()
+        self.assertFalse(run.sandbox_purged)
+        self.assertTrue(os.path.exists(run.full_sandbox_path))
+        self.assertIsNone(run.sandbox_size)
+
+    def test_purge_too_small(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=100)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=200)
+
+        purge.Command().handle(start=400, stop=400)
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertFalse(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+        self.assertTrue(os.path.exists(run1.full_sandbox_path))
+        self.assertEqual(100, run1.sandbox_size)
+
+    def test_purge_no_sandbox(self):
+        """ Sometimes a sandbox doesn't get created, and the path is blank. """
+        run = self.create_sandbox(size=500)
+        run.sandbox_path = ''
+        run.save()
+
+        purge.Command().handle(start=400, stop=400)
+
+        run.refresh_from_db()
+        self.assertFalse(run.sandbox_purged)
+        self.assertIsNone(run.sandbox_size)
+
+    def test_purge_folder(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+
+        purge.Command().handle(start=500, stop=500)
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertTrue(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+        self.assertFalse(os.path.exists(run1.full_sandbox_path))
+        self.assertTrue(os.path.exists(run2.full_sandbox_path))
+        self.assertEqual(200, run1.sandbox_size)
+
+    def test_purge_start(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+
+        purge.Command().handle(start=self.existing_storage+600,
+                               stop=self.existing_storage+400)
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertFalse(run1.sandbox_purged)
+        self.assertFalse(run2.sandbox_purged)
+
+    def test_purge_stop(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+
+        purge.Command().handle(start=self.existing_storage+400,
+                               stop=self.existing_storage+199)
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertTrue(run1.sandbox_purged)
+        self.assertTrue(run2.sandbox_purged)
+
+    def test_slurm_log(self):
+        run = self.create_sandbox(size=300)
+        log_path = os.path.join(
+            ContainerRun.SANDBOX_ROOT,
+            'userkive_run{}__job1234_nodefoo_stdout.txt'.format(run.id))
+        with open(log_path, 'w') as f:
+            f.write(b'.' * 200)
+
+        purge.Command().handle(start=400, stop=400)
+
+        run.refresh_from_db()
+        self.assertTrue(run.sandbox_purged)
+        self.assertFalse(os.path.exists(run.full_sandbox_path))
+        self.assertFalse(os.path.exists(log_path))
+        self.assertEqual(500, run.sandbox_size)
+
+    def test_unregistered_folder(self):
+        run = self.create_sandbox(size=500)
+
+        left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
+        os.mkdir(left_overs_path)
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+            f.write(b'.' * 100)
+
+        purge.Command().handle(start=400, stop=400, synch=True)
+
+        run.refresh_from_db()
+        self.assertFalse(run.sandbox_purged)  # registered sandboxes skipped
+        self.assertFalse(os.path.exists(left_overs_path))
+        self.assertTrue(os.path.exists(run.full_sandbox_path))
+
+    def test_unregistered_file(self):
+        run = self.create_sandbox(size=500)
+        log_path = os.path.join(
+            ContainerRun.SANDBOX_ROOT,
+            'userkive_run{}__job1234_nodefoo_stdout.txt'.format(run.id))
+        with open(log_path, 'w') as f:
+            f.write(b'.' * 100)
+
+        left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT,
+                                       'left_overs.txt')
+        with open(left_overs_path, 'w') as f:
+            f.write(b'.' * 100)
+
+        purge.Command().handle(start=400, stop=400, synch=True)
+
+        self.assertFalse(os.path.exists(left_overs_path))
+        self.assertTrue(os.path.exists(log_path))
+
+    def test_unregistered_too_new(self):
+        folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
+        os.mkdir(folder_path)
+        with open(os.path.join(folder_path, 'contents.txt'), 'w') as f:
+            f.write(b'.' * 100)
+
+        file_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'extras.txt')
+        with open(file_path, 'w') as f:
+            f.write(b'.' * 100)
+
+        purge.Command().handle(wait=timedelta(seconds=30), synch=True)
+
+        self.assertTrue(os.path.exists(folder_path))
+        self.assertTrue(os.path.exists(file_path))
+
+    @contextmanager
+    def capture_log_stream(self, log_level):
+        with capture_log_stream(
+                log_level,
+                b'container.management.commands.purge') as mocked_stderr:
+            yield mocked_stderr
+
+    def assertLogStreamEqual(self, expected, messages):
+        cleaned_messages = re.sub(r'(run|dataset) \d+',
+                                  r'\1 <id>',
+                                  messages).replace('\xa0', ' ')
+        self.assertMultiLineEqual(expected, cleaned_messages.encode('ascii'))
+
+    def test_info_logging(self):
+        self.create_sandbox(age=timedelta(minutes=11), size=100)
+        self.create_sandbox(age=timedelta(minutes=10), size=200)
+        self.create_sandbox(age=timedelta(minutes=9), size=400)
+        expected_messages = u"""\
+Purged 2 container runs containing 300 bytes from 11 minutes ago to 10 minutes ago.
+"""
+        with self.capture_log_stream(logging.INFO) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_debug_logging(self):
+        self.create_sandbox(age=timedelta(minutes=11), size=100)
+        self.create_sandbox(age=timedelta(minutes=10), size=200)
+        self.create_sandbox(age=timedelta(minutes=9), size=400)
+        expected_messages = u"""\
+Purged container run <id> containing 100 bytes.
+Purged container run <id> containing 200 bytes.
+Purged 2 container runs containing 300 bytes from 11 minutes ago to 10 minutes ago.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_error_logging_synch(self):
+        left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
+        os.mkdir(left_overs_path)
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+            f.write(b'.'*100)
+
+        with open(os.path.join(ContainerRun.SANDBOX_ROOT,
+                               'extras.txt'), 'w') as f:
+            f.write(b'.'*200)
+        expected_messages = u"""\
+Purged 2 unregistered container run files containing 300 bytes.
+"""
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_warn_logging_synch(self):
+        left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
+        os.mkdir(left_overs_path)
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+            f.write(b'.'*100)
+
+        with open(os.path.join(ContainerRun.SANDBOX_ROOT,
+                               'extras.txt'), 'w') as f:
+            f.write(b'.'*200)
+        expected_messages = u"""\
+Purged unregistered file 'ContainerRuns/extras.txt' containing 200 bytes.
+Purged unregistered file 'ContainerRuns/left_overs' containing 100 bytes.
+Purged 2 unregistered container run files containing 300 bytes.
+"""
+        with self.capture_log_stream(logging.WARN) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_synch_batch(self):
+        for i in range(11):
+            with open(os.path.join(ContainerRun.SANDBOX_ROOT,
+                                   'extras{:02d}.txt'.format(i)), 'w') as f:
+                f.write(b'.' * 1024)
+        expected_messages = u"""\
+Purged 11 unregistered container run files containing 11.0 KB.
+"""
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(synch=True, batch_size=10)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_sandbox_before_output(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=200, age=timedelta(minutes=9))
+
+        purge.Command().handle(start=400, stop=400, sandbox_aging=10)
+
+        run.refresh_from_db()
+        dataset = run.datasets.filter(argument__type='O').get().dataset
+        self.assertTrue(run.sandbox_purged)
+        self.assertNotEqual('', dataset.dataset_file)  # Not purged.
+
+    def test_sandbox_and_output(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=200, age=timedelta(minutes=9))
+
+        purge.Command().handle(start=150, stop=150, sandbox_aging=10)
+
+        run.refresh_from_db()
+        dataset = run.datasets.filter(argument__type='O').get().dataset
+        self.assertTrue(run.sandbox_purged)
+        self.assertEqual('', dataset.dataset_file)  # Purged.
+
+    def test_debug_logging_datasets(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=200, age=timedelta(minutes=1))
+
+        expected_messages = u"""\
+Purged container run <id> containing 300 bytes.
+Purged dataset <id> containing 200 bytes.
+Purged 1 container run containing 300 bytes from a minute ago to a minute ago.
+Purged 1 dataset containing 200 bytes from a minute ago to a minute ago.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=150, stop=150, sandbox_aging=10)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_ignore_sandboxes_already_purged(self):
+        run1 = self.create_sandbox(size=1000, age=timedelta(minutes=1))
+        self.create_sandbox(size=100, age=timedelta(minutes=1))
+        run1.set_sandbox_size()
+        run1.delete_sandbox()
+        run1.sandbox_purged = True
+        run1.save()
+
+        expected_messages = u"""\
+Nothing was purged.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_unable_to_purge_enough(self):
+        # Purge existing datasets:
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.delete()
+
+        run = self.create_sandbox(size=200, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=100, age=timedelta(minutes=1))
+
+        # Upload a new dataset, so it can't be purged.
+        output_path = os.path.join(ContainerRun.SANDBOX_ROOT,
+                                   'extra.txt')
+        with open(output_path, 'w') as f:
+            f.write(b'.' * 1000)
+        user = User.objects.get(username='kive')
+        Dataset.create_dataset(output_path, name='extra.txt', user=user)
+
+        expected_messages = u"""\
+Purged container run <id> containing 300 bytes.
+Purged dataset <id> containing 100 bytes.
+Purged 1 container run containing 300 bytes from a minute ago to a minute ago.
+Purged 1 dataset containing 100 bytes from a minute ago to a minute ago.
+Cannot reduce storage to 500 bytes: 1.0 KB of datasets.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_skip_purged_datasets(self):
+        # Purge existing datasets:
+        for dataset in Dataset.objects.all():
+            dataset.dataset_file.delete()
+
+        run = self.create_sandbox(size=200, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=1000, age=timedelta(minutes=1))
+
+        run.delete_sandbox()
+        run.sandbox_purged = True
+        run.save()
+        Dataset.set_dataset_sizes()
+        dataset = Dataset.objects.get(dataset_size=1000)
+        dataset.dataset_file.delete()
+
+        expected_messages = u"""\
+Nothing was purged.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_synch_datasets(self):
+        left_overs_path = os.path.join(settings.MEDIA_ROOT,
+                                       Dataset.UPLOAD_DIR,
+                                       '2018_06',
+                                       'left_over.txt')
+        os.makedirs(os.path.dirname(left_overs_path))
+        with open(left_overs_path, 'w') as f:
+            f.write(b'.'*100)
+
+        expected_messages = u"""\
+Purged 1 unregistered dataset file containing 100 bytes.
+"""
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_purge_empty_folder(self):
+        left_overs_path = os.path.join(settings.MEDIA_ROOT,
+                                       Dataset.UPLOAD_DIR,
+                                       '2018_06',
+                                       'empty_child')
+        os.makedirs(left_overs_path)
+
+        purge.Command().handle(synch=True)
+
+        self.assertFalse(os.path.exists(left_overs_path))
+        # Parent will get purged next time.
+        self.assertTrue(os.path.exists(os.path.dirname(left_overs_path)))

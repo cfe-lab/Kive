@@ -1,8 +1,10 @@
+from __future__ import print_function
 from collections import Counter
 from datetime import datetime
 import re
 from operator import itemgetter
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.core.urlresolvers import reverse, resolve
 from django.db import connection
@@ -22,14 +24,14 @@ class Command(BaseCommand):
     help = "Exercise the Run.is_complete() method for performance testing. "
 
     def handle(self, *args, **options):
-        self.count_queries(self.test_ajax)
+        self.count_queries(self.test_purge_synch)
 
     def check_many_runs(self):
-        RUN_COUNT = 100
-        runs = Run.objects.order_by('-id')[:RUN_COUNT]
+        run_count = 100
+        runs = Run.objects.order_by('-id')[:run_count]
         complete_count = sum(1 for run in runs if run.is_complete())
         print('Found {} complete in {} most recent runs.'.format(complete_count,
-                                                                 RUN_COUNT))
+                                                                 run_count))
 
     def test_dataset_view(self):
         dataset_id = self.find_big_dataset().id
@@ -41,18 +43,21 @@ class Command(BaseCommand):
         return len(list(dataset.rows(data_check=True, limit=7)))
 
     def test_many_runsteps(self):
-        COUNT = 100
+        count = 100
         run_steps = list(RunStep.objects.filter(
-            reused=False).prefetch_related('RSICs').order_by('-id')[:COUNT])
+            reused=False).prefetch_related('RSICs').order_by('-id')[:count])
         success_count = sum(1
                             for step in run_steps
                             if step.is_successful())
         print('Found {} successful in {} most recent runs.'.format(success_count,
                                                                    len(run_steps)))
 
+    def test_purge_synch(self):
+        call_command('purge', synch=True)
+
     def test_many_execrecords(self):
-        COUNT = 100
-        execrecords = list(ExecRecord.objects.order_by('-id')[:COUNT])
+        count = 100
+        execrecords = list(ExecRecord.objects.order_by('-id')[:count])
         fail_count = sum(1 for r in execrecords if r.has_ever_failed())
         print('Found {} failed in {} most recent runs.'.format(fail_count,
                                                                len(execrecords)))
@@ -112,7 +117,7 @@ class Command(BaseCommand):
                 table_counts[m.group(1)] += 1
                 table_times[m.group(1)] += float(query['time'])
                 if m.group(1) == 'transformation_xputstructureXXX':
-                    print query['sql']
+                    print(query['sql'])
         print('')
         print('Query counts:')
         for table, count in table_counts.most_common(20):
@@ -124,13 +129,13 @@ class Command(BaseCommand):
 
         return result
 
-    def test_prefetch_new(self):
+    def test_prefetch_new(self, use_transformation_output=False):
         queryset = Pipeline.objects.prefetch_related(
             'steps__transformation__outputs__structure').filter(family_id=1)[:25]
         pipeline = queryset.first()
         # pipelines[0].steps.all()[0].outputs[0].structure
         step = pipeline.steps.all()[0]
-        if False:
+        if use_transformation_output:
             transformation = step.transformation
             output = transformation.outputs.all()[0]
         else:
@@ -185,9 +190,9 @@ class Command(BaseCommand):
     def test_ajax_download(self):
         factory = APIRequestFactory()
         dataset_path = reverse('dataset-download', kwargs={'pk': 283134})
-        dataset_view, _, _ = resolve(dataset_path)
+        view, _, _ = resolve(dataset_path)
         request = factory.get(dataset_path)
         force_authenticate(request, user=kive_user())
-        response = dataset_view(request, pk=283134)
+        response = view(request, pk=283134)
         content = response.content
         return content

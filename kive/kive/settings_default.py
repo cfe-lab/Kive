@@ -301,10 +301,11 @@ PURGE_STOP = os.environ.get('KIVE_PURGE_STOP', '15 GB')
 # How fast the different types of storage get purged. Higher aging gets purged faster.
 PURGE_DATASET_AGING = os.environ.get('KIVE_PURGE_DATASET_AGING', '1.0')
 PURGE_LOG_AGING = os.environ.get('KIVE_PURGE_LOG_AGING', '10.0')
-PURGE_CONTAINER_AGING = os.environ.get('KIVE_PURGE_CONTAINER_AGING', '10.0')
+PURGE_SANDBOX_AGING = os.environ.get('KIVE_PURGE_SANDBOX_AGING', '10.0')
 # How long to wait before purging a file with no entry in the database.
 # This gets parsed by django.utils.dateparse.parse_duration().
-PURGE_WAIT = os.environ.get('KIVE_PURGE_WAIT', '0 days, 1:00')
+PURGE_WAIT = os.environ.get('KIVE_PURGE_WAIT', '0 days, 1:00:00')
+PURGE_BATCH_SIZE = int(os.environ.get('KIVE_PURGE_BATCH_SIZE', '100'))
 
 # Here you specify the time that sandboxes should be left after finishing
 # before being automatically purged. (They may still be manually purged
@@ -320,18 +321,7 @@ DO_IDLE_TASKS = True
 IDLE_TASK_FACTOR = 50
 
 # Keep this many of the most recent Sandboxes for any PipelineFamily.
-SANDBOX_KEEP_RECENT = 10
-
-# When to start purging old output datasets
-DATASET_MAX_STORAGE = 5 << 40  # TB
-# When to stop purging
-DATASET_TARGET_STORAGE = 2 << 40  # TB
-
-# Only dataset files older than this period will be considered for purging.
-DATASET_GRACE_PERIOD_HRS = 1.0
-
-# Set the frequency with which the dataset directory is rescanned for files to purge.
-DATASET_PURGE_SCAN_PERIOD_HRS = 12.0
+SANDBOX_KEEP_RECENT = int(os.environ.get('KIVE_SANDBOX_KEEP_RECENT', '10'))
 
 # When to start purging old logfiles
 LOGFILE_MAX_STORAGE = 5 << 40  # TB

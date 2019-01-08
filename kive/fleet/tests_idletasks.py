@@ -164,38 +164,6 @@ class IdleTaskTests(TestCase):
         self.man._do_idle_tasks(time_limit)
         self.assertTrue(os.path.exists(next_dirname), "directory was not made")
 
-    def test_dataset_purge01(self):
-        max_storage = 1000
-        target_size = 5000
-        # dataset_dir = os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR)
-
-        gg = Dataset.idle_dataset_purge(max_storage=max_storage, target_size=target_size)
-        self.man._add_idletask(gg)
-        for i in range(10):
-            # print "TEST", i
-            time_limit = time.time() + 10.0
-            self.man._do_idle_tasks(time_limit)
-
-    def test_external_file_check01(self):
-        # dataset_dir = os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR)
-
-        gg = Dataset.idle_external_file_check()
-        self.man._add_idletask(gg)
-        for i in range(10):
-            # print "TEST", i
-            time_limit = time.time() + 10.0
-            self.man._do_idle_tasks(time_limit)
-
-    def test_dataset_purge02(self):
-        # dataset_dir = os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR)
-
-        gg = Dataset.idle_dataset_purge()
-        self.man._add_idletask(gg)
-        for i in range(10):
-            # print "TEST", i
-            time_limit = time.time() + 10.0
-            self.man._do_idle_tasks(time_limit)
-
     def test_logfile_purge01(self):
         # dataset_dir = os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR)
         gg = MethodOutput.idle_logfile_purge()

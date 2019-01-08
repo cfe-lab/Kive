@@ -42,8 +42,7 @@ class ExternalFileDirectoryViewSet(ReadOnlyModelViewSet,
         queryset = super(ExternalFileDirectoryViewSet, self).filter_queryset(queryset)
         return self.apply_filters(queryset)
 
-    @staticmethod
-    def _add_filter(queryset, key, value):
+    def _add_filter(self, queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
                                    Q(path__icontains=value))
@@ -118,8 +117,7 @@ class DatasetViewSet(RemovableModelViewSet,
     def filter_queryset(self, queryset):
         return self.apply_filters(super(DatasetViewSet, self).filter_queryset(queryset))
 
-    @staticmethod
-    def _add_filter(queryset, key, value):
+    def _add_filter(self, queryset, key, value):
         if key == 'smart':
             return queryset.filter(Q(name__icontains=value) |
                                    Q(description__icontains=value))

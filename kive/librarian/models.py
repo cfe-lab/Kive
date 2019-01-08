@@ -8,29 +8,28 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 import csv
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 import hashlib
-import heapq
 import itertools
 import logging
 import os
 import os.path
 import re
 import shutil
-import sys
 import tempfile
 import time
 import io
-from operator import itemgetter
 
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.core.validators import MinValueValidator, RegexValidator
 from django.core.files import File
+from django.db.models.functions import Now
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.conf import settings
-from django.template.defaultfilters import filesizeformat
+from django.template.defaultfilters import filesizeformat, pluralize
 from django.db.models import Min
 from django.db.models.signals import post_delete
 from django.core.urlresolvers import reverse
@@ -41,10 +40,8 @@ import datachecking.models
 import metadata.models
 import archive.exceptions
 import librarian.signals
-import file_access_utils
 from constants import maxlengths, runcomponentstates
 from datachecking.models import BadData
-import librarian.filewalker as filewalker
 import six
 from container.models import ContainerRun
 
@@ -172,11 +169,6 @@ class Dataset(metadata.models.AccessControl):
 
     logger = logging.getLogger('librarian.Dataset')
 
-    # This class has a FilePurger instance. See purge() below.
-    filepurger = filewalker.FilePurger(os.path.join(settings.MEDIA_ROOT, UPLOAD_DIR),
-                                       grace_period_hrs=settings.DATASET_GRACE_PERIOD_HRS,
-                                       walk_period_hrs=settings.DATASET_PURGE_SCAN_PERIOD_HRS,
-                                       logger=logger)
     # For validation of Datasets when being reused, or when being
     # regenerated.  A blank MD5_checksum means that the file was
     # missing (not created when it was supposed to be created).
@@ -193,7 +185,7 @@ class Dataset(metadata.models.AccessControl):
 
     # The last time a check was performed on this external file, to see whether
     # the external file referenced was still there.
-    # See self.idle_externalcheck() for details.
+    # See external_file_check() for details.
     last_time_checked = models.DateTimeField(default=timezone.now,
                                              help_text="Date-time of last (external) dataset existence check.",
                                              null=True)
@@ -204,6 +196,9 @@ class Dataset(metadata.models.AccessControl):
         help_text="Size of the dataset file in bytes.  If null, this has not been computed yet or there is no "
                   "internally stored file."
     )
+    is_external_missing = models.BooleanField(
+        default=False,
+        help_text='True if the external file was missing when last checked.')
 
     class Meta:
         ordering = ["-date_created", "name"]
@@ -1357,8 +1352,7 @@ class Dataset(metadata.models.AccessControl):
         """
         datasets_to_set = cls.objects.filter(
             dataset_file__isnull=False,
-            dataset_size__isnull=True
-        )
+            dataset_size__isnull=True).exclude(dataset_file='')
         for ds in datasets_to_set:
             with transaction.atomic():
                 try:
@@ -1369,265 +1363,83 @@ class Dataset(metadata.models.AccessControl):
                     pass
 
     @classmethod
-    def purge_registered_datasets(cls, bytes_to_purge, date_cutoff=None):
-        """
-        Purge Datasets in chronological order until the target number of bytes is achieved.
+    def find_unneeded(cls):
+        """ Finds datasets that could be purged.
 
-        If date_cutoff is specified, then anything newer than it is not deleted.
-
-        :param bytes_to_purge:
-        :param date_cutoff:
-        :return:
+        Excludes datasets that were uploaded or from an active run.
+        :return: a QuerySet
         """
         # Exclude Datasets that are currently in use
-        active_runs = ContainerRun.objects.filter(
-            state__in=ContainerRun.ACTIVE_STATES)
-        active_datasets = cls.objects.filter(containers__run__in=active_runs)
+        active_datasets = cls.objects.filter(containers__run__end_time=None)
+        container_outputs = Dataset.objects.filter(containers__argument__type='O')
+        uploads = Dataset.objects.filter(
+            file_source=None, usurps__isnull=True).exclude(
+            pk__in=container_outputs)
 
-        expendable_datasets = cls.objects.exclude(pk__in=active_datasets)
-        # Exclude datasets that are uploaded
-        expendable_datasets = expendable_datasets.exclude(containers=None,
-                                                          file_source=None)
-        # Exclude datasets that have no file (i.e. already purged).
-        expendable_datasets = expendable_datasets.exclude(dataset_file=None)
-        if date_cutoff is not None:
-            expendable_datasets = expendable_datasets.exclude(date_created__gte=date_cutoff)
-        expendable_datasets = expendable_datasets.order_by('date_created')
-
-        return file_access_utils.purge_registered_files(
-            expendable_datasets,
-            "dataset_file",
-            bytes_to_purge)
+        unneeded = cls.objects.exclude(
+            pk__in=active_datasets).exclude(  # Don't purge while it's in use.
+            pk__in=uploads).exclude(  # Never purge uploads.
+            dataset_file=None).exclude(  # External file.
+            dataset_file='')  # Already purged.
+        return unneeded
 
     @classmethod
-    def purge_unregistered_datasets(cls, bytes_to_purge=None, date_cutoff=None):
-        """
-        Clean up files in the Dataset folder that do not belong to any known Datasets.
-
-        Files are removed in order from oldest to newest.  If date_cutoff is specified then
-        anything newer than it is not deleted.
-
-        :param bytes_to_purge: a target number of bytes to remove.  If this is None, just remove everything.
-        :param date_cutoff: a datetime object.
-        :return:
-        """
-        return file_access_utils.purge_unregistered_files(
-            os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR),
-            cls,
-            "dataset_file",
-            bytes_to_purge=bytes_to_purge,
-            date_cutoff=date_cutoff
-        )
-
-    @classmethod
-    def idle_dataset_purge(cls,
-                           max_storage=settings.DATASET_MAX_STORAGE,
-                           target_size=settings.DATASET_TARGET_STORAGE):
-        """Purge files if the total filesize is > max_storage. Once we start purging,
-        do this until the filesize <= target_size.
-
-        This is written as a generator that will interrupt itself when
-        time.time() > time_to_stop, and then continue when it next gets a time
-        slice by send()
-        """
-        # get batches of max 5 files at a time when we have to purge
-        BATCH_SIZE = 5
-        while True:
-            time_to_stop = (yield None)
-            cls.logger.debug('hello from idle_dataset_purge')
-            active_files = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                               for ds in Dataset._active_datasets())
-            up_loaded = set(os.path.join(settings.MEDIA_ROOT, ds.dataset_file.name)
-                            for ds in Dataset.objects.filter(file_source=None).all())
-            exclude_set = active_files | up_loaded
-            cls.logger.debug('Found %d active and uploaded datasets.', len(exclude_set))
-            for ff in exclude_set:
-                cls.logger.debug('--%s', ff)
-            # recalculate the total file size, while allowing for interruptions
-            # the resulting total file size will be in cls.filepurger.total_size once
-            # we have finished the file system scanning
-            cls.logger.debug('rescan of datasets files')
-            checker = cls.filepurger.regenerator(exclude_set)
-            try:
-                while True:
-                    time_to_stop = (yield None)
-                    checker.send(time_to_stop)
-            except StopIteration:
-                pass
-            cls.logger.debug('finished regenerating dataset file cache')
-            cls.logger.debug("\n".join(["%s: %s" % itm for itm in cls.filepurger.get_scaninfo().items()]))
-            if time.time() < time_to_stop and cls.filepurger.total_size > max_storage:
-                cls.logger.info("Purge cycle started, total size = %d > max_storage=%d",
-                                cls.filepurger.total_size, max_storage)
-                tot_size_deleted = 0
-                for ftup in cls.filepurger.next_to_purge(BATCH_SIZE, exclude_set,
-                                                         target_size,
-                                                         dodelete=True):
-                    if ftup is None:
-                        # we have run out of time: abruptly exit from for loop
-                        break
-                    else:
-                        # remove the file
-                        abspath, fsize = ftup
-                        relpath = os.path.relpath(abspath, settings.MEDIA_ROOT)
-                        tot_size_deleted += fsize
-                        dataset = Dataset.objects.filter(dataset_file=relpath).first()
-                        if dataset is None:
-                            # NOTE: must be defensive here: the file might have
-                            # moved in the mean-time (#481)
-                            try:
-                                with SafeContext():
-                                    filedate = os.path.getmtime(abspath)
-                                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
-                                    if file_age > timedelta(hours=1):
-                                        cls.logger.warn('No dataset matches file %r, deleting it.',
-                                                        abspath)
-                                        os.remove(abspath)
-                            except OSError:
-                                cls.logger.warn("Failed to remove file %r", abspath)
-                        else:
-                            dataset.dataset_file.delete(save=True)
-                # -- report purging progress
-                cls.logger.info("Purge cycle completed, deleted size %d", tot_size_deleted)
-
-    @classmethod
-    def purge(cls,
-              max_storage=settings.DATASET_MAX_STORAGE,
-              target=settings.DATASET_TARGET_STORAGE):
-
-        files = []  # [(date, path, filesize)]
-        start_path = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
-        total_size = 0
-        skipped_count = 0
-        for dirpath, _dirnames, filenames in os.walk(start_path):
+    def scan_file_names(cls):
+        """ Yield all file names, relative to MEDIA_ROOT. """
+        dataset_root = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR)
+        for dirpath, dirnames, filenames in os.walk(dataset_root):
             for filename in filenames:
-                filepath = os.path.join(dirpath, filename)
-                filedate = os.path.getmtime(filepath)
-                filesize = os.path.getsize(filepath)
-                relpath = os.path.relpath(filepath, settings.MEDIA_ROOT)
-                total_size += filesize
-                heapq.heappush(files, (filedate, relpath, filesize))
-        if total_size < max_storage:
-            cls.logger.debug('Dataset purge not needed at %s over %d files.',
-                             filesizeformat(total_size),
-                             len(files))
-        else:
-            cls.logger.info('Dataset purge triggered at %s over %d files.',
-                            filesizeformat(total_size),
-                            len(files))
-            active_dataset_ids = set(d.id for d in Dataset._active_datasets())
-            cls.logger.debug('Found %d active datasets.',
-                             len(active_dataset_ids))
-            while total_size > target and files:
-                filedate, relpath, filesize = heapq.heappop(files)
-                dataset = Dataset.objects.filter(dataset_file=relpath).first()
-                if dataset is None:
-                    filepath = os.path.join(settings.MEDIA_ROOT, relpath)
-                    filedate = os.path.getmtime(filepath)
-                    file_age = datetime.now() - datetime.fromtimestamp(filedate)
-                    if file_age < timedelta(hours=1):
-                        skipped_count += 1
-                    else:
-                        cls.logger.warn('No dataset matches file %r, deleting it.',
-                                        relpath)
-                        os.remove(filepath)
-                        total_size -= filesize
-                else:
-                    if dataset.file_source is None:
-                        is_skipped = True  # it was uploaded, not created
-                    else:
-                        # Check to see if it's being used by an active run.
-                        is_skipped = dataset.id in active_dataset_ids
-
-                    if is_skipped:
-                        skipped_count += 1
-                    else:
-                        dataset.dataset_file.delete(save=True)
-                        total_size -= filesize
-
-            remaining = 'Leaving {} over {} files.'.format(
-                filesizeformat(total_size),
-                len(files) + skipped_count)
-            if total_size > max_storage:
-                target = max_storage
-                log_method = cls.logger.error
-            elif total_size > target:
-                target = target
-                log_method = cls.logger.warning
-            else:
-                target = None
-                log_method = cls.logger.info
-            if target:
-                message = 'Cannot purge datasets below {}. {}'.format(
-                    filesizeformat(target),
-                    remaining)
-            else:
-                message = 'Dataset purge finished. ' + remaining
-            message = message.replace('\xa0', ' ')
-            log_method(message)
-            if log_method == cls.logger.error:
-                raise RuntimeError(message)
+                file_path = os.path.join(dirpath, filename)
+                yield os.path.relpath(file_path, settings.MEDIA_ROOT)
+            if not (dirnames or filenames):
+                # Empty folder can be purged.
+                yield dirpath
 
     @classmethod
-    def idle_external_file_check(cls):
-        """ Perform a consistency check of external files as an idle task.
-
-        We search for datasets that fullfil the following criteria:
-        a) external files with last_time_checked < now - CHECK_INTERVAL
-        b) sorted in ascending order by last_time_checked
-        c) in batches of N at a time.
-        """
-        batch_size = 10
+    def external_file_check(cls, batch_size=1000):
+        """ Perform a consistency check of external files. """
+        last_id = None
         missing_count = 0
-        report_start = None
+        last_missing_date = None
+        last_missing_path = None
         while True:
-            time_to_stop = (yield None)
-            cut_off_time = timezone.now() - timedelta(days=settings.EXTERNAL_FILE_CHECK_DAYS,
-                                                      hours=settings.EXTERNAL_FILE_CHECK_HOURS,
-                                                      minutes=settings.EXTERNAL_FILE_CHECK_MINUTES)
-            if report_start is not None and cut_off_time > report_start:
-                cut_off_time = report_start
-
-            # aset: only external files
-            a_set = Dataset.objects.filter(externalfiledirectory__isnull=False)
-            # bset: only those external files that haven't been checked for some time
-            b_set = a_set.filter(last_time_checked__lt=cut_off_time)
-            # prioritise least recently checked files
-            c_set = b_set.order_by('last_time_checked')
-            # limit number of results returned to 10. This must be the last filter to apply
-            d_set = c_set[:batch_size]
-            did_something = True
-            while time.time() < time_to_stop and did_something:
-                did_something = False
-                for dataset in d_set.all():
-                    did_something = True
-                    path_name = dataset.external_absolute_path()
-                    if path_name is None:
-                        raise RuntimeError("Unexpected None for external dataset path!")
-                    # --update the last_time_checked regardless of
-                    # whether we issue a warning or not
-                    if report_start and dataset.last_time_checked > report_start:
-                        did_something = False
-                        break
-                    dataset.last_time_checked = timezone.now()
-                    dataset.save()
-                    kive_name = dataset.name
-                    if not os.path.exists(path_name):
-                        if missing_count == 0:
-                            cls.logger.warn("Missing external file '%s' at '%s'",
-                                            kive_name,
-                                            path_name)
-                            report_start = dataset.last_time_checked
-                        missing_count += 1
-            if not did_something and report_start is not None:
-                # See if all external datasets have now been checked.
-                unchecked_set = a_set.filter(last_time_checked__lt=report_start)
-                if not unchecked_set.exists():
-                    # We've checked all external files since reporting the first missing file
-                    if missing_count > 1:
-                        cls.logger.warn("Missing %d more external files.", missing_count-1)
-                    missing_count = 0
-                    report_start = None
+            batch = Dataset.objects.filter(
+                externalfiledirectory__isnull=False).order_by(
+                'id').prefetch_related('externalfiledirectory')
+            if last_id is not None:
+                batch = batch.filter(id__gt=last_id)
+            batch = batch[:batch_size]
+            batch_count = 0
+            found_ids = []
+            for dataset in batch:
+                batch_count += 1
+                last_id = dataset.id
+                path_name = dataset.external_absolute_path()
+                if path_name is None:
+                    raise RuntimeError("Unexpected None for external dataset path!")
+                if os.path.exists(path_name):
+                    found_ids.append(dataset.id)
+                else:
+                    missing_count += 1
+                    if not dataset.is_external_missing:
+                        dataset.is_external_missing = True
+                        if (last_missing_date is None or
+                                dataset.last_time_checked > last_missing_date):
+                            last_missing_date = dataset.last_time_checked
+                            last_missing_path = path_name
+                        dataset.save()
+            Dataset.objects.filter(id__in=found_ids).update(
+                last_time_checked=Now(),
+                is_external_missing=False)
+            if batch_count < batch_size:
+                break
+        if last_missing_date is not None:
+            cls.logger.error(
+                "Missing %d external dataset%s. Most recent from %s, last checked %s.",
+                missing_count,
+                pluralize(missing_count),
+                last_missing_path,
+                naturaltime(last_missing_date))
 
     def increase_permissions_from_json(self, permissions_json):
         """

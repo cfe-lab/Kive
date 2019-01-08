@@ -2,7 +2,7 @@
 Shipyard models pertaining to the librarian app.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import random
 import re
@@ -41,7 +41,7 @@ from pipeline.models import Pipeline, PipelineFamily
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files
+from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files, capture_log_stream
 
 FROM_FILE_END = 2
 
@@ -2198,3 +2198,157 @@ class ExternalFileTests(TestCase):
         self.external_file_ds.refresh_from_db()
         self.assertEquals(self.external_file_ds.external_path, "")
         self.assertIsNone(self.external_file_ds.externalfiledirectory)
+
+    def test_file_check_passes(self):
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        expected_log_messages = ''
+        start_time = timezone.now()
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check()
+            log_messages = mocked_stderr.getvalue()
+
+        end_time = timezone.now()
+
+        external_file_ds.refresh_from_db()
+        self.assertGreaterEqual(external_file_ds.last_time_checked, start_time)
+        self.assertLessEqual(external_file_ds.last_time_checked, end_time)
+        self.assertFalse(external_file_ds.is_external_missing)
+        self.assertMultiLineEqual(expected_log_messages, log_messages)
+
+    def test_file_check_missing_one(self):
+        Dataset.objects.all().delete()  # Remove existing datasets.
+
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.last_time_checked = timezone.now() - timedelta(minutes=1)
+        external_file_ds.save()
+        os.remove(external_file_ds.external_absolute_path())
+        expected_log_messages = """\
+Missing 1 external dataset. Most recent from {}, last checked a minute ago.
+""".format(external_file_ds.external_absolute_path())
+        start_time = timezone.now()
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check()
+            log_messages = mocked_stderr.getvalue()
+
+        external_file_ds.refresh_from_db()
+        self.assertLess(external_file_ds.last_time_checked, start_time)
+        self.assertTrue(external_file_ds.is_external_missing)
+        self.assertMultiLineEqual(expected_log_messages, log_messages)
+
+    def test_file_check_missing_two(self):
+        Dataset.objects.all().delete()  # Remove existing datasets.
+
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.last_time_checked = timezone.now() - timedelta(minutes=5)
+        external_file_ds.save()
+        os.remove(external_file_ds.external_absolute_path())
+
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext2_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.last_time_checked = timezone.now() - timedelta(minutes=4)
+        external_file_ds.save()
+        os.remove(external_file_ds.external_absolute_path())
+        expected_log_messages = """\
+Missing 2 external datasets. Most recent from {}, last checked 4 minutes ago.
+""".format(external_file_ds.external_absolute_path())
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check()
+            log_messages = mocked_stderr.getvalue().replace(u'\xa0', ' ')
+
+        self.assertMultiLineEqual(expected_log_messages, log_messages)
+
+    def test_file_check_batches(self):
+        Dataset.objects.all().delete()  # Remove existing datasets.
+
+        for _ in range(10):
+            Dataset.create_dataset(
+                os.path.join(self.working_dir, self.ext1_path),
+                user=self.myUser,
+                keep_file=False,
+                externalfiledirectory=self.efd)
+
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext2_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.last_time_checked = timezone.now() - timedelta(minutes=4)
+        external_file_ds.save()
+        os.remove(external_file_ds.external_absolute_path())
+        expected_log_messages = """\
+Missing 1 external dataset. Most recent from {}, last checked 4 minutes ago.
+""".format(external_file_ds.external_absolute_path())
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check(batch_size=10)
+            log_messages = mocked_stderr.getvalue().replace(u'\xa0', ' ')
+
+        self.assertMultiLineEqual(expected_log_messages, log_messages)
+
+    def test_file_check_file_restored(self):
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext1_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.is_external_missing = True
+        external_file_ds.save()
+        expected_log_messages = ''
+        start_time = timezone.now()
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check()
+            log_messages = mocked_stderr.getvalue()
+
+        end_time = timezone.now()
+
+        external_file_ds.refresh_from_db()
+        self.assertGreaterEqual(external_file_ds.last_time_checked, start_time)
+        self.assertLessEqual(external_file_ds.last_time_checked, end_time)
+        self.assertFalse(external_file_ds.is_external_missing)
+        self.assertMultiLineEqual(expected_log_messages, log_messages)
+
+    def test_file_check_still_missing(self):
+        external_file_ds = Dataset.create_dataset(
+            os.path.join(self.working_dir, self.ext2_path),
+            user=self.myUser,
+            keep_file=False,
+            externalfiledirectory=self.efd)
+        external_file_ds.is_external_missing = True
+        external_file_ds.save()
+        os.remove(external_file_ds.external_absolute_path())
+        expected_log_messages = ''
+        start_time = timezone.now()
+
+        with capture_log_stream(logging.ERROR,
+                                'librarian.Dataset') as mocked_stderr:
+            Dataset.external_file_check()
+            log_messages = mocked_stderr.getvalue()
+
+        external_file_ds.refresh_from_db()
+        self.assertLess(external_file_ds.last_time_checked, start_time)
+        self.assertTrue(external_file_ds.is_external_missing)
+        self.assertMultiLineEqual(expected_log_messages, log_messages)

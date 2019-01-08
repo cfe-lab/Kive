@@ -5,7 +5,6 @@ import logging
 import os
 import re
 import sys
-from datetime import datetime
 from itertools import chain
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile
@@ -410,7 +409,7 @@ class ContainerRun(Stopwatch, AccessControl):
         RUNNING,
         SAVING
     ]
-    SANDBOX_ROOT = os.path.join(settings.MEDIA_ROOT, 'Containers')
+    SANDBOX_ROOT = os.path.join(settings.MEDIA_ROOT, 'ContainerRuns')
 
     app = models.ForeignKey(ContainerApp, related_name="runs")
     batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
@@ -470,6 +469,12 @@ class ContainerRun(Stopwatch, AccessControl):
                                        update_fields)
         if self.state == self.NEW:
             transaction.on_commit(self.schedule)
+
+    @property
+    def full_sandbox_path(self):
+        if not self.sandbox_path:
+            return ''
+        return os.path.join(settings.MEDIA_ROOT, self.sandbox_path)
 
     def schedule(self):
         try:
@@ -555,7 +560,7 @@ class ContainerRun(Stopwatch, AccessControl):
         assert not self.sandbox_purged
         size_accumulator = 0
         sandbox_files = (os.path.join(root, file_name)
-                         for root, _, files in os.walk(self.sandbox_path)
+                         for root, _, files in os.walk(self.full_sandbox_path)
                          for file_name in files)
         for file_path in chain(sandbox_files, self.find_slurm_logs()):
             size_accumulator += os.path.getsize(file_path)
@@ -577,14 +582,14 @@ class ContainerRun(Stopwatch, AccessControl):
         :return:
         """
         assert not self.sandbox_purged
-        shutil.rmtree(self.sandbox_path)
+        shutil.rmtree(self.full_sandbox_path)
 
         for log_path in self.find_slurm_logs():
             os.remove(log_path)
 
     def find_slurm_logs(self):
         """ Find the Slurm log files that are outside the sandbox folder. """
-        sandbox_basepath = os.path.dirname(self.sandbox_path)
+        sandbox_basepath = os.path.dirname(self.full_sandbox_path)
         stdout_log_path = os.path.join(
             sandbox_basepath,
             self.get_sandbox_prefix() + "_job*_node*_stdout.txt")
@@ -598,94 +603,30 @@ class ContainerRun(Stopwatch, AccessControl):
         return stdout_logs + stderr_logs
 
     @classmethod
-    def purge_sandboxes(cls, cutoff, keep_most_recent):
-        """
-        Purge sandboxes (i.e. delete the sandbox directories and Slurm logs).
-
-        :param cutoff: a datetime object.  Anything newer than this is not purged.
-        :param keep_most_recent: an integer.  Retain the most recent Sandboxes for
-        each ContainerApp up to this number.
-        :return:
-        """
-        # Look for finished jobs to clean up.
-        logger.debug("Checking for old sandboxes to clean up....")
-
-        purge_candidates = cls.objects.filter(
-            end_time__isnull=False,
-            end_time__lte=cutoff,
-            sandbox_purged=False).exclude(sandbox_path='')
-
-        # Retain the most recent ones for each ContainerApp.
-        apps_represented = purge_candidates.values_list("app_id")
-
-        ready_to_purge = []
-        for app_id, in set(apps_represented):
-            # Look for the oldest ones.
-            curr_candidates = purge_candidates.filter(app_id=app_id).order_by("end_time")
-            num_remaining = curr_candidates.count()
-
-            ready_to_purge.extend(
-                curr_candidates[:max(num_remaining - keep_most_recent, 0)])
-
-        for rtp in ready_to_purge:
-            logger.debug("Removing sandbox at %r.", rtp.sandbox_path)
-            try:
-                rtp.delete_sandbox()
-            except OSError:
-                logger.error(
-                    "Failed to purge run %d's sandbox at %r.",
-                    rtp.id,
-                    rtp.sandbox_path,
-                    exc_info=True
-                )
-            rtp.sandbox_purged = True  # Don't try to purge it again.
-            rtp.save()
-
-        return ready_to_purge
+    def find_unneeded(cls):
+        return cls.objects.filter(sandbox_purged=False,
+                                  end_time__isnull=False).exclude(
+            sandbox_path='')
 
     @classmethod
-    def scan_for_unaccounted_sandboxes_and_logs(cls, cutoff_date):
-        """
-        Clean up any unaccounted sandboxes and logs in the sandbox directory.
+    def scan_file_names(cls):
+        """ Yield all file names, relative to MEDIA_ROOT. """
+        relative_root = os.path.relpath(ContainerRun.SANDBOX_ROOT,
+                                        settings.MEDIA_ROOT)
 
-        :param datetime cutoff_date: the most recent modified date that can be
-            purged.
-        :return: [(file_name, file_size)] for all purged files and folders
-        """
-        logger.debug("Checking for orphaned sandbox directories and logs to clean up....")
-
-        sandbox_root = ContainerRun.SANDBOX_ROOT
-
-        paths_removed = []
-        for file_name in sorted(os.listdir(sandbox_root)):
-            file_path = os.path.join(sandbox_root, file_name)
-            modification_time = datetime.fromtimestamp(
-                os.stat(file_path).st_mtime,
-                timezone.get_current_timezone())
-            if modification_time > cutoff_date:
-                continue
-            if os.path.isdir(file_path):
-                if cls.objects.filter(sandbox_path=file_path).exists():
-                    continue
-                file_size = 0
-                for child_path, _, content_names in os.walk(file_path):
-                    for content_name in content_names:
-                        content_path = os.path.join(child_path, content_name)
-                        file_size += os.stat(content_path).st_size
-                shutil.rmtree(file_path)
-            else:
+        for file_name in os.listdir(ContainerRun.SANDBOX_ROOT):
+            file_path = os.path.join(ContainerRun.SANDBOX_ROOT, file_name)
+            if not os.path.isdir(file_path):
+                # Special check for log files.
                 match = re.match(r'user\w+_run\d+', file_name)
                 if match:
                     prefix = match.group(0)
-                    path_prefix = os.path.join(sandbox_root, prefix)
+                    path_prefix = os.path.join(relative_root, prefix)
                     if cls.objects.filter(sandbox_path__startswith=path_prefix,
                                           sandbox_purged=False).exists():
+                        # Matching sandbox found, skip the log file.
                         continue
-                file_size = os.stat(file_path).st_size
-                os.unlink(file_path)
-            paths_removed.append((file_name, file_size))
-
-        return paths_removed
+            yield os.path.join(relative_root, file_name)
 
 
 class ContainerDataset(models.Model):

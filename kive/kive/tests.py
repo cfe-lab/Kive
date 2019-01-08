@@ -1,6 +1,9 @@
 import errno
+import logging
 import os
 import shutil
+from contextlib import contextmanager
+
 from django.utils.six import StringIO
 from datetime import timedelta
 
@@ -274,3 +277,18 @@ def strip_removal_plan(plan):
                        for key, value in plan.items()
                        if value}
     return plan_not_blanks
+
+
+@contextmanager
+def capture_log_stream(log_level, logger_name):
+    mocked_stderr = StringIO()
+    stream_handler = logging.StreamHandler(mocked_stderr)
+    logger = logging.getLogger(logger_name)
+    logger.addHandler(stream_handler)
+    old_level = logger.level
+    logger.level = log_level
+    try:
+        yield mocked_stderr
+    finally:
+        logger.removeHandler(stream_handler)
+        logger.level = old_level

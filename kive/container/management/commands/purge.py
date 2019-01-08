@@ -1,39 +1,36 @@
 import logging
+import os
+import shutil
 from argparse import ArgumentDefaultsHelpFormatter
-from datetime import timedelta
+from collections import Counter
+from datetime import timedelta, datetime
+from itertools import chain
 
+from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db import models
 from django.db.models.aggregates import Sum
+from django.db.models.expressions import Value, F
+from django.db.models.functions import Now
 
-from django.template.defaultfilters import filesizeformat
+from django.template.defaultfilters import filesizeformat, pluralize
 from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
 from container.models import ContainerRun
+from librarian.models import Dataset
 from portal.models import parse_file_size
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Scan through sandboxes, recording the sandbox size of newly ' \
-           'finished runs, and purging sandboxes that are old enough.'
+    help = 'Scan through storage files, recording the size of new files, ' \
+           'and purging old files if needed.'
 
     def add_arguments(self, parser):
         parser.formatter_class = ArgumentDefaultsHelpFormatter
-
-        # # Settings for the purge task. How much storage triggers a purge, and how much
-        # # will stop the purge.
-        # PURGE_START = os.environ.get('KIVE_PURGE_START', '20 GB')
-        # PURGE_STOP = os.environ.get('KIVE_PURGE_STOP', '15 GB')
-        # # How fast the different types of storage get purged. Higher aging gets purged faster.
-        # PURGE_DATASET_AGING = os.environ.get('KIVE_PURGE_DATASET_AGING', '1.0')
-        # PURGE_LOG_AGING = os.environ.get('KIVE_PURGE_LOG_AGING', '10.0')
-        # PURGE_CONTAINER_AGING = os.environ.get('KIVE_PURGE_CONTAINER_AGING', '10.0')
-        # # How long to wait before purging a file with no entry in the database.
-        # # This gets parsed by django.utils.dateparse.parse_duration().
-        # PURGE_WAIT = os.environ.get('KIVE_PURGE_WAIT', '0 days, 1:00')
 
         parser.add_argument('--start',
                             help='How much storage triggers a purge?',
@@ -53,10 +50,10 @@ class Command(BaseCommand):
                                  'compared to other storage?',
                             default=settings.PURGE_LOG_AGING,
                             type=float)
-        parser.add_argument('--container_aging',
+        parser.add_argument('--sandbox_aging',
                             help='How fast do container sandboxes age, '
                                  'compared to other storage?',
-                            default=settings.PURGE_CONTAINER_AGING,
+                            default=settings.PURGE_SANDBOX_AGING,
                             type=float)
         parser.add_argument("--synch",
                             help="Synchronize the database and file system by "
@@ -69,68 +66,184 @@ class Command(BaseCommand):
                                  "unsynchronized files.",
                             default=settings.PURGE_WAIT,
                             type=parse_duration)
+        parser.add_argument("--batch_size",
+                            help="Number of files to synchronize at a time.",
+                            default=settings.PURGE_BATCH_SIZE,
+                            type=int)
 
     def handle(self,
                start=2000,
                stop=1000,
                dataset_aging=1.0,
                log_aging=1.0,
-               container_aging=1.0,
+               sandbox_aging=1.0,
                synch=False,
                wait=timedelta(seconds=0),
+               batch_size=100,
                **kwargs):
         if synch:
-            remove_older_than = timezone.now() - wait
-            names_removed = sorted(
-                ContainerRun.scan_for_unaccounted_sandboxes_and_logs(
-                    remove_older_than))
-            if names_removed:
-                total_size = 0
-                for name_removed, size_removed in names_removed:
-                    total_size += size_removed
-                    logger.warning(
-                        'Purged unregistered sandbox file %r containing %s.',
-                        name_removed,
-                        filesizeformat(size_removed))
-
-                logger.error(
-                    'Purged %d unregistered sandbox files containing %s.',
-                    len(names_removed),
-                    filesizeformat(total_size))
+            # noinspection PyTypeChecker
+            self.synch_model(ContainerRun, 'sandbox_path', wait, batch_size)
+            # noinspection PyTypeChecker
+            self.synch_model(Dataset, 'dataset_file', wait, batch_size)
+            Dataset.external_file_check(batch_size=batch_size)
         else:
-            need_sizing = ContainerRun.objects.filter(
+            runs_to_size = ContainerRun.objects.filter(
                 end_time__isnull=False,
                 sandbox_size__isnull=True,
                 sandbox_purged=False).exclude(sandbox_path='')
-            for run in need_sizing:
+            for run in runs_to_size:
                 run.set_sandbox_size()
+            sandbox_total = ContainerRun.objects.filter(
+                sandbox_purged=False).aggregate(
+                Sum('sandbox_size'))['sandbox_size__sum'] or 0
 
-            total_storage = ContainerRun.objects.aggregate(
-                total=Sum('sandbox_size'))['total']
-            total_bytes_removed = 0
-            purged_count = 0
+            Dataset.set_dataset_sizes()
+            dataset_total = Dataset.objects.exclude(
+                dataset_file='').exclude(  # Already purged.
+                dataset_file=None).aggregate(  # External file.
+                Sum('dataset_size'))['dataset_size__sum'] or 0
+
+            total_storage = remaining_storage = sandbox_total + dataset_total
             if total_storage <= start:
-                logger.debug("No sandboxes were purged.")
+                logger.debug(u"Nothing was purged.")
                 return
-            run_ids = ContainerRun.objects.order_by('end_time').values_list('id')
-            for run_id, in run_ids:
-                run = ContainerRun.objects.get(id=run_id)
-                total_bytes_removed += run.sandbox_size
-                purged_count += 1
-                logger.debug("Purged sandbox for run %d containing %s.",
-                             run.pk,
-                             filesizeformat(run.sandbox_size))
-                try:
-                    run.delete_sandbox()
-                except OSError:
-                    logger.error("Failed to purge run %d's sandbox at %r.",
-                                 run.id,
-                                 run.sandbox_path,
-                                 exc_info=True)
-                run.sandbox_purged = True  # Don't try to purge it again.
-                run.save()
-                if total_storage - total_bytes_removed <= stop:
+
+            sandbox_ages = ContainerRun.find_unneeded().annotate(
+                type=Value('r', models.CharField()),
+                age=sandbox_aging * (Now() - F('end_time'))).values_list(
+                'type',
+                'id',
+                'age')
+
+            dataset_ages = Dataset.find_unneeded().annotate(
+                type=Value('d', models.CharField()),
+                age=dataset_aging * (Now() - F('date_created'))).values_list(
+                'type',
+                'id',
+                'age')
+
+            purge_counts = Counter()
+            max_purge_dates = {}
+            min_purge_dates = {}
+            purge_entries = sandbox_ages.union(dataset_ages,
+                                               all=True).order_by('-age')
+            for entry_type, entry_id, age in purge_entries:
+                if entry_type == 'r':
+                    run = ContainerRun.objects.get(id=entry_id)
+                    entry_size = run.sandbox_size
+                    sandbox_total -= run.sandbox_size
+                    entry_date = run.end_time
+                    logger.debug("Purged container run %d containing %s.",
+                                 run.pk,
+                                 filesizeformat(entry_size))
+                    try:
+                        run.delete_sandbox()
+                    except OSError:
+                        logger.error(u"Failed to purge container run %d at %r.",
+                                     run.id,
+                                     run.sandbox_path,
+                                     exc_info=True)
+                    run.sandbox_purged = True  # Don't try to purge it again.
+                    run.save()
+                else:
+                    assert entry_type == 'd'
+                    dataset = Dataset.objects.get(id=entry_id)
+                    entry_size = dataset.dataset_size
+                    dataset_total -= dataset.dataset_size
+                    entry_date = dataset.date_created
+                    logger.debug("Purged dataset %d containing %s.",
+                                 dataset.pk,
+                                 filesizeformat(entry_size))
+                    dataset.dataset_file.delete()
+                purge_counts[entry_type] += 1
+                purge_counts[entry_type + ' bytes'] += entry_size
+                min_purge_dates[entry_type] = min(entry_date,
+                                                  min_purge_dates.get(entry_type, entry_date))
+                max_purge_dates[entry_type] = max(entry_date,
+                                                  max_purge_dates.get(entry_type, entry_date))
+                remaining_storage -= entry_size
+                if remaining_storage <= stop:
                     break
-            logger.info("Purged %d sandboxes containing %s.",
-                        purged_count,
-                        filesizeformat(total_bytes_removed))
+            for entry_type, entry_name in (('r', 'container run'), ('d', 'dataset')):
+                purged_count = purge_counts[entry_type]
+                if not purged_count:
+                    continue
+                min_purge_date = min_purge_dates[entry_type]
+                max_purge_date = max_purge_dates[entry_type]
+                collective = entry_name + pluralize(purged_count)
+                bytes_removed = purge_counts[entry_type + ' bytes']
+                logger.info("Purged %d %s containing %s from %s to %s.",
+                            purged_count,
+                            collective,
+                            filesizeformat(bytes_removed),
+                            naturaltime(min_purge_date),
+                            naturaltime(max_purge_date))
+            if remaining_storage > stop:
+                remainders = []
+                for size, label in [(sandbox_total, 'container runs'),
+                                    (dataset_total, 'datasets')]:
+                    if size:
+                        remainders.append(u'{} of {}'.format(
+                            filesizeformat(size),
+                            label))
+                logger.error('Cannot reduce storage to %s: %s.',
+                             filesizeformat(stop),
+                             ', '.join(remainders))
+
+    def synch_model(self, model, path_field_name, wait, batch_size):
+        file_names = set()
+        total_files = total_bytes = 0
+        for file_name in chain(model.scan_file_names(), [None]):
+            if file_name is not None:
+                file_names.add(file_name)
+            if len(file_names) >= batch_size or file_name is None:
+                files_removed, bytes_removed = self.synch_model_files(
+                    model,
+                    path_field_name,
+                    file_names,
+                    wait)
+                total_files += files_removed
+                total_bytes += bytes_removed
+                file_names.clear()
+        if total_files:
+            # noinspection PyProtectedMember
+            logger.error(
+                'Purged %d unregistered %s file%s containing %s.',
+                total_files,
+                model._meta.verbose_name,
+                pluralize(total_files),
+                filesizeformat(total_bytes))
+
+    def synch_model_files(self, model, path_field_name, file_names, wait):
+        remove_older_than = timezone.now() - wait
+        values_list = model.objects.filter(
+            **{path_field_name+'__in': file_names}).values_list(path_field_name)
+        found_file_names = {file_name for file_name, in values_list}
+        unknown_file_names = file_names - found_file_names
+        bytes_removed = files_removed = 0
+        for file_name in sorted(unknown_file_names):
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+            file_stat = os.stat(file_path)
+            modification_time = datetime.fromtimestamp(
+                file_stat.st_mtime,
+                timezone.get_current_timezone())
+            if modification_time > remove_older_than:
+                continue
+            if os.path.isdir(file_path):
+                file_size = 0
+                for child_path, _, content_names in os.walk(file_path):
+                    for content_name in content_names:
+                        content_path = os.path.join(child_path, content_name)
+                        file_size += os.stat(content_path).st_size
+                shutil.rmtree(file_path)
+            else:
+                file_size = file_stat.st_size
+                os.remove(file_path)
+            logger.warning(
+                'Purged unregistered file %r containing %s.',
+                file_name.encode('ascii'),
+                filesizeformat(file_size))
+            files_removed += 1
+            bytes_removed += file_size
+        return files_removed, bytes_removed
