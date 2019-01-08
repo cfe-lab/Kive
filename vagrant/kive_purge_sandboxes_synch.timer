@@ -1,0 +1,9 @@
+[Unit]
+Description=Timer that launches the kive_purge_sandboxes_synch service
+
+[Timer]
+OnCalendar=weekly
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target
