@@ -4,14 +4,15 @@ from __future__ import unicode_literals
 import logging
 import os
 import re
+import shutil
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from tempfile import NamedTemporaryFile
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.db.models import Sum
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
@@ -563,9 +564,7 @@ class PurgeTests(TestCase):
         super(PurgeTests, self).setUp()
         install_fixture_files('container_run')
         os.mkdir(ContainerRun.SANDBOX_ROOT)
-        Dataset.set_dataset_sizes()
-        self.existing_storage = Dataset.objects.aggregate(
-                Sum('dataset_size'))['dataset_size__sum'] or 0
+        self.delete_existing_storage()
 
     def create_sandbox(self, age=timedelta(0), size=1):
         """ Create a run and its sandbox.
@@ -605,7 +604,13 @@ class PurgeTests(TestCase):
         with open(os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt'),
                   'w') as f:
             f.write(b'.' * stderr_size)
+
+        old_end_time = run.end_time
         runcontainer.Command().save_outputs(run)
+        if old_end_time is not None and run.end_time != old_end_time:
+            run.end_time = old_end_time
+            run.save()
+
         for run_dataset in run.datasets.filter(argument__type='O'):
             dataset = run_dataset.dataset
             dataset.date_created = timezone.now() - age
@@ -613,6 +618,28 @@ class PurgeTests(TestCase):
         for log in run.logs.all():
             log.date_created = timezone.now() - age
             log.save()
+
+    def delete_existing_storage(self):
+        for container in Container.objects.all():
+            container.file.delete()
+        try:
+            os.remove(os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR, 'README.md'))
+        except OSError:
+            pass
+        for run in ContainerRun.objects.filter(
+                sandbox_purged=False).exclude(
+                sandbox_path=''):
+            run.delete_sandbox()
+            run.sandbox_purged = True
+            run.save()
+        for log in ContainerLog.objects.exclude(long_text='').exclude(
+                long_text=None):
+            log.long_text.delete()
+        for dataset in Dataset.objects.exclude(dataset_file='').exclude(
+                dataset_file=None):
+            dataset.dataset_file.delete()
+        shutil.rmtree(os.path.join(settings.MEDIA_ROOT, Dataset.UPLOAD_DIR),
+                      ignore_errors=True)
 
     def test_purge_incomplete(self):
         run = self.create_sandbox(age=timedelta(minutes=10), size=100)
@@ -669,8 +696,7 @@ class PurgeTests(TestCase):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
 
-        purge.Command().handle(start=self.existing_storage+600,
-                               stop=self.existing_storage+400)
+        purge.Command().handle(start=600, stop=400)
 
         run1.refresh_from_db()
         run2.refresh_from_db()
@@ -681,8 +707,7 @@ class PurgeTests(TestCase):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
 
-        purge.Command().handle(start=self.existing_storage+400,
-                               stop=self.existing_storage+199)
+        purge.Command().handle(start=400, stop=199)
 
         run1.refresh_from_db()
         run2.refresh_from_db()
@@ -761,7 +786,7 @@ class PurgeTests(TestCase):
             yield mocked_stderr
 
     def assertLogStreamEqual(self, expected, messages):
-        cleaned_messages = re.sub(r'(run|dataset) \d+',
+        cleaned_messages = re.sub(r'(run|log|dataset) \d+',
                                   r'\1 <id>',
                                   messages).replace('\xa0', ' ')
         self.assertMultiLineEqual(expected, cleaned_messages.encode('ascii'))
@@ -875,8 +900,8 @@ Purged 11 unregistered container run files containing 11.0 KB.
         expected_messages = u"""\
 Purged container run <id> containing 300 bytes.
 Purged dataset <id> containing 200 bytes.
-Purged 1 container run containing 300 bytes from a minute ago to a minute ago.
-Purged 1 dataset containing 200 bytes from a minute ago to a minute ago.
+Purged 1 container run containing 300 bytes from a minute ago.
+Purged 1 dataset containing 200 bytes from a minute ago.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
             purge.Command().handle(start=150, stop=150, sandbox_aging=10)
@@ -887,13 +912,14 @@ Purged 1 dataset containing 200 bytes from a minute ago to a minute ago.
     def test_ignore_sandboxes_already_purged(self):
         run1 = self.create_sandbox(size=1000, age=timedelta(minutes=1))
         self.create_sandbox(size=100, age=timedelta(minutes=1))
-        run1.set_sandbox_size()
+        ContainerRun.set_sandbox_sizes()
+        run1.refresh_from_db()
         run1.delete_sandbox()
         run1.sandbox_purged = True
         run1.save()
 
         expected_messages = u"""\
-Nothing was purged.
+No purge needed for 100 bytes: 100 bytes of container runs.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
             purge.Command().handle(start=500, stop=500)
@@ -902,10 +928,6 @@ Nothing was purged.
         self.assertLogStreamEqual(expected_messages, log_messages)
 
     def test_unable_to_purge_enough(self):
-        # Purge existing datasets:
-        for dataset in Dataset.objects.all():
-            dataset.dataset_file.delete()
-
         run = self.create_sandbox(size=200, age=timedelta(minutes=1))
         self.create_outputs(run, output_size=100, age=timedelta(minutes=1))
 
@@ -920,8 +942,8 @@ Nothing was purged.
         expected_messages = u"""\
 Purged container run <id> containing 300 bytes.
 Purged dataset <id> containing 100 bytes.
-Purged 1 container run containing 300 bytes from a minute ago to a minute ago.
-Purged 1 dataset containing 100 bytes from a minute ago to a minute ago.
+Purged 1 container run containing 300 bytes from a minute ago.
+Purged 1 dataset containing 100 bytes from a minute ago.
 Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
@@ -931,10 +953,6 @@ Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
         self.assertLogStreamEqual(expected_messages, log_messages)
 
     def test_skip_purged_datasets(self):
-        # Purge existing datasets:
-        for dataset in Dataset.objects.all():
-            dataset.dataset_file.delete()
-
         run = self.create_sandbox(size=200, age=timedelta(minutes=1))
         self.create_outputs(run, output_size=1000, age=timedelta(minutes=1))
 
@@ -946,7 +964,7 @@ Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
         dataset.dataset_file.delete()
 
         expected_messages = u"""\
-Nothing was purged.
+No purge needed for 0 bytes: empty storage.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
             purge.Command().handle(start=500, stop=500)
@@ -992,9 +1010,114 @@ Purged 1 unregistered dataset file containing 100 bytes.
 Purged 11 container runs containing 1.1 KB from 12 minutes ago to 2 minutes ago.
 """
         with self.capture_log_stream(logging.INFO) as mocked_stderr:
-            purge.Command().handle(start=self.existing_storage+100,
-                                   stop=self.existing_storage+100,
-                                   batch_size=10)
+            purge.Command().handle(start=100, stop=100, batch_size=10)
             log_messages = mocked_stderr.getvalue()
 
         self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_container_log(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=10))
+        self.create_outputs(run,
+                            output_size=200,
+                            stdout_size=2100,
+                            age=timedelta(minutes=10))
+        log = run.logs.first()
+        log_path = log.long_text.name
+
+        purge.Command().handle(start=0, stop=0)
+
+        run.refresh_from_db()
+        log.refresh_from_db()
+        self.assertTrue(run.sandbox_purged)
+        self.assertEqual('', log.long_text)  # Purged.
+        self.assertFalse(os.path.exists(log_path))
+
+    def test_container_log_debugging(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=9))
+        self.create_outputs(run,
+                            output_size=200,
+                            stdout_size=2100,
+                            age=timedelta(minutes=10))
+        run.delete_sandbox()
+        run.sandbox_purged = True
+        run.save()
+        expected_messages = u"""\
+Purged dataset <id> containing 200 bytes.
+Purged container log <id> containing 2.1 KB.
+Purged 1 container log containing 2.1 KB from 9 minutes ago.
+Purged 1 dataset containing 200 bytes from 10 minutes ago.
+"""
+        with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
+            purge.Command().handle(start=0, stop=0)
+            log_messages = mocked_stderr.getvalue()
+
+        self.maxDiff = 1200
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_synch_container_log(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=9))
+        self.create_outputs(run,
+                            output_size=200,
+                            stdout_size=2100,
+                            age=timedelta(minutes=10))
+        log = run.logs.get(type='O')
+
+        logs_root = os.path.join(settings.MEDIA_ROOT, ContainerLog.UPLOAD_DIR)
+        extra_log_path = os.path.join(logs_root, 'extra.log')
+        with open(extra_log_path, 'w') as f:
+            f.write(b'.'*400)
+
+        purge.Command().handle(synch=True)
+
+        self.assertTrue(os.path.exists(os.path.join(settings.MEDIA_ROOT,
+                                                    log.long_text.name)))
+        self.assertFalse(os.path.exists(extra_log_path))
+
+    def test_synch_containers(self):
+        logs_root = os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR)
+        extra_log_path = os.path.join(logs_root, 'extra.simg')
+        with open(extra_log_path, 'w') as f:
+            f.write(b'.'*400)
+
+        expected_log_messages = """\
+Purged unregistered file 'Containers/extra.simg' containing 400 bytes.
+Purged 1 unregistered container file containing 400 bytes.
+"""
+
+        with self.capture_log_stream(logging.WARN) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_log_messages, log_messages)
+
+    def test_synch_missing_folders(self):
+        self.assertEqual("Testing", os.path.basename(settings.MEDIA_ROOT))
+        shutil.rmtree(ContainerRun.SANDBOX_ROOT,
+                      ignore_errors=True)
+        shutil.rmtree(os.path.join(settings.MEDIA_ROOT,
+                                   ContainerLog.UPLOAD_DIR),
+                      ignore_errors=True)
+        shutil.rmtree(os.path.join(settings.MEDIA_ROOT,
+                                   Dataset.UPLOAD_DIR),
+                      ignore_errors=True)
+
+        purge.Command().handle(synch=True)
+
+    def test_no_purging_containers(self):
+        family = ContainerFamily.objects.first()
+        container = family.containers.create(user=family.user)
+        with NamedTemporaryFile() as f:
+            f.write('.'*100)
+            container.file.save('new_container.simg', f)
+        prefix_length = len(Container.UPLOAD_DIR)
+        path_prefix = container.file.name[:prefix_length]
+
+        expected_log_messages = (
+            "Cannot reduce storage to 99 bytes: 100 bytes of containers.\n")
+
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(start=99, stop=99)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertEqual(Container.UPLOAD_DIR, path_prefix)
+        self.assertLogStreamEqual(expected_log_messages, log_messages)

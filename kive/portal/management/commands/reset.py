@@ -9,11 +9,21 @@ import file_access_utils
 import method.models
 import archive.models
 import librarian.models
+import container.models
 import datachecking.models
 
 
 class Command(BaseCommand):
     help = 'Resets the database and loads sample data.'
+    TARGETS = (
+        method.models.CodeResourceRevision.UPLOAD_DIR,
+        librarian.models.Dataset.UPLOAD_DIR,
+        archive.models.MethodOutput.UPLOAD_DIR,
+        datachecking.models.VerificationLog.UPLOAD_DIR,
+        settings.SANDBOX_PATH,
+        container.models.Container.UPLOAD_DIR,
+        container.models.ContainerLog.UPLOAD_DIR,
+        container.models.ContainerRun.SANDBOX_ROOT)
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -22,18 +32,11 @@ class Command(BaseCommand):
             dest="load",
             help="fixture name to load"
         )
-    
+
     def handle(self, *args, **options):
         fixture = options['load']
 
-        targets = [
-            method.models.CodeResourceRevision.UPLOAD_DIR,
-            librarian.models.Dataset.UPLOAD_DIR,
-            archive.models.MethodOutput.UPLOAD_DIR,
-            datachecking.models.VerificationLog.UPLOAD_DIR,
-            settings.SANDBOX_PATH
-        ]
-        for target in targets:
+        for target in self.TARGETS:
             target_path = os.path.join(settings.MEDIA_ROOT, target)
             if os.path.isdir(target_path):
                 shutil.rmtree(target_path)

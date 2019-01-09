@@ -18,7 +18,7 @@ from django.template.defaultfilters import filesizeformat, pluralize
 from django.utils import timezone
 from django.utils.dateparse import parse_duration
 
-from container.models import ContainerRun
+from container.models import ContainerRun, ContainerLog, Container
 from librarian.models import Dataset
 from portal.models import parse_file_size
 
@@ -83,50 +83,65 @@ class Command(BaseCommand):
                **kwargs):
         if synch:
             # noinspection PyTypeChecker
+            self.synch_model(Container, 'file', wait, batch_size)
+            # noinspection PyTypeChecker
             self.synch_model(ContainerRun, 'sandbox_path', wait, batch_size)
+            # noinspection PyTypeChecker
+            self.synch_model(ContainerLog, 'long_text', wait, batch_size)
             # noinspection PyTypeChecker
             self.synch_model(Dataset, 'dataset_file', wait, batch_size)
             Dataset.external_file_check(batch_size=batch_size)
         else:
-            runs_to_size = ContainerRun.objects.filter(
-                end_time__isnull=False,
-                sandbox_size__isnull=True,
-                sandbox_purged=False).exclude(sandbox_path='')
-            for run in runs_to_size:
-                run.set_sandbox_size()
-            sandbox_total = ContainerRun.objects.filter(
-                sandbox_purged=False).aggregate(
-                Sum('sandbox_size'))['sandbox_size__sum'] or 0
+            Container.set_file_sizes()
+            container_total = Container.known_storage_used()
+
+            ContainerRun.set_sandbox_sizes()
+            sandbox_total = ContainerRun.known_storage_used()
+
+            ContainerLog.set_log_sizes()
+            log_total = ContainerLog.known_storage_used()
 
             Dataset.set_dataset_sizes()
-            dataset_total = Dataset.objects.exclude(
-                dataset_file='').exclude(  # Already purged.
-                dataset_file=None).aggregate(  # External file.
-                Sum('dataset_size'))['dataset_size__sum'] or 0
+            dataset_total = Dataset.known_storage_used()
 
-            total_storage = remaining_storage = sandbox_total + dataset_total
+            total_storage = remaining_storage = (
+                    container_total + sandbox_total + log_total + dataset_total)
             if total_storage <= start:
-                logger.debug(u"Nothing was purged.")
+                storage_text = self.summarize_storage(container_total,
+                                                      dataset_total,
+                                                      sandbox_total,
+                                                      log_total)
+                logger.debug(u"No purge needed for %s: %s.",
+                             filesizeformat(total_storage),
+                             storage_text)
                 return
 
             sandbox_ages = ContainerRun.find_unneeded().annotate(
-                type=Value('r', models.CharField()),
+                entry_type=Value('r', models.CharField()),
                 age=sandbox_aging * (Now() - F('end_time'))).values_list(
-                'type',
+                'entry_type',
+                'id',
+                'age')
+
+            log_ages = ContainerLog.find_unneeded().annotate(
+                entry_type=Value('l', models.CharField()),
+                age=log_aging * (Now() - F('run__end_time'))).values_list(
+                'entry_type',
                 'id',
                 'age')
 
             dataset_ages = Dataset.find_unneeded().annotate(
-                type=Value('d', models.CharField()),
+                entry_type=Value('d', models.CharField()),
                 age=dataset_aging * (Now() - F('date_created'))).values_list(
-                'type',
+                'entry_type',
                 'id',
                 'age')
 
             purge_counts = Counter()
             max_purge_dates = {}
             min_purge_dates = {}
-            purge_entries = sandbox_ages.union(dataset_ages,
+            purge_entries = sandbox_ages.union(log_ages,
+                                               dataset_ages,
                                                all=True).order_by('-age')
             while remaining_storage > stop:
                 entry_count = 0
@@ -135,7 +150,6 @@ class Command(BaseCommand):
                     if entry_type == 'r':
                         run = ContainerRun.objects.get(id=entry_id)
                         entry_size = run.sandbox_size
-                        sandbox_total -= run.sandbox_size
                         entry_date = run.end_time
                         logger.debug("Purged container run %d containing %s.",
                                      run.pk,
@@ -149,6 +163,14 @@ class Command(BaseCommand):
                                          exc_info=True)
                         run.sandbox_purged = True  # Don't try to purge it again.
                         run.save()
+                    elif entry_type == 'l':
+                        log = ContainerLog.objects.get(id=entry_id)
+                        entry_size = log.log_size
+                        entry_date = log.run.end_time
+                        logger.debug("Purged container log %d containing %s.",
+                                     log.id,
+                                     filesizeformat(entry_size))
+                        log.long_text.delete()
                     else:
                         assert entry_type == 'd'
                         dataset = Dataset.objects.get(id=entry_id)
@@ -161,8 +183,11 @@ class Command(BaseCommand):
                         dataset.dataset_file.delete()
                     purge_counts[entry_type] += 1
                     purge_counts[entry_type + ' bytes'] += entry_size
+                    # PyCharm false positives...
+                    # noinspection PyUnresolvedReferences
                     min_purge_dates[entry_type] = min(entry_date,
                                                       min_purge_dates.get(entry_type, entry_date))
+                    # noinspection PyUnresolvedReferences
                     max_purge_dates[entry_type] = max(entry_date,
                                                       max_purge_dates.get(entry_type, entry_date))
                     remaining_storage -= entry_size
@@ -170,7 +195,9 @@ class Command(BaseCommand):
                         break
                 if entry_count == 0:
                     break
-            for entry_type, entry_name in (('r', 'container run'), ('d', 'dataset')):
+            for entry_type, entry_name in (('r', 'container run'),
+                                           ('l', 'container log'),
+                                           ('d', 'dataset')):
                 purged_count = purge_counts[entry_type]
                 if not purged_count:
                     continue
@@ -178,23 +205,39 @@ class Command(BaseCommand):
                 max_purge_date = max_purge_dates[entry_type]
                 collective = entry_name + pluralize(purged_count)
                 bytes_removed = purge_counts[entry_type + ' bytes']
-                logger.info("Purged %d %s containing %s from %s to %s.",
+                start_text = naturaltime(min_purge_date)
+                end_text = naturaltime(max_purge_date)
+                date_range = (start_text
+                              if start_text == end_text
+                              else start_text + ' to ' + end_text)
+                logger.info("Purged %d %s containing %s from %s.",
                             purged_count,
                             collective,
                             filesizeformat(bytes_removed),
-                            naturaltime(min_purge_date),
-                            naturaltime(max_purge_date))
+                            date_range)
             if remaining_storage > stop:
-                remainders = []
-                for size, label in [(sandbox_total, 'container runs'),
-                                    (dataset_total, 'datasets')]:
-                    if size:
-                        remainders.append(u'{} of {}'.format(
-                            filesizeformat(size),
-                            label))
+                storage_text = self.summarize_storage(container_total,
+                                                      dataset_total)
                 logger.error('Cannot reduce storage to %s: %s.',
                              filesizeformat(stop),
-                             ', '.join(remainders))
+                             storage_text)
+
+    def summarize_storage(self,
+                          container_total,
+                          dataset_total,
+                          sandbox_total=0,
+                          log_total=0):
+        remainders = []
+        for size, label in [(container_total, 'containers'),
+                            (sandbox_total, 'container runs'),
+                            (log_total, 'container logs'),
+                            (dataset_total, 'datasets')]:
+            if size:
+                remainders.append(u'{} of {}'.format(
+                    filesizeformat(size),
+                    label))
+        storage_text = ', '.join(remainders) if remainders else 'empty storage'
+        return storage_text
 
     def synch_model(self, model, path_field_name, wait, batch_size):
         file_names = set()

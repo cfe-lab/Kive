@@ -15,14 +15,11 @@ from django.utils.dateparse import parse_datetime
 from django.utils.timezone import utc
 from django.conf import settings
 
-import archive.models
-import datachecking.models
 from container.models import ContainerFamily, ContainerArgument, Container
 from file_access_utils import compute_md5
 import kive.testing_utils as tools
 from librarian.models import Dataset
 from metadata.models import CompoundDatatype, everyone_group
-import method.models
 from method.models import CodeResource, MethodFamily, Method,\
     CodeResourceRevision
 import pipeline.models
@@ -30,6 +27,7 @@ from pipeline.models import PipelineFamily
 import sandbox.tests
 from fleet.workers import Manager
 from fleet.tests_slurmscheduler import execute_simple_run, execute_nested_run
+from portal.management.commands.reset import Command as ResetCommand
 
 
 class FixtureBuilder(object):
@@ -88,16 +86,7 @@ class FixtureBuilder(object):
         os.remove(before_filename)
         os.remove(after_filename)
 
-        # If any files were created at this time, we have to stash them in the appropriate place.
-        targets = [
-            method.models.CodeResourceRevision.UPLOAD_DIR,
-            Dataset.UPLOAD_DIR,
-            archive.models.MethodOutput.UPLOAD_DIR,
-            datachecking.models.VerificationLog.UPLOAD_DIR,
-            settings.SANDBOX_PATH
-        ]
-
-        for target in targets:
+        for target in ResetCommand.TARGETS:
             target_path = os.path.join(settings.MEDIA_ROOT, target)
             fixture_name, _extension = os.path.splitext(self.get_name())
             fixture_files_path = os.path.join("FixtureFiles", fixture_name, target)
@@ -1270,7 +1259,7 @@ class ContainerRunBuilder(FixtureBuilder):
         container = family.containers.create(
             tag='vFixture',
             user=user,
-            file='CodeResources/kive-default.simg')
+            file='Containers/kive-default.simg')
         app = container.apps.create()
         arg1 = app.arguments.create(type=ContainerArgument.INPUT,
                                     name='names_csv',
@@ -1288,7 +1277,7 @@ class ContainerRunBuilder(FixtureBuilder):
         readme_path = os.path.join(upload_path, 'README.md')
         os.makedirs(upload_path)
         with open(readme_path, 'w') as f:
-            f.write('Just a placeholder to create the folder for containrs.')
+            f.write('Just a placeholder to create the folder for containers.')
 
 
 class Command(BaseCommand):

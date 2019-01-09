@@ -114,7 +114,7 @@ class ContainerFileField(models.FileField):
 
 
 class Container(AccessControl):
-    UPLOAD_DIR = "CodeResources"
+    UPLOAD_DIR = "Containers"
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
     file = ContainerFileField(
@@ -137,6 +137,11 @@ class Container(AccessControl):
     created = models.DateTimeField(
         auto_now_add=True,
         help_text="When this was added to Kive.")
+    file_size = models.BigIntegerField(
+        blank=True,
+        null=True,
+        help_text="Size of the container file in bytes.  If null, this has "
+                  "not been computed yet.")
 
     # Related models get set later.
     methods = None
@@ -180,6 +185,41 @@ class Container(AccessControl):
     def remove(self):
         removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
+
+    @classmethod
+    def scan_file_names(cls):
+        """ Yield all file names, relative to MEDIA_ROOT. """
+        relative_root = Container.UPLOAD_DIR
+        absolute_root = os.path.join(settings.MEDIA_ROOT, relative_root)
+        if not os.path.exists(absolute_root):
+            return
+
+        for file_name in os.listdir(absolute_root):
+            yield os.path.join(relative_root, file_name)
+
+    @classmethod
+    def set_file_sizes(cls):
+        """ Set all missing file sizes. """
+        to_set = cls.objects.filter(
+            file__isnull=False,
+            file_size__isnull=True).exclude(file='')
+        for x in to_set:
+            try:
+                x.file_size = x.file.size
+                x.save()
+            except OSError:
+                logger.error('Failed to set file size for container id %d.',
+                             x.id,
+                             exc_info=True)
+
+    @classmethod
+    def known_storage_used(cls):
+        """ Get the total amount of active storage recorded. """
+
+        return cls.objects.exclude(
+            file='').exclude(  # Purged for some reason
+            file=None).aggregate(  # No file?
+            models.Sum('file_size'))['file_size__sum'] or 0
 
 
 class ContainerApp(models.Model):
@@ -566,13 +606,23 @@ class ContainerRun(Stopwatch, AccessControl):
             size_accumulator += os.path.getsize(file_path)
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
-    def set_sandbox_size(self):
-        """
-        Record the sandbox size.
-        :return:
-        """
-        self.sandbox_size = self.calculate_sandbox_size()
-        self.save()
+    @classmethod
+    def set_sandbox_sizes(cls):
+        runs_to_size = cls.objects.filter(
+            end_time__isnull=False,
+            sandbox_size__isnull=True,
+            sandbox_purged=False).exclude(sandbox_path='')
+        for run in runs_to_size:
+            run.sandbox_size = run.calculate_sandbox_size()
+            run.save()
+
+    @classmethod
+    def known_storage_used(cls):
+        """ Get the total amount of active storage recorded. """
+
+        return cls.objects.filter(
+            sandbox_purged=False).aggregate(
+            models.Sum('sandbox_size'))['sandbox_size__sum'] or 0
 
     def delete_sandbox(self):
         """
@@ -604,6 +654,7 @@ class ContainerRun(Stopwatch, AccessControl):
 
     @classmethod
     def find_unneeded(cls):
+        """ A queryset of records that could be purged. """
         return cls.objects.filter(sandbox_purged=False,
                                   end_time__isnull=False).exclude(
             sandbox_path='')
@@ -613,6 +664,8 @@ class ContainerRun(Stopwatch, AccessControl):
         """ Yield all file names, relative to MEDIA_ROOT. """
         relative_root = os.path.relpath(ContainerRun.SANDBOX_ROOT,
                                         settings.MEDIA_ROOT)
+        if not os.path.exists(ContainerRun.SANDBOX_ROOT):
+            return
 
         for file_name in os.listdir(ContainerRun.SANDBOX_ROOT):
             file_path = os.path.join(ContainerRun.SANDBOX_ROOT, file_name)
@@ -670,8 +723,7 @@ class ContainerLog(models.Model):
         blank=True,
         null=True,
         help_text="Size of the log file in bytes.  If null, this has not been computed yet, or the log is short"
-                  "and not stored in a file."
-    )
+                  "and not stored in a file.")
 
     objects = None  # Filled in later by Django.
 
@@ -704,8 +756,7 @@ class ContainerLog(models.Model):
         """
         logs_to_set = cls.objects.filter(
             long_text__isnull=False,
-            log_size__isnull=True
-        )
+            log_size__isnull=True).exclude(long_text='')
         for log in logs_to_set:
             with transaction.atomic():
                 try:
@@ -717,13 +768,11 @@ class ContainerLog(models.Model):
 
     @classmethod
     def known_storage_used(cls):
-        """
-        Get the total amount of storage used by all ContainerLogs.
-        :return:
-        """
-        return cls.objects.filter(long_text__isnull=False, log_size__isnull=False).aggregate(
-            total_bytes=models.Sum("log_size")
-        )["total_bytes"]
+        """ Get the total amount of active storage recorded. """
+        return cls.objects.exclude(
+            long_text='').exclude(  # Already purged.
+            long_text=None).aggregate(  # Short text.
+            models.Sum('log_size'))['log_size__sum'] or 0
 
     @staticmethod
     def _currently_used_by_container():
@@ -742,6 +791,22 @@ class ContainerLog(models.Model):
         :return:
         """
         return self.run.state in ContainerRun.ACTIVE_STATES
+
+    @classmethod
+    def find_unneeded(cls):
+        """ A queryset of records that could be purged. """
+        return cls.objects.exclude(long_text=None).exclude(long_text='')
+
+    @classmethod
+    def scan_file_names(cls):
+        """ Yield all file names, relative to MEDIA_ROOT. """
+        relative_root = ContainerLog.UPLOAD_DIR
+        absolute_root = os.path.join(settings.MEDIA_ROOT, relative_root)
+        if not os.path.exists(absolute_root):
+            return
+
+        for file_name in os.listdir(absolute_root):
+            yield os.path.join(relative_root, file_name)
 
     @classmethod
     def purge_registered_logs(cls, bytes_to_purge, date_cutoff=None):

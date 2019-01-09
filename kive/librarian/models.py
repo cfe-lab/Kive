@@ -1334,15 +1334,11 @@ class Dataset(metadata.models.AccessControl):
 
     @classmethod
     def known_storage_used(cls):
-        """
-        Get the total amount of storage used by all Datasets.
-        :return:
-        """
-        return cls.objects.exclude(dataset_file='').filter(
-            dataset_file__isnull=False,
-            dataset_size__isnull=False).aggregate(
-            total_bytes=models.Sum("dataset_size")
-        )["total_bytes"]
+        """ Get the total amount of active storage recorded. """
+        return cls.objects.exclude(
+            dataset_file='').exclude(  # Already purged.
+            dataset_file=None).aggregate(  # External file.
+            models.Sum("dataset_size"))["dataset_size__sum"] or 0
 
     @classmethod
     def set_dataset_sizes(cls):

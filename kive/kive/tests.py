@@ -240,7 +240,7 @@ def install_fixture_files(fixture_name):
         shutil.copytree(dir_to_install, target_path)
 
     test_container_path = os.path.join(settings.MEDIA_ROOT,
-                                       'CodeResources',
+                                       'Containers',
                                        settings.DEFAULT_CONTAINER)
     if not os.path.exists(test_container_path):
         alpine_container_path = os.path.abspath(os.path.join(
