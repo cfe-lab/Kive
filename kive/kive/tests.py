@@ -239,8 +239,10 @@ def install_fixture_files(fixture_name):
         dir_to_install = os.path.join(fixture_files_path, target)
         shutil.copytree(dir_to_install, target_path)
 
-    test_container_path = os.path.join(settings.MEDIA_ROOT,
-                                       'Containers',
+    containers_path = os.path.join(settings.MEDIA_ROOT, 'Containers')
+    if not os.path.exists(containers_path):
+        os.makedirs(containers_path)
+    test_container_path = os.path.join(containers_path,
                                        settings.DEFAULT_CONTAINER)
     if not os.path.exists(test_container_path):
         alpine_container_path = os.path.abspath(os.path.join(

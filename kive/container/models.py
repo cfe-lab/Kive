@@ -656,7 +656,7 @@ class ContainerRun(Stopwatch, AccessControl):
     def find_unneeded(cls):
         """ A queryset of records that could be purged. """
         return cls.objects.filter(sandbox_purged=False,
-                                  end_time__isnull=False).exclude(
+                                  sandbox_size__isnull=False).exclude(
             sandbox_path='')
 
     @classmethod
@@ -795,7 +795,10 @@ class ContainerLog(models.Model):
     @classmethod
     def find_unneeded(cls):
         """ A queryset of records that could be purged. """
-        return cls.objects.exclude(long_text=None).exclude(long_text='')
+        return cls.objects.exclude(
+            long_text=None).exclude(  # short log
+            long_text='').exclude(  # purged log
+            log_size=None)  # new log
 
     @classmethod
     def scan_file_names(cls):

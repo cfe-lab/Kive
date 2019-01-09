@@ -1376,7 +1376,8 @@ class Dataset(metadata.models.AccessControl):
             pk__in=active_datasets).exclude(  # Don't purge while it's in use.
             pk__in=uploads).exclude(  # Never purge uploads.
             dataset_file=None).exclude(  # External file.
-            dataset_file='')  # Already purged.
+            dataset_file='').exclude(  # Already purged.
+            dataset_size=None)  # New dataset.
         return unneeded
 
     @classmethod

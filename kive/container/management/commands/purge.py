@@ -10,7 +10,6 @@ from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import models
-from django.db.models.aggregates import Sum
 from django.db.models.expressions import Value, F
 from django.db.models.functions import Now
 
@@ -82,13 +81,9 @@ class Command(BaseCommand):
                batch_size=100,
                **kwargs):
         if synch:
-            # noinspection PyTypeChecker
             self.synch_model(Container, 'file', wait, batch_size)
-            # noinspection PyTypeChecker
             self.synch_model(ContainerRun, 'sandbox_path', wait, batch_size)
-            # noinspection PyTypeChecker
             self.synch_model(ContainerLog, 'long_text', wait, batch_size)
-            # noinspection PyTypeChecker
             self.synch_model(Dataset, 'dataset_file', wait, batch_size)
             Dataset.external_file_check(batch_size=batch_size)
         else:
@@ -216,6 +211,9 @@ class Command(BaseCommand):
                             filesizeformat(bytes_removed),
                             date_range)
             if remaining_storage > stop:
+                # Refresh totals, because new records may have appeared.
+                container_total = Container.known_storage_used()
+                dataset_total = Dataset.known_storage_used()
                 storage_text = self.summarize_storage(container_total,
                                                       dataset_total)
                 logger.error('Cannot reduce storage to %s: %s.',
