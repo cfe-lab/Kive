@@ -84,9 +84,9 @@ API.
 What are we working on?
 -----------------------
 
-You can see active tasks on [our project board][waffle].
+You can see active tasks on our [GitHub project].
 
-[waffle]: https://waffle.io/cfe-lab/kive
+[GitHub project]: https://github.com/cfe-lab/Kive/issues
 
 Development
 -----------

@@ -6,16 +6,16 @@
 set -e
 
 echo "Dumping kive database."
+mkdir --parents dumps
 
-sudo -u kive pg_dump -n public kive > db_data.sql
+sudo -u kive pg_dump -n public kive > dumps/db_data.sql
 
 echo "Dumping data files."
-mkdir --parents media_root_backup
 
 sudo chmod o+rx /var/kive
 rsync -a --delete --exclude ContainerRuns --exclude Sandboxes \
     /var/kive/media_root/ \
-    media_root_backup
+    dumps/media_root
 sudo chmod o-rx /var/kive
 
 echo "Dumped."

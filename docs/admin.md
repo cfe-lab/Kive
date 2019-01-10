@@ -6,6 +6,27 @@ subtitle: looking after a Kive server
 This page should help you look after Kive, Slurm, and PostgreSQL. If you don't find your answers here, consider adding
 some notes and a link to the documentation you found somewhere else.
 
+## Installing a new server ##
+This is closely related to the tasks for deploying a release in the
+CONTRIBUTING.md file, but there are extra tasks that only need to be done once.
+We try to keep the vagrant scripts up to date, so you can experiment with a
+working installation. This is a high level description of the tasks that are
+detailed in those scripts.
+
+* Install PostgreSQL - main database for the project
+* Install Singularity - isolates developer pipelines from the host machine
+* Install Docker - for backward compatibility, now replaced by Singularity
+* Install MySQL/MariDB - stores Slurm's accounting data
+* Install Slurm - allocates memory and processors for multiple jobs across the
+    cluster
+* Install Apache - web server, runs as kive user
+* Install virtual environment for Python - isolates Python libraries from the
+    system version of Python
+* Install pip - another Python installation tool
+* Install Kive - the Python source code for this project
+* Install Kive purge tasks - scheduled tasks under systemd
+* Create Kive database
+
 ## Restarting a compute node ##
 Sometimes, we have to restart compute nodes. The most common cause is a memory leak. We can see the memory available
 with this command:

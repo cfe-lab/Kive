@@ -17,5 +17,6 @@ fi
 
 sudo -u postgres dropdb kive
 sudo -u postgres dropuser kive
+sudo rm -rf /var/kive/media_root
 
 echo "Database dropped."

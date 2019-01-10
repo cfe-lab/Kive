@@ -54,14 +54,24 @@ systemctl restart slurmctld
 
 echo ========== Installing Apache ==========
 apt-get install -qq apache2 libapache2-mod-wsgi
+
+useradd --system kive
+mkdir /home/kive /etc/kive /var/log/kive
+chown kive:kive /home/kive /etc/kive /var/log/kive
+chmod go-rx /home/kive /etc/kive /var/log/kive
+
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/apache2/sites-available/
 a2ensite 001-kive
 sed -ie 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf
 sed -ie 's/Listen 80$/Listen 8080/' /etc/apache2/ports.conf
-cp /usr/local/share/Kive/vagrant_ubuntu/.pam_environment /home/vagrant/.pam_environment
-chown vagrant:vagrant /home/vagrant/.pam_environment
 cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/apache2/envvars
-. /usr/local/share/Kive/vagrant_ubuntu/envvars.conf
+echo "
+export KIVE_LOG=/var/log/kive/kive_apache.log
+export APACHE_RUN_USER=kive
+export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars
+# KIVE_SECRET_KEY gets added to /etc/apache2/envvars in the Kive section below.
+
+. /usr/local/share/Kive/vagrant_ubuntu/envvars.conf  # Lets this script run manage.py
 systemctl restart apache2
 
 echo ========== Installing virtualenv ==========
@@ -82,14 +92,10 @@ apt-get install -qq python-dev libsqlite3-dev wamerican graphviz libgraphviz-dev
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..
-mkdir --parents \
-    vagrant_ubuntu/media_root_backup/CodeResources \
-    vagrant_ubuntu/media_root_backup/Datasets \
-    vagrant_ubuntu/media_root_backup/Logs \
-    /var/kive/media_root
-chown vagrant:vagrant /var/kive/media_root
-ln -s /usr/local/share/Kive/vagrant_ubuntu/media_root_backup/* \
-    /var/kive/media_root/
+mkdir --parents /var/kive/media_root
+chown -R kive:kive /var/kive
+chmod go-rx /var/kive
+
 ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r requirements-dev.txt
 if [ ! -f kive/kive/settings.py ]; then
@@ -97,9 +103,28 @@ if [ ! -f kive/kive/settings.py ]; then
 fi
 cd kive
 ./manage.py collectstatic
+./manage.py shell -c "
+from django.core.management.utils import get_random_secret_key
+print('export KIVE_SECRET_KEY='+repr(get_random_secret_key()))" >> /etc/apache2/envvars
+systemctl restart apache2
 
-cd ../vagrant_ubuntu
-sudo -u vagrant ./dbcreate.sh
+echo ========== Installing Kive purge tasks ==========
+cd /etc/systemd/system
+cp /usr/local/share/Kive/vagrant/kive_purge.service .
+cp /usr/local/share/Kive/vagrant/kive_purge.timer .
+cp /usr/local/share/Kive/vagrant/kive_purge_synch.service .
+cp /usr/local/share/Kive/vagrant/kive_purge_synch.timer .
+cp /usr/local/share/Kive/vagrant/kive_purge.conf /etc/kive/
+systemctl enable kive_purge.service
+systemctl enable kive_purge.timer
+systemctl start kive_purge.timer
+systemctl enable kive_purge_synch.service
+systemctl enable kive_purge_synch.timer
+systemctl start kive_purge_synch.timer
+
+echo ========== Creating Kive database ==========
+cd /usr/local/share/Kive/vagrant_ubuntu
+./dbcreate.sh
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:

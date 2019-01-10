@@ -105,6 +105,7 @@ chmod go-rx /home/kive /etc/kive /var/log/kive
 
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
 sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd
+echo "KIVE_LOG=/var/log/kive/kive_apache.log" >> /etc/sysconfig/httpd
 # KIVE_SECRET_KEY gets added to /etc/sysconfig/httpd in the Kive section below.
 
 chmod g-r,o-r /etc/sysconfig/httpd
@@ -140,7 +141,7 @@ if [ ! -f kive/kive/settings.py ]; then
     cp kive/kive/settings_default.py kive/kive/settings.py
 fi
 
-. vagrant_ubuntu/.pam_environment
+. vagrant_ubuntu/envvars.conf  # Lets this script run manage.py
 cd kive
 ./manage.py collectstatic
 ./manage.py shell -c "
