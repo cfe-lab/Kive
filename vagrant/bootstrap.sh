@@ -98,12 +98,19 @@ echo ========== Installing Apache ==========
 # httpd is already installed.
 yum install -q -y mod_wsgi
 
+useradd --system kive
+mkdir /home/kive /etc/kive /var/log/kive
+chown kive:kive /home/kive /etc/kive /var/log/kive
+chmod go-rx /home/kive /etc/kive /var/log/kive
+
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
 sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd
+# KIVE_SECRET_KEY gets added to /etc/sysconfig/httpd in the Kive section below.
+
 chmod g-r,o-r /etc/sysconfig/httpd
 sed -e 's/Listen 80$/Listen 8080/' \
-    -e 's/User apache$/User vagrant/' \
-    -e 's/Group apache$/Group vagrant/' -i /etc/httpd/conf/httpd.conf
+    -e 's/User apache$/User kive/' \
+    -e 's/Group apache$/Group kive/' -i /etc/httpd/conf/httpd.conf
 systemctl enable httpd
 systemctl start httpd
 
@@ -124,14 +131,9 @@ yum install -q -y python-devel libsqlite3x-devel words lsof graphviz graphviz-de
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..
-mkdir --parents \
-    vagrant_ubuntu/media_root_backup/CodeResources \
-    vagrant_ubuntu/media_root_backup/Datasets \
-    vagrant_ubuntu/media_root_backup/Logs \
-    /var/kive/media_root
-chown vagrant:vagrant /var/kive/media_root
-ln -s /usr/local/share/Kive/vagrant_ubuntu/media_root_backup/* \
-    /var/kive/media_root/
+mkdir --parents /var/kive/media_root
+chown -R kive:kive /var/kive
+chmod go-rx /var/kive
 ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r requirements-dev.txt
 if [ ! -f kive/kive/settings.py ]; then
@@ -141,23 +143,30 @@ fi
 . vagrant_ubuntu/.pam_environment
 cd kive
 ./manage.py collectstatic
-cd ../vagrant_ubuntu
-sudo -u vagrant ./dbcreate.sh
+./manage.py shell -c "
+from django.core.management.utils import get_random_secret_key
+print('KIVE_SECRET_KEY='+repr(get_random_secret_key()))" >> /etc/sysconfig/httpd
+systemctl restart httpd
+
+echo ========== Installing Kive purge tasks ==========
+cd /etc/systemd/system
+cp /usr/local/share/Kive/vagrant/kive_purge.service .
+cp /usr/local/share/Kive/vagrant/kive_purge.timer .
+cp /usr/local/share/Kive/vagrant/kive_purge_synch.service .
+cp /usr/local/share/Kive/vagrant/kive_purge_synch.timer .
+cp /usr/local/share/Kive/vagrant/kive_purge.conf /etc/kive/
+systemctl enable kive_purge.service
+systemctl enable kive_purge.timer
+systemctl start kive_purge.timer
+systemctl enable kive_purge_synch.service
+systemctl enable kive_purge_synch.timer
+systemctl start kive_purge_synch.timer
+
+echo ========== Creating Kive database ==========
+cd /usr/local/share/Kive/vagrant_ubuntu
+./dbcreate.sh
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:
 # cd /usr/local/share/Kive/kive
 # ./manage.py runserver 0.0.0.0:8000
-
-echo ========== Installing Kive purge tasks ==========
-cd /etc/systemd/system
-cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes.service .
-cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes.timer .
-cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes_synch.service .
-cp /usr/local/share/Kive/vagrant/kive_purge_sandboxes_synch.timer .
-systemctl enable kive_purge_sandboxes.service
-systemctl enable kive_purge_sandboxes.timer
-systemctl start kive_purge_sandboxes.timer
-systemctl enable kive_purge_sandboxes_synch.service
-systemctl enable kive_purge_sandboxes_synch.timer
-systemctl start kive_purge_sandboxes_synch.timer

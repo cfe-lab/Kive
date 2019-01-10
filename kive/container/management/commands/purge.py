@@ -81,12 +81,15 @@ class Command(BaseCommand):
                batch_size=100,
                **kwargs):
         if synch:
+            logger.debug('Starting purge synchronization.')
             self.synch_model(Container, 'file', wait, batch_size)
             self.synch_model(ContainerRun, 'sandbox_path', wait, batch_size)
             self.synch_model(ContainerLog, 'long_text', wait, batch_size)
             self.synch_model(Dataset, 'dataset_file', wait, batch_size)
             Dataset.external_file_check(batch_size=batch_size)
+            logger.debug('Finished purge synchronization.')
         else:
+            logger.debug('Starting purge.')
             Container.set_file_sizes()
             container_total = Container.known_storage_used()
 

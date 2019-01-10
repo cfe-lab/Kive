@@ -7,10 +7,15 @@ set -e
 
 echo "Dumping kive database."
 
-pg_dump -n public kive > db_data.sql
+sudo -u kive pg_dump -n public kive > db_data.sql
 
-echo "Dumping CodeResources."
-mkdir --parents media_root_backup/CodeResources
-rsync -a --delete /var/kive/media_root/CodeResources media_root_backup
+echo "Dumping data files."
+mkdir --parents media_root_backup
+
+sudo chmod o+rx /var/kive
+rsync -a --delete --exclude ContainerRuns --exclude Sandboxes \
+    /var/kive/media_root/ \
+    media_root_backup
+sudo chmod o-rx /var/kive
 
 echo "Dumped."

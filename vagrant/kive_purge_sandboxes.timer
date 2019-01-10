@@ -1,9 +1,0 @@
-[Unit]
-Description=Timer that launches the kive_purge_sandboxes service
-
-[Timer]
-OnCalendar=hourly
-
-# This activates the timer on (multi-user) startup.
-[Install]
-WantedBy=multi-user.target

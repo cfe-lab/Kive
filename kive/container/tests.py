@@ -809,6 +809,7 @@ Purged 2 container runs containing 300 bytes from 11 minutes ago to 10 minutes a
         self.create_sandbox(age=timedelta(minutes=10), size=200)
         self.create_sandbox(age=timedelta(minutes=9), size=400)
         expected_messages = u"""\
+Starting purge.
 Purged container run <id> containing 100 bytes.
 Purged container run <id> containing 200 bytes.
 Purged 2 container runs containing 300 bytes from 11 minutes ago to 10 minutes ago.
@@ -898,6 +899,7 @@ Purged 11 unregistered container run files containing 11.0 KB.
         self.create_outputs(run, output_size=200, age=timedelta(minutes=1))
 
         expected_messages = u"""\
+Starting purge.
 Purged container run <id> containing 300 bytes.
 Purged dataset <id> containing 200 bytes.
 Purged 1 container run containing 300 bytes from a minute ago.
@@ -919,6 +921,7 @@ Purged 1 dataset containing 200 bytes from a minute ago.
         run1.save()
 
         expected_messages = u"""\
+Starting purge.
 No purge needed for 100 bytes: 100 bytes of container runs.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
@@ -940,6 +943,7 @@ No purge needed for 100 bytes: 100 bytes of container runs.
         Dataset.create_dataset(output_path, name='extra.txt', user=user)
 
         expected_messages = u"""\
+Starting purge.
 Purged container run <id> containing 300 bytes.
 Purged dataset <id> containing 100 bytes.
 Purged 1 container run containing 300 bytes from a minute ago.
@@ -964,6 +968,7 @@ Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
         dataset.dataset_file.delete()
 
         expected_messages = u"""\
+Starting purge.
 No purge needed for 0 bytes: empty storage.
 """
         with self.capture_log_stream(logging.DEBUG) as mocked_stderr:
@@ -1042,6 +1047,7 @@ Purged 11 container runs containing 1.1 KB from 12 minutes ago to 2 minutes ago.
         run.sandbox_purged = True
         run.save()
         expected_messages = u"""\
+Starting purge.
 Purged dataset <id> containing 200 bytes.
 Purged container log <id> containing 2.1 KB.
 Purged 1 container log containing 2.1 KB from 9 minutes ago.

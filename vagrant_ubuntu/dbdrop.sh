@@ -16,6 +16,6 @@ if [ "$confirmed" = "${confirmed#[Yy]}" ] ;then
 fi
 
 sudo -u postgres dropdb kive
-sudo -u postgres dropuser vagrant
+sudo -u postgres dropuser kive
 
 echo "Database dropped."

@@ -296,8 +296,8 @@ SANDBOX_PATH = "Sandboxes"
 
 # Settings for the purge task. How much storage triggers a purge, and how much
 # will stop the purge.
-PURGE_START = os.environ.get('KIVE_PURGE_START', '20 GB')
-PURGE_STOP = os.environ.get('KIVE_PURGE_STOP', '15 GB')
+PURGE_START = os.environ.get('KIVE_PURGE_START', '20GB')
+PURGE_STOP = os.environ.get('KIVE_PURGE_STOP', '15GB')
 # How fast the different types of storage get purged. Higher aging gets purged faster.
 PURGE_DATASET_AGING = os.environ.get('KIVE_PURGE_DATASET_AGING', '1.0')
 PURGE_LOG_AGING = os.environ.get('KIVE_PURGE_LOG_AGING', '10.0')
