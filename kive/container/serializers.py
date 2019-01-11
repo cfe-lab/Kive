@@ -282,6 +282,7 @@ class ContainerRunSerializer(AccessControlSerializer,
         datasets = validated_data.pop("datasets", [])
 
         run = super(ContainerRunSerializer, self).create(validated_data)
+        run.validate_restrict_access(run.get_access_limits())
         dataset_serializer = ContainerDatasetSerializer()
         for dataset in datasets:
             dataset['run'] = run
