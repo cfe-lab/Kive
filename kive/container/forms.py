@@ -1,9 +1,6 @@
 from django import forms
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.forms.widgets import TextInput
 
-import metadata
 from container.models import ContainerFamily, Container, ContainerApp, ContainerRun, Batch
 from metadata.forms import PermissionsForm
 
@@ -55,8 +52,8 @@ class ContainerAppForm(forms.ModelForm):
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
 
 
-class ContainerRunForm(forms.ModelForm):
+class ContainerRunForm(PermissionsForm):
     class Meta(object):
         model = ContainerRun
-        fields = ['name', 'description']
+        fields = ['name', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))

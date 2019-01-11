@@ -7,6 +7,7 @@ from io import BytesIO
 import errno
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db import transaction
 from django.http import Http404
 from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
@@ -100,7 +101,9 @@ class ContainerCreate(CreateView, AdminViewMixin):
         form.instance.md5 = md5
 
         response = super(ContainerCreate, self).form_valid(form)
-        self.object.grant_from_json(form.cleaned_data["permissions"])
+        with transaction.atomic():
+            self.object.grant_from_json(form.cleaned_data["permissions"])
+            self.object.validate_restrict_access([self.object.family])
         return response
 
     def get_success_url(self):
@@ -127,7 +130,9 @@ class ContainerUpdate(UpdateView, AdminViewMixin):
 
     def form_valid(self, form):
         response = super(ContainerUpdate, self).form_valid(form)
-        self.object.grant_from_json(form.cleaned_data["permissions"])
+        with transaction.atomic():
+            self.object.grant_from_json(form.cleaned_data["permissions"])
+            self.object.validate_restrict_access([self.object.family])
         return response
 
     def get_success_url(self):
@@ -258,6 +263,19 @@ class ContainerRunList(TemplateView, AdminViewMixin):
 class ContainerRunUpdate(UpdateView, AdminViewMixin):
     model = ContainerRun
     form_class = ContainerRunForm
+
+    def form_valid(self, form):
+        response = super(ContainerRunUpdate, self).form_valid(form)
+        with transaction.atomic():
+            self.object.grant_from_json(form.cleaned_data["permissions"])
+            self.object.validate_restrict_access(self.object.get_access_limits())
+        return response
+
+    def get_form_kwargs(self):
+        kwargs = super(ContainerRunUpdate, self).get_form_kwargs()
+        access_limits = kwargs.setdefault('access_limits', [])
+        self.object.get_access_limits(access_limits)
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super(ContainerRunUpdate, self).get_context_data(**kwargs)

@@ -498,6 +498,15 @@ class ContainerRun(Stopwatch, AccessControl):
     def get_absolute_url(self):
         return reverse('container_run_detail', kwargs=dict(pk=self.pk))
 
+    def get_access_limits(self, access_limits=None):
+        if access_limits is None:
+            access_limits = []
+        access_limits.append(self.app.container)
+        input_entries = self.datasets.filter(
+            argument__type=ContainerArgument.INPUT).prefetch_related('dataset')
+        access_limits.extend(entry.dataset for entry in input_entries)
+        return access_limits
+
     def save(self,
              force_insert=False,
              force_update=False,

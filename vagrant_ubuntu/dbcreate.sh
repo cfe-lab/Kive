@@ -19,7 +19,7 @@ fi
 echo "Creating media_root folder."
 sudo mkdir --parents /var/kive/media_root
 if [ -e dumps/media_root ] ;then
-    sudo -u kive rsync -a dumps/media_root/ /var/kive/media_root
+    sudo rsync -a dumps/media_root/ /var/kive/media_root
 fi
 sudo chown -R kive:kive /var/kive
 

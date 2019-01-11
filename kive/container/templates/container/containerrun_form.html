@@ -100,30 +100,8 @@
         </td>
     </tr>
     <tr>
-        <td>Permissions:</td>
-        <td>
-            <h4>Users allowed</h4>
-            {% if dataset.users_allowed.exists %}
-                <ul>
-                {% for user in dataset.users_allowed.all %}
-                    <li>{{ user }}</li>
-                {% endfor %}
-                </ul>
-            {% else %}
-            <em>None</em>
-            {% endif %}
-
-            <h4>Groups allowed</h4>
-            {% if dataset.groups_allowed.exists %}
-                <ul>
-                {% for group in dataset.groups_allowed.all %}
-                    <li>{{ group }}</li>
-                {% endfor %}
-                </ul>
-            {% else %}
-            <em>None</em>
-            {% endif %}
-        </td>
+        <th>Permissions:</th>
+        <td>{{ form.permissions }}</td>
     </tr>
     <tr>
         <th>State:</th>
@@ -155,8 +133,10 @@
     </tr>
     </table>
 
+{% if is_owner or is_user_admin %}
     <input type="submit" value="Submit" />
 </form>
+{% endif %}
 
 <table>
     <tr><th>Type</th>
