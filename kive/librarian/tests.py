@@ -16,7 +16,7 @@ import django.utils.six as dsix
 
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
-from django.test import TestCase, skipIfDBFeature
+from django.test import TestCase, skipIfDBFeature, Client
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
@@ -30,6 +30,7 @@ from rest_framework import status
 
 from archive.models import ExecLog, MethodOutput, Run, RunStep, RunComponentState
 from constants import datatypes, groups, runcomponentstates
+from container.models import ContainerFamily
 from datachecking.models import MD5Conflict
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
 from librarian.models import Dataset, ExecRecord, ExternalFileDirectory, DatasetStructure
@@ -355,6 +356,103 @@ Bob,tw3nty
 
         self.assertTrue(self.singlet_dataset.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
         self.assertTrue(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
+
+    def test_update_name(self):
+        dataset = self.singlet_dataset
+        self.assertEqual('singlet', dataset.name)
+
+        user = dataset.user
+        client = Client()
+        client.force_login(user)
+        expected_name = 'Changed to Synglet'
+
+        response = client.post(reverse('dataset_view',
+                                       kwargs=dict(dataset_id=dataset.id)),
+                               dict(name=expected_name))
+
+        if response.status_code != 302:
+            self.assertEqual({}, response.context['form'].errors)
+        dataset.refresh_from_db()
+        self.assertEqual(expected_name, dataset.name)
+
+    def test_increase_permissions(self):
+        dataset = self.singlet_dataset
+        dataset.groups_allowed.clear()
+        self.assertFalse(dataset.shared_with_everyone)
+
+        user = dataset.user
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(reverse('dataset_view',
+                                       kwargs=dict(dataset_id=dataset.id)),
+                               dict(name='synglet',
+                                    permissions_1='Everyone'))
+
+        if response.status_code != 302:
+            self.assertEqual({}, response.context['form'].errors)
+        dataset.refresh_from_db()
+        self.assertTrue(dataset.shared_with_everyone)
+
+    def test_source_run_permissions(self):
+        """ Dataset not allowed to have more permissions than source run. """
+        run_step = RunStep.objects.first()
+        run_step.run.groups_allowed.clear()
+
+        dataset = self.singlet_dataset
+        dataset.groups_allowed.clear()
+        dataset.file_source = run_step
+        dataset.save()
+        self.assertFalse(dataset.shared_with_everyone)
+        expected_errors = {
+            '__all__': ['Group(s) Everyone cannot be granted access']}
+
+        user = dataset.user
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(reverse('dataset_view',
+                                       kwargs=dict(dataset_id=dataset.id)),
+                               dict(name='synglet',
+                                    permissions_1='Everyone'))
+
+        self.assertEqual(200, response.status_code)  # Form error, not redirect
+        self.assertEqual(expected_errors,
+                         response.context['dataset_form'].errors)
+        dataset.refresh_from_db()
+        self.assertFalse(dataset.shared_with_everyone)
+
+    def test_source_container_run_permissions(self):
+        """ Dataset can't have more permissions than source container run. """
+        user = self.singlet_dataset.user
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        app = container.apps.create()
+        argument = app.arguments.create(type='O')
+        run = app.runs.create(user=user)
+
+        dataset = self.singlet_dataset
+        dataset.groups_allowed.clear()
+        run.datasets.create(dataset=dataset,
+                            argument=argument)
+        self.assertFalse(dataset.shared_with_everyone)
+        expected_errors = {
+            '__all__': ['Group(s) Everyone cannot be granted access']}
+
+        user = dataset.user
+        client = Client()
+        client.force_login(user)
+
+        response = client.post(reverse('dataset_view',
+                                       kwargs=dict(dataset_id=dataset.id)),
+                               dict(name='synglet',
+                                    permissions_1='Everyone'))
+
+        self.assertEqual(200, response.status_code)  # Form error, not redirect
+        self.assertEqual(expected_errors,
+                         response.context['dataset_form'].errors)
+        dataset.refresh_from_db()
+        self.assertFalse(dataset.shared_with_everyone)
 
 
 class DatasetStructureTests(LibrarianTestCase):

@@ -366,7 +366,8 @@ class DatasetViewMockTests(ViewMockTestCase):
 
     def test_dataset_view_output(self):
         """ Link back to the run that generated the output dataset. """
-        run = Run(id=2000)
+        user = User()
+        run = Run(id=2000, user=user)
         self.dataset.file_source = RunStep(run=run)
         response = self.client.get(reverse('dataset_view',
                                            kwargs=dict(dataset_id='99')))

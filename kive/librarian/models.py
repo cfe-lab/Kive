@@ -488,6 +488,20 @@ class Dataset(metadata.models.AccessControl):
                 }
             )
 
+    def get_access_limits(self, access_limits=None):
+        if access_limits is None:
+            access_limits = []
+
+        # Is this an output from an old run?
+        if self.file_source is not None:
+            access_limits.append(self.file_source.parent_run)
+
+        # Is this an output from a container run?
+        for container_dataset in self.containers.filter(argument__type='O'):
+            access_limits.append(container_dataset.run)
+
+        return access_limits
+
     @property
     def absolute_url(self):
         """

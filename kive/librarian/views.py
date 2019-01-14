@@ -113,9 +113,6 @@ def dataset_view(request, dataset_id):
         generating_run = None
     else:
         generating_run = dataset.file_source.top_level_run
-        addable_users.exclude(pk=generating_run.user_id)
-        addable_users.exclude(pk__in=generating_run.users_allowed.values_list("pk", flat=True))
-        addable_groups.exclude(pk__in=generating_run.groups_allowed.values_list("pk", flat=True))
     container_dataset = dataset.containers.filter(argument__type='O').first()  # Output from which runs?
     if container_dataset is None:
         container_run = None
@@ -128,8 +125,7 @@ def dataset_view(request, dataset_id):
         # We are going to try and update this Dataset.
         dataset_form = DatasetDetailsForm(
             request.POST,
-            addable_users=addable_users,
-            addable_groups=addable_groups,
+            access_limits=dataset.get_access_limits(),
             instance=dataset
         )
         try:
@@ -138,7 +134,9 @@ def dataset_view(request, dataset_id):
                 dataset.description = dataset_form.cleaned_data["description"]
                 dataset.clean()
                 dataset.save()
-                dataset.grant_from_json(dataset_form.cleaned_data["permissions"])
+                with transaction.atomic():
+                    dataset.grant_from_json(dataset_form.cleaned_data["permissions"])
+                    dataset.validate_restrict_access(dataset.get_access_limits())
 
                 return HttpResponseRedirect(return_url)
         except (AttributeError, ValidationError, ValueError) as e:
@@ -148,8 +146,7 @@ def dataset_view(request, dataset_id):
     else:
         # A DatasetForm which we can use to make submission and editing easier.
         dataset_form = DatasetDetailsForm(
-            addable_users=addable_users,
-            addable_groups=addable_groups,
+            access_limits=dataset.get_access_limits(),
             initial={"name": dataset.name, "description": dataset.description}
         )
 
@@ -164,7 +161,6 @@ def dataset_view(request, dataset_id):
         "container_run": container_run
     }
 
-    rendered_response = None
     if not dataset.has_data():
         t = loader.get_template("librarian/missing_dataset_view.html")
         if dataset.external_path:

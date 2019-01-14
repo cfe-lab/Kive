@@ -9,6 +9,7 @@ from django.contrib.auth.models import User, Group
 import logging
 from datetime import datetime
 
+from metadata.forms import PermissionsForm
 from metadata.models import CompoundDatatype
 from librarian.models import Dataset
 import metadata.forms
@@ -23,28 +24,16 @@ from constants import maxlengths
 LOGGER = logging.getLogger(__name__)
 
 
-class DatasetDetailsForm(forms.ModelForm):
+class DatasetDetailsForm(PermissionsForm):
     """
     Handles just the Dataset details.
     """
-    permissions = metadata.forms.PermissionsField(
-        label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this Dataset?",
-        required=False
-    )
-
     class Meta:
         model = Dataset
         fields = ("name", "description", "permissions")
 
     def _post_clean(self):
         pass
-
-    def __init__(self, data=None, files=None,
-                 addable_users=None, addable_groups=None,
-                 *args, **kwargs):
-        super(DatasetDetailsForm, self).__init__(data, files, *args, **kwargs)
-        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
 
 
 class DatasetForm(forms.ModelForm):
@@ -279,8 +268,7 @@ class BulkAddDatasetForm (BaseMultiDatasetAddForm):
         for file_size, uploaded_file in self.cleaned_data['dataset_files']:
             # Note that uploaded_file should be seek'd to the beginning.  It was presumably
             # just opened so that should be OK but if this ever changes we will have to fix this.
-            dataset = None
-            error_str = None
+            dataset = error_str = auto_name = None
             try:
                 # TODO:  use correct unique constraints
                 name_prefix = ""
@@ -365,7 +353,6 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
 
         The returned list will be accessible from the cleaned_data directory.
         """
-        files = []
         # First try to unzip the archive
         try:
             archive = ZipFile(self.cleaned_data["dataset_file"])
@@ -442,8 +429,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
         for file_size, uploaded_file in self.cleaned_data['dataset_file']:
             # Note that uploaded_file should be seek'd to the beginning.  It was presumably
             # just opened so that should be OK but if this ever changes we will have to fix this.
-            dataset = None
-            error_str = None
+            dataset = error_str = auto_name = None
             try:
                 # TODO:  use correct unique constraints
                 name_prefix = ""
