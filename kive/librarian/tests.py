@@ -404,8 +404,9 @@ Bob,tw3nty
         dataset.file_source = run_step
         dataset.save()
         self.assertFalse(dataset.shared_with_everyone)
-        expected_errors = {
-            '__all__': ['Group(s) Everyone cannot be granted access']}
+        expected_errors = {'permissions': ['Select a valid choice. Everyone '
+                                           'is not one of the available '
+                                           'choices.']}
 
         user = dataset.user
         client = Client()
@@ -436,8 +437,9 @@ Bob,tw3nty
         run.datasets.create(dataset=dataset,
                             argument=argument)
         self.assertFalse(dataset.shared_with_everyone)
-        expected_errors = {
-            '__all__': ['Group(s) Everyone cannot be granted access']}
+        expected_errors = {'permissions': ['Select a valid choice. Everyone '
+                                           'is not one of the available '
+                                           'choices.']}
 
         user = dataset.user
         client = Client()
