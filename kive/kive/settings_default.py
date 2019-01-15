@@ -1,21 +1,28 @@
 # Django settings for server project.
 
-# Copy this file to settings.py, then adjust the settings in the copy.
-# Kive-specific things to set:
-# DATABASES: NAME, USER, and PASSWORD are site-specific
-# MEDIA_ROOT: set to the absolute path you wish to use on your system
-# STATIC_ROOT: set to the absolute path you wish to use on your system
-# KIVE_SANDBOX_WORKER_ACCOUNT: the user account used to run sandboxes
-# KIVE_PROCESSING_GROUP: group representing users that have access to the sandboxes
-# EMAIL_{HOST|PORT|HOST_USER|HOST_PASSWORD|USE_TLS|USE_SSL|TIMEOUT|SSL_KEYFILE|SSL_CERTFILE}:
+# Copy this file to settings.py, then set environment variables when you don't
+# like the default values. Search for os.environ.get(name, default) to see all
+# the options.
+# Some common environment variables to change:
+# KIVE_DEBUG: Turn this off in production! It gives more detailed error
+#   messages, and provides other helpful features, like automatically
+#   reloading when the source code changes.
+# KIVE_SECRET_KEY: Encrypts session data.
+# DATABASES: KIVE_DB_NAME, KIVE_DB_USER, and KIVE_DB_PASSWORD are site-specific.
+# KIVE_MEDIA_ROOT: set to the absolute path you wish to use on your system
+# KIVE_STATIC_ROOT: set to the absolute path you wish to use on your system
+# KIVE_ALLOWED_HOSTS: the server's IP address to listen on
+# KIVE_EMAIL_*:
 #    settings used for sending logged error messages via email to the administrators
-# ADMINS: system administrators
+# KIVE_ADMINS: system administrators
+# KIVE_LOG: log file to write to
+# KIVE_PURGE_*: adjust the levels for when to purge old files
 import os
 import json
 
 from django.core.management.utils import get_random_secret_key
 
-DEBUG = os.environ.get("KIVE_DEBUG", True)
+DEBUG = os.environ.get("KIVE_DEBUG", True)  # Turn this off in production!
 
 ADMINS = (
     # ('Your Name', 'your_email@example.com'),
@@ -23,20 +30,6 @@ ADMINS = (
 raw_admins = os.environ.get("KIVE_ADMINS")
 if raw_admins is not None:
     ADMINS = json.loads(raw_admins)
-
-# These are the default values; customize for your installation.
-# EMAIL_HOST = "localhost"
-# EMAIL_PORT = 25
-# SERVER_EMAIL = ""
-# EMAIL_HOST_USER = ""
-# EMAIL_HOST_PASSWORD = ""
-# EMAIL_USE_TLS = False
-# EMAIL_USE_SSL = False
-# EMAIL_TIMEOUT = None
-# EMAIL_SUBJECT_PREFIX = "[Kive] "
-# EMAIL_SSL_CERTFILE = None
-# EMAIL_SSL_KEYFILE = None
-# EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 EMAIL_HOST = os.environ.get("KIVE_EMAIL_HOST", "localhost")
 SERVER_EMAIL = os.environ.get("KIVE_SERVER_EMAIL", "")
