@@ -17,7 +17,7 @@ utils/memory_plot.png
 /utils/speed_plot_cache
 /static_root
 /static_root.tar.gz
-/venv_kive
+/venv_kive*
 
 # Ignore nodeJS modules
 node_modules/
