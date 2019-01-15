@@ -150,7 +150,7 @@ class Container(AccessControl):
         return '{}:{}'.format(self.family.name, self.tag)
 
     class Meta:
-        ordering = ['family__name', '-tag']
+        ordering = ['family__name', '-created']
 
     def __str__(self):
         return self.display_name

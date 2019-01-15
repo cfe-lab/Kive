@@ -6,6 +6,7 @@
 	    this.registerLinkColumn("Tag", "", "tag", "absolute_url");
 	    this.registerColumn("Description", "description");
         this.registerColumn("Apps", "num_apps");
+		this.registerDateTimeColumn("Created", "created");
         this.registerStandardColumn("user");
         this.registerStandardColumn("users_allowed");
         this.registerStandardColumn("groups_allowed");
