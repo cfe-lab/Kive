@@ -562,9 +562,15 @@ class RunContainerTests(TestCase):
         stdout = run.logs.get(type=ContainerLog.STDOUT)
         stderr = run.logs.get(type=ContainerLog.STDERR)
         self.assertEqual(expected_stdout, stdout.short_text)
-        self.assertEqual(expected_stderr, stderr.long_text.read())
+        #
+        stderr_bytes = stderr.long_text.read()
+        stderr_str = stderr_bytes.decode('ascii')
+        self.assertEqual(expected_stderr, stderr_str)
         self.assertEqual(expected_stdout, stdout.read())
-        self.assertEqual(expected_stderr, stderr.read())
+        #
+        stderr_bytes = stderr.read()
+        stderr_str = stderr_bytes.decode('ascii')
+        self.assertEqual(expected_stderr, stderr_str)
         self.assertEqual(expected_stdout[:10], stdout.read(10))
         self.assertEqual(expected_stderr[:10], stderr.read(10))
         upload_length = len(ContainerLog.UPLOAD_DIR)
@@ -597,7 +603,7 @@ class PurgeTests(TestCase):
         self.assertTrue(os.path.exists(run.full_sandbox_path))
         run.end_time = now - age
         with open(os.path.join(run.full_sandbox_path, 'contents.txt'),
-                  'w') as f:
+                  'wb') as f:
             f.write(b'.' * size)
         run.save()
         return run
@@ -611,13 +617,13 @@ class PurgeTests(TestCase):
         output_path = os.path.join(run.full_sandbox_path,
                                    'output',
                                    'greetings_csv')
-        with open(output_path, 'w') as f:
+        with open(output_path, 'wb') as f:
             f.write(b'.' * output_size)
         with open(os.path.join(run.full_sandbox_path, 'logs', 'stdout.txt'),
-                  'w') as f:
+                  'wb') as f:
             f.write(b'.' * stdout_size)
         with open(os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt'),
-                  'w') as f:
+                  'wb') as f:
             f.write(b'.' * stderr_size)
 
         old_end_time = run.end_time
@@ -734,7 +740,7 @@ class PurgeTests(TestCase):
 
         left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
         os.mkdir(left_overs_path)
-        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'wb') as f:
             f.write(b'.' * 100)
 
         purge.Command().handle(start=400, stop=400, synch=True)
@@ -747,7 +753,7 @@ class PurgeTests(TestCase):
     def test_unregistered_file(self):
         left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT,
                                        'left_overs.txt')
-        with open(left_overs_path, 'w') as f:
+        with open(left_overs_path, 'wb') as f:
             f.write(b'.' * 100)
 
         purge.Command().handle(start=400, stop=400, synch=True)
@@ -757,11 +763,11 @@ class PurgeTests(TestCase):
     def test_unregistered_too_new(self):
         folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
         os.mkdir(folder_path)
-        with open(os.path.join(folder_path, 'contents.txt'), 'w') as f:
+        with open(os.path.join(folder_path, 'contents.txt'), 'wb') as f:
             f.write(b'.' * 100)
 
         file_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'extras.txt')
-        with open(file_path, 'w') as f:
+        with open(file_path, 'wb') as f:
             f.write(b'.' * 100)
 
         purge.Command().handle(wait=timedelta(seconds=30), synch=True)
@@ -773,14 +779,15 @@ class PurgeTests(TestCase):
     def capture_log_stream(self, log_level):
         with capture_log_stream(
                 log_level,
-                b'container.management.commands.purge') as mocked_stderr:
+                'container.management.commands.purge') as mocked_stderr:
             yield mocked_stderr
 
     def assertLogStreamEqual(self, expected, messages):
         cleaned_messages = re.sub(r'(run|log|dataset) \d+',
                                   r'\1 <id>',
                                   messages).replace('\xa0', ' ')
-        self.assertMultiLineEqual(expected, cleaned_messages.encode('ascii'))
+        # self.assertMultiLineEqual(expected, cleaned_messages.encode('ascii'))
+        self.assertMultiLineEqual(expected, cleaned_messages)
 
     def test_info_logging(self):
         self.create_sandbox(age=timedelta(minutes=11), size=100)
@@ -814,11 +821,11 @@ Purged 2 container runs containing 300 bytes from 11 minutes ago to 10 minutes a
     def test_error_logging_synch(self):
         left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
         os.mkdir(left_overs_path)
-        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'wb') as f:
             f.write(b'.'*100)
 
         with open(os.path.join(ContainerRun.SANDBOX_ROOT,
-                               'extras.txt'), 'w') as f:
+                               'extras.txt'), 'wb') as f:
             f.write(b'.'*200)
         expected_messages = u"""\
 Purged 2 unregistered container run files containing 300 bytes.
@@ -832,11 +839,11 @@ Purged 2 unregistered container run files containing 300 bytes.
     def test_warn_logging_synch(self):
         left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
         os.mkdir(left_overs_path)
-        with open(os.path.join(left_overs_path, 'contents.txt'), 'w') as f:
+        with open(os.path.join(left_overs_path, 'contents.txt'), 'wb') as f:
             f.write(b'.'*100)
 
         with open(os.path.join(ContainerRun.SANDBOX_ROOT,
-                               'extras.txt'), 'w') as f:
+                               'extras.txt'), 'wb') as f:
             f.write(b'.'*200)
         expected_messages = u"""\
 Purged unregistered file 'ContainerRuns/extras.txt' containing 200 bytes.
@@ -852,7 +859,7 @@ Purged 2 unregistered container run files containing 300 bytes.
     def test_synch_batch(self):
         for i in range(11):
             with open(os.path.join(ContainerRun.SANDBOX_ROOT,
-                                   'extras{:02d}.txt'.format(i)), 'w') as f:
+                                   'extras{:02d}.txt'.format(i)), 'wb') as f:
                 f.write(b'.' * 1024)
         expected_messages = u"""\
 Purged 11 unregistered container run files containing 11.0 KB.
@@ -928,7 +935,7 @@ No purge needed for 100 bytes: 100 bytes of container runs.
         # Upload a new dataset, so it can't be purged.
         output_path = os.path.join(ContainerRun.SANDBOX_ROOT,
                                    'extra.txt')
-        with open(output_path, 'w') as f:
+        with open(output_path, 'wb') as f:
             f.write(b'.' * 1000)
         user = User.objects.get(username='kive')
         Dataset.create_dataset(output_path, name='extra.txt', user=user)
@@ -974,7 +981,7 @@ No purge needed for 0 bytes: empty storage.
                                        '2018_06',
                                        'left_over.txt')
         os.makedirs(os.path.dirname(left_overs_path))
-        with open(left_overs_path, 'w') as f:
+        with open(left_overs_path, 'wb') as f:
             f.write(b'.'*100)
 
         expected_messages = u"""\
@@ -1061,7 +1068,7 @@ Purged 1 dataset containing 200 bytes from 10 minutes ago.
 
         logs_root = os.path.join(settings.MEDIA_ROOT, ContainerLog.UPLOAD_DIR)
         extra_log_path = os.path.join(logs_root, 'extra.log')
-        with open(extra_log_path, 'w') as f:
+        with open(extra_log_path, 'wb') as f:
             f.write(b'.'*400)
 
         purge.Command().handle(synch=True)
@@ -1073,7 +1080,7 @@ Purged 1 dataset containing 200 bytes from 10 minutes ago.
     def test_synch_containers(self):
         logs_root = os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR)
         extra_log_path = os.path.join(logs_root, 'extra.simg')
-        with open(extra_log_path, 'w') as f:
+        with open(extra_log_path, 'wb') as f:
             f.write(b'.'*400)
 
         expected_log_messages = """\
@@ -1104,7 +1111,7 @@ Purged 1 unregistered container file containing 400 bytes.
         family = ContainerFamily.objects.first()
         container = family.containers.create(user=family.user)
         with NamedTemporaryFile() as f:
-            f.write('.'*100)
+            f.write(b'.'*100)
             container.file.save('new_container.simg', f)
         prefix_length = len(Container.UPLOAD_DIR)
         path_prefix = container.file.name[:prefix_length]

@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import logging
 import os
 import shutil
@@ -193,9 +195,9 @@ class Command(BaseCommand):
                         break
                 if entry_count == 0:
                     break
-            for entry_type, entry_name in (('r', 'container run'),
-                                           ('l', 'container log'),
-                                           ('d', 'dataset')):
+            for entry_type, entry_name in (('r', u'container run'),
+                                           ('l', u'container log'),
+                                           ('d', u'dataset')):
                 purged_count = purge_counts[entry_type]
                 if not purged_count:
                     continue
@@ -229,10 +231,10 @@ class Command(BaseCommand):
                           sandbox_total=0,
                           log_total=0):
         remainders = []
-        for size, label in [(container_total, 'containers'),
-                            (sandbox_total, 'container runs'),
-                            (log_total, 'container logs'),
-                            (dataset_total, 'datasets')]:
+        for size, label in [(container_total, u'containers'),
+                            (sandbox_total, u'container runs'),
+                            (log_total, u'container logs'),
+                            (dataset_total, u'datasets')]:
             if size:
                 remainders.append(u'{} of {}'.format(
                     filesizeformat(size),
@@ -257,12 +259,12 @@ class Command(BaseCommand):
                 file_names.clear()
         if total_files:
             # noinspection PyProtectedMember
-            logger.error(
-                'Purged %d unregistered %s file%s containing %s.',
+            msg = 'Purged {} unregistered {} file{} containing {}.'.format(
                 total_files,
                 model._meta.verbose_name,
                 pluralize(total_files),
                 filesizeformat(total_bytes))
+            logger.error(msg)
 
     def synch_model_files(self, model, path_field_name, file_names, wait):
         remove_older_than = timezone.now() - wait
@@ -290,9 +292,8 @@ class Command(BaseCommand):
                 file_size = file_stat.st_size
                 os.remove(file_path)
             logger.warning(
-                'Purged unregistered file %r containing %s.',
-                file_name.encode('ascii'),
-                filesizeformat(file_size))
+                "Purged unregistered file '{}' containing {}.".format(file_name,
+                                                                      filesizeformat(file_size)))
             files_removed += 1
             bytes_removed += file_size
         return files_removed, bytes_removed
