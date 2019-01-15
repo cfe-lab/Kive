@@ -1,27 +1,18 @@
-import logging
 import os
-import shutil
 from argparse import Namespace
-from contextlib import contextmanager
-from datetime import timedelta
-from io import BytesIO, StringIO
+from io import BytesIO
 
-from shutil import rmtree
-from tempfile import mkdtemp
-
-from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from django.test import TestCase
 from django.urls import reverse, resolve
-from django.utils import timezone
 from django_mock_queries.mocks import mocked_relations
 from mock import patch
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
-from container.management.commands import runcontainer, purge
+from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
     ContainerArgument, ContainerFileFormField, ContainerRun, ContainerDataset
 from kive.tests import BaseTestCases, strip_removal_plan
@@ -505,6 +496,7 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
                   ContainerArgument,
                   ContainerDataset,
                   Dataset)
+@patch('django.conf.settings.MEDIA_ROOT', new='/tmp/kive_media')
 class ContainerRunMockTests(TestCase):
     def test_slurm_command_default_app(self):
         run = ContainerRun(pk=99)
@@ -512,12 +504,12 @@ class ContainerRunMockTests(TestCase):
         run.app = ContainerApp()
         run.app.container = Container()
         run.app.container.family = ContainerFamily(name='my container')
-        sandbox_root = '/Sandboxes'
+        run.sandbox_path = 'run23'
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
-            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
-            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
+            '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '--export', 'all',
             '-c', '1',
             '--mem', '6000',
@@ -525,7 +517,7 @@ class ContainerRunMockTests(TestCase):
             'runcontainer',
             '99']
 
-        command = run.build_slurm_command(sandbox_root)
+        command = run.build_slurm_command()
 
         self.assertListEqual(expected_command, command)
 
@@ -535,12 +527,12 @@ class ContainerRunMockTests(TestCase):
         run.app = ContainerApp(name='my_app')
         run.app.container = Container()
         run.app.container.family = ContainerFamily(name='my container')
-        sandbox_root = '/Sandboxes'
+        run.sandbox_path = 'run23'
         expected_command = [
             'sbatch',
             '-J', 'r99 my_app',
-            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
-            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
+            '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '--export', 'all',
             '-c', '1',
             '--mem', '6000',
@@ -548,7 +540,7 @@ class ContainerRunMockTests(TestCase):
             'runcontainer',
             '99']
 
-        command = run.build_slurm_command(sandbox_root)
+        command = run.build_slurm_command()
 
         self.assertListEqual(expected_command, command)
 
@@ -558,12 +550,12 @@ class ContainerRunMockTests(TestCase):
         run.app = ContainerApp(threads=3, memory=100)
         run.app.container = Container()
         run.app.container.family = ContainerFamily(name='my container')
-        sandbox_root = '/Sandboxes'
+        run.sandbox_path = 'run23'
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
-            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
-            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
+            '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '--export', 'all',
             '-c', '3',
             '--mem', '100',
@@ -571,7 +563,7 @@ class ContainerRunMockTests(TestCase):
             'runcontainer',
             '99']
 
-        command = run.build_slurm_command(sandbox_root)
+        command = run.build_slurm_command()
 
         self.assertListEqual(expected_command, command)
 
@@ -585,12 +577,12 @@ class ContainerRunMockTests(TestCase):
                         ('medium', 'kive-medium'),
                         ('high', 'kive-high'))
         run.priority = 2
-        sandbox_root = '/Sandboxes'
+        run.sandbox_path = 'run23'
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
-            '--output', '/Sandboxes/userbob_run99__job%J_node%N_stdout.txt',
-            '--error', '/Sandboxes/userbob_run99__job%J_node%N_stderr.txt',
+            '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
+            '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '--export', 'all',
             '-c', '1',
             '--mem', '6000',
@@ -599,7 +591,7 @@ class ContainerRunMockTests(TestCase):
             'runcontainer',
             '99']
 
-        command = run.build_slurm_command(sandbox_root, slurm_queues)
+        command = run.build_slurm_command(slurm_queues)
 
         self.assertListEqual(expected_command, command)
 
@@ -691,3 +683,19 @@ class RunContainerMockTests(TestCase):
         command = handler.build_command(run)
 
         self.assertListEqual(expected_command, command)
+
+    def test_build_dataset_name(self):
+        run = ContainerRun(id=42)
+        handler = runcontainer.Command()
+        
+        scenarios = [('example_csv', 'example_42.csv'),
+                     ('example_tar_gz', 'example_42.tar.gz'),
+                     ('csv', '42.csv'),
+                     ('_csv', '_42.csv'),
+                     ('_', '__42'),
+                     ('no_extension', 'no_extension_42')]
+        
+        for argument_name, expected_dataset_name in scenarios:
+            dataset_name = handler.build_dataset_name(run, argument_name)
+
+            self.assertEqual(expected_dataset_name, dataset_name)

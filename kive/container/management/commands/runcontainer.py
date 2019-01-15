@@ -5,9 +5,7 @@ import logging
 import os
 import shutil
 from subprocess import call
-from tempfile import mkdtemp
 
-from django.conf import settings
 from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -15,6 +13,15 @@ from django.utils import timezone
 from container.models import ContainerRun, ContainerArgument, ContainerLog
 from librarian.models import Dataset
 
+KNOWN_EXTENSIONS = ('csv',
+                    'doc',
+                    'fasta',
+                    'fastq',
+                    'pdf',
+                    'txt',
+                    'tar',
+                    'gz',
+                    'zip')
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +37,7 @@ class Command(BaseCommand):
     def handle(self, run_id, **kwargs):
         run = self.record_start(run_id)
         try:
-            self.create_sandbox(run)
+            self.fill_sandbox(run)
             run.save()
 
             self.run_container(run)
@@ -64,16 +71,10 @@ class Command(BaseCommand):
                     run.state))
         return run
 
-    def create_sandbox(self, run):
-        sandbox_root = ContainerRun.SANDBOX_ROOT
-        try:
-            os.mkdir(sandbox_root)
-        except OSError as ex:
-            if ex.errno != errno.EEXIST:
-                raise
-        prefix = 'user{}_run{}_'.format(run.user.username, run.pk)
-        full_sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
-        run.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
+    def fill_sandbox(self, run):
+        if not run.sandbox_path:
+            # This should only be needed during tests.
+            run.create_sandbox()
 
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
@@ -83,7 +84,6 @@ class Command(BaseCommand):
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
         os.mkdir(os.path.join(run.full_sandbox_path, 'output'))
-        os.mkdir(os.path.join(run.full_sandbox_path, 'logs'))
 
         run.state = ContainerRun.RUNNING
 
@@ -119,19 +119,40 @@ class Command(BaseCommand):
                 folder = '/mnt/output'
             command.append(os.path.join(folder, argument.name))
         return command
+    
+    def build_dataset_name(self, run, argument_name):
+        parts = argument_name.split('_')
+        extension = parts[-1]
+        if extension.lower() in KNOWN_EXTENSIONS:
+            parts.pop()
+            if parts and parts[-1] == 'tar':
+                parts.pop()
+                extension = 'tar' + '.' + extension
+        else:
+            extension = None
+        parts.append(str(run.id))
+        dataset_name = '_'.join(parts)
+        if extension is not None:
+            dataset_name += '.' + extension
+        return dataset_name
 
     def save_outputs(self, run):
         output_path = os.path.join(run.full_sandbox_path, 'output')
+        upload_path = os.path.join(run.full_sandbox_path, 'upload')
+        os.mkdir(upload_path)
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
             argument_path = os.path.join(output_path, argument.name)
+            dataset_name = self.build_dataset_name(run, argument.name)
+            new_argument_path = os.path.join(upload_path, dataset_name)
             try:
-                dataset = Dataset.create_dataset(argument_path,
-                                                 name=argument.name,
+                os.rename(argument_path, new_argument_path)
+                dataset = Dataset.create_dataset(new_argument_path,
+                                                 name=dataset_name,
                                                  user=run.user)
                 dataset.copy_permissions(run)
                 run.datasets.create(dataset=dataset,
                                     argument=argument)
-            except IOError as ex:
+            except (OSError, IOError) as ex:
                 if ex.errno != errno.ENOENT:
                     raise
         # noinspection PyUnresolvedReferences,PyProtectedMember

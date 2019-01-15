@@ -27,7 +27,7 @@ from container.management.commands import purge, runcontainer
 from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
-from librarian.models import Dataset, ExternalFileDirectory
+from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
 
 
 @skipIfDBFeature('is_mocked')
@@ -220,7 +220,7 @@ class ContainerRunTests(TestCase):
     def test_no_outputs(self):
         run = ContainerRun.objects.get(id=1)
         expected_entries = [dict(created=make_aware(datetime(2000, 1, 1), utc),
-                                 name='names_csv',
+                                 name='names.csv',
                                  size='30\xa0bytes',
                                  type='Input',
                                  url='/dataset_view/1')]
@@ -237,12 +237,15 @@ class ContainerRunTests(TestCase):
         run.state = ContainerRun.COMPLETE
         run.end_time = make_aware(datetime(2000, 1, 2), utc)
         run.save()
-        dataset = Dataset.objects.first()
+        dataset = Dataset.objects.create(
+            user=run.user,
+            name='greetings_123.csv',
+            date_created=make_aware(datetime(2000, 1, 1), utc))
         argument = run.app.arguments.get(name='greetings_csv')
         run.datasets.create(argument=argument, dataset=dataset)
         log = run.logs.create(short_text='Job completed.', type=ContainerLog.STDERR)
         expected_entries = [dict(created=make_aware(datetime(2000, 1, 1), utc),
-                                 name='names_csv',
+                                 name='names.csv',
                                  size='30\xa0bytes',
                                  type='Input',
                                  url='/dataset_view/1'),
@@ -252,10 +255,10 @@ class ContainerRunTests(TestCase):
                                  type='Log',
                                  url='/container_logs/{}/'.format(log.id)),
                             dict(created=make_aware(datetime(2000, 1, 1), utc),
-                                 name='greetings_csv',
-                                 size='30\xa0bytes',
+                                 name='greetings_123.csv',
+                                 size='missing',
                                  type='Output',
-                                 url='/dataset_view/1')]
+                                 url='/dataset_view/2')]
         client = Client()
         client.force_login(run.user)
         response = client.get(reverse('container_run_detail',
@@ -408,6 +411,8 @@ class RunContainerTests(TestCase):
         everyone = Group.objects.get(name='Everyone')
         run.groups_allowed.clear()
         run.groups_allowed.add(everyone)
+        expected_dataset_name = 'greetings_{}.csv'.format(run.id)
+        expected_dataset_path = get_upload_path(Dataset, expected_dataset_name)
 
         call_command('runcontainer', str(run.id))
 
@@ -416,10 +421,13 @@ class RunContainerTests(TestCase):
         self.assertEqual(ContainerRun.COMPLETE, run.state)
         sandbox_path = run.full_sandbox_path
         self.assertTrue(sandbox_path)
-        input_path = os.path.join(sandbox_path, 'input/names_csv')
-        self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
-        output_path = os.path.join(sandbox_path, 'output/greetings_csv')
-        self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
+        input_path = os.path.join(sandbox_path, 'input', 'names_csv')
+        self.assertTrue(os.path.exists(input_path),
+                        input_path + ' should exist.')
+        upload_path = os.path.join(sandbox_path, 'upload',
+                                   expected_dataset_name)
+        self.assertTrue(os.path.exists(upload_path),
+                        upload_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
         self.assertIsNotNone(run.submit_time)
@@ -429,6 +437,9 @@ class RunContainerTests(TestCase):
         self.assertLessEqual(run.start_time, run.end_time)
         output_dataset = run.datasets.get(
             argument__type=ContainerArgument.OUTPUT).dataset
+        self.assertEqual(expected_dataset_name, output_dataset.name)
+        self.assertEqual(expected_dataset_path,
+                         output_dataset.dataset_file.name)
         expected_groups = [('Everyone', )]
         dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
         self.assertEqual(expected_groups, dataset_groups)
@@ -483,9 +494,13 @@ class RunContainerTests(TestCase):
         sandbox_path = run.full_sandbox_path
         self.assertTrue(sandbox_path)
         input_path = os.path.join(sandbox_path, 'input/names_csv')
-        self.assertTrue(os.path.exists(input_path), input_path + ' should exist.')
-        output_path = os.path.join(sandbox_path, 'output/greetings_csv')
-        self.assertTrue(os.path.exists(output_path), output_path + ' should exist.')
+        self.assertTrue(os.path.exists(input_path),
+                        input_path + ' should exist.')
+        upload_path = os.path.join(sandbox_path,
+                                   'upload',
+                                   'greetings_{}.csv'.format(run.id))
+        self.assertTrue(os.path.exists(upload_path),
+                        upload_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
 
@@ -578,7 +593,7 @@ class PurgeTests(TestCase):
         run_command = runcontainer.Command()
         app = ContainerApp.objects.first()
         run = ContainerRun.objects.create(user=user, app=app)
-        run_command.create_sandbox(run)
+        run_command.fill_sandbox(run)
         self.assertTrue(os.path.exists(run.full_sandbox_path))
         run.end_time = now - age
         with open(os.path.join(run.full_sandbox_path, 'contents.txt'),
@@ -714,22 +729,6 @@ class PurgeTests(TestCase):
         self.assertTrue(run1.sandbox_purged)
         self.assertTrue(run2.sandbox_purged)
 
-    def test_slurm_log(self):
-        run = self.create_sandbox(size=300)
-        log_path = os.path.join(
-            ContainerRun.SANDBOX_ROOT,
-            'userkive_run{}__job1234_nodefoo_stdout.txt'.format(run.id))
-        with open(log_path, 'w') as f:
-            f.write(b'.' * 200)
-
-        purge.Command().handle(start=400, stop=400)
-
-        run.refresh_from_db()
-        self.assertTrue(run.sandbox_purged)
-        self.assertFalse(os.path.exists(run.full_sandbox_path))
-        self.assertFalse(os.path.exists(log_path))
-        self.assertEqual(500, run.sandbox_size)
-
     def test_unregistered_folder(self):
         run = self.create_sandbox(size=500)
 
@@ -746,13 +745,6 @@ class PurgeTests(TestCase):
         self.assertTrue(os.path.exists(run.full_sandbox_path))
 
     def test_unregistered_file(self):
-        run = self.create_sandbox(size=500)
-        log_path = os.path.join(
-            ContainerRun.SANDBOX_ROOT,
-            'userkive_run{}__job1234_nodefoo_stdout.txt'.format(run.id))
-        with open(log_path, 'w') as f:
-            f.write(b'.' * 100)
-
         left_overs_path = os.path.join(ContainerRun.SANDBOX_ROOT,
                                        'left_overs.txt')
         with open(left_overs_path, 'w') as f:
@@ -761,7 +753,6 @@ class PurgeTests(TestCase):
         purge.Command().handle(start=400, stop=400, synch=True)
 
         self.assertFalse(os.path.exists(left_overs_path))
-        self.assertTrue(os.path.exists(log_path))
 
     def test_unregistered_too_new(self):
         folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')

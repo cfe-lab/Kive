@@ -190,6 +190,10 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
         view_name='dataset-detail',
         lookup_field='pk',
         queryset=Dataset.objects.all())
+    dataset_name = serializers.SlugRelatedField(
+        source='dataset',
+        slug_field='name',
+        read_only=True)
     dataset_purged = serializers.SlugRelatedField(
         source='dataset',
         slug_field='is_purged',
@@ -210,6 +214,7 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
                   'argument_name',
                   'argument_type',
                   'dataset',
+                  'dataset_name',
                   'dataset_purged',
                   'name',
                   'created')

@@ -289,7 +289,7 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
             data_entries.append(dict(
                 type=type_names[run_dataset.argument.type],
                 url=run_dataset.dataset.get_view_url(),
-                name=run_dataset.argument.name,
+                name=run_dataset.dataset.name,
                 size=run_dataset.dataset.get_formatted_filesize(),
                 created=run_dataset.dataset.date_created))
             if run_dataset.argument.type == ContainerArgument.INPUT:

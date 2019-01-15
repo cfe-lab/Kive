@@ -5,11 +5,9 @@ import logging
 import os
 import re
 import sys
-from itertools import chain
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, mkdtemp
 import shutil
-import glob
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -516,7 +514,7 @@ class ContainerRun(Stopwatch, AccessControl):
                                        force_update,
                                        using,
                                        update_fields)
-        if self.state == self.NEW:
+        if self.state == self.NEW and not self.sandbox_path:
             transaction.on_commit(self.schedule)
 
     @property
@@ -525,23 +523,35 @@ class ContainerRun(Stopwatch, AccessControl):
             return ''
         return os.path.join(settings.MEDIA_ROOT, self.sandbox_path)
 
-    def schedule(self):
+    def create_sandbox(self):
+        sandbox_root = self.SANDBOX_ROOT
         try:
-            os.mkdir(self.SANDBOX_ROOT)
+            os.mkdir(sandbox_root)
         except OSError as ex:
             if ex.errno != errno.EEXIST:
                 raise
+        prefix = 'user{}_run{}_'.format(self.user.username, self.pk)
+        full_sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
+        os.mkdir(os.path.join(full_sandbox_path, 'logs'))
+        self.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
+
+    def schedule(self):
+        self.create_sandbox()
+        self.save()
 
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-        check_call(self.build_slurm_command(self.SANDBOX_ROOT,
-                                            settings.SLURM_QUEUES),
+        check_call(self.build_slurm_command(settings.SLURM_QUEUES),
                    env=child_env)
 
-    def build_slurm_command(self, sandbox_root, slurm_queues=None):
-        sandbox_prefix = os.path.join(sandbox_root,
-                                      self.get_sandbox_prefix())
-        slurm_prefix = sandbox_prefix + '_job%J_node%N_'
+    def build_slurm_command(self, slurm_queues=None):
+        if not self.sandbox_path:
+            raise RuntimeError(
+                'Container run needs a sandbox before calling Slurm.')
+        slurm_prefix = os.path.join(settings.MEDIA_ROOT,
+                                    self.sandbox_path,
+                                    'logs',
+                                    'job%J_node%N_')
         job_name = 'r{} {}'.format(self.pk,
                                    self.app.name or
                                    self.app.container.family.name)
@@ -611,7 +621,7 @@ class ContainerRun(Stopwatch, AccessControl):
         sandbox_files = (os.path.join(root, file_name)
                          for root, _, files in os.walk(self.full_sandbox_path)
                          for file_name in files)
-        for file_path in chain(sandbox_files, self.find_slurm_logs()):
+        for file_path in sandbox_files:
             size_accumulator += os.path.getsize(file_path)
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
@@ -643,24 +653,6 @@ class ContainerRun(Stopwatch, AccessControl):
         assert not self.sandbox_purged
         shutil.rmtree(self.full_sandbox_path)
 
-        for log_path in self.find_slurm_logs():
-            os.remove(log_path)
-
-    def find_slurm_logs(self):
-        """ Find the Slurm log files that are outside the sandbox folder. """
-        sandbox_basepath = os.path.dirname(self.full_sandbox_path)
-        stdout_log_path = os.path.join(
-            sandbox_basepath,
-            self.get_sandbox_prefix() + "_job*_node*_stdout.txt")
-        stdout_logs = glob.glob(stdout_log_path)
-
-        stderr_log_path = os.path.join(
-            sandbox_basepath,
-            self.get_sandbox_prefix() + "_job*_node*_stderr.txt")
-        stderr_logs = glob.glob(stderr_log_path)
-
-        return stdout_logs + stderr_logs
-
     @classmethod
     def find_unneeded(cls):
         """ A queryset of records that could be purged. """
@@ -677,17 +669,6 @@ class ContainerRun(Stopwatch, AccessControl):
             return
 
         for file_name in os.listdir(ContainerRun.SANDBOX_ROOT):
-            file_path = os.path.join(ContainerRun.SANDBOX_ROOT, file_name)
-            if not os.path.isdir(file_path):
-                # Special check for log files.
-                match = re.match(r'user\w+_run\d+', file_name)
-                if match:
-                    prefix = match.group(0)
-                    path_prefix = os.path.join(relative_root, prefix)
-                    if cls.objects.filter(sandbox_path__startswith=path_prefix,
-                                          sandbox_purged=False).exists():
-                        # Matching sandbox found, skip the log file.
-                        continue
             yield os.path.join(relative_root, file_name)
 
 
