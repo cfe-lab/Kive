@@ -1,6 +1,7 @@
 from __future__ import print_function
 import logging
 import os
+import shutil
 import sys
 from argparse import ArgumentDefaultsHelpFormatter
 
@@ -71,7 +72,7 @@ class Command(BaseCommand):
             with transaction.atomic():
                 print("Moving {} to {}....".format(curr_loc, new_loc))
                 container.file.name = new_loc
-                os.rename(curr_loc, new_loc)
+                shutil.move(curr_loc, new_loc)
                 container.save()
 
     # This is copied from the "purge.py" management command.
