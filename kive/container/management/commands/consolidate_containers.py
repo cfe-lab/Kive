@@ -61,18 +61,14 @@ class Command(BaseCommand):
         :return:
         """
         for container in containers_to_move:
-            with transaction.atomic():
-                print("Moving {} to {}....".format(container.file.path, self.container_directory))
+            print("Moving {} to {}....".format(container.file.path, self.container_directory))
 
-                new_name = os.path.basename(container.file.name)
-                # First make a temporary home for the contents.
-                with tempfile.TemporaryFile() as f:
-                    for chunk in container.file.chunks():
-                        f.write(chunk)
+            original_path = container.file.path
+            new_name = os.path.basename(container.file.name)
+            with open(original_path, "rb") as f:
+                container.file.save(new_name, File(f), save=True)
 
-                    f.seek(0)
-                    container.file.delete()
-                    container.file.save(new_name, File(f), save=True)
+            os.remove(original_path)
 
     # This is copied from the "purge.py" management command.
     def confirm(self, prompt):
