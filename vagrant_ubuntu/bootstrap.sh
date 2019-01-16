@@ -128,5 +128,8 @@ cd /usr/local/share/Kive/vagrant_ubuntu
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:
+# sudo su kive
 # cd /usr/local/share/Kive/kive
+# . /opt/venv_kive/bin/activate
+# . ../vagrant_ubuntu/envvars.conf
 # ./manage.py runserver 0.0.0.0:8000

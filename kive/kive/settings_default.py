@@ -55,7 +55,7 @@ DATABASES = {
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.11/ref/settings/#allowed-hosts
 # This is a list of strings in JSON, for example:
-# export KIVE_ALLOWED_HOSTS='["localhost", "127.0.0.1"]]'
+# export KIVE_ALLOWED_HOSTS='["localhost", "127.0.0.1"]'
 ALLOWED_HOSTS = json.loads(os.environ.get("KIVE_ALLOWED_HOSTS", "[]"))
 
 # Local time zone for this installation. Choices can be found here:
