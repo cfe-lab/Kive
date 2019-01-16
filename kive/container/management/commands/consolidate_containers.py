@@ -65,7 +65,8 @@ class Command(BaseCommand):
 
             original_path = container.file.path
             new_name = os.path.basename(container.file.name)
-            container.file.save(new_name, container.file, save=True)
+            with open(original_path, "rb") as f:
+                container.file.save(new_name, File(f), save=True)
 
             os.remove(original_path)
 
