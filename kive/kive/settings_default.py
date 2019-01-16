@@ -22,14 +22,12 @@ import json
 
 from django.core.management.utils import get_random_secret_key
 
-DEBUG = os.environ.get("KIVE_DEBUG", True)  # Turn this off in production!
+# Turn this off in production!
+DEBUG = os.environ.get("KIVE_DEBUG", 'True').lower() != 'false'
 
-ADMINS = (
-    # ('Your Name', 'your_email@example.com'),
-)
-raw_admins = os.environ.get("KIVE_ADMINS")
-if raw_admins is not None:
-    ADMINS = json.loads(raw_admins)
+# This is a list of lists in JSON, for example:
+# export KIVE_ADMINS='[["Your Name", "your_email@example.com"]]'
+ADMINS = json.loads(os.environ.get("KIVE_ADMINS", "[]"))
 
 EMAIL_HOST = os.environ.get("KIVE_EMAIL_HOST", "localhost")
 SERVER_EMAIL = os.environ.get("KIVE_SERVER_EMAIL", "")
@@ -55,11 +53,10 @@ DATABASES = {
 }
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
-# See https://docs.djangoproject.com/en/1.7/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = []
-raw_allowed_hosts = os.environ.get("KIVE_ALLOWED_HOSTS")  # this must be a JSON list string
-if raw_allowed_hosts is not None:
-    ALLOWED_HOSTS = json.loads(raw_allowed_hosts)
+# See https://docs.djangoproject.com/en/1.11/ref/settings/#allowed-hosts
+# This is a list of strings in JSON, for example:
+# export KIVE_ALLOWED_HOSTS='["localhost", "127.0.0.1"]]'
+ALLOWED_HOSTS = json.loads(os.environ.get("KIVE_ALLOWED_HOSTS", "[]"))
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -265,16 +262,6 @@ FLEET_PURGING_INTERVAL = 3600  # in seconds
 # Shorter sleep makes worker more responsive, generates more load when idle.
 SLEEP_SECONDS = 0.1
 
-# External files are held on a remote file system beyond Kive's control; When the
-# Kive Manager is idle, she will periodically check to see whether these files still
-# exist where they were when they were added to the system.
-# If a file is found to be missing, an error is issued via the logging system.
-# Here, set how often each external file should be checked
-# Setting these variables to zero will disable the checking system.
-EXTERNAL_FILE_CHECK_DAYS = 0
-EXTERNAL_FILE_CHECK_HOURS = 0
-EXTERNAL_FILE_CHECK_MINUTES = 0
-
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 LOGIN_URL = "login"
@@ -351,11 +338,13 @@ DATASET_DISPLAY_MAX = 100
 # be used by Kive.  Fill these in with the names of the queues as you have them
 # defined on your system.  The tuples contain the name Kive will use for the
 # queue as well as the actual Slurm name.
-SLURM_QUEUES = [
-    ("Low priority", "LOW_PRIO"),
-    ("Medium priority", "MEDIUM_PRIO"),
-    ("High priority", "HIGH_PRIO")
+SLURM_QUEUES = json.loads(os.environ.get("KIVE_SLURM_QUEUES", """\
+[
+    ["Low priority", "LOW_PRIO"],
+    ["Medium priority", "MEDIUM_PRIO"],
+    ["High priority", "HIGH_PRIO"]
 ]
+"""))
 # Number of seconds between checking Slurm for job information.
 DEFAULT_SLURM_CHECK_INTERVAL = 5
 
@@ -424,4 +413,4 @@ RUN_SINGULARITY_TESTS = (
         os.environ.get('KIVE_RUN_SINGULARITY_TESTS', 'False').lower() != 'false')
 
 # Container file in CodeResources folder
-DEFAULT_CONTAINER = 'kive-default.simg'
+DEFAULT_CONTAINER = os.environ.get('KIVE_DEFAULT_CONTAINER', 'kive-default.simg')

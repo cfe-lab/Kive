@@ -114,8 +114,9 @@ Once you have set up your production server, this is how to deploy a new release
         git fetch
         git checkout tags/vX.Y
 
-7. Check if you need to set any new settings by running
-    `diff kive/settings_default.py kive/settings.py`.
+7. Check if you need to set any new environment variables by running
+    `diff kive/settings_default.py kive/settings.py`. Then copy
+    `settings_default.py` over `settings.py`.
     
 8. Migrate the database as described in the Creating Database Tables section
     of INSTALL.md, and deploy the static files:
@@ -123,7 +124,7 @@ Once you have set up your production server, this is how to deploy a new release
         ssh user@server
         cd /usr/local/share/Kive/kive
         ./manage.py migrate
-        grep STATIC_ROOT kive/settings.py
+        echo $KIVE_STATIC_ROOT
         cd /path/to/static/..
         sudo rm -Rf static
         sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz -O static_root.tar.gz
