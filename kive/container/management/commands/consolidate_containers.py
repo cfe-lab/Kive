@@ -3,9 +3,11 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
 from argparse import ArgumentDefaultsHelpFormatter
 
 from django.core.management.base import BaseCommand
+from django.core.files import File
 from django.conf import settings
 from django.db import transaction
 
@@ -19,61 +21,58 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = "Consolidates Container file locations into their default directory."
 
+    container_directory = os.path.normpath(os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR))
+
     def add_arguments(self, parser):
         parser.formatter_class = ArgumentDefaultsHelpFormatter
 
-        parser.add_argument('--directory',
-                            help='Directory to consolidate Container files in',
-                            default=os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR))
-
-    def handle(self, directory, **options):
-        move_instructions = self.identify_containers_to_move(directory=directory)
-        prompt_message = "The following Container files will be moved:\n"
-        for container, curr_loc, new_loc in move_instructions:
-            prompt_message += "{} ({} -> {})\n".format(container, curr_loc, new_loc)
+    def handle(self, **options):
+        containers_to_move = self.identify_containers_to_move()
+        prompt_message = "The following Container files will be moved to {}:\n".format(self.container_directory)
+        for container in containers_to_move:
+            prompt_message += "{} ({})\n".format(container, container.file.path)
         prompt_message += "Proceed?"
         proceed = self.confirm(prompt_message)
         if not proceed:
             return
-        self.move_container_files(move_instructions)
+        self.move_container_files(containers_to_move)
 
-    def identify_containers_to_move(self, directory):
+    def identify_containers_to_move(self):
         """
         Identify Containers whose files must move.
-        :param directory:
         :return:
         """
-        new_container_directory = os.path.normpath(directory)
-
-        containers_to_consolidate = []  # this will be a list of 3-tuples containing Container, old path, and new path
+        containers_to_consolidate = []
         # Scan through all Containers and examine the filenames.
         for container in Container.objects.all():
-            current_absolute_path = os.path.join(settings.MEDIA_ROOT, container.file.name)
-            directory_in_storage = os.path.normpath(os.path.dirname(current_absolute_path))
-            if directory_in_storage == new_container_directory:
+            current_absolute_path = os.path.normpath(container.file.path)
+            directory_in_storage = os.path.dirname(current_absolute_path)
+            if directory_in_storage == self.container_directory:
                 continue
-
-            current_basename = os.path.basename(current_absolute_path)
-            new_absolute_path = os.path.join(new_container_directory, current_basename)
-            containers_to_consolidate.append((container, current_absolute_path, new_absolute_path))
+            containers_to_consolidate.append(container)
 
         return containers_to_consolidate
 
-    def move_container_files(self, move_instructions):
+    def move_container_files(self, containers_to_move):
         """
         Move Container files around as specified.
 
-        :param move_instructions: a list of 3-tuples (container, current location, new location)
+        :param containers_to_move: a list of Containers
         :return:
         """
-        for container, curr_loc, new_loc in move_instructions:
-            # This incantation is copied from
-            # https://docs.djangoproject.com/en/1.11/topics/files/#using-files-in-models
+        for container in containers_to_move:
             with transaction.atomic():
-                print("Moving {} to {}....".format(curr_loc, new_loc))
-                container.file.name = new_loc
-                shutil.move(curr_loc, new_loc)
-                container.save()
+                print("Moving {} to {}....".format(container.file.path, self.container_directory))
+
+                new_name = os.path.basename(container.file.name)
+                # First make a temporary home for the contents.
+                with tempfile.TemporaryFile() as f:
+                    for chunk in container.file.chunks():
+                        f.write(chunk)
+
+                    f.seek(0)
+                    container.file.delete()
+                    container.file.save(new_name, File(f), save=True)
 
     # This is copied from the "purge.py" management command.
     def confirm(self, prompt):
