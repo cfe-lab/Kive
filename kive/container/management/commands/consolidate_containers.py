@@ -1,15 +1,12 @@
 from __future__ import print_function
 import logging
 import os
-import shutil
 import sys
-import tempfile
 from argparse import ArgumentDefaultsHelpFormatter
 
 from django.core.management.base import BaseCommand
 from django.core.files import File
 from django.conf import settings
-from django.db import transaction
 
 from container.models import Container
 
