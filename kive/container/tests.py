@@ -267,8 +267,28 @@ class ContainerRunTests(TestCase):
         self.assertEqual('Complete', response.context['state_name'])
         self.assertListEqual(expected_entries, response.context['data_entries'])
 
+    @patch.dict('os.environ', KIVE_LOG='/tmp/forbidden.log')
+    @patch('container.models.check_output')
+    def test(self, mock_check_output):
+        mock_check_output.return_value = '42\n'
+        expected_slurm_job_id = 42
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        run.slurm_job_id = None
+        run.sandbox_path = ''
+        run.save()
+
+        run.schedule()
+
+        run.refresh_from_db()
+        self.assertNotEqual('', run.sandbox_path)
+        self.assertEqual(expected_slurm_job_id, run.slurm_job_id)
+        (check_output_args, check_output_kwargs), = mock_check_output.call_args_list
+        self.assertEqual('sbatch', check_output_args[0][0])
+        self.assertNotIn('KIVE_LOG', check_output_kwargs['env'])
+
     @patch('container.models.check_call')
-    def test(self, mock_check_call):
+    def test_cancel_new_run(self, mock_check_call):
         run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
         self.assertIsNotNone(run)
         user = run.user
@@ -786,7 +806,7 @@ class PurgeTests(TestCase):
         cleaned_messages = re.sub(r'(run|log|dataset) \d+',
                                   r'\1 <id>',
                                   messages).replace('\xa0', ' ')
-        # self.assertMultiLineEqual(expected, cleaned_messages.encode('ascii'))
+        # noinspection PyTypeChecker
         self.assertMultiLineEqual(expected, cleaned_messages)
 
     def test_info_logging(self):

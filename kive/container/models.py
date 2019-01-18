@@ -541,8 +541,14 @@ class ContainerRun(Stopwatch, AccessControl):
 
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-        check_call(self.build_slurm_command(settings.SLURM_QUEUES),
-                   env=child_env)
+        del child_env['KIVE_LOG']
+        output = check_output(self.build_slurm_command(settings.SLURM_QUEUES),
+                              env=child_env)
+
+        self.slurm_job_id = int(output)
+        # It's just possible the slurm job has already started modifying the
+        # run, so only update one field.
+        self.save(update_fields=['slurm_job_id'])
 
     def build_slurm_command(self, slurm_queues=None):
         if not self.sandbox_path:
@@ -559,7 +565,6 @@ class ContainerRun(Stopwatch, AccessControl):
                    '-J', job_name,
                    '--output', slurm_prefix + 'stdout.txt',
                    '--error', slurm_prefix + 'stderr.txt',
-                   '--export', 'all,KIVE_LOG=',
                    '-c', str(self.app.threads),
                    '--mem', str(self.app.memory)]
         if slurm_queues is not None:
