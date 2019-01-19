@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import sys
+from datetime import datetime, timedelta
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile, mkdtemp
 import shutil
@@ -14,6 +15,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator, MinValueValidator
 from django.db import models, transaction
+from django.db.models.functions import Now
 from django.dispatch import receiver
 from django.forms.fields import FileField as FileFormField
 from django.urls import reverse
@@ -541,7 +543,7 @@ class ContainerRun(Stopwatch, AccessControl):
 
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-        del child_env['KIVE_LOG']
+        child_env.pop('KIVE_LOG', None)
         output = check_output(self.build_slurm_command(settings.SLURM_QUEUES),
                               env=child_env)
 
@@ -563,6 +565,7 @@ class ContainerRun(Stopwatch, AccessControl):
                                    self.app.container.family.name)
         command = ['sbatch',
                    '-J', job_name,
+                   '--parsable',
                    '--output', slurm_prefix + 'stdout.txt',
                    '--error', slurm_prefix + 'stderr.txt',
                    '-c', str(self.app.threads),
@@ -675,6 +678,42 @@ class ContainerRun(Stopwatch, AccessControl):
 
         for file_name in os.listdir(ContainerRun.SANDBOX_ROOT):
             yield os.path.join(relative_root, file_name)
+
+    @classmethod
+    def check_slurm_state(cls, pk=None):
+        """ Check active runs to make sure their Slurm jobs haven't died.
+
+        :param pk: a run id to check, or None if all active runs should be
+            checked.
+        """
+        runs = cls.objects.only('state', 'end_time', 'slurm_job_id')
+        if pk is None:
+            runs = runs.filter(state__in=cls.ACTIVE_STATES)
+        else:
+            runs = runs.filter(pk=pk)
+        job_runs = {str(run.slurm_job_id): run
+                    for run in runs
+                    if run.slurm_job_id is not None}
+        if not job_runs:
+            # No jobs to check.
+            return
+        job_id_text = ','.join(job_runs)
+        output = check_output(['sacct',
+                               '-j', job_id_text,
+                               '-o', 'jobid,end',
+                               '--noheader',
+                               '--parsable2'])
+        max_end_time = datetime.now() - timedelta(minutes=1)
+        max_end_time_text = max_end_time.strftime('%Y-%m-%dT%H:%M:%S')
+        for line in output.splitlines():
+            job_id, end_time = line.split('|')
+            if end_time > max_end_time_text:
+                continue
+            run = job_runs.get(job_id)
+            if run is not None:
+                run.state = cls.FAILED
+                run.end_time = Now()
+                run.save()
 
 
 class ContainerDataset(models.Model):

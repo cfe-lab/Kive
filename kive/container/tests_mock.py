@@ -508,6 +508,7 @@ class ContainerRunMockTests(TestCase):
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
+            '--parsable',
             '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
             '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '-c', '1',
@@ -530,6 +531,7 @@ class ContainerRunMockTests(TestCase):
         expected_command = [
             'sbatch',
             '-J', 'r99 my_app',
+            '--parsable',
             '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
             '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '-c', '1',
@@ -552,6 +554,7 @@ class ContainerRunMockTests(TestCase):
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
+            '--parsable',
             '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
             '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '-c', '3',
@@ -578,6 +581,7 @@ class ContainerRunMockTests(TestCase):
         expected_command = [
             'sbatch',
             '-J', 'r99 my container',
+            '--parsable',
             '--output', '/tmp/kive_media/run23/logs/job%J_node%N_stdout.txt',
             '--error', '/tmp/kive_media/run23/logs/job%J_node%N_stderr.txt',
             '-c', '1',

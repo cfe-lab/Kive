@@ -312,6 +312,12 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
     def get_success_url(self):
         return reverse('container_runs')
 
+    def get(self, request, *args, **kwargs):
+        # noinspection PyTypeChecker
+        pk = kwargs.get('pk')
+        ContainerRun.check_slurm_state(pk)
+        return super(ContainerRunUpdate, self).get(request, *args, **kwargs)
+
 
 @method_decorator(login_required, name='dispatch')
 class ContainerLogDetail(DetailView):

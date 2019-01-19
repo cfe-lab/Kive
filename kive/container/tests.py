@@ -208,6 +208,135 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_count = ContainerRun.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
 
+    @patch('container.models.check_output')
+    def test_slurm_ended(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.save()
+        other_run = self.test_run.app.runs.create(user=self.test_run.user,
+                                                  slurm_job_id=43)
+        end_time = (datetime.now() -
+                    timedelta(seconds=61)).strftime('%y-%m-%dT%H:%M:%S')
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+""".replace('<end-time>', end_time)
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        other_run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, self.test_run.state)
+        self.assertEqual(ContainerRun.NEW, other_run.state)
+        self.assertIsNotNone(self.test_run.end_time)
+        self.assertIsNone(other_run.end_time)
+
+    @patch('container.models.check_output')
+    def test_slurm_just_ended(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.save()
+        other_run = self.test_run.app.runs.create(user=self.test_run.user,
+                                                  slurm_job_id=43)
+        end_time = (datetime.now() -
+                    timedelta(seconds=59)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+""".replace('<end-time>', end_time)
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        other_run.refresh_from_db()
+        self.assertEqual(ContainerRun.NEW, self.test_run.state)
+        self.assertEqual(ContainerRun.NEW, other_run.state)
+        self.assertIsNone(self.test_run.end_time)
+        self.assertIsNone(other_run.end_time)
+
+    @patch('container.models.check_output')
+    def test_runs_finished(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.save()
+        other_run = self.test_run.app.runs.create(user=self.test_run.user,
+                                                  slurm_job_id=43)
+        end_time = (datetime.now() -
+                    timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+43|<end-time>
+43.batch|<end-time>
+""".replace('<end-time>', end_time)
+
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        other_run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, self.test_run.state)
+        self.assertEqual(ContainerRun.FAILED, other_run.state)
+        self.assertIsNotNone(self.test_run.end_time)
+        self.assertIsNotNone(other_run.end_time)
+
+    @patch('container.models.check_output')
+    def test_some_runs_finished(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.save()
+        other_run = self.test_run.app.runs.create(user=self.test_run.user,
+                                                  slurm_job_id=43)
+        end_time = (datetime.now() -
+                    timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+43|Unknown
+""".replace('<end-time>', end_time)
+
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        other_run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, self.test_run.state)
+        self.assertEqual(ContainerRun.NEW, other_run.state)
+        self.assertIsNotNone(self.test_run.end_time)
+        self.assertIsNone(other_run.end_time)
+
+    @patch('container.models.check_output')
+    def test_no_active_runs(self, mock_check_output):
+        ContainerRun.objects.update(state=ContainerRun.CANCELLED)
+
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual([], mock_check_output.call_args_list)
+
+    @patch('container.models.check_output')
+    def test_null_slurm_job_id(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+
+        request = self.factory.get(self.list_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.assertEqual([], mock_check_output.call_args_list)
+
 
 @skipIfDBFeature('is_mocked')
 class ContainerRunTests(TestCase):
@@ -269,7 +398,29 @@ class ContainerRunTests(TestCase):
 
     @patch.dict('os.environ', KIVE_LOG='/tmp/forbidden.log')
     @patch('container.models.check_output')
-    def test(self, mock_check_output):
+    def test_launch_run(self, mock_check_output):
+        mock_check_output.return_value = '42\n'
+        expected_slurm_job_id = 42
+        run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(run)
+        run.slurm_job_id = None
+        run.sandbox_path = ''
+        run.save()
+
+        run.schedule()
+
+        run.refresh_from_db()
+        self.assertNotEqual('', run.sandbox_path)
+        self.assertEqual(expected_slurm_job_id, run.slurm_job_id)
+        (check_output_args, check_output_kwargs), = mock_check_output.call_args_list
+        self.assertEqual('sbatch', check_output_args[0][0])
+        self.assertNotIn('KIVE_LOG', check_output_kwargs['env'])
+
+    @patch.dict('os.environ', KIVE_LOG='/tmp/forbidden.log')
+    @patch('container.models.check_output')
+    def test_launch_without_kive_log(self, mock_check_output):
+        """ What if KIVE_LOG isn't set? """
+        del os.environ['KIVE_LOG']
         mock_check_output.return_value = '42\n'
         expected_slurm_job_id = 42
         run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()

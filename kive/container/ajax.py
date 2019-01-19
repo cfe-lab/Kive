@@ -449,6 +449,15 @@ class ContainerRunViewSet(CleanCreateModelMixin,
                                                    context=dict(request=request),
                                                    many=True).data)
 
+    def retrieve(self, request, *args, **kwargs):
+        pk = kwargs.get('pk')
+        ContainerRun.check_slurm_state(pk)
+        return super(ContainerRunViewSet, self).retrieve(request, *args, **kwargs)
+
+    def list(self, request, *args, **kwargs):
+        ContainerRun.check_slurm_state()
+        return super(ContainerRunViewSet, self).list(request, *args, **kwargs)
+
     # noinspection PyUnusedLocal
     def patch_object(self, request, pk=None):
         return Response(ContainerRunSerializer(self.get_object(),
