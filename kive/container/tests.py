@@ -261,6 +261,30 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertIsNone(other_run.end_time)
 
     @patch('container.models.check_output')
+    def test_check_slurm_after_success(self, mock_check_output):
+        """ When a run is already completed, don't mark it as failed. """
+        end_time = timezone.now() - timedelta(seconds=61)
+        end_time_text = end_time.strftime('%y-%m-%dT%H:%M:%S')
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.state = ContainerRun.COMPLETE
+        self.test_run.end_time = end_time
+        self.test_run.save()
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+""".replace('<end-time>', end_time_text)
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        self.assertEqual(ContainerRun.COMPLETE, self.test_run.state)
+        self.assertEqual(end_time, self.test_run.end_time)
+
+    @patch('container.models.check_output')
     def test_runs_finished(self, mock_check_output):
         ContainerRun.objects.update(slurm_job_id=None)
         self.test_run.slurm_job_id = 42

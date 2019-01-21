@@ -686,10 +686,11 @@ class ContainerRun(Stopwatch, AccessControl):
         :param pk: a run id to check, or None if all active runs should be
             checked.
         """
-        runs = cls.objects.only('state', 'end_time', 'slurm_job_id')
-        if pk is None:
-            runs = runs.filter(state__in=cls.ACTIVE_STATES)
-        else:
+        runs = cls.objects.filter(state__in=cls.ACTIVE_STATES).only(
+            'state',
+            'end_time',
+            'slurm_job_id')
+        if pk is not None:
             runs = runs.filter(pk=pk)
         job_runs = {str(run.slurm_job_id): run
                     for run in runs
