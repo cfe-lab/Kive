@@ -1404,7 +1404,7 @@ class Dataset(metadata.models.AccessControl):
                 yield os.path.relpath(file_path, settings.MEDIA_ROOT)
             if not (dirnames or filenames):
                 # Empty folder can be purged.
-                yield dirpath
+                yield os.path.relpath(dirpath, settings.MEDIA_ROOT)
 
     @classmethod
     def external_file_check(cls, batch_size=1000):

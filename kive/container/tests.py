@@ -1194,12 +1194,19 @@ Purged 1 unregistered dataset file containing 100 bytes.
                                        '2018_06',
                                        'empty_child')
         os.makedirs(left_overs_path)
+        expected_messages = """\
+Purged unregistered file 'Datasets/2018_06/empty_child' containing 0 bytes.
+Purged 1 unregistered dataset file containing 0 bytes.
+"""
 
-        purge.Command().handle(synch=True)
+        with self.capture_log_stream(logging.WARN) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
 
         self.assertFalse(os.path.exists(left_overs_path))
         # Parent will get purged next time.
         self.assertTrue(os.path.exists(os.path.dirname(left_overs_path)))
+        self.assertLogStreamEqual(expected_messages, log_messages)
 
     def test_purge_batch(self):
         for i in range(12):

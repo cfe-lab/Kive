@@ -325,8 +325,6 @@ class Manager(object):
         """
         # add any idle tasks that should be performed in the mainloop here
         # --
-        # make Dataset sub-directories for next month
-        self._add_idletask(Dataset.idle_create_next_month_upload_dir())
         # purge old log files
         self._add_idletask(MethodOutput.idle_logfile_purge())
 
