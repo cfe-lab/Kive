@@ -23,6 +23,9 @@ from container.models import ContainerRun, ContainerLog, Container
 from librarian.models import Dataset
 from portal.models import parse_file_size
 
+# error - summary of unregistered files, can't meet purge target, or can't purge
+# warning - list each unregistered file
+# info - summary of regular purge
 logger = logging.getLogger(__name__)
 
 
