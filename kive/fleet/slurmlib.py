@@ -4,6 +4,7 @@ import os
 import stat
 import os.path
 import logging
+import sys
 import tempfile
 import json
 import time
@@ -998,7 +999,10 @@ def startit(wdir, dname, arglst, stdout, stderr):
         re.escape(os.path.join(wdir, dname)),
         " ".join([re.escape(x) for x in arglst]))
     cclst = ["/bin/bash", "-c", '{}'.format(act_cmdstr)]
-    p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr)
+    child_env = dict(os.environ)
+    child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
+    child_env.pop('KIVE_LOG')  # Helpers should log to stderr, not a file.
+    p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr, env=child_env)
     return p
 
 

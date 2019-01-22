@@ -37,7 +37,7 @@ generate a call graph with timing information:
 
 ## Deploying a Release ##
 
-See the project wiki for instructions on how to [start a production server][wiki].
+See the vagrant scripts for examples of how to start a production server.
 Once you have set up your production server, this is how to deploy a new release:
 
 1. Make sure the code works in your development environment. Run all the
@@ -161,7 +161,6 @@ Once you have set up your production server, this is how to deploy a new release
     decide which issues you will include in that milestone.
 
 [release]: https://help.github.com/categories/85/articles
-[wiki]: https://github.com/cfe-lab/Kive/wiki/Starting-a-production-server-for-Shipyard-(Django)
 
 ## Restoring the system after something's gone wrong ##
 
