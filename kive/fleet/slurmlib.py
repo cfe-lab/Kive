@@ -396,7 +396,7 @@ class SlurmScheduler(BaseSlurmScheduler):
                    "-c", str(num_cpus),
                    "--mem={}".format(mem),
                    "--export=PYTHONPATH={}".format(workingdir),
-                   "--export=all"]
+                   "--export=all,KIVE_LOG="]
         # "--get-user-env",
         if stdoutfile:
             cmd_lst.append("--output=%s" % stdoutfile)
