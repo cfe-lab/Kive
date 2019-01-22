@@ -1001,7 +1001,7 @@ def startit(wdir, dname, arglst, stdout, stderr):
     cclst = ["/bin/bash", "-c", '{}'.format(act_cmdstr)]
     child_env = dict(os.environ)
     child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-    child_env.pop('KIVE_LOG')  # Helpers should log to stderr, not a file.
+    child_env.pop('KIVE_LOG', None)  # Helpers should log to stderr, not a file.
     p = sp.Popen(cclst, shell=False, stdout=stdout, stderr=stderr, env=child_env)
     return p
 
