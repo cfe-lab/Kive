@@ -178,3 +178,74 @@ class Command(BaseCommand):
                      if run.return_code == 0
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
+
+    def run_pipeline(self,
+                     instructions,
+                     parent_container,
+                     run,
+                     binary_dir="/mnt/bin",
+                     inputs_dir="/mnt/inputs",
+                     outputs_dir="/mnt/inputs",
+                     working_dir="/mnt/bin"):
+        """
+        Run the pipeline dictated in the instructions.
+
+        :param instructions:
+        :param parent_container:
+        :param run:
+        :param binary_dir: as it appears inside the container
+        :param inputs_dir: as it appears inside the container
+        :param outputs_dir: as it appears inside the container
+        :param working_dir: as it appears inside the container
+        :return:
+        """
+        # The instructions take the form of a Python representation of a pipeline JSON file.
+        # We keep track of what files were produced by what steps in file_map, which is a list of dictionaries.
+        # Each dictionary maps dataset_name -|-> (internal path, external path), and the step index is their
+        # position in the list.
+        inputs_map = {}
+        external_inputs_dir = os.path.join(run.full_sandbox_path, "inputs")
+        for input_dict in instructions["inputs"]:
+            # This dictionary has a field called "dataset_name".
+            inputs_map[input_dict["dataset_name"]] = (
+                os.path.join(inputs_dir, input_dict["dataset_name"]),
+                os.path.join(external_inputs_dir, input_dict["dataset_name"])
+            )  # the second isn't needed but we keep it for consistency
+        file_map = [inputs_map]
+
+        external_outputs_dir = os.path.join(run.full_sandbox_path, "outputs")
+        for step in instructions["steps"]:
+            # Each step is a dictionary with fields:
+            # - driver (the executable)
+            # - inputs (a list of (step_num, dataset_name) pairs)
+            # - outputs (a list of dataset_names)
+            executable = os.path.join(binary_dir, step["driver"])
+            input_paths = [file_map[step_num][dataset_name] for step_num, dataset_name in step["inputs"]]
+            outputs_map = {}
+            for step_num, dataset_name in step["outputs"]:
+                file_name = "step{}_{}".format(step_num, dataset_name)
+                outputs_map[dataset_name] = (
+                    os.path.join(outputs_dir, file_name),
+                    os.path.join(external_outputs_dir, file_name)
+                )
+            file_map.append(outputs_map)
+
+            output_paths = [outputs_map[x][0] for _, x in step["outputs"]]
+            execution_args = [
+                "singularity",
+                "exec",
+                parent_container.file.path,
+                "--pwd",
+                working_dir,
+                executable
+            ]
+            call(execution_args + input_paths + output_paths)
+
+        # Now rename the outputs.
+        for output in instructions["outputs"]:
+            # This dictionary has fields
+            # - dataset_name
+            # - source (pairs that look like [step_num, output_name])
+            final_output_path = os.path.join(external_outputs_dir, self.build_dataset_name(run, output["dataset_name"]))
+            source_step, source_dataset_name = output["source"]
+            os.link(file_map[source_step][source_dataset_name][1], final_output_path)
