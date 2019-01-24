@@ -184,8 +184,8 @@ class Command(BaseCommand):
                      parent_container,
                      run,
                      binary_dir="/mnt/bin",
-                     inputs_dir="/mnt/inputs",
-                     outputs_dir="/mnt/inputs",
+                     inputs_dir="/mnt/input",
+                     outputs_dir="/mnt/output",
                      working_dir="/mnt/bin"):
         """
         Run the pipeline dictated in the instructions.

@@ -116,11 +116,30 @@ class ContainerFileField(models.FileField):
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
+    SIMG = "SIMG"
+    ZIP = "ZIP"
+    TAR = "TAR"
+    TGZ = "TGZ"
+    SUPPORTED_FILE_TYPES = (
+        (SIMG, "Singularity"),
+        (ZIP, "Zip"),
+        (TAR, "Tar"),
+        (TGZ, "Gzipped tar")
+    )
+
     family = models.ForeignKey(ContainerFamily, related_name="containers")
     file = ContainerFileField(
         "Container file",
         upload_to=UPLOAD_DIR,
         help_text="Singularity container file")
+
+    file_type = models.CharField(
+        choices=SUPPORTED_FILE_TYPES,
+        default=SIMG
+    )
+
+    parent = models.ForeignKey("Container", related_name="children")
+
     tag = models.CharField('Tag',
                            help_text='Git tag or revision name',
                            max_length=128)
@@ -159,6 +178,9 @@ class Container(AccessControl):
 
     def __repr__(self):
         return 'Container(id={})'.format(self.pk)
+
+    def can_be_parent(self):
+        return self.file_type == self.SIMG
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
