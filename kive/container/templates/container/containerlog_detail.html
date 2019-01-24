@@ -30,9 +30,20 @@
 {% endif %}
 </h2>
 
+<table>
+<tr>
+    <th>Size:</th>
+    <td>{{ object.size_display }}</td>
+    {% if download_url %}
+        <td><a href="{{ download_url }}" class="large button">Download</a></td>
+    {% endif %}
+</tr>
+</table>
+
+
 <div class="dataset_contents">
 <pre>
-{{ object.read }}
+{{ object.preview }}
 </pre>
 </div>
 

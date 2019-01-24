@@ -1,5 +1,6 @@
 import mimetypes
 import os
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from wsgiref.util import FileWrapper
 
@@ -14,14 +15,14 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, Batch, ContainerArgument, ContainerDataset
+    ContainerRun, Batch, ContainerArgument, ContainerDataset, ContainerLog
 from container.serializers import ContainerFamilySerializer, \
     ContainerSerializer, ContainerAppSerializer, \
     ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
-    ContainerArgumentSerializer, ContainerDatasetSerializer
+    ContainerArgumentSerializer, ContainerDatasetSerializer, ContainerLogSerializer
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination, \
-    IsGrantedReadCreate
+    IsGrantedReadCreate, GrantedModelMixin, IsGrantedReadOnly
 from metadata.models import AccessControl
 from portal.views import admin_check
 
@@ -449,6 +450,14 @@ class ContainerRunViewSet(CleanCreateModelMixin,
                                                    context=dict(request=request),
                                                    many=True).data)
 
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Logs')
+    def log_list(self, request, pk=None):
+        logs = self.get_object().logs.all()
+        return Response(ContainerLogSerializer(logs,
+                                               context=dict(request=request),
+                                               many=True).data)
+
     def retrieve(self, request, *args, **kwargs):
         pk = kwargs.get('pk')
         ContainerRun.check_slurm_state(pk)
@@ -478,3 +487,46 @@ class ContainerRunViewSet(CleanCreateModelMixin,
             run.request_stop(request.user)
 
         return self.patch_object(request, pk)
+
+
+class ContainerLogViewSet(GrantedModelMixin, ReadOnlyModelViewSet):
+    queryset = ContainerLog.objects.all()
+    serializer_class = ContainerLogSerializer
+    permission_classes = (permissions.IsAuthenticated, IsGrantedReadOnly)
+    pagination_class = StandardPagination
+
+    def filter_granted(self, queryset):
+        """ Logs don't have permissions, so filter by parent runs. """
+        granted_runs = ContainerRun.filter_by_user(self.request.user)
+
+        return queryset.filter(run_id__in=granted_runs)
+
+    @contextmanager
+    def read_content(self, log):
+        if log.long_text:
+            log.long_text.open()
+            try:
+                # Stream file in chunks to avoid overloading memory.
+                file_chunker = FileWrapper(log.long_text)
+                yield file_chunker, log.long_text.size
+            finally:
+                log.long_text.close()
+        elif log.log_size:
+            message = 'purged'
+            yield message, len(message)
+        else:
+            yield log.short_text, len(log.short_text)
+
+    # noinspection PyUnusedLocal
+    @action(detail=True)
+    def download(self, request, pk=None):
+        log = self.get_object()
+        type_names = dict(ContainerLog.TYPES)
+        type_name = type_names[log.type]
+        file_name = 'run_{}_{}.txt'.format(log.run_id, type_name)
+        with self.read_content(log) as (content, size):
+            response = HttpResponse(content, content_type='text/plain')
+            response['Content-Length'] = size
+            response['Content-Disposition'] = 'attachment; filename="{}"'.format(
+                file_name)
+        return response

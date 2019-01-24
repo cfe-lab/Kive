@@ -3,7 +3,7 @@ import django.contrib.auth.views
 
 from archive.ajax import MethodOutputViewSet, RunViewSet, RunBatchViewSet
 from container.ajax import ContainerFamilyViewSet, ContainerViewSet, ContainerAppViewSet, ContainerChoiceViewSet, \
-    ContainerRunViewSet, BatchViewSet, ContainerArgumentViewSet
+    ContainerRunViewSet, BatchViewSet, ContainerArgumentViewSet, ContainerLogViewSet
 from librarian.ajax import DatasetViewSet, ExternalFileDirectoryViewSet
 from kive.kive_router import KiveRouter
 from metadata.ajax import DatatypeViewSet, CompoundDatatypeViewSet
@@ -39,6 +39,7 @@ router.register(r'containers', ContainerViewSet)
 router.register(r'containerapps', ContainerAppViewSet)
 router.register(r'containerargs', ContainerArgumentViewSet)
 router.register(r'containerruns', ContainerRunViewSet)
+router.register(r'containerlogs', ContainerLogViewSet)
 router.register(r'dockerimages', DockerImageViewSet)
 router.register(r'datasets', DatasetViewSet)
 router.register(r'externalfiledirectories', ExternalFileDirectoryViewSet)

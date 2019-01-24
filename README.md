@@ -1,6 +1,14 @@
 Kive
 ====
 
+[![Build Status]][travis]
+[![Code Coverage]][codecov]
+
+[Build Status]: https://travis-ci.org/cfe-lab/Kive.svg?branch=master
+[travis]: https://travis-ci.org/cfe-lab/Kive
+[Code Coverage]: https://codecov.io/github/cfe-lab/Kive/coverage.svg?branch=master
+[codecov]: https://codecov.io/github/cfe-lab/Kive?branch=master
+
 *Kive* is an accessible computing framework for the version control of
 bioinformatic pipelines, along with their input and output datasets.
 
