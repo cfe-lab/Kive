@@ -135,10 +135,13 @@ class Container(AccessControl):
 
     file_type = models.CharField(
         choices=SUPPORTED_FILE_TYPES,
-        default=SIMG
-    )
+        default=SIMG,
+        max_length=20)
 
-    parent = models.ForeignKey("Container", related_name="children")
+    parent = models.ForeignKey("Container",
+                               related_name="children",
+                               null=True,
+                               blank=True)
 
     tag = models.CharField('Tag',
                            help_text='Git tag or revision name',
