@@ -93,6 +93,9 @@ urlpatterns = [
     url(r'^container_update/(?P<pk>\d+)/$',
         container.views.ContainerUpdate.as_view(),
         name='container_update'),
+    url(r'^container_update/(?P<pk>\d+)/content',
+        container.views.ContainerContentUpdate.as_view(),
+        name='container_content_update'),
 
     url(r'^container_update/(?P<container_id>\d+)/app_add$',
         container.views.ContainerAppCreate.as_view(),

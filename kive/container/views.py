@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
 import os
 from io import BytesIO
 
@@ -161,6 +162,61 @@ class ContainerUpdate(UpdateView, AdminViewMixin):
         access_limits = kwargs.setdefault('access_limits', [])
         access_limits.append(self.object.family)
         return kwargs
+
+
+@method_decorator(dev_decorators, name='dispatch')
+class ContainerContentUpdate(DetailView, AdminViewMixin):
+    model = Container
+    template_name_suffix = '_content'
+
+    def get_context_data(self, **kwargs):
+        context = super(ContainerContentUpdate, self).get_context_data(**kwargs)
+        # This will be read from the container file's archive listing.
+        content_files = ["filter_quality.sh", "helper.py", "lib/antigravity.py"]
+        # This will be read from the container file's pipeline.json.
+        pipeline_json = """\
+{
+    "kive_version": "0.14",
+    "default_config": {
+        "container_name": "kive-default",
+        "container_md5": "225a63213afdfd2e2659e9f9c1a3b695",
+        "memory": 100,
+        "threads": 1
+    },
+    "inputs": [
+        {
+            "dataset_name": "quality_csv",
+            "x": 0.426540479529696,
+            "y": 0.345062429057889
+        }
+    ],
+    "steps": [
+        {
+            "driver": "filter_quality.sh",
+            "inputs": [
+                [0, "quality_csv"]
+            ],
+            "outputs": ["bad_cycles_csv"],
+            "x": 0.501879443635952,
+            "y": 0.497715260532689,
+            "fill_colour": ""
+        }
+    ],
+    "outputs": [
+        {
+            "dataset_name": "bad_cycles_csv",
+            "source": [1, "bad_cycles_csv"],
+            "x": 0.588014776534994,
+            "y": 0.640181611804767
+        }
+    ]
+}
+"""
+        pipeline_config = json.loads(pipeline_json)
+        content_json = json.dumps(dict(files=content_files,
+                                       pipeline=pipeline_config))
+        context['content_json'] = content_json
+        return context
 
 
 class ArgumentWriterMixin(ModelFormMixin):

@@ -3,7 +3,7 @@
 
 {% extends "portal/base.html" %}
 
-{% block title %}Pipelines{% endblock %}
+{% block title %}Pipeline{% endblock %}
 
 {% block javascript %}
     <!-- Do not remove - Accumulator still uses jQuery as a global. -->
@@ -15,7 +15,7 @@
     <style>
         #canvas{}
     </style>
-    <link rel="stylesheet" href="/static/pipeline/drydock.css"/>
+    <link rel="stylesheet" href="/static/container/drydock.css"/>
 {% endblock %}
 
 {% block widget_media %}
@@ -24,14 +24,10 @@
 
 {% block content %}
 
-    {% if not family and not parent_revision %}
-    <a href="pipeline_families" rel="prev">Back to pipelines</a>
-    {% else %}
-    <a href="/pipelines/{{ family.pk }}" rel="prev">Back to pipeline summary</a>
-    {% endif %}
+    <a href="." rel="prev">Back to container</a>
 
     <!-- Stash the parent revision's representation here. -->
-    <div id="initial_data" style="display:none">{{ parent_revision_json|escape }}</div>
+    <div id="initial_data" style="display:none">{{ content_json|escape }}</div>
 
     <!-- CANVAS -->
     <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
