@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import NamedTemporaryFile, mkdtemp
 import shutil
+import zipfile
+import tarfile
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -113,6 +115,10 @@ class ContainerFileField(models.FileField):
         return super(ContainerFileField, self).formfield(**kwargs)
 
 
+class ContainerNotChild(Exception):
+    pass
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
@@ -128,6 +134,7 @@ class Container(AccessControl):
     )
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
+
     file = ContainerFileField(
         "Container file",
         upload_to=UPLOAD_DIR,
@@ -184,6 +191,26 @@ class Container(AccessControl):
 
     def can_be_parent(self):
         return self.file_type == self.SIMG
+
+    def extract_archive(self, extraction_path):
+        """
+        Extract this child container to the specified extraction path.
+
+        Raises ContainerNotChild if this is not a child container.
+
+        :param extraction_path:
+        :return:
+        """
+        if self.can_be_parent():
+            raise ContainerNotChild()
+
+        if self.file_type == self.ZIP:
+            with zipfile.ZipFile(self.file) as z:
+                z.extractall(path=extraction_path)
+
+        elif self.file_type in (self.TAR, self.TGZ):
+            with tarfile.open(self.file.path, mode="r") as t:
+                t.extractall(path=extraction_path)
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))

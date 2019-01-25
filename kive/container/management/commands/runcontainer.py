@@ -5,6 +5,7 @@ import logging
 import os
 import shutil
 from subprocess import call
+import json
 
 from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
@@ -91,10 +92,26 @@ class Command(BaseCommand):
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
-        command = self.build_command(run)
         with open(stdout_path, 'w') as stdout, open(stderr_path, 'w') as stderr:
-            run.return_code = call(command, stdout=stdout, stderr=stderr)
-
+            if run.app.container.can_be_parent():
+                # This is a Singularity container.
+                command = self.build_command(run)
+                run.return_code = call(command, stdout=stdout, stderr=stderr)
+            else:
+                # This is a child container to be run inside another Singularity container.
+                bin_dir = os.path.join(run.full_sandbox_path, "bin")
+                run.app.container.extract_archive(os.path.join(run.full_sandbox_path, "bin"))
+                with open(os.path.join(bin_dir, "pipeline.json"), "r") as f:
+                    instructions = json.loads(f.read())
+                run.return_code = self.run_pipeline(
+                    instructions,
+                    run.app.container.parent.file.path,
+                    stdout,
+                    stderr,
+                    bin_dir,
+                    os.path.join(run.full_sandbox_path, "inputs"),
+                    os.path.join(run.full_sandbox_path, "outputs")
+                )
         run.state = ContainerRun.SAVING
 
     def build_command(self, run):
@@ -181,22 +198,30 @@ class Command(BaseCommand):
 
     def run_pipeline(self,
                      instructions,
-                     parent_container,
-                     run,
-                     binary_dir="/mnt/bin",
-                     inputs_dir="/mnt/input",
-                     outputs_dir="/mnt/output",
-                     working_dir="/mnt/bin"):
+                     parent_container_path,
+                     standard_out,
+                     standard_err,
+                     extracted_archive_dir,
+                     external_inputs_dir,
+                     external_outputs_dir,
+                     internal_binary_dir="/mnt/bin",
+                     internal_inputs_dir="/mnt/input",
+                     internal_outputs_dir="/mnt/output",
+                     internal_working_dir="/mnt/bin"):
         """
         Run the pipeline dictated in the instructions.
 
         :param instructions:
-        :param parent_container:
-        :param run:
-        :param binary_dir: as it appears inside the container
-        :param inputs_dir: as it appears inside the container
-        :param outputs_dir: as it appears inside the container
-        :param working_dir: as it appears inside the container
+        :param parent_container_path: absolute path to the parent container in which to run the pipeline
+        :param standard_out: a writable file-like object to write stdout to
+        :param standard_err: similarly for stderr
+        :param extracted_archive_dir:
+        :param external_inputs_dir:
+        :param external_outputs_dir:
+        :param internal_binary_dir: as it appears inside the container
+        :param internal_inputs_dir: as it appears inside the container
+        :param internal_outputs_dir: as it appears inside the container
+        :param internal_working_dir: as it appears inside the container
         :return:
         """
         # The instructions take the form of a Python representation of a pipeline JSON file.
@@ -204,28 +229,31 @@ class Command(BaseCommand):
         # Each dictionary maps dataset_name -|-> (internal path, external path), and the step index is their
         # position in the list.
         inputs_map = {}
-        external_inputs_dir = os.path.join(run.full_sandbox_path, "inputs")
         for input_dict in instructions["inputs"]:
             # This dictionary has a field called "dataset_name".
             inputs_map[input_dict["dataset_name"]] = (
-                os.path.join(inputs_dir, input_dict["dataset_name"]),
+                os.path.join(internal_inputs_dir, input_dict["dataset_name"]),
                 os.path.join(external_inputs_dir, input_dict["dataset_name"])
             )  # the second isn't needed but we keep it for consistency
         file_map = [inputs_map]
 
-        external_outputs_dir = os.path.join(run.full_sandbox_path, "outputs")
-        for step in instructions["steps"]:
+        final_return_code = 0
+        for idx, step in enumerate(instructions["steps"]):
+            step_header = "========\nProcessing step {}: {}\n========\n".format(idx, step["driver"])
+            standard_out.write(step_header)
+            standard_err.write(step_header)
+
             # Each step is a dictionary with fields:
             # - driver (the executable)
             # - inputs (a list of (step_num, dataset_name) pairs)
             # - outputs (a list of dataset_names)
-            executable = os.path.join(binary_dir, step["driver"])
+            executable = os.path.join(internal_binary_dir, step["driver"])
             input_paths = [file_map[step_num][dataset_name] for step_num, dataset_name in step["inputs"]]
             outputs_map = {}
             for step_num, dataset_name in step["outputs"]:
                 file_name = "step{}_{}".format(step_num, dataset_name)
                 outputs_map[dataset_name] = (
-                    os.path.join(outputs_dir, file_name),
+                    os.path.join(internal_outputs_dir, file_name),
                     os.path.join(external_outputs_dir, file_name)
                 )
             file_map.append(outputs_map)
@@ -234,18 +262,33 @@ class Command(BaseCommand):
             execution_args = [
                 "singularity",
                 "exec",
-                parent_container.file.path,
+                parent_container_path,
+                "--B",
+                extracted_archive_dir,
+                internal_binary_dir,
+                "--B",
+                external_inputs_dir,
+                internal_inputs_dir,
+                "--B",
+                external_outputs_dir,
+                internal_outputs_dir,
                 "--pwd",
-                working_dir,
+                internal_working_dir,
                 executable
             ]
-            call(execution_args + input_paths + output_paths)
+            step_return_code = call(execution_args + input_paths + output_paths)
+            if step_return_code != 0:
+                final_return_code = step_return_code
+                break
 
-        # Now rename the outputs.
-        for output in instructions["outputs"]:
-            # This dictionary has fields
-            # - dataset_name
-            # - source (pairs that look like [step_num, output_name])
-            final_output_path = os.path.join(external_outputs_dir, self.build_dataset_name(run, output["dataset_name"]))
-            source_step, source_dataset_name = output["source"]
-            os.link(file_map[source_step][source_dataset_name][1], final_output_path)
+        if final_return_code == 0:
+            # Now rename the outputs.
+            for output in instructions["outputs"]:
+                # This dictionary has fields
+                # - dataset_name
+                # - source (pairs that look like [step_num, output_name])
+                final_output_path = os.path.join(external_outputs_dir, output["dataset_name"])
+                source_step, source_dataset_name = output["source"]
+                os.link(file_map[source_step][source_dataset_name][1], final_output_path)
+
+        return final_return_code
