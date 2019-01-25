@@ -138,7 +138,7 @@ class Container(AccessControl):
     file = ContainerFileField(
         "Container file",
         upload_to=UPLOAD_DIR,
-        help_text="Singularity container file")
+        help_text="Singularity or archive container file")
 
     file_type = models.CharField(
         choices=SUPPORTED_FILE_TYPES,
@@ -182,6 +182,13 @@ class Container(AccessControl):
 
     class Meta:
         ordering = ['family__name', '-created']
+
+    def clean(self):
+        if self.file_type != self.SIMG:
+            if self.parent is None:
+                raise ValidationError("Non-Singularity container must have a Singularity-based container parent")
+            elif not self.parent.can_be_parent():
+                raise ValidationError("Parent container must be a Singularity container")
 
     def __str__(self):
         return self.display_name
