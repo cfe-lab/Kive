@@ -167,6 +167,17 @@ echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu
 ./dbcreate.sh
 
+# Enable the vagrant user to access Postgres as the `kive` user.
+mv /var/lib/pgsql/data/pg_ident.conf /var/lib/pgsql/data/pg_ident.conf.orig
+mv /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf.orig
+cp /usr/local/share/Kive/vagrant/pg_ident.conf /var/lib/pgsql/data/pg_ident.conf
+cp /usr/local/share/Kive/vagrant/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf
+chown postgres:postgres /var/lib/pgsql/data/pg_ident.conf
+chown postgres:postgres /var/lib/pgsql/data/pg_hba.conf
+chmod 600 /var/lib/pgsql/data/pg_ident.conf
+chmod 600 /var/lib/pgsql/data/pg_hba.conf
+systemctl reload postgresql
+
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:
 # sudo su kive
