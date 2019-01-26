@@ -1,0 +1,208 @@
+/* Pipeline-specific formatting. */
+html body {
+    background-image: url("/static/pipeline/img/isogrid.png");
+}
+#inner_wrap {
+    margin-bottom: 0 !important;
+}
+#pipeline_canvas {
+    margin-left: -4em;
+    margin-top: -2.5em;
+}
+#pipeline_ctrl {
+    position: absolute;
+    top: 46px; left: 0;
+    width: 100%;
+    height: 1.5em;
+    z-index: 1;
+}
+#pipeline_ctrl input,
+#pipeline_ctrl textarea,
+#pipeline_ctrl select {
+    display: block;
+    margin-bottom: -1px;
+    margin-top: 0;
+}
+#pipeline_ctrl input[type="checkbox"],
+#pipeline_ctrl input[type="radio"] {
+    display: inline;
+}
+#pipeline_ctrl #id_method_button,
+#pipeline_ctrl #id_cdt_button,
+#pipeline_ctrl #id_output_button {
+    margin: .5em;
+}
+#pipeline_ctrl h3 { display: none; }
+
+#id_ctrl_nav { padding: 0; margin: 0 0 0 3.5em; }
+#id_ctrl_nav li {
+    display: inline;
+    padding: .2em 1em;
+    cursor: pointer;
+    font-weight: bold;
+}
+#id_ctrl_nav li.clicked,
+#id_ctrl_nav li.clicked:hover {
+    background-color: #aaa;
+    color: #fff;
+}
+#id_ctrl_nav li:hover {
+    background-color: #aaa;
+    color: #fff;
+}
+
+#description_wrap {
+  margin-bottom: .2em;
+}
+.ctrl_menu {
+    top: 4.3em;
+    position: fixed;
+    padding: .5em;
+    border: 1px solid #aaa;
+    display: none;
+    background: #fff;
+    width: 250px;
+    min-width: 10em;
+}
+.ctrl_menu#id_meta_ctrl,
+.ctrl_menu#id_view_ctrl {
+    width: auto;
+}
+.ctrl_menu h5 {
+    margin-bottom: 2px;
+}
+.ctrl_menu h5.first {
+    margin-top: 2px;
+}
+.input-label { color: #ccc; }
+.image-button { border: 1px solid #ddd; cursor: pointer; padding: 2px; }
+
+#id_datatype_name, #id_select_method_family, 
+#id_select_method, #id_method_name, 
+#id_revision_name, #id_select_cdt,
+#id_output_name {
+    box-sizing: border-box;
+    width: 250px;
+}
+#id_select_method:empty {
+    display: none;
+}
+#id_method_delete_outputs_field {
+    margin: .5em 0;
+    font-size: .8em;
+}
+#id_method_delete_outputs_field .expand_outputs_ctrl {
+    cursor: pointer;
+    font-size: .9em;
+}
+#id_method_delete_outputs_field fieldset {
+    display: none;
+}
+
+#pipeline_ctrl .form-inline-opts {
+    font-size: 0.85em;
+    font-style:italic;
+    margin: .5em 0 1em;
+    white-space: nowrap;
+}
+#pipeline_ctrl .form-inline-opts input {
+    display: inline;
+}
+
+#pipeline_ctrl #form_ctrl {
+    float: right;
+    margin-top: -1.25em;
+    margin-right: 9em;
+}
+    #id_submit_button {
+        font-weight: bold;
+        border-radius: 1em;
+        padding: 0 1em;
+        float: left;
+        margin-right: -1px;
+        margin-left: 0;
+        padding-right: 1.75em !important;
+    }
+    #id_submit_button + .tooltip {
+        display: none;
+        position: absolute;
+        background-color: #fdd;
+        border: 1px solid #c44;
+        padding: .5em;
+    }
+    #id_submit_button:hover + .tooltip {
+        display: block;
+    }
+
+#form_ctrl .indicator-light {
+    border-radius: .35em;
+    padding: .35em;
+    line-height: .01px;
+    width: 1px; height: 1px;
+    float: left;
+    margin-left: -1.5em;
+    margin-top: .3em;
+}
+.pipeline-ready     + .indicator-light { background-color: #0d0; }
+.pipeline-not-ready + .indicator-light { background-color: #d00; }
+
+#id_submit_error {
+    display: none;
+    position: absolute;
+    top: 2.5em;
+    right: 0;
+    margin: 0 1em;
+    padding: 1em;
+    border: 1px solid #f00;
+    background-color: #fee;
+    max-width: calc(50% - 4em - 2px);
+}
+.submit-error-missing {
+    background-color: #ffc;
+}
+
+#colour_picker_menu {
+    width: 147px;
+    display: block;
+    position: absolute;
+    display: none;
+}
+.colour_picker_colour {
+    width: 20px; height: 20px;
+    display: block;
+    float: left;
+    border: 1px solid white;
+    margin: -1px -1px 0 0;
+    cursor: pointer;
+}
+#colour_picker_pick {
+    float: none;
+}
+
+#pipeline_ctrl #id_add_ctrl {
+    padding: 0;
+}
+#context_menu {
+    position: absolute;
+    display: none;
+    border: 1px solid #ddd;
+    font-size: 1em;
+}
+#context_menu ul,
+#id_add_ctrl  ul {
+    display: block;
+    margin: 0; padding: 0;
+    background-color: #fff;
+}
+#context_menu li,
+#id_add_ctrl  li  {
+    display: block;
+    margin: 0; padding: 0.7em;
+    background-color: #fff;
+    padding-right: 1.5em;
+    cursor: pointer;
+}
+#context_menu li:hover,
+#id_add_ctrl  li:hover {
+    background-color: #eee;
+}

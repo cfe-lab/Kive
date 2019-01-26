@@ -1,6 +1,6 @@
-import { CanvasState } from "@container/canvas/drydock";
-import { buildPipelineSubmit } from "@container/io/pipeline_submit";
-import { RawNode, MethodNode, OutputNode, Connector } from "@container/canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import { buildPipelineSubmit } from "@pipeline/io/pipeline_submit";
+import { RawNode, MethodNode, OutputNode, Connector } from "@canvas/drydock_objects";
 import * as imagediff from 'imagediff';
 
 (window as any).$ = (window as any).jQuery = $;

@@ -1,8 +1,8 @@
-import { MethodDialog, Dialog, InputDialog, OutputDialog } from "@container/pipeline_dialogs";
-import {MethodNode, CdtNode, OutputNode} from "@container/canvas/drydock_objects";
-import { REDRAW_INTERVAL, CanvasState } from "@container/canvas/drydock";
+import { MethodDialog, Dialog, InputDialog, OutputDialog } from "@pipeline/pipeline_dialogs";
+import {MethodNode, CdtNode, OutputNode} from "@canvas/drydock_objects";
+import { REDRAW_INTERVAL, CanvasState } from "@canvas/drydock";
 import * as imagediff from 'imagediff';
-import {RawNode} from "@container/canvas/drydock_objects";
+import {RawNode} from "@canvas/drydock_objects";
 
 jasmine.getFixtures().fixturesPath = '/templates/pipeline';
 jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';

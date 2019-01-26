@@ -1,6 +1,6 @@
-import { CanvasState } from "@container/canvas/drydock";
-import { CanvasContextMenu } from "@container/canvas/drydock_contextmenu";
-import { RawNode } from "@container/canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
+import { CanvasContextMenu } from "@canvas/drydock_contextmenu";
+import { RawNode } from "@canvas/drydock_objects";
 import * as imagediff from 'imagediff';
 
 describe("Drydock context menu", function() {
