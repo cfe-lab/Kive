@@ -1,19 +1,18 @@
 "use strict";
 
-import { RestApi } from "../rest_api.service";
-import { MethodNode, CdtNode, RawNode, OutputNode, Connector } from "../canvas/drydock_objects";
-import { CanvasState } from "../canvas/drydock";
-import { PipelineFromApi } from "./PipelineApi";
+import {RestApi} from "../rest_api.service";
+import {Connector, MethodNode, OutputNode, RawNode} from "../canvas/drydock_objects";
+import {CanvasState} from "../canvas/drydock";
+import {Container, PipelineData} from "./PipelineApi";
 
 /**
  * Convert between API calls and CanvasState object.
  */
 export class Pipeline {
 
-    pipeline: PipelineFromApi = null;
-    private FAMILY_API_URL = "/api/pipelinefamilies/";
+    pipeline: PipelineData = null;
+    files: string[] = [];
     private REVISION_API_URL = "/api/pipelines/";
-    private family_pk: number;
 
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {}
@@ -24,15 +23,16 @@ export class Pipeline {
      *
      * See: /api/pipelines/
      *
-     * @param pipeline: serialized pipeline array
+     * @param container: serialized pipeline array
      */
-    load(pipeline: PipelineFromApi) {
-        this.pipeline = pipeline;
+    load(container: Container) {
+        this.pipeline = container.pipeline;
+        this.files = container.files;
         this.canvasState.reset();
 
-        this.buildInputs(pipeline);
-        this.buildSteps(pipeline);
-        this.buildOutputs(pipeline);
+        this.buildInputs(this.pipeline);
+        this.buildSteps(this.pipeline);
+        this.buildOutputs(this.pipeline);
 
         this.canvasState.has_unsaved_changes = false;
         for (let shape of this.canvasState.shapes) {
@@ -40,15 +40,14 @@ export class Pipeline {
         }
     }
 
-    loadFromString(pipeline_data: string) {
-        let pipeline_json;
+    loadFromString(container_data: string) {
+        let container_json;
         try {
-            pipeline_json = JSON.parse(pipeline_data);
+            container_json = JSON.parse(container_data);
         } catch (e) {
             throw "Pipeline could not be loaded: JSON parse error";
         }
-        this.family_pk = pipeline_json.family_pk;
-        this.load(pipeline_json);
+        this.load(container_json);
     }
 
     /**
@@ -115,31 +114,21 @@ export class Pipeline {
     /**
      * Sets up the canvas state with the inputs for a pipeline
      */
-    private buildInputs(pipeline: PipelineFromApi) {
+    private buildInputs(pipeline: PipelineData) {
         let [ x_ratio, y_ratio ] = this.canvasState.getAspectRatio();
 
         // Not sure why this was true, but I set it to false so the inputs
         // wouldn't get reordered until the user starts dragging them around.
         this.canvasState.dragging = false;
 
-        for (let node of pipeline.inputs) {
-
-            let node_args = [
+        for (let i in pipeline.inputs) {
+            let node = pipeline.inputs[i];
+            // BaseNode has no structure => no CDT, so it's raw
+            this.canvasState.addShape(new RawNode(
                 node.x * x_ratio,
                 node.y * y_ratio,
                 node.dataset_name,
-                node.dataset_idx
-            ];
-
-            // BaseNode has no structure => no CDT, so it's raw
-            let InputCtor;
-            if (node.structure === null) {
-                InputCtor = RawNode;
-            } else {
-                node_args.unshift(node.structure.compounddatatype);
-                InputCtor = CdtNode;
-            }
-            this.canvasState.addShape(new InputCtor(...node_args));
+                i));
         }
 
     }
@@ -147,27 +136,20 @@ export class Pipeline {
     /**
      * Private method that sets up canvas state to draw methods
      */
-    private buildSteps(pipeline: PipelineFromApi) {
+    private buildSteps(pipeline: PipelineData) {
         let [ x_ratio, y_ratio ] = this.canvasState.getAspectRatio();
 
         if (pipeline === null) { throw "build_steps() called with no pipeline?"; }
 
-        // required for cables to connect properly - API should return it already sorted but just in case
-        pipeline.steps.sort((a, b) => a.step_num - b.step_num);
-
         // Over each pipeline step
         for (let node of pipeline.steps) {
             let method_node = new MethodNode(
-                    node.transformation,
-                    node.transformation_family,
                     node.x * x_ratio,
                     node.y * y_ratio,
                     node.fill_colour, // fill
-                    node.name,
+                    node.driver,
                     node.inputs,
-                    node.outputs,
-                    undefined, // status
-                    node.outputs_to_delete
+                    node.outputs
                 );
 
             // Add `n draw
@@ -175,12 +157,12 @@ export class Pipeline {
             let methods = this.canvasState.getMethodNodes();
 
             // Connect method inputs
-            for (let cable of node.cables_in) {
+            for (let cable of node.inputs) {
                 let source = null;
                 let connector = null;
                 // Find the destination for this
                 let in_magnet = method_node.in_magnets.filter(
-                    magnet => magnet.label === cable.dest_dataset_name
+                    magnet => magnet.label === cable.dataset_name
                 )[0];
 
                 // Not found?
@@ -239,37 +221,29 @@ export class Pipeline {
     /**
      * Private method that sets up canvas state to draw outputs
      */
-    private buildOutputs(pipeline: PipelineFromApi) {
+    private buildOutputs(pipeline: PipelineData) {
         let [ x_ratio, y_ratio ] = this.canvasState.getAspectRatio();
         let method_node_offset = pipeline.inputs.length;
 
-        for (let outcable of pipeline.outcables) {
+        for (let output_idx in pipeline.outputs) {
+            let outcable = pipeline.outputs[output_idx];
             // identify source Method
             let source = this.canvasState.shapes[method_node_offset + outcable.source_step - 1];
 
             // Over each out magnet for that source
             for (let magnet of source.out_magnets) {
                 if (magnet.label === outcable.source_dataset_name) {
-                    let output_idx = outcable.output_idx;
-                    let output = pipeline.outputs.filter(
-                        output => output.dataset_idx === output_idx
-                    )[0];
-                    if (output === undefined || output === null) {
-                        throw "There should be exactly 1 output with dataset index " + output_idx;
-                    }
-
                     let connector = new Connector(magnet);
                     let output_node = new OutputNode(
-                        output.x * x_ratio,
-                        output.y * y_ratio,
-                        outcable.output_name,
-                        outcable.pk
+                        outcable.x * x_ratio,
+                        outcable.y * y_ratio,
+                        outcable.dataset_name
                     );
 
                     this.canvasState.addShape(output_node);
 
-                    connector.x = output.x * x_ratio;
-                    connector.y = output.y * y_ratio;
+                    connector.x = outcable.x * x_ratio;
+                    connector.y = outcable.y * y_ratio;
                     connector.dest = output_node.in_magnets[0];
                     connector.dest.connected = [ connector ];  // bind cable to output node
                     connector.source = magnet;
@@ -348,8 +322,6 @@ export class Pipeline {
                 }
             } else {
                 let new_method = new MethodNode(
-                    update.method.id,
-                    update.method.family_id,
                     0, // x
                     0, // y
                     old_method.fill,

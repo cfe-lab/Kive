@@ -776,16 +776,13 @@ export class MethodNode extends BaseNode implements CNode {
     private update_signal: NodeUpdateSignal;
 
     constructor (
-            public pk,
-            public family, // can be passed from database
             public x,
             public y,
             public fill,
             public label,
             public inputs,
             public outputs,
-            public status?, // Members for instances of methods in runs
-            public outputs_to_delete = []
+            public status? // Members for instances of methods in runs
         ) {
         super();
         this.x = x || 0;
@@ -796,11 +793,10 @@ export class MethodNode extends BaseNode implements CNode {
         this.n_outputs = Object.keys(outputs).length;
         this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
 
-        var sortByIdxFn = (a, b) => a.dataset_idx - b.dataset_idx;
-        for (let input of this.inputs.sort( sortByIdxFn )) {
+        for (let input of this.inputs) {
             this.addInput(input);
         }
-        for (let output of this.outputs.sort( sortByIdxFn )) {
+        for (let output of this.outputs) {
             this.addOutput(output);
         }
     }
@@ -808,18 +804,21 @@ export class MethodNode extends BaseNode implements CNode {
     private addInput(input, r = 5, attract = 5, magnet_fill = '#fff') {
         this.addXput(input, this.in_magnets, false, r, attract, magnet_fill);
     }
-    private addOutput(output, r = 5, attract = 5, magnet_fill = '#fff') {
-        this.addXput(output, this.out_magnets, true, r, attract, magnet_fill);
+    private addOutput(output_name, r = 5, attract = 5, magnet_fill = '#fff') {
+        this.addXput(
+            {dataset_name: output_name},
+            this.out_magnets,
+            true,
+            r,
+            attract,
+            magnet_fill);
     }
     private addXput(input, magnet_array, is_output, r = 5, attract = 5, magnet_fill = '#fff') {
         var cdt_pk = null;
-        if (input.structure !== null) {
-            cdt_pk = input.structure.compounddatatype;
-        }
         magnet_array.push(new Magnet(
             this, r, attract, magnet_fill,
             cdt_pk, input.dataset_name, null, is_output, null,
-            this.outputs_to_delete.indexOf(input.dataset_name) > -1
+            false
         ));
     }
 

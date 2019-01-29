@@ -4,7 +4,7 @@ import { Pipeline } from "@container/io/pipeline_load";
 import { serializePipeline } from "@container/io/serializer";
 import * as imagediff from 'imagediff';
 
-describe("Pipeline functions", function() {
+describe("Container pipeline functions", function() {
     beforeEach(function() {
         var width = 600,
             height = 300;
@@ -15,274 +15,101 @@ describe("Pipeline functions", function() {
         this.canvasState = new CanvasState(this.rawCanvas, true);
 
         this.api_pipeline = {
-            "id": 25,
-            "url": "http://127.0.0.1:8000/api/pipelines/25/",
-            "family_pk": 2,
-            "family": "Test",
-            "revision_name": "",
-            "revision_desc": "Carl Sagan's science slam-jam",
-            "revision_number": 3,
-            "revision_parent": 24,
-            "revision_DateTime": "2015-06-10T19:36:31.570191Z",
-            "user": "kive",
-            "users_allowed": [],
-            "groups_allowed": [],
-            "inputs": [{
-                "dataset_name": "input2",
-                "dataset_idx": 1,
-                "x": 0.15,
-                "y": 0.15,
-                "structure": {
-                    "compounddatatype": 9,
-                    "min_row": null,
-                    "max_row": null
-                }
-            }, {
-                "dataset_name": "input1",
-                "dataset_idx": 2,
-                "x": 0.05,
-                "y": 0.3,
-                "structure": null
-            }],
-            "outputs": [{
-                "dataset_name": "unmapped2_fastq",
-                "dataset_idx": 1,
-                "x": 0.637772562280456,
-                "y": 0.633208895290869,
-                "structure": null
-            }, {
-                "dataset_name": "unmapped1_fastq",
-                "dataset_idx": 2,
-                "x": 0.637772562280456,
-                "y": 0.633208895290869,
-                "structure": null
-            }, {
-                "dataset_name": "remap_conseq",
-                "dataset_idx": 3,
-                "x": 0.637772562280456,
-                "y": 0.633208895290869,
-                "structure": {
-                    "compounddatatype": 10,
-                    "min_row": null,
-                    "max_row": null
-                }
-            }, {
-                "dataset_name": "remap",
-                "dataset_idx": 4,
-                "x": 0.637772562280456,
-                "y": 0.633208895290869,
-                "structure": {
-                    "compounddatatype": 8,
-                    "min_row": null,
-                    "max_row": null
-                }
-            }, {
-                "dataset_name": "remap_counts",
-                "dataset_idx": 5,
-                "x": 0.637772562280456,
-                "y": 0.633208895290869,
-                "structure": {
-                    "compounddatatype": 9,
-                    "min_row": null,
-                    "max_row": null
-                }
-            }],
-            "steps": [{
-                "transformation": 4,
-                "transformation_family": 3,
-                "step_num": 1,
-                "outputs_to_delete": [],
-                "x": 0.344662650584514,
-                "y": 0.5,
-                "name": "prelim_map.py",
-                "cables_in": [{
-                    "source_step": 0,
-                    "source": 143,
-                    "source_dataset_name": "input1",
-                    "dest": 7,
-                    "dest_dataset_name": "fastq1",
-                    "custom_wires": [],
-                    "keep_output": false
-                }, {
-                    "source_step": 0,
-                    "source": 142,
-                    "source_dataset_name": "input2",
-                    "dest": 8,
-                    "dest_dataset_name": "fastq2",
-                    "custom_wires": [],
-                    "keep_output": false
-                }],
-                "outputs": [{
-                    "dataset_name": "prelim",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 7,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }],
+            "files": [
+                "prelim_map.py",
+                "remap.py",
+                "helper.py"
+            ],
+            "pipeline": {
+                "kive_version": "0.14",
+                "default_config": {
+                    "parent_family": "sample",
+                    "parent_tag": "basic",
+                    "parent_md5": "8dab0b3c7b7d812f0ba4819664be8acb",
+                    "memory": 100,
+                    "threads": 1
+                },
                 "inputs": [{
-                    "dataset_name": "fastq1",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
+                    "dataset_name": "input2",
+                    "x": 0.15,
+                    "y": 0.15,
                 }, {
-                    "dataset_name": "fastq2",
-                    "dataset_idx": 2,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
-                }]
-            }, {
-                "transformation": 5,
-                "transformation_family": 4,
-                "step_num": 2,
-                "outputs_to_delete": [],
-                "x": 0.450583501602465,
-                "y": 0.257130788000083,
-                "name": "remap.py",
-                "cables_in": [{
-                    "source_step": 0,
-                    "source": 143,
-                    "source_dataset_name": "input1",
-                    "dest": 10,
-                    "dest_dataset_name": "fastq1",
-                    "custom_wires": [],
-                    "keep_output": false
-                }, {
-                    "source_step": 0,
-                    "source": 142,
-                    "source_dataset_name": "input2",
-                    "dest": 11,
-                    "dest_dataset_name": "fastq2",
-                    "custom_wires": [],
-                    "keep_output": false
-                }, {
-                    "source_step": 1,
-                    "source": 9,
-                    "source_dataset_name": "prelim",
-                    "dest": 12,
-                    "dest_dataset_name": "prelim",
-                    "custom_wires": [],
-                    "keep_output": false
+                    "dataset_name": "input1",
+                    "x": 0.05,
+                    "y": 0.3,
                 }],
                 "outputs": [{
-                    "dataset_name": "remap",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 8,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }, {
-                    "dataset_name": "remap_counts",
-                    "dataset_idx": 2,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 9,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }, {
-                    "dataset_name": "remap_conseq",
-                    "dataset_idx": 3,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 10,
-                        "min_row": null,
-                        "max_row": null
-                    }
+                    "dataset_name": "unmapped2_fastq",
+                    "source_step": 2,
+                    "source_dataset_name": "unmapped2_fastq",
+                    "x": 0.637772562280456,
+                    "y": 0.633208895290869,
                 }, {
                     "dataset_name": "unmapped1_fastq",
-                    "dataset_idx": 4,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
+                    "source_step": 2,
+                    "source_dataset_name": "unmapped1_fastq",
+                    "x": 0.637772562280456,
+                    "y": 0.633208895290869,
                 }, {
-                    "dataset_name": "unmapped2_fastq",
-                    "dataset_idx": 5,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
+                    "dataset_name": "remap_conseq",
+                    "source_step": 2,
+                    "source_dataset_name": "remap_conseq",
+                    "x": 0.637772562280456,
+                    "y": 0.633208895290869,
+                }, {
+                    "dataset_name": "remap",
+                    "source_step": 2,
+                    "source_dataset_name": "remap",
+                    "x": 0.637772562280456,
+                    "y": 0.633208895290869,
+                }, {
+                    "dataset_name": "remap_counts",
+                    "source_step": 2,
+                    "source_dataset_name": "remap_counts",
+                    "x": 0.637772562280456,
+                    "y": 0.633208895290869,
                 }],
-                "inputs": [{
-                    "dataset_name": "fastq1",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
+                "steps": [{
+                    "x": 0.344662650584514,
+                    "y": 0.5,
+                    "driver": "prelim_map.py",
+
+                    "inputs": [{
+                        "dataset_name": "fastq1",
+                        "source_step": 0,
+                        "source_dataset_name": "input1",
+                    }, {
+                        "dataset_name": "fastq2",
+                        "source_step": 0,
+                        "source_dataset_name": "input2",
+                    }],
+                    "outputs": ["prelim"],
                 }, {
-                    "dataset_name": "fastq2",
-                    "dataset_idx": 2,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": null
-                }, {
-                    "dataset_name": "prelim",
-                    "dataset_idx": 3,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 7,
-                        "min_row": null,
-                        "max_row": null
-                    }
+                    "x": 0.450583501602465,
+                    "y": 0.257130788000083,
+                    "driver": "remap.py",
+                    "inputs": [{
+                        "dataset_name": "fastq1",
+                        "source_step": 0,
+                        "source_dataset_name": "input1",
+                    }, {
+                        "dataset_name": "fastq2",
+                        "source_step": 0,
+                        "source_dataset_name": "input2",
+                    }, {
+                        "dataset_name": "prelim",
+                        "source_step": 1,
+                        "source_dataset_name": "prelim",
+                    }],
+                    "outputs": [
+                        "remap",
+                        "remap_counts",
+                        "remap_conseq",
+                        "unmapped1_fastq",
+                        "unmapped2_fastq"
+                    ]
                 }]
-            }],
-            "outcables": [{
-                "pk": 128,
-                "output_idx": 1,
-                "output_name": "unmapped2_fastq",
-                "output_cdt": null,
-                "source_step": 2,
-                "source": 55,
-                "source_dataset_name": "unmapped2_fastq",
-                "custom_wires": []
-            }, {
-                "pk": 129,
-                "output_idx": 2,
-                "output_name": "unmapped1_fastq",
-                "output_cdt": null,
-                "source_step": 2,
-                "source": 54,
-                "source_dataset_name": "unmapped1_fastq",
-                "custom_wires": []
-            }, {
-                "pk": 130,
-                "output_idx": 3,
-                "output_name": "remap_conseq",
-                "output_cdt": 10,
-                "source_step": 2,
-                "source": 15,
-                "source_dataset_name": "remap_conseq",
-                "custom_wires": []
-            }, {
-                "pk": 131,
-                "output_idx": 4,
-                "output_name": "remap",
-                "output_cdt": 8,
-                "source_step": 2,
-                "source": 13,
-                "source_dataset_name": "remap",
-                "custom_wires": []
-            }, {
-                "pk": 132,
-                "output_idx": 5,
-                "output_name": "remap_counts",
-                "output_cdt": 9,
-                "source_step": 2,
-                "source": 14,
-                "source_dataset_name": "remap_counts",
-                "custom_wires": []
-            }],
-            "removal_plan": "http://127.0.0.1:8000/api/pipelines/25/removal_plan/"
+            }
         };
     });
 
@@ -382,21 +209,6 @@ describe("Pipeline functions", function() {
             expect(umfasq2.isConnectedTo(remap)).toBe(true);
             expect(remapc.isConnectedTo(umfasq2)).toBe(false);
         });
-
-        it('should ignore order of cables_in when wiring', function(){
-            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
-            pipeline.draw();
-
-            // Now reverse the order of the cables_in
-            let expectedCanvas = imagediff.createCanvas(600, 300);
-            let expectedCanvasState = new CanvasState(expectedCanvas, true);
-            this.api_pipeline.steps[1].cables_in.reverse();
-            pipeline = loadApiPipeline(expectedCanvasState, this.api_pipeline);
-            pipeline.draw();
-
-            (expect(this.rawCanvas) as any).toImageDiffEqual(
-                expectedCanvas);
-        });
     });
 
     describe('Structure', function(){
@@ -417,7 +229,7 @@ describe("Pipeline functions", function() {
             });
         });
 
-        it('shoud have correct properties for inputs API', function(){
+        it('should have correct properties for steps API', function(){
             var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
 
@@ -427,13 +239,11 @@ describe("Pipeline functions", function() {
             var i1keys = Object.keys(prelim),
                 i2keys = Object.keys(remap);
 
-            $.each(['x', 'y', 'dx', 'dy', 'fill', 'label', 'family'], function(_, key){
+            $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
                 expect(i1keys).toContain(key);
                 expect(i2keys).toContain(key);
             });
 
-            expect(prelim.family).toBe(3);
-            expect(remap.family).toBe(4);
             expect(prelim.out_magnets[0].connected.length).toBe(1);
             expect(remap.out_magnets[0].connected.length).toBe(1);
         });
@@ -452,241 +262,6 @@ describe("Pipeline functions", function() {
                 expect(i1keys).toContain(key);
                 expect(i2keys).toContain(key);
             });
-        });
-    });
-
-    describe('Update steps', function(){
-        it('should apply method update', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 77,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "fastq2",
-                                dataset_idx: 2,
-                                structure: null
-                            }],
-                        outputs: [{
-                            dataset_name: "prelim",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 7 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            expect(new_method.pk).toBe(new_method_id);
-        });
-
-        it('should notify the user of updates', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 77,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "fastq2",
-                                dataset_idx: 2,
-                                structure: null
-                            }],
-                        outputs: [{
-                            dataset_name: "prelim",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 7 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            var no_updates_found_method = this.canvasState.findNodeByLabel('remap.py');
-            expect(updated_method.update_signal.status).toBe('updated');
-            expect(no_updates_found_method.update_signal.status).toBe('no update available');
-        });
-
-        it('should notify the user if an updated method has changed inputs', function(){
-            // changed input
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 78,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "new_cdt",
-                                dataset_idx: 2,
-                                structure: { compounddatatype: 19 }
-                            }],
-                        outputs: [{
-                            dataset_name: "prelim",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 7 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            expect(updated_method.update_signal.status).toBe('updated with issues');
-        });
-
-        it('should notify the user if an updated method has changed outputs', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 78,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "fastq2",
-                                dataset_idx: 2,
-                                structure: null
-                            }],
-                        outputs: [{
-                            dataset_name: "changed_output",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 19 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            expect(updated_method.update_signal.status).toBe('updated with issues');
-        });
-
-        it('should notify the user if an updated method has new inputs', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 78,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "fastq2",
-                                dataset_idx: 2,
-                                structure: null
-                            }, {
-                                dataset_name: "new_input",
-                                dataset_idx: 3,
-                                structure: null
-                            }],
-                        outputs: [{
-                            dataset_name: "prelim",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 7 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            expect(updated_method.update_signal.status).toBe('updated with issues');
-        });
-
-        it('should notify the user if an updated method has new outputs', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                new_method_id = 78,
-                step_updates = [{
-                    step_num: 1,
-                    method: {
-                        id: new_method_id,
-                        family_id: 3,
-                        inputs: [{
-                            dataset_name: "fastq1",
-                            dataset_idx: 1,
-                            structure: null
-                        },
-                            {
-                                dataset_name: "fastq2",
-                                dataset_idx: 2,
-                                structure: null
-                            }],
-                        outputs: [{
-                            dataset_name: "prelim",
-                            dataset_idx: 1,
-                            structure: { compounddatatype: 7 }
-                        }, {
-                            dataset_name: "new_output",
-                            dataset_idx: 2,
-                            structure: { compounddatatype: 19 }
-                        }]
-                    }
-                }];
-
-            pipeline.applyStepRevisions(step_updates);
-            var updated_method = this.canvasState.findNodeByLabel('prelim_map.py');
-            expect(updated_method.update_signal.status).toBe('updated with issues');
-        });
-
-        it('should apply code resource update', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                step_updates = [{
-                    step_num: 1,
-                    code_resource_revision: {
-                        id: 77,
-                        revision_name: "new feature"
-                    }
-                }];
-            pipeline.applyStepRevisions(step_updates);
-
-            var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-
-            expect(new_method.new_code_resource_revision).toBe(
-                step_updates[0].code_resource_revision,
-                "new_code_resource_revision");
-        });
-
-        it('should apply dependency update', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                step_updates = [{
-                    step_num: 1,
-                    dependencies: [{
-                        id: 77,
-                        revision_name: "new feature"
-                    }]
-                }];
-            pipeline.applyStepRevisions(step_updates);
-
-            var new_method = this.canvasState.findNodeByLabel('prelim_map.py');
-
-            expect(new_method.new_dependencies).toBe(
-                step_updates[0].dependencies,
-                "new_dependencies");
         });
     });
 
@@ -723,18 +298,11 @@ describe("Pipeline functions", function() {
 
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.inputs, function(index, ser_input){
-                var api_input = self.api_pipeline.inputs[index];
+                var api_input = self.api_pipeline.pipeline.inputs[index];
 
                 expect(ser_input.dataset_name).toBe(api_input.dataset_name);
-                expect(ser_input.dataset_idx).toBe(api_input.dataset_idx);
                 expect(ser_input.x).toBeCloseTo(api_input.x, 8);
                 expect(ser_input.y).toBeCloseTo(api_input.y, 8);
-
-                if (ser_input.structure === null) {
-                    expect(ser_input.structure).toBe(api_input.structure);
-                } else {
-                    expect(ser_input.structure.compounddatatype).toBe(api_input.structure.compounddatatype);
-                }
             });
         });
 
@@ -747,11 +315,9 @@ describe("Pipeline functions", function() {
 
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.steps, function(index, ser_step){
-                var api_step = self.api_pipeline.steps[index];
+                var api_step = self.api_pipeline.pipeline.steps[index];
 
-                expect(ser_step.name).toBe(api_step.name);
-                expect(ser_step.step_num).toBe(api_step.step_num);
-                expect(ser_step.transformation).toBe(api_step.transformation);
+                expect(ser_step.driver).toBe(api_step.driver);
                 expect(ser_step.x).toBeCloseTo(api_step.x, 8);
                 expect(ser_step.y).toBeCloseTo(api_step.y, 8);
 
@@ -767,12 +333,12 @@ describe("Pipeline functions", function() {
 
             // TODO: These (inputs) should really be sorted by dataset_idx
             $.each(serialized.steps, function(index, ser_step){
-                var api_step = self.api_pipeline.steps[index];
+                var api_step = self.api_pipeline.pipeline.steps[index];
 
-                $.each(ser_step.cables_in, function(cable_index, ser_cable){
-                    var api_cable = api_step.cables_in[cable_index];
+                $.each(ser_step.inputs, function(cable_index, ser_cable){
+                    var api_cable = api_step.inputs[cable_index];
 
-                    expect(ser_cable.dest_dataset_name).toBe(api_cable.dest_dataset_name);
+                    expect(ser_cable.dataset_name).toBe(api_cable.dataset_name);
                     expect(ser_cable.source_dataset_name).toBe(api_cable.source_dataset_name);
                 });
             });
@@ -786,52 +352,15 @@ describe("Pipeline functions", function() {
                 );
 
             // TODO: These (inputs) should really be sorted by dataset_idx
-            $.each(serialized.outcables, function(index, ser_output){
-                var api_outcable = self.api_pipeline.outcables[index];
-                var api_output = self.api_pipeline.outputs[index];
+            $.each(serialized.outputs, function(index, ser_output){
+                var api_output = self.api_pipeline.pipeline.outputs[index];
 
-                expect(ser_output.output_cdt).toBe(api_outcable.output_cdt);
-                expect(ser_output.output_idx).toBe(api_outcable.output_idx);
-                expect(ser_output.output_name).toBe(api_outcable.output_name);
-                expect(ser_output.source_dataset_name).toBe(api_outcable.source_dataset_name);
-                expect(ser_output.source_step).toBe(api_outcable.source_step);
+                expect(ser_output.dataset_name).toBe(api_output.dataset_name);
+                expect(ser_output.source_dataset_name).toBe(api_output.source_dataset_name);
+                expect(ser_output.source_step).toBe(api_output.source_step);
                 expect(ser_output.x).toBeCloseTo(api_output.x, 8);
                 expect(ser_output.y).toBeCloseTo(api_output.y, 8);
             });
-        });
-
-        it('should submit code resource update', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                method = this.canvasState.findNodeByLabel("prelim_map.py"),
-                new_code_resource_revision_id = 72;
-            method.new_code_resource_revision = {
-                id: new_code_resource_revision_id,
-                name: "French"
-            };
-            pipeline.draw();
-            var data = serializePipeline(this.canvasState),
-                step = data.steps[0];
-
-            expect(step.new_code_resource_revision_id).toBe(
-                new_code_resource_revision_id,
-                "step.new_code_resource_revision_id");
-        });
-
-        it('should submit dependency update', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline),
-                method = this.canvasState.findNodeByLabel("prelim_map.py"),
-                new_code_resource_revision_id = 72;
-            method.new_dependencies = [{
-                id: new_code_resource_revision_id,
-                name: "French"
-            }];
-            pipeline.draw();
-            var data = serializePipeline(this.canvasState),
-                step = data.steps[0];
-
-            expect(step.new_dependency_ids).toEqual(
-                [new_code_resource_revision_id],
-                "step.new_dependency_ids");
         });
     });
 });

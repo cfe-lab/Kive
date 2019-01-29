@@ -70,7 +70,7 @@ describe("Dialog fixture", function() {
 
 });
 
-describe("MethodDialog fixture", function() {
+describe("Container MethodDialog fixture", function() {
 
     let dlg;
     let $cp_hidden_input;
@@ -364,20 +364,14 @@ describe("MethodDialog fixture", function() {
         expected_canvas = imagediff.createCanvas(canvas.width, 78);
         expected_ctx = expected_canvas.getContext('2d');
         expected_method = new MethodNode(
-            99,  // pk
-            null,  // family
             103.349365,  // x
             31,  // y (for 3 outputs)
             "#999",  // fill
             null,  // label
             [
-              {"structure": {"compounddatatype": null}}
+                { dataset_name: '', source_step: 0, source_dataset_name: ''}
             ],  // inputs
-            [
-              {"structure": {"compounddatatype": null}},
-              {"structure": {"compounddatatype": null}},
-              {"structure": {"compounddatatype": null}}
-            ]);  // outputs
+            ['', '', '']);  // outputs
 
         $select_method_family.find('option')
             .filter(function() { return $(this).val() !== ""; })
@@ -496,59 +490,17 @@ describe("MethodDialog fixture", function() {
         });
     });
 
-    it('should update the preview canvas when child outputs-to-delete change', function(done) {
-        expected_method.out_magnets.forEach(function(magnet) {
-            magnet.toDelete = true;
-        });
-        expected_method.draw(expected_ctx);
-
-        dlg.activator.click();
-        loadMockMethod(function () {
-            let outputs = $delete_outputs_details.find('input');
-            outputs = [
-                outputs.eq(0).prop('checked', false),
-                outputs.eq(1).prop('checked', false),
-                outputs.eq(2).prop('checked', false)
-            ];
-            outputs[1].change();
-
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-
-        });
-        done();
-    });
-
-    it('should update the preview canvas when parent outputs-to-delete change', function(done) {
-        expected_method.out_magnets.forEach(function(magnet) {
-            magnet.toDelete = true;
-        });
-        expected_method.draw(expected_ctx);
-
-        dlg.activator.click();
-        loadMockMethod(function () {
-            $delete_outputs.prop('checked', false).change();
-
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-        });
-        done();
-    });
-
     it('should refresh preview when method revision changes', function(done) {
         expected_method = new MethodNode(
-            99,  // pk
-            null,  // family
             110.2775682,  // x
             35,  // y (for 2 outputs)
             "#999",  // fill
             null,  // label
             [
-              {"structure": {"compounddatatype": null}},
-              {"structure": {"compounddatatype": null}}
+                { dataset_name: '', source_step: 0, source_dataset_name: ''},
+                { dataset_name: '', source_step: 0, source_dataset_name: ''}
             ],  // inputs
-            [
-              {"structure": {"compounddatatype": null}},
-              {"structure": {"compounddatatype": null}}
-            ]);  // outputs
+            ['', '']);  // outputs
         expected_method.draw(expected_ctx);
 
         dlg.activator.click();
@@ -602,37 +554,16 @@ describe("MethodDialog fixture", function() {
     it('should load a MethodNode object', function(done) {
         dlg.show();
         let mock_method_node = new MethodNode(
-            6, 5, 50 /* x */, 50 /* y */,
+            50 /* x */, 50 /* y */,
             "#0d8",
             "custom_name",
             [
-                {
-                    "dataset_name": "remap",
-                    "dataset_idx": 1,
-                    "structure": {"compounddatatype": 8}
-                }
+                { dataset_name: 'remap', source_step: 0, source_dataset_name: 'remap'}
             ],
-            [
-                {
-                    "dataset_name": "aligned",
-                    "dataset_idx": 1,
-                    "structure": {"compounddatatype": 11}
-                }, {
-                "dataset_name": "conseq_ins",
-                "dataset_idx": 2,
-                "structure": {"compounddatatype": 12}
-            }, {
-                "dataset_name": "failed_read",
-                "dataset_idx": 3,
-                "structure": {"compounddatatype": 13}
-            }
-            ]
+            ["aligned", "conseq_ins", "failed_read"]
         );
-        mock_method_node.outputs_to_delete = [ "conseq_ins" ];
-        mock_method_node.out_magnets[1].toDelete = true;
 
         expected_method.fill = "#0d8";
-        expected_method.out_magnets[1].toDelete = true;
         expected_method.draw(expected_ctx);
 
         jasmine.Ajax.withMock(function() {
@@ -640,17 +571,8 @@ describe("MethodDialog fixture", function() {
             jasmine.Ajax.requests.mostRecent().respondWith(mockData1);
             jasmine.Ajax.requests.mostRecent().respondWith(mockData2);
 
-            expect(+$select_method_family.val()).toEqual(5);
-            expect(+$select_method.val()).toBe(6);
             expect($input_name.val()).toBe('custom_name');
             expect($cp_hidden_input.val()).toBe('#0d8');
-            expect($delete_outputs.prop('indeterminate')).toBeTruthy();
-
-            let delete_checkboxes = $delete_outputs_details.find('input');
-            expect(delete_checkboxes.length).toBe(3);
-            expect(delete_checkboxes.eq(0).prop('checked')).toBeTruthy();
-            expect(delete_checkboxes.eq(1).prop('checked')).toBeFalsy();
-            expect(delete_checkboxes.eq(2).prop('checked')).toBeTruthy();
 
             (expect(canvas) as any).toImageDiffEqual(expected_canvas);
         });

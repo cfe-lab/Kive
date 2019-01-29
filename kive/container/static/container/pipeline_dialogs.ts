@@ -563,9 +563,6 @@ export class MethodDialog extends NodePreviewDialog {
                 this.methodOutputs = result.outputs;
                 this.cached_api_result = result;
                 this.setOutputsFieldsetList(result.outputs);
-                if (this.editing_node) {
-                    this.setOutputsToDeleteFromEditingNode();
-                }
                 this.drawPreviewCanvas(result, this.colour_picker.val());
             });
         }
@@ -638,15 +635,6 @@ export class MethodDialog extends NodePreviewDialog {
             this.$select_method.val(node.pk);
             this.$input_name.val(node.label).select();
         });
-    }
-    
-    setOutputsToDeleteFromEditingNode() {
-        let editing_node = this.editing_node;
-        this.$delete_outputs_details.find('input').each(function() {
-            $(this).prop('checked', -1 === editing_node.outputs_to_delete.indexOf(this.value) );
-        });
-        this.linkParentCheckbox();
-        // this.refreshPreviewCanvasMagnets();
     }
     
     /**
@@ -777,8 +765,6 @@ export class MethodDialog extends NodePreviewDialog {
         
         let method = MethodDialog.setOutputsToDelete(
             new MethodNode(
-                api_method_result.pk,
-                null, // family
                 // Ensures node is centred perfectly on the preview canvas
                 // For this calculation to be accurate, method node draw params cannot change.
                 this.preview_canvas.width / 2 -
@@ -808,7 +794,7 @@ export class MethodDialog extends NodePreviewDialog {
      */
     private produceMethodNode(id, family, x, y, colour, label, inputs, outputs): MethodNode {
         return MethodDialog.setOutputsToDelete(
-            new MethodNode(id, family, x, y, colour, label, inputs, outputs),
+            new MethodNode(x, y, colour, label, inputs, outputs),
             this.$delete_outputs_details.find('input').get()
                 .filter( el => !$(el).prop('checked') )
                 .map( el => el.value )

@@ -7,7 +7,7 @@ import * as imagediff from 'imagediff';
 
 "use strict";
 
-describe("Canvas classes", function() {
+describe("Container canvas classes", function() {
     beforeEach(function() {
         var width = 300,
             height = 150;
@@ -554,11 +554,9 @@ describe("Canvas classes", function() {
                 fill = "#999",
                 label = "example",
                 inputs = [{dataset_idx: 1, dataset_name: "in", structure: {compounddatatype: 7} }],
-                outputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 7}}];
+                outputs = ["out"];
 
             this.node = new MethodNode(
-                    method_pk,
-                    family_pk,
                     x,
                     y,
                     fill,
@@ -1154,12 +1152,10 @@ describe("Canvas classes", function() {
             beforeEach(function() {
                 this.methodId = 27;
                 this.methodFamilyId = 13;
-                this.methodInputs = [{dataset_idx: 1, dataset_name: "i1: in", structure: null}];
-                this.methodOutputs = [{dataset_idx: 1, dataset_name: "out", structure: {compounddatatype: 17}}];
+                this.methodInputs = [{dataset_name: "i1: in", source_step: 0, source_dataset_name: "in"}];
+                this.methodOutputs = ["out"];
 
                 this.expectedMethod = new MethodNode(
-                        this.methodId,
-                        this.methodFamilyId,
                         100,
                         50,
                         null,
@@ -1167,8 +1163,6 @@ describe("Canvas classes", function() {
                         this.methodInputs,
                         this.methodOutputs);
                 this.actualMethod = new MethodNode(
-                        this.methodId,
-                        this.methodFamilyId,
                         100,
                         50,
                         null,
@@ -1458,8 +1452,8 @@ describe("Canvas classes", function() {
             it('should create output', function() {
                 drawStartingPipeline(this);
                 // crazy double-precisions that collision detection will produce
-                this.expectedOutput.x = 223.56696744775581;
-                this.expectedOutput.y = 29.94283749469356;
+                this.expectedOutput.x = 225.75182021515238;
+                this.expectedOutput.y = 44.395818840424354;
                 this.expectedOutput.draw(this.expectedCanvas.ctx);
                 this.expectedCanvas.drawText({
                     x: this.expectedOutput.x,
@@ -1482,8 +1476,8 @@ describe("Canvas classes", function() {
 
                 this.state.draw(this.ctx);
                 this.state.doDown({pageX: magnet.x, pageY: magnet.y});
-                this.state.doMove({pageX: 250, pageY: 20});
-                this.state.doUp({pageX: 250, pageY: 20}); // in output zone
+                this.state.doMove({pageX: 250, pageY: 30});
+                this.state.doUp({pageX: 250, pageY: 30}); // in output zone
                 this.state.draw(this.ctx);
             });
 
@@ -2003,21 +1997,15 @@ describe("Canvas classes", function() {
 
                     it('should update a method', function() {
                         var methodInputs = [{
-                                dataset_idx: 1,
                                 dataset_name: "in",
-                                structure: null
+                                source_step: 0,
+                                source_dataset_name: "in"
                             }],
-                            methodOutputs = [{
-                                dataset_idx: 1,
-                                dataset_name: "out",
-                                structure: {compounddatatype: 17}
-                            }],
+                            methodOutputs = ["out"],
                             fill = "#999",
                             old_method_name = "example",
                             method_name = old_method_name + " (new)",
                             method = new MethodNode(
-                                    this.methodId,
-                                    this.methodFamilyId,
                                     0,
                                     0,
                                     fill,
@@ -2049,8 +2037,6 @@ describe("Canvas classes", function() {
                             inputs = [],
                             outputs = [],
                             extra_method = new MethodNode(
-                                method_id,
-                                family_id,
                                 200,
                                 100,
                                 fill,
@@ -2084,25 +2070,20 @@ describe("Canvas classes", function() {
                 [7, 8, 9, 10, 11, 12, 13, 14],
                 [15]
             ];
-            var method1 = new MethodNode(0, 0, 0, 0, '#000', 'method1',
+            var method1 = new MethodNode(0, 0, '#000', 'method1',
                 [
-                    { structure: null, dataset_id: 0, dataset_name: ''},
-                    { structure: null, dataset_id: 1, dataset_name: ''}
+                    { dataset_name: '', source_step: 0, source_dataset_name: ''},
+                    { dataset_name: '', source_step: 0, source_dataset_name: ''}
                 ],
-                [
-                    { structure: null, dataset_id: 0, dataset_name: ''},
-                    { structure: null, dataset_id: 1, dataset_name: ''}
-                ]
+                ['', '']
             );
-            var method2 = new MethodNode(0, 0, 0, 0, '#000', 'method2',
+            var method2 = new MethodNode(0, 0, '#000', 'method2',
                 [
-                    { structure: null, dataset_id: 0, dataset_name: ''},
-                    { structure: null, dataset_id: 1, dataset_name: ''},
-                    { structure: null, dataset_id: 2, dataset_name: ''}
+                    { dataset_name: '', source_step: 0, source_dataset_name: ''},
+                    { dataset_name: '', source_step: 0, source_dataset_name: ''},
+                    { dataset_name: '', source_step: 0, source_dataset_name: ''}
                 ],
-                [
-                    { structure: null, dataset_id: 0, dataset_name: ''}
-                ]
+                ['']
             );
             var input1 = new RawNode(0, 0);
             var input2 = new RawNode(0, 0);

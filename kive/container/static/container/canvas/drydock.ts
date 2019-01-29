@@ -925,30 +925,15 @@ export class CanvasState {
         // 4 arguments tell it which properties to use
         // modifies from_node and to_node in parent's scope
         function migrateFnUsing(xputs_prop, magnets_prop, terminal_prop, shift_dir) {
-            return old_xput => {
-                var old_didx_s1 = old_xput.dataset_idx - 1,
-                    old_xput_connections = from_node[magnets_prop][old_didx_s1].connected,
-                    new_xput = to_node[xputs_prop][old_didx_s1],
-                    xputs_are_matching_cdts = new_xput &&
-                        new_xput.structure !== null && old_xput.structure !== null &&
-                        new_xput.structure.compounddatatype === old_xput.structure.compounddatatype,
-                    xputs_are_raw = new_xput &&
-                        new_xput.structure === null && old_xput.structure === null;
+            return (old_xput, old_didx_s1) => {
+                var old_xput_connections = from_node[magnets_prop][old_didx_s1].connected;
 
-                if (xputs_are_raw || xputs_are_matching_cdts) {
-                    // re-attach all Connectors
-                    while (old_xput_connections.length > 0) {
-                        let connector = old_xput_connections.pop();
-                        connector[terminal_prop] = to_node[magnets_prop][old_didx_s1];
-                        connector[terminal_prop].connected[shift_dir](connector);
-                    }
+                // re-attach all Connectors
+                while (old_xput_connections.length > 0) {
+                    let connector = old_xput_connections.pop();
+                    connector[terminal_prop] = to_node[magnets_prop][old_didx_s1];
+                    connector[terminal_prop].connected[shift_dir](connector);
                 }
-                /*
-                This code block may be useful if we want to provide 
-                more specific info about the mismatch? Variable must
-                be returned by migrateConnectors.
-                else {}
-                */
             };
         }
     }

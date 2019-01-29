@@ -104,18 +104,10 @@ function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ numbe
 
         // Put the method in the form data
         serialized_steps[i] = {
-            transformation: step.pk,  // to retrieve Method
-            transformation_type: "Method",
-            step_num: i + 1,  // 1-index (pipeline inputs are index 0)
             x: step.x / x_ratio,
             y: step.y / y_ratio,
-            name: step.label,
-            fill_colour: step.fill,
-            new_code_resource_revision_id: (
-                step.new_code_resource_revision ?
-                    step.new_code_resource_revision.id :
-                    null),
-            new_outputs_to_delete_names: step.outputs_to_delete
+            driver: step.label,
+            fill_colour: step.fill
         };
 
         if (step.new_dependencies && step.new_dependencies.length) {

@@ -56,10 +56,11 @@ describe("Pipeline Submit class", function() {
     function mockPipeline() {
         let input = new RawNode(50, 50, 'raw_node');
         let method = new MethodNode(
-            555, 0, 60, 60,
+            60, 60,
             '#999', 'method_node',
-            [ { dataset_name: 'input1', structure: null } ],
-            [ { dataset_name: 'output1', structure: null } ]
+            [
+                { dataset_name: 'input1', source_step: 0, source_dataset_name: 'input1'}],
+            ['output1']
         );
         let output = new OutputNode(50, 50, 'output_node');
 

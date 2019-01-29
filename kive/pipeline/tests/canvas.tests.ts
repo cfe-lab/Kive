@@ -1,8 +1,8 @@
 import {
     CanvasWrapper, MethodNode, CdtNode, RawNode,
     OutputNode, OutputZone, Magnet, Connector
-} from "@container/canvas/drydock_objects";
-import { CanvasState } from "@container/canvas/drydock";
+} from "@canvas/drydock_objects";
+import { CanvasState } from "@canvas/drydock";
 import * as imagediff from 'imagediff';
 
 "use strict";
