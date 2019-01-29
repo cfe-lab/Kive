@@ -248,7 +248,9 @@ class Command(BaseCommand):
             # - inputs (a list of (step_num, dataset_name) pairs)
             # - outputs (a list of dataset_names)
             executable = os.path.join(internal_binary_dir, step["driver"])
-            input_paths = [file_map[step_num][dataset_name] for step_num, dataset_name in step["inputs"]]
+            input_paths = []
+            for input_dict in step["inputs"]:
+                input_paths.append(file_map[input_dict["source_step"]][input_dict["source_dataset_name"]])
             outputs_map = {}
             for step_num, dataset_name in step["outputs"]:
                 file_name = "step{}_{}".format(step_num, dataset_name)
@@ -288,7 +290,8 @@ class Command(BaseCommand):
                 # - dataset_name
                 # - source (pairs that look like [step_num, output_name])
                 final_output_path = os.path.join(external_outputs_dir, output["dataset_name"])
-                source_step, source_dataset_name = output["source"]
+                source_step = output["source_step"]
+                source_dataset_name = output["source_dataset_name"]
                 os.link(file_map[source_step][source_dataset_name][1], final_output_path)
 
         return final_return_code
