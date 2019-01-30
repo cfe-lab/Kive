@@ -119,6 +119,10 @@ class ContainerNotChild(Exception):
     pass
 
 
+class ChildNotConfigured(Exception):
+    pass
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
@@ -218,6 +222,55 @@ class Container(AccessControl):
         elif self.file_type in (self.TAR, self.TGZ):
             with tarfile.open(self.file.path, mode="r") as t:
                 t.extractall(path=extraction_path)
+
+    def get_file_list(self):
+        """
+        Retrieve the file list for this child container.
+
+        Raises ContainerNotChild if this is not a child container.
+        :return:
+        """
+        if self.can_be_parent():
+            raise ContainerNotChild()
+
+        file_list = []
+        if self.file_type == self.ZIP:
+            with zipfile.ZipFile(self.file) as z:
+                file_list = z.namelist()
+
+        elif self.file_type in (self.TAR, self.TGZ):
+            with tarfile.open(self.file.path, mode="r") as t:
+                file_list = t.getnames()
+
+        return file_list
+
+    def get_pipeline_json(self):
+        """
+        Retrieve the pipeline JSON file for this child container.
+
+        Raises ContainerNotChild if this is not a child container.
+        Raises ChildNotConfigured if no such JSON is found.
+        :return:
+        """
+        if self.can_be_parent():
+            raise ContainerNotChild()
+
+        def check_and_extract(file_list, single_file_extractor):
+            base_dir = os.path.commonprefix(file_list)
+            # Look for a `pipeline.json` file in that base directory.
+            pipeline_json_path = os.path.join(base_dir, "pipeline.json")
+            if pipeline_json_path not in file_list:
+                raise ChildNotConfigured()
+            with single_file_extractor(pipeline_json_path) as json:
+                return json.read()
+
+        if self.file_type == self.ZIP:
+            with zipfile.ZipFile(self.file) as z:
+                return check_and_extract(z.namelist(), lambda x: z.open(x, mode="r"))
+
+        elif self.file_type in (self.TAR, self.TGZ):
+            with tarfile.open(self.file.path, mode="r") as t:
+                return check_and_extract(t.getnames(), t.extractfile)
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
