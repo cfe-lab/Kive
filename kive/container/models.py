@@ -71,11 +71,6 @@ class ContainerFamily(AccessControl):
         remove_helper(removal_plan)
 
 
-class ContainerFileField(models.FileField):
-    # FIXME remove this once we are able to squash the old migrations, as it is no longer used.
-    pass
-
-
 class ContainerNotChild(Exception):
     pass
 
