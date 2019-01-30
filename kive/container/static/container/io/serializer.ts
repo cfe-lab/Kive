@@ -1,7 +1,7 @@
 import { CanvasState } from "../canvas/drydock";
 import { Geometry } from "../canvas/geometry";
 import { CdtNode, RawNode, MethodNode, Magnet, OutputNode } from "../canvas/drydock_objects";
-import { PipelineForApi, ApiXputData, StepForApi, ApiCableData, OutcableForApi } from "./PipelineApi";
+import {Container, DataSource, PipelineData, Step} from "./PipelineApi";
 
 /**
  * This method serializes the pipeline into an object that can be
@@ -20,7 +20,7 @@ import { PipelineForApi, ApiXputData, StepForApi, ApiCableData, OutcableForApi }
  * form_data will be merged with existing this.metadata if setMetadata()
  * is used first.
  */
-export function serializePipeline (canvasState: CanvasState, metadata?: PipelineForApi) {
+export function serializePipeline (canvasState: CanvasState, metadata?: Container) {
 
     let pipeline_outputs = canvasState.getOutputNodes();
     let pipeline_inputs = canvasState.getInputNodes();
@@ -41,10 +41,12 @@ export function serializePipeline (canvasState: CanvasState, metadata?: Pipeline
     pipeline_inputs.sort(Geometry.isometricSort);
     pipeline_outputs.sort(Geometry.isometricSort);
 
-    let form_data = metadata || <PipelineForApi> {};
-    form_data.steps = serializeSteps(pipeline_steps, canvas_dimensions);
-    form_data.inputs = serializeInputs(pipeline_inputs, canvas_dimensions);
-    form_data.outcables = serializeOutcables(pipeline_outputs, pipeline_steps, canvas_dimensions);
+    let form_data = metadata || <Container> {};
+    let pipeline_data = form_data.pipeline || <PipelineData> {};
+    form_data.pipeline = pipeline_data;
+    pipeline_data.steps = serializeSteps(pipeline_steps, canvas_dimensions);
+    pipeline_data.inputs = serializeInputs(pipeline_inputs, canvas_dimensions);
+    pipeline_data.outputs = serializeOutcables(pipeline_outputs, pipeline_steps, canvas_dimensions);
 
     // this code written on Signal Hill, St. John's, Newfoundland
     // May 2, 2014 - afyp
@@ -61,7 +63,7 @@ export function serializePipeline (canvasState: CanvasState, metadata?: Pipeline
     return form_data;
 }
 
-function serializeInputs(pipeline_inputs: (CdtNode|RawNode)[], canvas_dimensions: [ number, number ]): ApiXputData[] {
+function serializeInputs(pipeline_inputs: (CdtNode|RawNode)[], canvas_dimensions: [ number, number ]): DataSource[] {
     let serialized_inputs = [];
     let [ x_ratio, y_ratio ] = canvas_dimensions;
 
@@ -92,7 +94,7 @@ function serializeInputs(pipeline_inputs: (CdtNode|RawNode)[], canvas_dimensions
     return serialized_inputs;
 }
 
-function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ number, number ]): StepForApi[] {
+function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ number, number ]): Step[] {
     let serialized_steps = [];
     let [ x_ratio, y_ratio ] = canvas_dimensions;
 
@@ -122,7 +124,7 @@ function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ numbe
     return serialized_steps;
 }
 
-function serializeInMagnets(in_magnets: Magnet[], pipeline_steps: MethodNode[]): ApiCableData[] {
+function serializeInMagnets(in_magnets: Magnet[], pipeline_steps: MethodNode[]): DataSource[] {
     let serialized_cables = [];
 
     // retrieve Connectors
@@ -152,7 +154,7 @@ function serializeOutcables(
     pipeline_outputs: OutputNode[],
     pipeline_steps: MethodNode[],
     canvas_dimensions: [ number, number ]
-): OutcableForApi[] {
+): DataSource[] {
     let serialized_outputs = [];
     let [ x_ratio, y_ratio ] = canvas_dimensions;
 
@@ -163,15 +165,11 @@ function serializeOutcables(
         let source_step = connector.source.parent;
 
         serialized_outputs[i] = {
-            output_name: output.label,
-            output_idx: i + 1,
-            output_cdt: connector.source.cdt,
-            source: source_step.pk,
+            dataset_name: output.label,
             source_step: pipeline_steps.indexOf(source_step) + 1, // 1-index
             source_dataset_name: connector.source.label, // magnet label
             x: output.x / x_ratio,
-            y: output.y / y_ratio,
-            custom_wires: [] // in the future we might have this
+            y: output.y / y_ratio
         };
     }
     return serialized_outputs;

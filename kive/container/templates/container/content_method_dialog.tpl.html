@@ -1,0 +1,30 @@
+<div id="{{ dlg_id }}" class="ctrl_menu">
+    <canvas width="100%" height="60"></canvas>
+    <h3>Methods</h3>
+
+    <form>
+        <input type="hidden" id="id_select_colour" value="#999">
+        <div id="colour_picker_menu">
+            <div class="colour_picker_colour" style="background-color: #999;"></div>
+            <div class="colour_picker_colour" style="background-color: #d80;"></div>
+            <div class="colour_picker_colour" style="background-color: #d08;"></div>
+            <div class="colour_picker_colour" style="background-color: #8d0;"></div>
+            <div class="colour_picker_colour" style="background-color: #80d;"></div>
+            <div class="colour_picker_colour" style="background-color: #08d;"></div>
+            <div class="colour_picker_colour" style="background-color: #0d8;"></div>
+        </div>
+        <div class="colour_picker_colour" id="colour_picker_pick" style="background-color: #999;"></div>
+
+        <div id="id_method_revision_field">
+            <select id="id_select_method" name="select_method">
+                <!-- populated by ajax transaction -->
+            </select>
+        </div>
+
+        <input id="id_input_names" maxlength="128" name="input_names" type="text" placeholder="Input names">
+        <input id="id_output_names" maxlength="128" name="output_names" type="text" placeholder="Output names">
+
+        <input type="submit" id="id_method_button" value="Add Method">
+        <div class="errortext" id="id_method_error"></div>
+    </form>
+</div>

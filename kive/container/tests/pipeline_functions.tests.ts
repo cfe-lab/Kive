@@ -6,7 +6,7 @@ import * as imagediff from 'imagediff';
 
 describe("Container pipeline functions", function() {
     beforeEach(function() {
-        var width = 600,
+        let width = 600,
             height = 300;
 
         jasmine.addMatchers(imagediff.jasmine);
@@ -266,27 +266,25 @@ describe("Container pipeline functions", function() {
     });
 
     function loadAndSerialize(canvasState, api_pipeline, additional_args?) {
-        var pipeline = loadApiPipeline(canvasState, api_pipeline);
+        let pipeline = loadApiPipeline(canvasState, api_pipeline);
         pipeline.draw();
         return serializePipeline(canvasState, additional_args);
     }
 
     describe('Serialize', function(){
         it('should serialize', function(){
-            var test = loadAndSerialize(this.canvasState, this.api_pipeline);
+            loadAndSerialize(this.canvasState, this.api_pipeline);
         });
 
         it('should check structure', function() {
-            var serialized = loadAndSerialize(
+            let serialized = loadAndSerialize(
                 this.canvasState,
-                this.api_pipeline,
-                { family: "pass this argument thru" }
+                this.api_pipeline
             );
 
-            expect(serialized.family).toBe("pass this argument thru");
-            expect(serialized.steps).toBeDefined();
-            expect(serialized.inputs).toBeDefined();
-            expect(serialized.outcables).toBeDefined();
+            expect(serialized.pipeline.steps).toBeDefined();
+            expect(serialized.pipeline.inputs).toBeDefined();
+            expect(serialized.pipeline.outputs).toBeDefined();
         });
 
         it('should match original pipeline inputs', function(){
@@ -296,8 +294,7 @@ describe("Container pipeline functions", function() {
                     this.api_pipeline
                 );
 
-            // TODO: These (inputs) should really be sorted by dataset_idx
-            $.each(serialized.inputs, function(index, ser_input){
+            $.each(serialized.pipeline.inputs, function(index, ser_input){
                 var api_input = self.api_pipeline.pipeline.inputs[index];
 
                 expect(ser_input.dataset_name).toBe(api_input.dataset_name);
@@ -313,8 +310,7 @@ describe("Container pipeline functions", function() {
                     this.api_pipeline
                 );
 
-            // TODO: These (inputs) should really be sorted by dataset_idx
-            $.each(serialized.steps, function(index, ser_step){
+            $.each(serialized.pipeline.steps, function(index, ser_step){
                 var api_step = self.api_pipeline.pipeline.steps[index];
 
                 expect(ser_step.driver).toBe(api_step.driver);
@@ -331,8 +327,7 @@ describe("Container pipeline functions", function() {
                     this.api_pipeline
                 );
 
-            // TODO: These (inputs) should really be sorted by dataset_idx
-            $.each(serialized.steps, function(index, ser_step){
+            $.each(serialized.pipeline.steps, function(index, ser_step){
                 var api_step = self.api_pipeline.pipeline.steps[index];
 
                 $.each(ser_step.inputs, function(cable_index, ser_cable){
@@ -345,15 +340,14 @@ describe("Container pipeline functions", function() {
         });
 
         it('should match original pipeline output', function() {
-            var self = this,
+            let self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
 
-            // TODO: These (inputs) should really be sorted by dataset_idx
-            $.each(serialized.outputs, function(index, ser_output){
-                var api_output = self.api_pipeline.pipeline.outputs[index];
+            $.each(serialized.pipeline.outputs, function(index, ser_output){
+                let api_output = self.api_pipeline.pipeline.outputs[index];
 
                 expect(ser_output.dataset_name).toBe(api_output.dataset_name);
                 expect(ser_output.source_dataset_name).toBe(api_output.source_dataset_name);

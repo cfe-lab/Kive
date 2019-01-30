@@ -272,6 +272,9 @@ contributions.
 
 Run both the Webpack and Sass watchers simultaneously with `npm run watch:all`.
 
+To debug TypeScript code in the browser, change the `devtool` setting in
+`webpack.config.js`.
+
 ### Updating embedded icon files ###
 
 Some icon files are stored as base64-encoded strings which describe PNG images

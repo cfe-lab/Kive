@@ -2034,8 +2034,11 @@ describe("Container canvas classes", function() {
                         var method_id = 77,
                             family_id = 3,
                             fill = "#999",
-                            inputs = [],
-                            outputs = [],
+                            inputs = [{
+                                dataset_name: "in1",
+                                source_step: 0,
+                                source_dataset_name: "in1"}],
+                            outputs = ["out1"],
                             extra_method = new MethodNode(
                                 200,
                                 100,

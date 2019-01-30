@@ -19,15 +19,17 @@ export interface PipelineConfig {
     threads: number;
 }
 
-export interface DataSource extends Point {
+export interface DataSource {
+    x?: number;
+    y?: number;
     dataset_name: string;
-    source_step: number;
-    source_dataset_name: string;
+    source_step?: number;
+    source_dataset_name?: string;
 }
 
 interface Step extends Point {
     driver: string;
-    fill_colour: string;
+    fill_colour?: string;
     inputs: DataSource[];
     outputs: string[];
 }

@@ -15,7 +15,7 @@
     <style>
         #canvas{}
     </style>
-    <link rel="stylesheet" href="/static/container/drydock.css"/>
+    <link rel="stylesheet" href="/static/pipeline/drydock.css"/>
 {% endblock %}
 
 {% block widget_media %}
@@ -24,10 +24,14 @@
 
 {% block content %}
 
-    <a href="." rel="prev">Back to container</a>
+    {% if not family and not parent_revision %}
+    <a href="pipeline_families" rel="prev">Back to pipelines</a>
+    {% else %}
+    <a href="/pipelines/{{ family.pk }}" rel="prev">Back to pipeline summary</a>
+    {% endif %}
 
     <!-- Stash the parent revision's representation here. -->
-    <div id="initial_data" style="display:none">{{ content_json|escape }}</div>
+    <div id="initial_data" style="display:none">{{ parent_revision_json|escape }}</div>
 
     <!-- CANVAS -->
     <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>

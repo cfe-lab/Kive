@@ -10,6 +10,7 @@ import {Container, PipelineData} from "./PipelineApi";
  */
 export class Pipeline {
 
+    container: Container = null;
     pipeline: PipelineData = null;
     files: string[] = [];
     private REVISION_API_URL = "/api/pipelines/";
@@ -26,6 +27,7 @@ export class Pipeline {
      * @param container: serialized pipeline array
      */
     load(container: Container) {
+        this.container = container;
         this.pipeline = container.pipeline;
         this.files = container.files;
         this.canvasState.reset();
@@ -280,20 +282,6 @@ export class Pipeline {
         return url.replace(host_pattern, "");
     }
 
-    findNewStepRevisions() {
-        let steps = this.canvasState.getSteps();
-        Pipeline.updateSignalsOf(steps, "update in progress");
-        this.canvasState.valid = false;
-        RestApi.get(
-            Pipeline.stripHostFrom(this.pipeline.step_updates),
-            updates => this.applyStepRevisions(updates),
-            () => {
-                Pipeline.updateSignalsOf(steps, "unavailable");
-                this.canvasState.valid = false;
-            }
-        );
-    }
-
     private static checkForCrrAndDepUpdates(method: MethodNode, update): boolean {
         if (update.code_resource_revision) {
             method.new_code_resource_revision = update.code_resource_revision;
@@ -338,39 +326,12 @@ export class Pipeline {
         this.canvasState.valid = false;
     }
 
-    /**
-     * Returns whether or not the pipeline has been published
-     */
-    isPublished() {
-        return this.pipeline.published;
-    }
-
-    /**
-     * Sets this pipeline as published
-     * @todo test and utilize this!
-     *
-     * @param callback: Function called on success
-     */
-    publish(callback) {
-        RestApi.patch(this.REVISION_API_URL + this.pipeline.id, { published: true }, callback);
-    }
-
-    /**
-     * Sets this pipeline as unpublished
-     * @todo test and utilize this!
-     *
-     * @param callback: Function called on success
-     */
-    unpublish(callback) {
-        RestApi.patch(this.REVISION_API_URL + this.pipeline.id, { published: false }, callback);
-    }
-
     setRevertCtrl(ctrl: string) {
         document.querySelector(ctrl).addEventListener('click', () => {
             let $canvas = $(this.canvasState.canvas);
             $canvas.fadeOut({
                 complete: () => {
-                    this.load(this.pipeline);
+                    this.load(this.container);
                     $canvas.fadeIn();
                 }
             });
@@ -379,10 +340,6 @@ export class Pipeline {
             );
         });
 
-    }
-
-    setUpdateCtrl(ctrl: string) {
-        document.querySelector(ctrl).addEventListener('click', () => this.findNewStepRevisions());
     }
 }
 

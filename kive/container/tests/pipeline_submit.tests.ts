@@ -8,51 +8,24 @@ require("@portal/noxss.js");
 
 interface BuildSubmitArgs extends Array<any> {
     0: CanvasState;
-    1: string;
-    2: JQuery;
-    3: JQuery;
-    4: number;
-    5: JQuery;
-    6: JQuery;
-    7: number;
-    8: JQuery;
-    9: JQuery;
-    10: JQuery;
-    11: JQuery;
-    12: () => any;
+    1: number; // container_pk
+    2: JQuery; // $error
 }
 
-describe("Pipeline Submit class", function() {
+describe("Container Pipeline Submit class", function() {
 
     // static vars
     let canvasState;
     let args: BuildSubmitArgs,
         $error: JQuery,
         arg_names = [
-            "canvasState", "action",
-            "$family_name", "$family_desc",
-            "family_pk",
-            "$revision_name", "$revision_desc",
-            "parent_revision_id",
-            "$published",
-            "$user_permissions", "$group_permissions",
-            "$error",
-            "familyNameError"
+            "canvasState",
+            "container_pk",
+            "$error"
         ];
 
     let built_submit;
 
-    function jqInput(value: string): JQuery {
-        return $('<input>').val(value);
-    }
-    function jqOpt(value: string): JQuery {
-        return $('<option>').val(value).text(value);
-    }
-    function jqPermissionsWidget(): JQuery {
-        return $('<select multiple>')
-            .append([ jqOpt("a"), jqOpt("b"), jqOpt("c") ])
-            .val([ "b", "c" ]);
-    }
     function mockPipeline() {
         let input = new RawNode(50, 50, 'raw_node');
         let method = new MethodNode(
@@ -95,18 +68,8 @@ describe("Pipeline Submit class", function() {
 
         args = [
             canvasState,
-            'new', // action: new|add|revise
-            jqInput('custom_family_name'),
-            jqInput('custom_family_desc'),
-            0, // family_pk
-            jqInput('custom_revision_name'),
-            jqInput('custom_revision_desc'),
-            -1, // parent_revision_id
-            $('<input>').attr('type', 'checkbox').prop('checked', false), // published
-            jqPermissionsWidget(), // users
-            jqPermissionsWidget(), // groups
-            $error, // error outlet
-            function() {} // special callback for family name errors
+            0, // container_pk
+            $error // error outlet
         ];
 
     });
@@ -118,7 +81,7 @@ describe("Pipeline Submit class", function() {
     it('should attach a CSRF token to each AJAX request', function() {
         expect($.ajaxSettings.beforeSend).not.toBeUndefined();
         expect($.ajaxSettings.beforeSend.toString()).toMatch(
-            /\.setRequestHeader\s*\(\s*["']X-CSRFToken["']\s*,\s*[A-Za-z_\$]+\s*\)/
+            /\.setRequestHeader\s*\(\s*["']X-CSRFToken["']\s*,\s*[A-Za-z_$]+\s*\)/
         );
     });
 
@@ -145,19 +108,8 @@ describe("Pipeline Submit class", function() {
             });
         }
 
-        it('trying to revise and parent_revision_id is missing', function () {
-            args[1] = 'revise';
-            args[7] = undefined;
-        });
-
-        it('trying to revise and family_pk is blank', function () {
-            args[1] = 'revise';
-            args[4] = parseInt(undefined, 10);
-        });
-
-        it('trying to add and family_pk is blank', function () {
-            args[1] = 'add';
-            args[4] = parseInt(undefined, 10);
+        it('container_pk is blank', function () {
+            args[1] = parseInt(undefined, 10);
         });
 
     });
@@ -170,19 +122,8 @@ describe("Pipeline Submit class", function() {
             }).not.toThrow();
         });
 
-        it('trying to add and parent_revision_id is missing', function () {
-            args[1] = 'add';
-            args[7] = undefined;
-        });
-
-        it('trying to create new family and parent_revision_id is missing', function () {
-            args[1] = 'new';
-            args[7] = undefined;
-        });
-
-        it('trying to create new family and $family_pk is missing', function () {
-            args[1] = 'new';
-            args[4] = parseInt(undefined, 10);
+        it('all fields are set', function () {
+            args[1] = 99;
         });
 
     });
@@ -194,6 +135,7 @@ describe("Pipeline Submit class", function() {
         });
 
         beforeEach(function() {
+            args[1] = 42;  // container_pk
             built_submit = buildPipelineSubmit.apply(null, args);
             jasmine.Ajax.install();
         });
@@ -213,50 +155,19 @@ describe("Pipeline Submit class", function() {
             expect(event.preventDefault).toHaveBeenCalled();
         });
 
-        it('should generate a user error message when $family_name is empty', function () {
-            args[2].val('');
-            $error.empty();
-            built_submit(new Event('submit'));
-            expect($error).not.toBeEmpty();
-        });
-
         it('should submit a new pipeline family and first revision', function() {
             built_submit(new Event('submit'));
 
             // @types for JasmineAjaxRequest seems to be a bit spotty.
             let request: any = jasmine.Ajax.requests.mostRecent();
 
-            expect(request.url).toBe("/api/pipelinefamilies/");
-            expect(request.method).toBe('POST');
-            expect(request.data()).toEqual({
-                users_allowed:  [ "b", "c" ],
-                groups_allowed: [ "b", "c" ],
-                name: 'custom_family_name',
-                description: 'custom_family_desc',
-            });
-
-            request.respondWith({
-                status: 200,
-                statusText: 'HTTP/1.1 200 OK',
-                contentType: 'application/json;charset=UTF-8',
-                responseText: "{ \"id\": 6 }"
-            });
-
-            request = jasmine.Ajax.requests.mostRecent();
-            expect(request.url).toBe("/api/pipelines/");
+            expect(request.url).toBe("/api/containers/42/content");
             expect(request.method).toBe('POST');
 
             let requestData = request.data();
-            expect(requestData.users_allowed).toEqual([ "b", "c" ]);
-            expect(requestData.groups_allowed).toEqual([ "b", "c" ]);
-            expect(requestData.family).toEqual('custom_family_name');
-            expect(requestData.family_desc).toEqual('custom_family_desc');
-            expect(requestData.revision_name).toEqual('custom_revision_name');
-            expect(requestData.revision_desc).toEqual('custom_revision_desc');
-            expect(requestData.revision_parent).toEqual(null);
-            expect(requestData.published).toEqual(false);
-            expect(requestData.canvas_width).toEqual(300);
-            expect(requestData.canvas_height).toEqual(150);
+            expect(requestData.pipeline.inputs[0].dataset_name).toEqual("raw_node");
+            expect(requestData.pipeline.steps[0].driver).toEqual("method_node");
+            expect(requestData.pipeline.outputs[0].dataset_name).toEqual("output_node");
         });
 
         it('should handle API errors for pipeline family', function() {
@@ -277,13 +188,6 @@ describe("Pipeline Submit class", function() {
             built_submit(new Event('submit'));
 
             jasmine.Ajax.requests.mostRecent().respondWith({
-                status: 200,
-                statusText: 'HTTP/1.1 200 OK',
-                contentType: 'application/json;charset=UTF-8',
-                responseText: "{ \"id\": 6 }"
-            });
-
-            jasmine.Ajax.requests.mostRecent().respondWith({
                 status: 500,
                 statusText: 'HTTP/1.1 500 Internal Server Error',
                 contentType: 'application/json;charset=UTF-8',
@@ -295,65 +199,4 @@ describe("Pipeline Submit class", function() {
         });
 
     });
-
-    it('should submit a new pipeline revision to an empty pipeline family', function() {
-        mockPipeline();
-        args[1] = "add";
-        built_submit = buildPipelineSubmit.apply(null, args);
-        jasmine.Ajax.install();
-
-        built_submit(new Event('submit'));
-
-        // @types for JasmineAjaxRequest seems to be a bit spotty.
-        let request: any = jasmine.Ajax.requests.mostRecent();
-        expect(request.url).toBe("/api/pipelines/");
-        expect(request.method).toBe('POST');
-
-        let requestData = request.data();
-        expect(requestData.users_allowed).toEqual([ "b", "c" ]);
-        expect(requestData.groups_allowed).toEqual([ "b", "c" ]);
-        expect(requestData.family).toEqual('custom_family_name');
-        expect(requestData.family_desc).toEqual('custom_family_desc');
-        expect(requestData.revision_name).toEqual('custom_revision_name');
-        expect(requestData.revision_desc).toEqual('custom_revision_desc');
-        expect(requestData.revision_parent).toEqual(null);
-        expect(requestData.published).toEqual(false);
-        expect(requestData.canvas_width).toEqual(300);
-        expect(requestData.canvas_height).toEqual(150);
-
-        jasmine.Ajax.uninstall();
-
-    });
-
-    it('should submit a new pipeline revision with a parent revision', function() {
-
-        mockPipeline();
-        args[1] = "revise";
-        args[7] = 1;
-        built_submit = buildPipelineSubmit.apply(null, args);
-        jasmine.Ajax.install();
-
-        built_submit(new Event('submit'));
-
-        // @types for JasmineAjaxRequest seems to be a bit spotty.
-        let request: any = jasmine.Ajax.requests.mostRecent();
-        expect(request.url).toBe("/api/pipelines/");
-        expect(request.method).toBe('POST');
-
-        let requestData = request.data();
-        expect(requestData.users_allowed).toEqual([ "b", "c" ]);
-        expect(requestData.groups_allowed).toEqual([ "b", "c" ]);
-        expect(requestData.family).toEqual('custom_family_name');
-        expect(requestData.family_desc).toEqual('custom_family_desc');
-        expect(requestData.revision_name).toEqual('custom_revision_name');
-        expect(requestData.revision_desc).toEqual('custom_revision_desc');
-        expect(requestData.revision_parent).toEqual(1);
-        expect(requestData.published).toEqual(false);
-        expect(requestData.canvas_width).toEqual(300);
-        expect(requestData.canvas_height).toEqual(150);
-
-        jasmine.Ajax.uninstall();
-
-    });
-
 });

@@ -1,24 +1,27 @@
-import { MethodDialog, Dialog, InputDialog, OutputDialog } from "@container/pipeline_dialogs";
+import {MethodDialog, Dialog, InputDialog, OutputDialog} from "@container/pipeline_dialogs";
 import {MethodNode, CdtNode, OutputNode} from "@container/canvas/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "@container/canvas/drydock";
 import * as imagediff from 'imagediff';
 import {RawNode} from "@container/canvas/drydock_objects";
+import {Container} from "@container/io/PipelineApi";
 
-jasmine.getFixtures().fixturesPath = '/templates/pipeline';
-jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
+jasmine.getFixtures().fixturesPath = '/templates/container';
+jasmine.getStyleFixtures().fixturesPath = '/static/container';
+// noinspection TypeScriptValidateJSTypes
 jasmine.getFixtures().preload(
-    'pipeline_view_dialog.tpl.html',
-    'pipeline_method_dialog.tpl.html',
-    'pipeline_input_dialog.tpl.html',
-    'pipeline_output_dialog.tpl.html'
+    'content_view_dialog.tpl.html',
+    'content_method_dialog.tpl.html',
+    'content_input_dialog.tpl.html',
+    'content_output_dialog.tpl.html'
 );
+// noinspection TypeScriptValidateJSTypes
 jasmine.getStyleFixtures().preload('drydock.css');
 
 describe("Dialog fixture", function() {
     let dlg;
 
     beforeEach(function(){
-        appendLoadFixtures('pipeline_view_dialog.tpl.html');
+        appendLoadFixtures('content_view_dialog.tpl.html');
         appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new Dialog(
@@ -76,12 +79,10 @@ describe("Container MethodDialog fixture", function() {
     let $cp_hidden_input;
     let $cp_pick;
     let $cp_menu;
-    let $delete_outputs;
-    let $delete_outputs_details;
     let $submit_button;
     let $select_method;
-    let $select_method_family;
-    let $input_name;
+    let $input_names;
+    let $output_names;
     let $error;
     let $expand_outputs_ctrl;
     let canvas;
@@ -89,277 +90,128 @@ describe("Container MethodDialog fixture", function() {
     let expected_ctx;
     let expected_method;
 
-    let mockData1 = {
-        "status": 200,
-        "responseText": `[
-            {
-                "revision_name": "sam2aln",
-                "display_name": "1: sam2aln",
-                "revision_number": 1,
-                "revision_desc": "Conversion of SAM data into aligned format.",
-                "revision_DateTime": "2014-08-11T21:34:09.900000Z",
-                "revision_parent": null,
-                "user": "kive",
-                "users_allowed": [],
-                "groups_allowed": [
-                "Everyone"
-            ],
-                "id": 6,
-                "url": "http://localhost:8000/api/methods/6/",
-                "absolute_url": "/method_revise/6/",
-                "view_url": "/method_view/6/",
-                "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
-                "family_id": 5,
-                "family": "sam2aln",
-                "driver": 8,
-                "reusable": 1,
-                "threads": 1,
-                "dependencies": [
-                {
-                    "requirement": 3,
-                    "path": "./",
-                    "filename": ""
-                }
-            ],
-                "inputs": [
-                {
-                    "dataset_name": "remap",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 8,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ],
-                "outputs": [
-                {
-                    "dataset_name": "aligned",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 11,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "conseq_ins",
-                    "dataset_idx": 2,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 12,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "failed_read",
-                    "dataset_idx": 3,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 13,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ]
-            }
-        ]`
-    };
-    let mockData2 = {
-        "status": 200,
-        "responseText": `{
-            "revision_name": "sam2aln",
-            "display_name": "1: sam2aln",
-            "revision_number": 1,
-            "revision_desc": "Conversion of SAM data into aligned format.",
-            "revision_DateTime": "2014-08-11T21:34:09.900000Z",
-            "revision_parent": null,
-            "user": "kive",
-            "users_allowed": [],
-            "groups_allowed": [
-                "Everyone"
-            ],
-            "id": 6,
-            "url": "http://localhost:8000/api/methods/6/",
-            "absolute_url": "/method_revise/6/",
-            "view_url": "/method_view/6/",
-            "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
-            "family_id": 5,
-            "family": "sam2aln",
-            "driver": 8,
-            "reusable": 1,
-            "threads": 1,
-            "dependencies": [
-                {
-                    "requirement": 3,
-                    "path": "./",
-                    "filename": ""
-                }
-            ],
-            "inputs": [
-                {
-                    "dataset_name": "remap",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 8,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ],
-            "outputs": [
-                {
-                    "dataset_name": "aligned",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 11,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "conseq_ins",
-                    "dataset_idx": 2,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 12,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "failed_read",
-                    "dataset_idx": 3,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 13,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ]
-        }`
-    };
-    let mockData3 = {
-        "status": 200,
-        "responseText": `{
-            "revision_name": "sam2aln",
-            "display_name": "1: sam2aln",
-            "revision_number": 1,
-            "revision_desc": "Conversion of SAM data into aligned format.",
-            "revision_DateTime": "2014-08-11T21:34:09.900000Z",
-            "revision_parent": null,
-            "user": "kive",
-            "users_allowed": [],
-            "groups_allowed": [
-                "Everyone"
-            ],
-            "id": 6,
-            "url": "http://localhost:8000/api/methods/6/",
-            "absolute_url": "/method_revise/6/",
-            "view_url": "/method_view/6/",
-            "removal_plan": "http://localhost:8000/api/methods/6/removal_plan/",
-            "family_id": 5,
-            "family": "sam2aln",
-            "driver": 8,
-            "reusable": 1,
-            "threads": 1,
-            "dependencies": [
-                {
-                    "requirement": 3,
-                    "path": "./",
-                    "filename": ""
-                }
-            ],
-            "inputs": [
-                {
-                    "dataset_name": "remap",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 8,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "remap_duplicate",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 8,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ],
-            "outputs": [
-                {
-                    "dataset_name": "aligned",
-                    "dataset_idx": 1,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 11,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                },
-                {
-                    "dataset_name": "failed_read",
-                    "dataset_idx": 3,
-                    "x": 0.0,
-                    "y": 0.0,
-                    "structure": {
-                        "compounddatatype": 13,
-                        "min_row": null,
-                        "max_row": null
-                    }
-                }
-            ]
-        }`
-    };
+    let initial_container: Container = {
+        "files": [
+            "prelim_map.py",
+            "remap.py",
+            "helper.py"
+        ],
+        "pipeline": {
+            "kive_version": "0.14",
+            "default_config": {
+                "parent_family": "sample",
+                "parent_tag": "basic",
+                "parent_md5": "8dab0b3c7b7d812f0ba4819664be8acb",
+                "memory": 100,
+                "threads": 1
+            },
+            "inputs": [{
+                "dataset_name": "input2",
+                "x": 0.15,
+                "y": 0.15,
+            }, {
+                "dataset_name": "input1",
+                "x": 0.05,
+                "y": 0.3,
+            }],
+            "outputs": [{
+                "dataset_name": "unmapped2_fastq",
+                "source_step": 2,
+                "source_dataset_name": "unmapped2_fastq",
+                "x": 0.637772562280456,
+                "y": 0.633208895290869,
+            }, {
+                "dataset_name": "unmapped1_fastq",
+                "source_step": 2,
+                "source_dataset_name": "unmapped1_fastq",
+                "x": 0.637772562280456,
+                "y": 0.633208895290869,
+            }, {
+                "dataset_name": "remap_conseq",
+                "source_step": 2,
+                "source_dataset_name": "remap_conseq",
+                "x": 0.637772562280456,
+                "y": 0.633208895290869,
+            }, {
+                "dataset_name": "remap",
+                "source_step": 2,
+                "source_dataset_name": "remap",
+                "x": 0.637772562280456,
+                "y": 0.633208895290869,
+            }, {
+                "dataset_name": "remap_counts",
+                "source_step": 2,
+                "source_dataset_name": "remap_counts",
+                "x": 0.637772562280456,
+                "y": 0.633208895290869,
+            }],
+            "steps": [{
+                "x": 0.344662650584514,
+                "y": 0.5,
+                "driver": "prelim_map.py",
 
+                "inputs": [{
+                    "dataset_name": "fastq1",
+                    "source_step": 0,
+                    "source_dataset_name": "input1",
+                }, {
+                    "dataset_name": "fastq2",
+                    "source_step": 0,
+                    "source_dataset_name": "input2",
+                }],
+                "outputs": ["prelim"],
+            }, {
+                "x": 0.450583501602465,
+                "y": 0.257130788000083,
+                "driver": "remap.py",
+                "inputs": [{
+                    "dataset_name": "fastq1",
+                    "source_step": 0,
+                    "source_dataset_name": "input1",
+                }, {
+                    "dataset_name": "fastq2",
+                    "source_step": 0,
+                    "source_dataset_name": "input2",
+                }, {
+                    "dataset_name": "prelim",
+                    "source_step": 1,
+                    "source_dataset_name": "prelim",
+                }],
+                "outputs": [
+                    "remap",
+                    "remap_counts",
+                    "remap_conseq",
+                    "unmapped1_fastq",
+                    "unmapped2_fastq"
+                ]
+            }]
+        }
+    };
 
     beforeAll(function() {
         jasmine.addMatchers(imagediff.jasmine);
     });
 
     beforeEach(function(){
-        appendLoadFixtures('pipeline_method_dialog.tpl.html');
+        appendLoadFixtures('content_method_dialog.tpl.html');
         appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new MethodDialog(
             $('.ctrl_menu').attr('id', '#id_method_ctrl'),
-            $('#activator')
-        );
+            $('#activator'),
+            initial_container);
 
         $cp_hidden_input = $('#id_select_colour');
         $cp_pick = $('#colour_picker_pick');
         $cp_menu = $('#colour_picker_menu');
-        $delete_outputs = $('#id_method_delete_outputs');
-        $delete_outputs_details = $('#id_method_delete_outputs_details');
         $submit_button = $('#id_method_button');
         $select_method = $("#id_select_method");
-        $select_method_family = $('#id_select_method_family');
-        $input_name = $('#id_method_name');
+        $input_names = $('#id_input_names');
+        $output_names = $('#id_output_names');
         $error = $('#id_method_error');
         $expand_outputs_ctrl = $('.ctrl_menu .expand_outputs_ctrl');
+        $input_names.val('in1');
+        $output_names.val('out1 out2 out3');
         canvas = <HTMLCanvasElement> $('canvas')[0];
         expected_canvas = imagediff.createCanvas(canvas.width, 78);
         expected_ctx = expected_canvas.getContext('2d');
@@ -369,15 +221,9 @@ describe("Container MethodDialog fixture", function() {
             "#999",  // fill
             null,  // label
             [
-                { dataset_name: '', source_step: 0, source_dataset_name: ''}
+                { dataset_name: 'in1', source_step: 0, source_dataset_name: 'in1'}
             ],  // inputs
-            ['', '', '']);  // outputs
-
-        $select_method_family.find('option')
-            .filter(function() { return $(this).val() !== ""; })
-            .remove();
-
-        $('<option>').val('5').appendTo($select_method_family);
+            ['out1', 'out2', 'out3']);  // outputs
     });
 
     it('should initialize properly', function() {
@@ -397,121 +243,36 @@ describe("Container MethodDialog fixture", function() {
     });
 
     it('should reset itself', function() {
-        $input_name.val('foo');
+        $input_names.val('foo bar');
+        $output_names.val('baz');
         $error.text('error');
-        $delete_outputs_details.show();
         $expand_outputs_ctrl.text('▾ Hide list');
         $submit_button.val('Revise Method');
         dlg.reset();
 
-        expect($input_name.val()).toBe('');
-        expect($delete_outputs_details).toBeHidden();
+        expect($input_names.val()).toBe('');
+        expect($output_names.val()).toBe('');
         expect($submit_button.val().match(/Revise/i)).toBeFalsy();
     });
 
-    function loadMockMethod(callback: () => void) {
-        jasmine.Ajax.withMock(function() {
-            $select_method_family.val('5').change();
-
-            // populate method revisions menu
-            expect($select_method.find('option').length).toEqual(0);
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData1);
-            expect($select_method.find('option').length).toEqual(1);
-
-            // thumbnail refresh
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData2);
-
-            callback();
-        });
-    }
-
-    it('should update when the family menu changes', function(done) {
-        expected_method.draw(expected_ctx);
-        dlg.activator.click();
-
-        loadMockMethod(function () {
-
-            // No extra calls, just checking default drawing.
-
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-        });
-        done();
-    });
-
-    it('should toggle visibility of the outputs list', function() {
-        dlg.activator.click();
-        $delete_outputs_details.show();
-        $expand_outputs_ctrl.click();
-        expect($delete_outputs_details).toBeHidden();
-        $expand_outputs_ctrl.click();
-        expect($delete_outputs_details).toBeVisible();
-    });
-
-    it('should sync child checkboxes of the outputs list with the parent check', function() {
-        dlg.activator.click();
-        loadMockMethod(function () {
-            $delete_outputs.prop('checked', false).change();
-            $delete_outputs_details.find('input').each(function() {
-                expect($(this).prop('checked')).toBeFalsy();
-            });
-
-            $delete_outputs.prop('checked', true).change();
-            $delete_outputs_details.find('input').each(function() {
-                expect($(this).prop('checked')).toBeTruthy();
-            });
-        });
-    });
-
-    it('should sync the parent checkbox of the outputs list with the child checkboxes', function() {
-        dlg.activator.click();
-
-        loadMockMethod(function () {
-            let outputs = $delete_outputs_details.find('input');
-            outputs = [
-                outputs.eq(0).prop('checked', false),
-                outputs.eq(1).prop('checked', true),
-                outputs.eq(2).prop('checked', false)
-            ];
-
-            outputs[1].change();
-            expect($delete_outputs.prop('indeterminate')).toBeTruthy();
-
-            outputs[1].prop('checked', false).change();
-            expect($delete_outputs.prop('indeterminate')).toBeFalsy();
-            expect($delete_outputs.prop('checked')).toBeFalsy();
-
-            outputs[0].prop('checked', true).change();
-            outputs[1].prop('checked', true).change();
-            expect($delete_outputs.prop('indeterminate')).toBeTruthy();
-
-            outputs[2].prop('checked', true).change();
-            expect($delete_outputs.prop('indeterminate')).toBeFalsy();
-            expect($delete_outputs.prop('checked')).toBeTruthy();
-        });
-    });
-
-    it('should refresh preview when method revision changes', function(done) {
+    it('should refresh preview when input names change', function() {
         expected_method = new MethodNode(
-            110.2775682,  // x
+            106.8134666,  // x
             35,  // y (for 2 outputs)
             "#999",  // fill
             null,  // label
             [
-                { dataset_name: '', source_step: 0, source_dataset_name: ''},
-                { dataset_name: '', source_step: 0, source_dataset_name: ''}
+                { dataset_name: 'in1', source_step: 0, source_dataset_name: 'in1'},
+                { dataset_name: 'in2', source_step: 0, source_dataset_name: 'in2'}
             ],  // inputs
-            ['', '']);  // outputs
+            ['out1', 'out2', 'out3']);  // outputs
+        expected_canvas.height = 82; // based on number of inputs and outputs.
         expected_method.draw(expected_ctx);
 
+        $input_names.val('in1 in2');
         dlg.activator.click();
-        loadMockMethod(function() {
-            $select_method.append($('<option>').val(8));
-            $select_method.val(8).change();
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData3);
 
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-        });
-        done();
+        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
 
     it('should open the colour picker', function() {
@@ -520,24 +281,20 @@ describe("Container MethodDialog fixture", function() {
         expect($cp_menu).toBeVisible();
     });
 
-    it('should pick a colour and close the menu', function(done) {
+    it('should pick a colour and close the menu', function() {
         dlg.activator.click();
 
-        loadMockMethod(function() {
-            $cp_pick.click();
-            let $color1 = $cp_menu.find('.colour_picker_colour').eq(3);
-            let bgcol = $color1.css('background-color');
-            $color1.click();
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData2);
-            expect($cp_pick.css('background-color')).toBe(bgcol);
-            expect($cp_hidden_input.val()).toBe(bgcol);
-            expect($cp_menu).toBeHidden();
+        $cp_pick.click();
+        let $color1 = $cp_menu.find('.colour_picker_colour').eq(3);
+        let bgcol = $color1.css('background-color');
+        $color1.click();
+        expect($cp_pick.css('background-color')).toBe(bgcol);
+        expect($cp_hidden_input.val()).toBe(bgcol);
+        expect($cp_menu).toBeHidden();
 
-            expected_method.fill = bgcol;
-            expected_method.draw(expected_ctx);
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-        });
-        done();
+        expected_method.fill = bgcol;
+        expected_method.draw(expected_ctx);
+        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
 
     it('should move to a specified coordinate', function() {
@@ -551,12 +308,12 @@ describe("Container MethodDialog fixture", function() {
         expect(dlg_pos.top).toBe(100);
     });
 
-    it('should load a MethodNode object', function(done) {
+    it('should load a MethodNode object', function() {
         dlg.show();
         let mock_method_node = new MethodNode(
             50 /* x */, 50 /* y */,
             "#0d8",
-            "custom_name",
+            "prelim_map.py",
             [
                 { dataset_name: 'remap', source_step: 0, source_dataset_name: 'remap'}
             ],
@@ -566,17 +323,12 @@ describe("Container MethodDialog fixture", function() {
         expected_method.fill = "#0d8";
         expected_method.draw(expected_ctx);
 
-        jasmine.Ajax.withMock(function() {
-            dlg.load(mock_method_node);
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData1);
-            jasmine.Ajax.requests.mostRecent().respondWith(mockData2);
+        dlg.load(mock_method_node);
 
-            expect($input_name.val()).toBe('custom_name');
-            expect($cp_hidden_input.val()).toBe('#0d8');
+        expect($select_method.val()).toBe('prelim_map.py');
+        expect($cp_hidden_input.val()).toBe('#0d8');
 
-            (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-        });
-        done();
+        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
 
     it('should not submit when required fields are missing', function() {
@@ -586,31 +338,13 @@ describe("Container MethodDialog fixture", function() {
         let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
         spyOn(canvasState, 'addShape');
 
-        loadMockMethod(function() {
-            $error.text('');
-            $select_method.val('');
-            $input_name.val('custom_name');
-            dlg.submit(canvasState);
-            expect($select_method).toBeFocused();
-            expect($error).not.toBeEmpty();
+        $error.text('');
+        $select_method.val('');
+        dlg.submit(canvasState);
+        expect($select_method).toBeFocused();
+        expect($error).not.toBeEmpty();
 
-            $error.text('');
-            $select_method.val(6);
-            $input_name.val('');
-            dlg.submit(canvasState);
-            expect($input_name).toBeFocused();
-            expect($error).not.toBeEmpty();
-
-            $error.text('');
-            $select_method_family.val('');
-            $select_method.val(6);
-            $input_name.val('custom_name');
-            dlg.submit(canvasState);
-            expect($select_method_family).toBeFocused();
-            expect($error).not.toBeEmpty();
-
-            expect(canvasState.addShape).not.toHaveBeenCalled();
-        });
+        expect(canvasState.addShape).not.toHaveBeenCalled();
     });
 
     it('should not submit when there\'s already a node by that name', function() {
@@ -618,17 +352,20 @@ describe("Container MethodDialog fixture", function() {
 
         let canvas = imagediff.createCanvas(300, 150);
         let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
-        canvasState.addShape(new CdtNode(23, 50, 50, 'custom_name'));
+        canvasState.addShape(new MethodNode(
+            23,
+            50,
+            'red',
+            'my_script.py',
+            [{dataset_name: "in1", source_step: 0, source_dataset_name: "in1"}],
+            ["out1"]));
 
         spyOn(canvasState, 'addShape');
 
-        loadMockMethod(function() {
-            $select_method.val(6);
-            $input_name.val('custom_name');
-            dlg.submit(canvasState);
-            expect($error).not.toBeEmpty();
-            expect(canvasState.addShape).not.toHaveBeenCalled();
-        });
+        $select_method.val('my_script.py');
+        dlg.submit(canvasState);
+        expect($error).not.toBeEmpty();
+        expect(canvasState.addShape).not.toHaveBeenCalled();
     });
 
     it('should apply its state to a CanvasState', function(done) {
@@ -649,21 +386,17 @@ describe("Container MethodDialog fixture", function() {
         spyOn(canvasState, 'addShape').and.callThrough();
         spyOn(dlg, 'reset').and.callThrough();
 
-        loadMockMethod(function() {
-            $select_method.val(6);
-            $input_name.val('custom_name');
-            dlg.submit(canvasState);
-            expect(canvasState.addShape).toHaveBeenCalled();
-            expect(dlg.reset).toHaveBeenCalled();
+        $select_method.val('remap.py');
+        dlg.submit(canvasState);
+        expect(canvasState.addShape).toHaveBeenCalled();
+        expect(dlg.reset).toHaveBeenCalled();
 
-            let methods = canvasState.getMethodNodes();
-            expect(methods.length).toEqual(1);
-            expect(methods[0].label).toBe('custom_name');
-            expect(methods[0].n_outputs).toEqual(3);
-            expect(methods[0].n_inputs).toEqual(1);
-        });
+        let methods = canvasState.getMethodNodes();
+        expect(methods.length).toEqual(1);
+        expect(methods[0].label).toBe('custom_name');
+        expect(methods[0].n_outputs).toEqual(3);
+        expect(methods[0].n_inputs).toEqual(1);
     });
-
 });
 
 describe("InputDialog fixture", function() {
@@ -682,7 +415,7 @@ describe("InputDialog fixture", function() {
     });
 
     beforeEach(function(){
-        appendLoadFixtures('pipeline_input_dialog.tpl.html');
+        appendLoadFixtures('content_input_dialog.tpl.html');
         appendLoadStyleFixtures('drydock.css');
         appendSetFixtures("<a id='activator'>Activator</a>");
         dlg = new InputDialog(
@@ -788,7 +521,7 @@ describe("InputDialog fixture", function() {
 
 });
 
-describe("OutputDialog fixture", function() {
+describe("Container OutputDialog fixture", function() {
     let dlg;
     let $output_name;
     let $error;
@@ -801,19 +534,20 @@ describe("OutputDialog fixture", function() {
     });
 
     beforeEach(function(){
-        appendLoadFixtures('pipeline_output_dialog.tpl.html');
-        appendLoadStyleFixtures('drydock.css');
-        appendSetFixtures("<a id='activator'>Activator</a>");
-        dlg = new OutputDialog(
-            $('.ctrl_menu').attr('id', '#id_output_ctrl'),
-            $('#activator')
-        );
-
-        $output_name = $('#id_output_name');
-        $error = $('#id_output_error');
-        canvas = <HTMLCanvasElement> $('canvas')[0];
-        expected_canvas = imagediff.createCanvas(canvas.width, canvas.height);
-        expected_ctx = expected_canvas.getContext('2d');
+        for (let i = 0; i < 2; i++) {
+            appendLoadFixtures('content_output_dialog.tpl.html');
+            appendLoadStyleFixtures('drydock.css');
+            appendSetFixtures("<a id='activator'>Activator</a>");
+            dlg = new OutputDialog(
+                $('.ctrl_menu').attr('id', '#id_output_ctrl'),
+                $('#activator')
+            );
+            $output_name = $('#id_output_name');
+            $error = $('#id_output_error');
+            canvas = <HTMLCanvasElement> $('canvas')[0];
+            expected_canvas = imagediff.createCanvas(canvas.width, canvas.height);
+            expected_ctx = expected_canvas.getContext('2d');
+        }
     });
 
     it('should initialize properly', function() {

@@ -70,7 +70,7 @@ describe("Dialog fixture", function() {
 
 });
 
-describe("MethodDialog fixture", function() {
+describe("Pipeline MethodDialog fixture", function() {
 
     let dlg;
     let $cp_hidden_input;

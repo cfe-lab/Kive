@@ -792,6 +792,12 @@ export class MethodNode extends BaseNode implements CNode {
         this.n_inputs = Object.keys(inputs).length;
         this.n_outputs = Object.keys(outputs).length;
         this.h = Math.max(this.n_inputs, this.n_outputs) * this.spacing;
+        if (this.n_inputs === 0) {
+            throw "No inputs passed to MethodNode."
+        }
+        if (this.n_outputs === 0) {
+            throw "No outputs passed to MethodNode."
+        }
 
         for (let input of this.inputs) {
             this.addInput(input);

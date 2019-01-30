@@ -146,7 +146,7 @@ export class Dialog {
         for (let propertyName in this) {
             if (propertyName[0] === "$" && this[propertyName]['constructor'] === $) {
                 if (this[propertyName]['length'] === 0) {
-                    throw "Error in dialog: could not find " + this[propertyName]['selector'] + " in template";
+                    throw "Error in dialog: could not find " + propertyName + " in template";
                 }
             }
         }

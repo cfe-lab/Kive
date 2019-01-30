@@ -26,8 +26,9 @@
 
     <a href="." rel="prev">Back to container</a>
 
-    <!-- Stash the parent revision's representation here. -->
+    <!-- Stash the original pipeline data here. -->
     <div id="initial_data" style="display:none">{{ content_json|escape }}</div>
+    <input type="hidden" id="id_container_pk" value="{{ object.pk }}"/>
 
     <!-- CANVAS -->
     <canvas id="pipeline_canvas">HTML5 Canvas not supported by this browser.</canvas>
@@ -38,8 +39,6 @@
     <!-- Method selector -->
     <div id="pipeline_ctrl">
         <ul id="id_ctrl_nav">
-            <li data-rel="#id_family_ctrl">Family</li>
-            <li data-rel="#id_meta_ctrl">Pipeline</li>
             <li data-rel="#id_add_ctrl"><span class="icon">+</span><span class="longname"> Add Node</span></li>
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
@@ -52,16 +51,8 @@
             </div>
         </form>
 
-        {% if parent_revision %}
         <input id="id_pipeline_action" value="revise" type="hidden">
-        {% elif family %}
-        <input id="id_pipeline_action" value="add" type="hidden">
-        {% else %}
-        <input id="id_pipeline_action" value="new" type="hidden">
-        {% endif %}
-        {% include 'pipeline/pipeline_family_dialog.tpl.html' with dlg_id="id_family_ctrl" %}
-        {% include 'pipeline/pipeline_meta_dialog.tpl.html'   with dlg_id="id_meta_ctrl" %}
-        {% include 'pipeline/pipeline_view_dialog.tpl.html'   with dlg_id="id_view_ctrl" %}
+        {% include 'pipeline/content_view_dialog.tpl.html'   with dlg_id="id_view_ctrl" %}
 
         <div id="id_add_ctrl" class="ctrl_menu">
             <ul>
@@ -71,11 +62,11 @@
             </ul>
         </div>
 
-        {% include 'pipeline/pipeline_input_dialog.tpl.html'  with dlg_id="id_input_ctrl"  %}
-        {% include 'pipeline/pipeline_method_dialog.tpl.html' with dlg_id="id_method_ctrl" %}
-        {% include 'pipeline/pipeline_output_dialog.tpl.html' with dlg_id="id_output_ctrl" %}
+        {% include 'container/content_input_dialog.tpl.html'  with dlg_id="id_input_ctrl"  %}
+        {% include 'container/content_method_dialog.tpl.html' with dlg_id="id_method_ctrl" %}
+        {% include 'container/content_output_dialog.tpl.html' with dlg_id="id_output_ctrl" %}
 
     </div>
-    <script src="/static/portal/pipeline_add.bundle.js"></script>
+    <script src="/static/portal/container_content.bundle.js"></script>
 
 {% endblock %}

@@ -1340,15 +1340,6 @@ export class CanvasState {
         this.dispatchChangeEvent({ removed: sel });
     }
 
-    findMethodNode (method_pk: number): MethodNode {
-        for (let method of this.methods) {
-            if (method.pk === method_pk) {
-                return method;
-            }
-        }
-        return null;
-    }
-
     findOutputNode (pk: number): OutputNode {
         for (let output of this.outputs) {
             if (output.pk === pk) {

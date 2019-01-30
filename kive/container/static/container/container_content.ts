@@ -43,14 +43,11 @@ CanvasListeners.initResizeListeners(canvasState);
 /**
  * Part 2/8: Load initial pipeline data if present.
  */
-let parent_revision_id;
 let text = $("#initial_data").text();
 let loader = new Pipeline(canvasState);
 if (text) {
-    loader.setUpdateCtrl('#id_update');
     loader.setRevertCtrl('#id_revert');
     loader.loadFromString(text);
-    parent_revision_id = loader.pipeline.id;
     loader.draw();
     $(canvas).hide().fadeIn();
 }
@@ -123,18 +120,8 @@ $view_menu.find('#autolayout_btn').click(
  */
 $('#id_pipeline_form').submit(buildPipelineSubmit(
     canvasState,
-    $('#id_pipeline_action').val(),
-    $('#id_family_name'),   $('#id_family_desc'),
-    parseInt($('#id_family_pk').val(), 10),
-    $('#id_revision_name'), $('#id_revision_desc'),
-    parent_revision_id,
-    $('#published'),
-    $("#id_permissions_0"), $("#id_permissions_1"),
-    $('#id_submit_error'),
-    function() {
-        family_dialog.show();
-        $('#id_family_name').addClass('submit-error-missing').focus();
-    }
+    parseInt($('#id_container_pk').val(), 10),
+    $('#id_submit_error')
 ));
 
 /**
