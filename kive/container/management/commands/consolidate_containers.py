@@ -68,6 +68,7 @@ class Command(BaseCommand):
             os.remove(original_path)
 
     # This is copied from the "purge.py" management command.
+    @staticmethod
     def confirm(self, prompt):
         print(prompt, end=' ')
         confirmation = sys.stdin.readline().strip()

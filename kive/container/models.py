@@ -11,6 +11,8 @@ from tempfile import NamedTemporaryFile, mkdtemp
 import shutil
 import zipfile
 import tarfile
+import tempfile
+import io
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -69,50 +71,9 @@ class ContainerFamily(AccessControl):
         remove_helper(removal_plan)
 
 
-class ContainerFileFormField(FileFormField):
-    default_error_messages = {
-        'invalid_container': "Upload a valid container file."}
-
-    def to_python(self, data):
-        """ Checks that the file-upload data contains a valid container. """
-        f = super(ContainerFileFormField, self).to_python(data)
-        if f is None:
-            return None
-
-        # We need to get a file object to validate. We might have a path or we might
-        # have to read the data out of memory.
-        if hasattr(data, 'temporary_file_path'):
-            self.validate_container(data.temporary_file_path())
-        else:
-            upload_name = getattr(data, 'name', 'container')
-            upload_base, upload_ext = os.path.splitext(upload_name)
-            with NamedTemporaryFile(prefix=upload_base,
-                                    suffix=upload_ext) as f_temp:
-                if hasattr(data, 'read'):
-                    f_temp.write(data.read())
-                else:
-                    f_temp.write(data['content'])
-                f_temp.flush()
-                self.validate_container(f_temp.name)
-
-        if hasattr(f, 'seek') and callable(f.seek):
-            f.seek(0)
-        return f
-
-    def validate_container(self, filename):
-        try:
-            check_output(['singularity', 'check', filename], stderr=STDOUT)
-        except CalledProcessError as ex:
-            logger.warning('Invalid container file:\n%s', ex.output)
-            raise ValidationError(self.error_messages['invalid_container'],
-                                  code='invalid_container')
-
-
 class ContainerFileField(models.FileField):
-    def formfield(self, **kwargs):
-        # noinspection PyTypeChecker
-        kwargs.setdefault('form_class', ContainerFileFormField)
-        return super(ContainerFileField, self).formfield(**kwargs)
+    # FIXME remove this once we are able to squash the old migrations, as it is no longer used.
+    pass
 
 
 class ContainerNotChild(Exception):
@@ -137,9 +98,17 @@ class Container(AccessControl):
         (TGZ, "Gzipped tar")
     )
 
+    DEFAULT_ERROR_MESSAGES = {
+        'invalid_singularity_container': "Upload a valid Singularity container file.",
+        'invalid_archive': "Upload a valid archive file.",
+        'singularity_cannot_have_parent': "Singularity containers cannot have parents",
+        'archive_must_have_parent': "Archive containers must have a valid Singularity container parent",
+        'parent_container_not_singularity': "Parent container must be a Singularity container"
+    }
+
     family = models.ForeignKey(ContainerFamily, related_name="containers")
 
-    file = ContainerFileField(
+    file = models.FileField(
         "Container file",
         upload_to=UPLOAD_DIR,
         help_text="Singularity or archive container file")
@@ -188,11 +157,62 @@ class Container(AccessControl):
         ordering = ['family__name', '-created']
 
     def clean(self):
-        if self.file_type != self.SIMG:
+        """
+        Confirm that the file is of the correct type.
+        :return:
+        """
+        if self.file_type == Container.SIMG:
+            if self.parent is not None:
+                raise ValidationError(self.default_error_messages["singularity_cannot_have_parent"],
+                                      code="singularity_cannot_have_parent")
+
+            temp_file_created = False
+            try:
+                file_path = self.file.path()
+            except NotImplementedError:
+                # Whatever the underlying Storage object is, it doesn't have a local file path.  Rewrite the
+                # file to a temporary file.
+                fd, file_path = tempfile.mkstemp()
+                with io.open(fd, mode="w+b") as f:
+                    for chunk in self.file.chunks():
+                        f.write(chunk)
+                temp_file_created = True
+            finally:
+                self.file.close()
+
+            try:
+                check_output(['singularity', 'check', file_path], stderr=STDOUT)
+            except CalledProcessError as ex:
+                logger.warning('Invalid container file:\n%s', ex.output)
+                raise ValidationError(self.error_messages['invalid_singularity_container'],
+                                      code='invalid_singularity_container')
+
+            if temp_file_created:
+                os.remove(file_path)
+
+        else:
             if self.parent is None:
-                raise ValidationError("Non-Singularity container must have a Singularity-based container parent")
+                raise ValidationError(self.default_error_messages["archive_must_have_parent"],
+                                      code="archive_must_have_parent")
             elif not self.parent.can_be_parent():
-                raise ValidationError("Parent container must be a Singularity container")
+                raise ValidationError(self.default_error_messages["parent_container_not_singularity"],
+                                      code="parent_container_not_singularity")
+
+            if self.file_type == Container.ZIP:
+                try:
+                    with zipfile.ZipFile(self.file):
+                        pass
+                except zipfile.BadZipfile:
+                    raise ValidationError(self.default_error_messages["invalid_archive"],
+                                          code="invalid_archive")
+
+            else:  # this is either a tarfile or a gzipped tar file
+                try:
+                    with tarfile.open(fileobj=self.file, mode="r"):
+                        pass
+                except tarfile.ReadError:
+                    raise ValidationError(self.default_error_messages["invalid_archive"],
+                                          code="invalid_archive")
 
     def __str__(self):
         return self.display_name
