@@ -170,20 +170,6 @@ describe("Container Pipeline Submit class", function() {
             expect(requestData.pipeline.outputs[0].dataset_name).toEqual("output_node");
         });
 
-        it('should handle API errors for pipeline family', function() {
-            built_submit(new Event('submit'));
-
-            jasmine.Ajax.requests.mostRecent().respondWith({
-                status: 500,
-                statusText: 'HTTP/1.1 500 Internal Server Error',
-                contentType: 'application/json;charset=UTF-8',
-                responseText: "{ \"non_field_errors\": [ \"custom error message\" ] }"
-            });
-
-            expect($error).toContainText("custom error message");
-            expect($error).toBeVisible();
-        });
-
         it('should handle API errors for pipeline revision', function() {
             built_submit(new Event('submit'));
 

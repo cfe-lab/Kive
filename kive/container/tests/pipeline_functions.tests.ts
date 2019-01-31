@@ -304,14 +304,16 @@ describe("Container pipeline functions", function() {
         });
 
         it('should match original pipeline steps', function() {
-            var self = this,
+            let self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
 
+            expect(serialized.pipeline.steps.length).toBe(
+                self.api_pipeline.pipeline.steps.length);
             $.each(serialized.pipeline.steps, function(index, ser_step){
-                var api_step = self.api_pipeline.pipeline.steps[index];
+                let api_step = self.api_pipeline.pipeline.steps[index];
 
                 expect(ser_step.driver).toBe(api_step.driver);
                 expect(ser_step.x).toBeCloseTo(api_step.x, 8);
@@ -321,21 +323,37 @@ describe("Container pipeline functions", function() {
         });
 
         it('should match original pipeline steps (cables_in)', function() {
-            var self = this,
+            let self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
 
             $.each(serialized.pipeline.steps, function(index, ser_step){
-                var api_step = self.api_pipeline.pipeline.steps[index];
+                let api_step = self.api_pipeline.pipeline.steps[index];
 
+                expect(ser_step.inputs.length).toBe(api_step.inputs.length);
                 $.each(ser_step.inputs, function(cable_index, ser_cable){
-                    var api_cable = api_step.inputs[cable_index];
+                    let api_cable = api_step.inputs[cable_index];
 
                     expect(ser_cable.dataset_name).toBe(api_cable.dataset_name);
+                    expect(ser_cable.source_step).toBe(api_cable.source_step);
                     expect(ser_cable.source_dataset_name).toBe(api_cable.source_dataset_name);
                 });
+            });
+        });
+
+        it('should match original pipeline steps (cables_out)', function() {
+            let self = this,
+                serialized = loadAndSerialize(
+                    this.canvasState,
+                    this.api_pipeline
+                );
+
+            $.each(serialized.pipeline.steps, function(index, ser_step){
+                let api_step = self.api_pipeline.pipeline.steps[index];
+
+                expect(ser_step.outputs).toEqual(api_step.outputs);
             });
         });
 

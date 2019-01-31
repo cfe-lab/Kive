@@ -83,9 +83,7 @@ function serializeInputs(pipeline_inputs: (CdtNode|RawNode)[], canvas_dimensions
 
         // Slap this input into the form data
         serialized_inputs[i] = {
-            structure: structure,
             dataset_name: input.label,
-            dataset_idx: i + 1,
             x: input.x / x_ratio,
             y: input.y / y_ratio
         };
@@ -100,7 +98,6 @@ function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ numbe
 
     // Add arguments for input cabling
     for (let i = 0; i < pipeline_steps.length; i++) {
-        // TODO: Make this work for nested pipelines
 
         let step = pipeline_steps[i];
 
@@ -118,7 +115,9 @@ function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ numbe
         }
 
         // retrieve Connectors
-        serialized_steps[i].cables_in = serializeInMagnets(step.in_magnets, pipeline_steps);
+        serialized_steps[i].inputs = serializeInMagnets(step.in_magnets, pipeline_steps);
+        serialized_steps[i].outputs = step.out_magnets.map(
+            magnet => magnet.label);
     }
 
     return serialized_steps;
@@ -140,11 +139,10 @@ function serializeInMagnets(in_magnets: Magnet[], pipeline_steps: MethodNode[]):
 
         serialized_cables[j] = {
             source_dataset_name: connector.source.label,
-            dest_dataset_name: connector.dest.label,
-            source_step: CanvasState.isMethodNode(source) ? pipeline_steps.indexOf(source) + 1 : 0,
-            keep_output: false, // in the future this can be more flexible
-            custom_wires: [] // no wires for a raw cable
-        };
+            dataset_name: connector.dest.label,
+            source_step: CanvasState.isMethodNode(source)
+                ? pipeline_steps.indexOf(source) + 1
+                : 0};
     }
 
     return serialized_cables;
