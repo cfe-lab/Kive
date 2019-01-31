@@ -7,11 +7,10 @@ import re
 import sys
 from datetime import datetime, timedelta
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
-from tempfile import NamedTemporaryFile, mkdtemp
+from tempfile import mkdtemp, mkstemp
 import shutil
 import zipfile
 import tarfile
-import tempfile
 import io
 
 from django.conf import settings
@@ -21,7 +20,6 @@ from django.core.validators import RegexValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Now
 from django.dispatch import receiver
-from django.forms.fields import FileField as FileFormField
 from django.urls import reverse
 from django.utils import timezone
 
@@ -158,7 +156,7 @@ class Container(AccessControl):
         """
         if self.file_type == Container.SIMG:
             if self.parent is not None:
-                raise ValidationError(self.default_error_messages["singularity_cannot_have_parent"],
+                raise ValidationError(self.DEFAULT_ERROR_MESSAGES["singularity_cannot_have_parent"],
                                       code="singularity_cannot_have_parent")
 
             temp_file_created = False
@@ -167,7 +165,7 @@ class Container(AccessControl):
             except NotImplementedError:
                 # Whatever the underlying Storage object is, it doesn't have a local file path.  Rewrite the
                 # file to a temporary file.
-                fd, file_path = tempfile.mkstemp()
+                fd, file_path = mkstemp()
                 with io.open(fd, mode="w+b") as f:
                     for chunk in self.file.chunks():
                         f.write(chunk)
@@ -187,10 +185,10 @@ class Container(AccessControl):
 
         else:
             if self.parent is None:
-                raise ValidationError(self.default_error_messages["archive_must_have_parent"],
+                raise ValidationError(self.DEFAULT_ERROR_MESSAGES["archive_must_have_parent"],
                                       code="archive_must_have_parent")
             elif not self.parent.can_be_parent():
-                raise ValidationError(self.default_error_messages["parent_container_not_singularity"],
+                raise ValidationError(self.DEFAULT_ERROR_MESSAGES["parent_container_not_singularity"],
                                       code="parent_container_not_singularity")
 
             if self.file_type == Container.ZIP:
@@ -198,7 +196,7 @@ class Container(AccessControl):
                     with zipfile.ZipFile(self.file):
                         pass
                 except zipfile.BadZipfile:
-                    raise ValidationError(self.default_error_messages["invalid_archive"],
+                    raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
             else:  # this is either a tarfile or a gzipped tar file
@@ -206,7 +204,7 @@ class Container(AccessControl):
                     with tarfile.open(fileobj=self.file, mode="r"):
                         pass
                 except tarfile.ReadError:
-                    raise ValidationError(self.default_error_messages["invalid_archive"],
+                    raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
     def __str__(self):
@@ -251,11 +249,17 @@ class Container(AccessControl):
         file_list = []
         if self.file_type == self.ZIP:
             with zipfile.ZipFile(self.file) as z:
-                file_list = z.namelist()
+                file_info_list = z.infolist()
+                for file_info in file_info_list:
+                    if not file_info.filename.endswith("/"):  # file_info.is_dir() doesn't exist until Python 3.6
+                        file_list.append(file_info.filename)
 
         elif self.file_type in (self.TAR, self.TGZ):
             with tarfile.open(self.file.path, mode="r") as t:
-                file_list = t.getnames()
+                file_info_list = t.getmembers()
+                for file_info in file_info_list:
+                    if file_info.isfile():
+                        file_list.append(file_info.name)
 
         return file_list
 
