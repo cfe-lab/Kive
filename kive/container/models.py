@@ -280,8 +280,13 @@ class Container(AccessControl):
             pipeline_json_path = os.path.join(base_dir, "pipeline.json")
             if pipeline_json_path not in file_list:
                 raise ChildNotConfigured()
-            with single_file_extractor(pipeline_json_path) as json:
+            # The `extractfile` method on a TarFile does not appear to be usable as a context manager,
+            # so we do this the old-fashioned way.
+            try:
+                json = single_file_extractor(pipeline_json_path)
                 return json.read()
+            finally:
+                json.close()
 
         if self.file_type == self.ZIP:
             with zipfile.ZipFile(self.file) as z:
