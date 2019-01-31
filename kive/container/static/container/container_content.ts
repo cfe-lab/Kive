@@ -82,7 +82,10 @@ var family_dialog =       new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[d
 /* anonymous */       new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
 var add_menu      =       new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
 var input_dialog  =  new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
-var method_dialog = new MethodDialog( $('#id_method_ctrl'), $add_menu.find("li[data-rel='#id_method_ctrl']") );
+var method_dialog = new MethodDialog(
+    $('#id_method_ctrl'),
+    $add_menu.find("li[data-rel='#id_method_ctrl']"),
+    loader.container);
 var output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
 
 $add_menu.click('li', function() { add_menu.hide(); });

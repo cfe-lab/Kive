@@ -502,7 +502,7 @@ export class MethodDialog extends NodePreviewDialog {
      * @param container
      *      Definition of the container contents.
      */
-    constructor(jqueryRef, activator, container?: Container) {
+    constructor(jqueryRef, activator, container: Container) {
         super(jqueryRef, activator);
 
         this.container = container;
