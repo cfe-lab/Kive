@@ -21,7 +21,7 @@ import rest_framework.reverse
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument, ContainerLog, Batch
+    ContainerRun, ContainerArgument, ContainerLog, Batch, ChildNotConfigured
 from file_access_utils import compute_md5
 from portal.views import developer_check, AdminViewMixin
 
@@ -173,7 +173,16 @@ class ContainerContentUpdate(DetailView, AdminViewMixin):
         context = super(ContainerContentUpdate, self).get_context_data(**kwargs)
         c = self.get_object()
         content_files = c.get_file_list()
-        pipeline_json = c.get_pipeline_json()
+        try:
+            pipeline_json = c.get_pipeline_json()
+        except ChildNotConfigured:
+            pipeline_json = json.dumps(
+                {
+                    "inputs": [],
+                    "steps": [],
+                    "outputs": []
+                }
+            )
         pipeline_config = json.loads(pipeline_json)
         content_json = json.dumps(dict(files=content_files,
                                        pipeline=pipeline_config))
