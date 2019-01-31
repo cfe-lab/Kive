@@ -5,6 +5,7 @@ from io import BytesIO
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from django.core.files.base import ContentFile, File
 from django.test import TestCase
 from django.urls import reverse, resolve
 from django_mock_queries.mocks import mocked_relations
@@ -82,6 +83,30 @@ class ContainerMockTests(TestCase):
         plan = container.build_removal_plan()
 
         self.assertEqual(expected_plan, strip_removal_plan(plan))
+
+
+class ContainerCleanMockTests(TestCase):
+    def setUp(self):
+        super(ContainerCleanMockTests, self).setUp()
+        self.alpine_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+
+    def test_clean_good_singularity_image(self):
+        """
+        A proper Singularity container should pass validation.
+        :return:
+        """
+        container = Container(id=42)
+        container.file_type = Container.SIMG
+        with open(self.alpine_path, 'rb') as alpine_file:
+            container.file = File(alpine_file)
+            container.clean()
 
 
 @mocked_relations(Container,

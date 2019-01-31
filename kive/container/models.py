@@ -159,19 +159,13 @@ class Container(AccessControl):
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["singularity_cannot_have_parent"],
                                       code="singularity_cannot_have_parent")
 
-            temp_file_created = False
-            try:
-                file_path = self.file.path()
-            except NotImplementedError:
-                # Whatever the underlying Storage object is, it doesn't have a local file path.  Rewrite the
-                # file to a temporary file.
-                fd, file_path = mkstemp()
-                with io.open(fd, mode="w+b") as f:
+            # FIXME can we replace this with something less inefficient but will still work for ContentFiles
+            # and whatever else we might get back from self.file?
+            fd, file_path = mkstemp()
+            with io.open(fd, mode="w+b") as f:
+                with self.file:
                     for chunk in self.file.chunks():
                         f.write(chunk)
-                temp_file_created = True
-            finally:
-                self.file.close()
 
             try:
                 check_output(['singularity', 'check', file_path], stderr=STDOUT)
@@ -180,8 +174,7 @@ class Container(AccessControl):
                 raise ValidationError(self.error_messages['invalid_singularity_container'],
                                       code='invalid_singularity_container')
 
-            if temp_file_created:
-                os.remove(file_path)
+            os.remove(file_path)
 
         else:
             if self.parent is None:
@@ -193,16 +186,18 @@ class Container(AccessControl):
 
             if self.file_type == Container.ZIP:
                 try:
-                    with zipfile.ZipFile(self.file):
-                        pass
+                    with self.file:
+                        with zipfile.ZipFile(self.file):
+                            pass
                 except zipfile.BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
             else:  # this is either a tarfile or a gzipped tar file
                 try:
-                    with tarfile.open(fileobj=self.file, mode="r"):
-                        pass
+                    with self.file:
+                        with tarfile.open(fileobj=self.file, mode="r"):
+                            pass
                 except tarfile.ReadError:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
