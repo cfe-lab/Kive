@@ -5,7 +5,7 @@
  */
 "use strict";
 import {
-    CanvasObject, CNode, MethodNode, CdtNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
+    CanvasObject, CNode, MethodNode, RawNode, OutputNode, OutputZone, Magnet, Connector,
     CanvasWrapper, STATUS_COLOR_MAP
 } from "./drydock_objects";
 import { Geometry, Point, Rectangle } from "./geometry";
@@ -36,7 +36,7 @@ export class CanvasState {
     valid = false; // if false, canvas will redraw everything
     shapes: CNode[] = []; // collection of shapes to be drawn
     methods: MethodNode[] = []; // collection of methods to be drawn (subset of shapes)
-    inputs: (CdtNode|RawNode)[] = []; // collection of inputs to be drawn (subset of shapes)
+    inputs: RawNode[] = []; // collection of inputs to be drawn (subset of shapes)
     outputs: OutputNode[] = []; // collection of outputs to be drawn (subset of shapes)
     connectors: Connector[] = []; // collection of connectors between shapes
     dragging = false; // if mouse drag
@@ -829,7 +829,6 @@ export class CanvasState {
         var suffix = 0,
             name = desired_name;
         for (let i = 0, shape; (shape = this.shapes[i]); i++) {
-            // @todo: BUG: CdtNodes and RawNodes may share a name under this scheme
             if (object_class && !(shape instanceof object_class)) {
                 continue;
             }
@@ -845,16 +844,10 @@ export class CanvasState {
     completeMethodInputs(method): void {
         let emptyMagnets = method.in_magnets.filter(el => el.connected.length === 0);
         for (let magnet of emptyMagnets) {
-            let ctor;
-            let args: (string|number)[] = [ magnet.x - 80, magnet.y - 80 ];
-            if (magnet.cdt !== null && magnet.cdt !== undefined) {
-                ctor = CdtNode;
-                args.unshift(magnet.cdt);
-            } else {
-                ctor = RawNode;
-            }
-            args.push(this.uniqueNodeName(magnet.label, ctor));
-            let input = new ctor(...args);
+            let input = new RawNode(
+                magnet.x - 80,
+                magnet.y - 80,
+                this.uniqueNodeName(magnet.label, RawNode));
             this.addShape(input);
             this.detectCollisions(input);
             this.connectMagnets(input.out_magnets[0], magnet);
@@ -1362,7 +1355,7 @@ export class CanvasState {
         return this.outputs;
     }
 
-    getInputNodes(): (CdtNode|RawNode)[] {
+    getInputNodes(): RawNode[] {
         return this.inputs;
     }
 
@@ -1403,9 +1396,6 @@ export class CanvasState {
     static isNode(node: any): node is CNode {
         return node && node.isNode && node.isNode();
     }
-    static isCdtNode(node: any): node is CdtNode  {
-        return node && node.isCdtNode && node.isCdtNode();
-    }
     static isRawNode(node: any): node is RawNode {
         return node && node.isRawNode && node.isRawNode();
     }
@@ -1415,11 +1405,8 @@ export class CanvasState {
     static isOutputNode(node: any): node is OutputNode {
         return node && node.isOutputNode && node.isOutputNode();
     }
-    static isInputNode(node: any): node is CdtNode|RawNode {
-        return node && (CanvasState.isCdtNode(node) || CanvasState.isRawNode(node));
-    }
-    static isDataNode(node: any): node is CdtNode|RawNode|OutputNode {
-        return node && (CanvasState.isInputNode(node) || CanvasState.isOutputNode(node));
+    static isInputNode(node: any): node is RawNode {
+        return node && CanvasState.isRawNode(node);
     }
     static isSelectable(obj: any): obj is CNode|Connector {
         return obj && (CanvasState.isNode(obj) || CanvasState.isConnector(obj));
@@ -1478,7 +1465,7 @@ export class CanvasState {
                 throw 'Invalid input detected: ' + shape.label;
             }
 
-            // all CDtNodes or RawNodes (inputs) should feed into a MethodNode and have only one magnet
+            // all inputs should feed into a MethodNode and have only one magnet
             if (shape.out_magnets.length !== 1) {
                 throw 'Invalid amount of magnets for input node ' + shape.label;
             }

@@ -3,14 +3,7 @@
     <h3>Inputs</h3>
 
     <form>
-        <input id="id_datatype_name" maxlength="128" name="datatype_name" type="text" placeholder="Label">
-
-        <select id="id_select_cdt" name="select_cdt" class="select-label">
-            <option value="">Raw</option>
-            {% for name, pk in compound_datatypes %}
-            <option value="{{ pk }}">{{ name }}</option>
-            {% endfor %}
-        </select>
+        <input id="id_input_name" maxlength="128" name="input_name" type="text" placeholder="Label">
 
         <input type="submit" id="id_cdt_button" value="Add Input">
         <div class="errortext" id="id_dt_error"></div>

@@ -1,4 +1,4 @@
-import {CdtNode, MethodNode, OutputNode, RawNode} from "./canvas/drydock_objects";
+import {MethodNode, OutputNode, RawNode} from "./canvas/drydock_objects";
 import {CanvasState} from "./canvas/drydock";
 import {Container} from "@container/io/PipelineApi";
 
@@ -276,9 +276,9 @@ export class InputDialog extends NodePreviewDialog {
             <div #id_dt_error .errortext>
 
     */
-    private $datatype_name;
-    private $select_cdt;
     private $error;
+    private $input_name;
+    private paired_node: RawNode;
     
     /**
      * In addition to the NodePreviewDialog functionality,
@@ -290,23 +290,42 @@ export class InputDialog extends NodePreviewDialog {
      */
     constructor(jqueryRef, activator) {
         super(jqueryRef, activator);
-        let dialog = this;
-        this.$datatype_name = $('#id_datatype_name');
         this.$error = $('#id_dt_error');
-        this.$select_cdt = $('#id_select_cdt');
-        this.$select_cdt.change(function(e) {
-            e.stopPropagation();
-            dialog.triggerPreviewRefresh();
-        });
+        this.$input_name = $('#id_input_name');
+        this.paired_node = null;
+        this.drawPreviewCanvas();
     }
-    
+
+    /**
+     * Draws the node on the preview canvas.
+     */
+    private drawPreviewCanvas(): void {
+        let ctx = this.preview_canvas.getContext('2d');
+        let w = this.preview_canvas.width;
+        let h = this.preview_canvas.height;
+        let node = new RawNode(w / 2, h / 2, '');
+        ctx.clearRect(0, 0, w, h);
+        node.draw(ctx);
+    }
+
     /**
      * Update the preview canvas.
      */
     triggerPreviewRefresh() {
-        this.drawPreviewCanvas();
+        // inputs all look the same: take no action
     }
-    
+
+    /**
+     * Load an existing InputNode so that we can rename it.
+     * @param node
+     *      The OutputNode to edit
+     */
+    load(node: RawNode): void {
+        this.reset();
+        this.paired_node = node;
+        this.$input_name.val(node.label).select(); // default value
+    }
+
     /**
      * Align the dialog to a given coord. Anchor point is center of the dialog.
      * @param x
@@ -320,31 +339,7 @@ export class InputDialog extends NodePreviewDialog {
             top:  y - parseInt(this.jqueryRef.css('padding-top'), 10)
         });
     }
-    
-    /**
-     * Creates a node object based on the dialog state.
-     * Coords default to 0, 0 and label is an empty string.
-     * @returns {RawNode|CdtNode}
-     */
-    private generateNode(label: string = ''): RawNode|CdtNode {
-        let pk = parseInt(this.$select_cdt.val(), 10); // primary key
-        return isNaN(pk) ? new RawNode(0, 0, label) : new CdtNode(pk, 0, 0, label);
-    }
-    
-    /**
-     * Draws the node on the preview canvas.
-     */
-    private drawPreviewCanvas(): void {
-        let ctx = this.preview_canvas.getContext('2d');
-        let w = this.preview_canvas.width;
-        let h = this.preview_canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        let node = this.generateNode();
-        node.x = w / 2;
-        node.y = h / 2;
-        node.draw(ctx);
-    }
-    
+
     /**
      * Adds a new node to canvasState based on the InputDialog state. Calculates the corresponding coordinate position,
      * checks for name uniqueness, and detects shape collisions. If successful the dialog is reset and closed.
@@ -354,20 +349,27 @@ export class InputDialog extends NodePreviewDialog {
         let pos = this.translateToOtherCanvas(canvasState);
         
         // check for empty and duplicate names
-        let node_label = this.$datatype_name.val();
+        let node_label = this.$input_name.val();
         if (node_label === '') {
             // required field
             this.$error.text("Label is required.");
+        } else if (this.paired_node !== null && node_label === this.paired_node.label) {
+            /* No change */
+            this.hide();
+            this.reset();
         } else if (!CanvasState.isUniqueName(canvasState.getInputNodes(), node_label)) {
             this.$error.text('That name has already been used.');
         } else {
-            let shape = this.generateNode(node_label);
-            shape.x = pos.left;
-            shape.y = pos.top;
-            
-            canvasState.addShape(shape);
-            // Second arg: Upon collision, move new shape 0% and move existing objects 100%
-            canvasState.detectCollisions(shape, 0);
+            if (this.paired_node !== null) {
+                this.paired_node.label = node_label;
+                canvasState.valid = false;
+            } else {
+                let shape = new RawNode(pos.left, pos.top, node_label);
+
+                canvasState.addShape(shape);
+                // Second arg: Upon collision, move new shape 0% and move existing objects 100%
+                canvasState.detectCollisions(shape, 0);
+            }
 
             this.reset(); // reset text field
             this.hide();
@@ -378,8 +380,9 @@ export class InputDialog extends NodePreviewDialog {
      * Clears the dialog state.
      */
     reset() {
-        super.reset();
-        this.$error.text('');
+        this.$input_name.val('');
+        this.$error.empty();
+        this.paired_node = null;
     }
 }
 

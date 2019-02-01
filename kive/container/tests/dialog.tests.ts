@@ -1,5 +1,5 @@
 import {MethodDialog, Dialog, InputDialog, OutputDialog} from "@container/pipeline_dialogs";
-import {MethodNode, CdtNode, OutputNode} from "@container/canvas/drydock_objects";
+import {MethodNode, OutputNode} from "@container/canvas/drydock_objects";
 import { REDRAW_INTERVAL, CanvasState } from "@container/canvas/drydock";
 import * as imagediff from 'imagediff';
 import {RawNode} from "@container/canvas/drydock_objects";
@@ -399,15 +399,13 @@ describe("Container MethodDialog fixture", function() {
     });
 });
 
-describe("InputDialog fixture", function() {
+describe("Container InputDialog fixture", function() {
     let dlg;
-    let $datatype_name;
-    let $select_cdt;
+    let $input_name;
     let $error;
     let canvas;
     let expected_canvas;
     let expected_ctx;
-    let expected_input;
     let expected_raw_input;
 
     beforeAll(function() {
@@ -423,13 +421,11 @@ describe("InputDialog fixture", function() {
             $('#activator')
         );
 
-        $datatype_name = $('#id_datatype_name');
+        $input_name = $('#id_input_name');
         $error = $('#id_dt_error');
-        $select_cdt = $('#id_select_cdt');
         canvas = <HTMLCanvasElement> $('canvas')[0];
         expected_canvas = imagediff.createCanvas(canvas.width, canvas.height);
         expected_ctx = expected_canvas.getContext('2d');
-        expected_input = new CdtNode(99, 125, 30, '');
         expected_raw_input = new RawNode(125, 30, '');
     });
 
@@ -456,22 +452,10 @@ describe("InputDialog fixture", function() {
         expect(dlg_pos.top).toBeCloseTo(92, 1);
     });
 
-    it('should show a CDTNode preview when a CDT is selected', function() {
-        expected_input.draw(expected_ctx);
-
-        dlg.activator.click();
-        $select_cdt.append($('<option>').val(23));
-        $select_cdt.val(23).change();
-
-        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
-    });
-
-    it('should show a RawNode preview when no CDT is selected', function() {
+    it('should show a RawNode preview', function() {
         expected_raw_input.draw(expected_ctx);
 
         dlg.activator.click();
-        $select_cdt.append($('<option>').val('foo'));
-        $select_cdt.val('foo').change();
 
         (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
@@ -480,7 +464,7 @@ describe("InputDialog fixture", function() {
         dlg.activator.click();
         let canvas = imagediff.createCanvas(300, 150);
         let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
-        $datatype_name.val('');
+        $input_name.val('');
         spyOn(canvasState, 'addShape');
         dlg.submit(canvasState);
         expect($error).not.toBeEmpty();
@@ -489,12 +473,10 @@ describe("InputDialog fixture", function() {
 
     it('should not submit when there\'s already a node by that name', function() {
         dlg.activator.click();
-        $select_cdt.append($('<option>').val(23));
-        $select_cdt.val(23);
         let canvas = imagediff.createCanvas(300, 150);
         let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
-        canvasState.addShape(new CdtNode(23, 50, 50, 'foo'));
-        $datatype_name.val('foo');
+        canvasState.addShape(new RawNode(50, 50, 'foo'));
+        $input_name.val('foo');
 
         spyOn(canvasState, 'addShape');
         dlg.submit(canvasState);
@@ -507,9 +489,7 @@ describe("InputDialog fixture", function() {
         let canvas = imagediff.createCanvas(300, 150);
         let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
 
-        $select_cdt.append($('<option>').val(23));
-        $select_cdt.val(23);
-        $datatype_name.val('foo');
+        $input_name.val('foo');
 
         spyOn(canvasState, 'addShape').and.callThrough();
         dlg.submit(canvasState);

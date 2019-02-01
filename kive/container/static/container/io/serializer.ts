@@ -1,6 +1,6 @@
 import { CanvasState } from "../canvas/drydock";
 import { Geometry } from "../canvas/geometry";
-import { CdtNode, RawNode, MethodNode, Magnet, OutputNode } from "../canvas/drydock_objects";
+import { RawNode, MethodNode, Magnet, OutputNode } from "../canvas/drydock_objects";
 import {Container, DataSource, PipelineData, Step} from "./PipelineApi";
 
 /**
@@ -26,10 +26,6 @@ export function serializePipeline (canvasState: CanvasState, metadata?: Containe
     let pipeline_inputs = canvasState.getInputNodes();
     let pipeline_steps = canvasState.getSteps();
     let canvas_dimensions = canvasState.getAspectRatio();
-
-    // This is a trivial modification until we hit a non trivial
-    // @todo: This variable is not used. Why?
-    let is_trivial = true;
 
     // Check graph integrity
     // Warning: This will throw errors if pipeline is not complete.
@@ -63,23 +59,13 @@ export function serializePipeline (canvasState: CanvasState, metadata?: Containe
     return form_data;
 }
 
-function serializeInputs(pipeline_inputs: (CdtNode|RawNode)[], canvas_dimensions: [ number, number ]): DataSource[] {
+function serializeInputs(pipeline_inputs: RawNode[], canvas_dimensions: [ number, number ]): DataSource[] {
     let serialized_inputs = [];
     let [ x_ratio, y_ratio ] = canvas_dimensions;
 
     // Construct the input updates
     for (let i = 0; i < pipeline_inputs.length; i++) {
         let input = pipeline_inputs[i];
-        let structure = null;
-
-        // Set up the compound datatype
-        if (CanvasState.isCdtNode(input)) {
-            structure = {
-                compounddatatype: input.pk,
-                min_row: null,
-                max_row: null
-            };
-        }
 
         // Slap this input into the form data
         serialized_inputs[i] = {

@@ -143,6 +143,7 @@ contextMenu.registerAction('Delete', function(multi, sel) {
 contextMenu.registerAction('Edit', function(multi, sel) {
     return !multi &&
         (
+            CanvasState.isInputNode(sel) ||
             CanvasState.isMethodNode(sel) ||
             CanvasState.isOutputNode(sel)
         );
@@ -150,7 +151,15 @@ contextMenu.registerAction('Edit', function(multi, sel) {
     let coords = canvasState.getAbsoluteCoordsOfNode(sel);
 
     // For methods, open the edit dialog (rename, method selection, colour picker...)
-    if (CanvasState.isMethodNode(sel)) {
+    if (CanvasState.isInputNode(sel)) {
+        let dialog = input_dialog;
+        dialog.show();
+        dialog.align(coords.x, coords.y);
+        dialog.load(sel);
+    }
+
+    // For methods, open the edit dialog (rename, method selection, colour picker...)
+    else if (CanvasState.isMethodNode(sel)) {
         let dialog = method_dialog;
         dialog.show();
         dialog.align(coords.x, coords.y);
