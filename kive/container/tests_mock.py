@@ -1,6 +1,10 @@
 import os
 from argparse import Namespace
 from io import BytesIO
+import tempfile
+import io
+import zipfile
+import tarfile
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -97,6 +101,52 @@ class ContainerCleanMockTests(TestCase):
             'singularity',
             'python2-alpine-trimmed.simg'))
 
+        fd, self.useless_file = tempfile.mkstemp()
+        with io.open(fd, mode="w") as f:
+            f.write(u"foobar")
+
+        hello_world_script = """\
+#! /bin/bash
+echo Hello World
+"""
+        _, self.zip_archive = tempfile.mkstemp()
+        _, self.tar_archive = tempfile.mkstemp()
+        _, self.tgz_archive = tempfile.mkstemp()
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(hello_world_script)
+            with zipfile.ZipFile(self.zip_archive, mode="w") as z:
+                z.write(f.name, arcname="hello_world.sh")
+
+            with tarfile.open(self.tar_archive, mode="w") as t:
+                t.add(f.name, arcname="hello_world.sh")
+
+            with tarfile.open(self.tgz_archive, mode="w:gz") as tgz:
+                tgz.add(f.name, arcname="hello_world.sh")
+
+    def tearDown(self):
+        os.remove(self.useless_file)
+        os.remove(self.zip_archive)
+        os.remove(self.tar_archive)
+        os.remove(self.tgz_archive)
+
+    def test_validate_singularity_container_pass(self):
+        """
+        A proper Singularity container should pass validation.
+        :return:
+        """
+        Container.validate_singularity_container(self.alpine_path)
+
+    def test_validate_singularity_container_fail(self):
+        """
+        A non-Singularity container should raise an error.
+        :return:
+        """
+        with self.assertRaisesMessage(
+                ValidationError,
+                Container.DEFAULT_ERROR_MESSAGES["invalid_singularity_container"]
+        ):
+            Container.validate_singularity_container(self.useless_file)
+
     def test_clean_good_singularity_image(self):
         """
         A proper Singularity container should pass validation.
@@ -107,6 +157,107 @@ class ContainerCleanMockTests(TestCase):
         with open(self.alpine_path, 'rb') as alpine_file:
             container.file = File(alpine_file)
             container.clean()
+
+    def test_clean_singularity_image_with_parent(self):
+        """
+        A Singularity container should not have a parent.
+        :return:
+        """
+        parent = Container(id=41)
+        container = Container(id=42, parent=parent, file_type=Container.SIMG)
+        with open(self.alpine_path, "rb") as alpine_file:
+            container.file = File(alpine_file)
+
+            with self.assertRaisesMessage(
+                    ValidationError,
+                    Container.DEFAULT_ERROR_MESSAGES["singularity_cannot_have_parent"]
+            ):
+                container.clean()
+
+    def test_good_zip_archive(self):
+        """
+        A good zip archive container passes validation.
+        :return:
+        """
+        parent = Container(id=41, file_type=Container.SIMG)
+        container = Container(id=42, file_type=Container.ZIP, parent=parent)
+        with open(self.zip_archive, "rb") as zip_archive:
+            container.file = File(zip_archive)
+            container.clean()
+
+    def test_good_tar_archive(self):
+        """
+        A good tar archive container passes validation.
+        :return:
+        """
+        parent = Container(id=41, file_type=Container.SIMG)
+        container = Container(id=42, file_type=Container.TAR, parent=parent)
+        with open(self.tar_archive, "rb") as tar_archive:
+            container.file = File(tar_archive)
+            container.clean()
+
+    def test_archive_with_no_parent(self):
+        """
+        An archive container must have a parent.
+        :return:
+        """
+        container = Container(id=42, file_type=Container.ZIP)
+        with open(self.zip_archive, "rb") as zip_archive:
+            container.file = File(zip_archive)
+
+            with self.assertRaisesMessage(
+                    ValidationError,
+                    Container.DEFAULT_ERROR_MESSAGES["archive_must_have_parent"]
+            ):
+                container.clean()
+
+    def bad_archive_test_helper(self, archive_type):
+        """
+        Helper for testing bad archive containers.
+        :return:
+        """
+        parent = Container(id=41, file_type=Container.SIMG)
+        container = Container(id=42, file_type=archive_type, parent=parent)
+        with open(self.useless_file, "rb") as f:
+            container.file = File(f)
+            with self.assertRaisesMessage(
+                    ValidationError,
+                    Container.DEFAULT_ERROR_MESSAGES["invalid_archive"]
+            ):
+                container.clean()
+
+    def test_bad_zip_archive(self):
+        """
+        A bad zip archive file fails validation.
+        :return:
+        """
+        self.bad_archive_test_helper(Container.ZIP)
+
+    def test_bad_tar_archive(self):
+        """
+        A bad tar archive file fails validation.
+        :return:
+        """
+        self.bad_archive_test_helper(Container.TAR)
+
+    def test_bad_tgz_archive(self):
+        """
+        A bad tgz archive file fails validation.
+        :return:
+        """
+        self.bad_archive_test_helper(Container.TGZ)
+
+    @patch("container.models.Container.validate_singularity_container")
+    def test_skip_singularity_validation(self, mock_val):
+        """
+        Skip Singularity validation if it's marked as having already been done.
+        :param mock_val:
+        :return:
+        """
+        container = Container(id=42, file_type=Container.SIMG)
+        container.singularity_validated = True
+        container.clean()
+        mock_val.assert_not_called()
 
 
 @mocked_relations(Container,

@@ -149,6 +149,20 @@ class Container(AccessControl):
     class Meta:
         ordering = ['family__name', '-created']
 
+    @classmethod
+    def validate_singularity_container(cls, file_path):
+        """
+        Confirm that the given file is a Singularity container.
+        :param file_path:
+        :return:
+        """
+        try:
+            check_output(['singularity', 'check', file_path], stderr=STDOUT)
+        except CalledProcessError as ex:
+            logger.warning('Invalid container file:\n%s', ex.output)
+            raise ValidationError(cls.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
+                                  code='invalid_singularity_container')
+
     def clean(self):
         """
         Confirm that the file is of the correct type.
@@ -159,22 +173,17 @@ class Container(AccessControl):
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["singularity_cannot_have_parent"],
                                       code="singularity_cannot_have_parent")
 
-            # FIXME can we replace this with something less inefficient but will still work for ContentFiles
-            # and whatever else we might get back from self.file?
-            fd, file_path = mkstemp()
-            with io.open(fd, mode="w+b") as f:
-                with self.file:
-                    for chunk in self.file.chunks():
-                        f.write(chunk)
+            # Because it's potentially more efficient to validate a Singularity container before
+            # this step, we check for an "already validated" flag.
+            if not getattr(self, "singularity_validated", False):
+                fd, file_path = mkstemp()
+                with io.open(fd, mode="w+b") as f:
+                    with self.file:
+                        for chunk in self.file.chunks():
+                            f.write(chunk)
 
-            try:
-                check_output(['singularity', 'check', file_path], stderr=STDOUT)
-            except CalledProcessError as ex:
-                logger.warning('Invalid container file:\n%s', ex.output)
-                raise ValidationError(self.error_messages['invalid_singularity_container'],
-                                      code='invalid_singularity_container')
-
-            os.remove(file_path)
+                Container.validate_singularity_container(file_path)
+                os.remove(file_path)
 
         else:
             if self.parent is None:
