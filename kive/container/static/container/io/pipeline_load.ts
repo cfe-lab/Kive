@@ -13,7 +13,6 @@ export class Pipeline {
     container: Container = null;
     pipeline: PipelineData = null;
     files: string[] = [];
-    private REVISION_API_URL = "/api/pipelines/";
 
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {}

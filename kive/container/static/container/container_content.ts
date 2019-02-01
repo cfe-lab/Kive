@@ -20,7 +20,6 @@ import 'jquery';
  */
 
 /**
- * @todo
  * New features:
  * - History tracking: Ctrl+Z & Ctrl+Shift+Z - medium
  * - Upload Methods from the Dialog - hard
@@ -45,18 +44,30 @@ CanvasListeners.initResizeListeners(canvasState);
  */
 let text = $("#initial_data").text();
 let loader = new Pipeline(canvasState);
+let $memory = $("#id_memory");
+let $threads = $("#id_threads");
 if (text) {
     loader.setRevertCtrl('#id_revert');
     loader.loadFromString(text);
     loader.draw();
     $(canvas).hide().fadeIn();
 }
+$memory.val(
+    loader.pipeline &&
+    loader.pipeline.default_config &&
+    loader.pipeline.default_config.memory ||
+    5000);
+$threads.val(
+    loader.pipeline &&
+    loader.pipeline.default_config &&
+    loader.pipeline.default_config.threads ||
+    1);
 
 /**
  * Part 3/8: Prepare Pipeline completeness check.
  */
 interface BtnFunction extends Function { $btn?: JQuery; }
-var pipelineCheckCompleteness: BtnFunction = function() {
+let pipelineCheckCompleteness: BtnFunction = function() {
     let $submit_btn = pipelineCheckCompleteness.$btn || $('#id_submit_button');
     pipelineCheckCompleteness.$btn = $submit_btn;
     let is = 'pipeline-not-ready';
@@ -73,20 +84,19 @@ pipelineCheckCompleteness();
 /**
  * Part 4/8: Initialize Dialogs (Family, revision, add, add input, add method, add output, and view)
  */
-var $ctrl_nav = $("#id_ctrl_nav");
-var $add_menu = $('#id_add_ctrl');
-var $view_menu = $('#id_view_ctrl');
+let $ctrl_nav = $("#id_ctrl_nav");
+let $add_menu = $('#id_add_ctrl');
+let $view_menu = $('#id_view_ctrl');
 
-var family_dialog =       new Dialog( $('#id_family_ctrl'), $ctrl_nav.find("li[data-rel='#id_family_ctrl']") );
-/* anonymous */           new Dialog( $('#id_meta_ctrl'),   $ctrl_nav.find("li[data-rel='#id_meta_ctrl']")   );
+/* anonymous */       new Dialog( $('#id_defaults_ctrl'), $ctrl_nav.find("li[data-rel='#id_defaults_ctrl']") );
 /* anonymous */       new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
-var add_menu      =       new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
-var input_dialog  =  new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
-var method_dialog = new MethodDialog(
+let add_menu      =       new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
+let input_dialog  =  new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
+let method_dialog = new MethodDialog(
     $('#id_method_ctrl'),
     $add_menu.find("li[data-rel='#id_method_ctrl']"),
     loader.container);
-var output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
+let output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
 
 $add_menu.click('li', function() { add_menu.hide(); });
 
@@ -123,15 +133,17 @@ $view_menu.find('#autolayout_btn').click(
  */
 $('#id_pipeline_form').submit(buildPipelineSubmit(
     canvasState,
-    parseInt($('#id_container_pk').val(), 10),
+    $('#id_container_pk'),
+    $memory,
+    $threads,
     $('#id_submit_error')
 ));
 
 /**
  * Part 6/8: Initialize context menu and register actions
  */
-var contextMenu = new CanvasContextMenu('#context_menu', canvasState);
-var nothingSelected = (multi, sel) => sel === undefined || sel === null || Array.isArray(sel) && sel.length === 0;
+let contextMenu = new CanvasContextMenu('#context_menu', canvasState);
+let nothingSelected = (multi, sel) => sel === undefined || sel === null || Array.isArray(sel) && sel.length === 0;
 CanvasListeners.initContextMenuListener(canvasState, contextMenu);
 contextMenu.registerAction('Delete', function(multi, sel) {
     return CanvasState.isNode(sel) ||

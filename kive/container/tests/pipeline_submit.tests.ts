@@ -8,8 +8,10 @@ require("@portal/noxss.js");
 
 interface BuildSubmitArgs extends Array<any> {
     0: CanvasState;
-    1: number; // container_pk
-    2: JQuery; // $error
+    1: JQuery; // container_pk
+    2: JQuery; // memory
+    3: JQuery; // threads
+    4: JQuery; // $error
 }
 
 describe("Container Pipeline Submit class", function() {
@@ -18,9 +20,14 @@ describe("Container Pipeline Submit class", function() {
     let canvasState;
     let args: BuildSubmitArgs,
         $error: JQuery,
+        $container_pk = $('<input type="text" value="0">'),
+        $memory = $('<input type="text" value="400">'),
+        $threads = $('<input type="text" value="2">'),
         arg_names = [
             "canvasState",
             "container_pk",
+            "memory",
+            "threads",
             "$error"
         ];
 
@@ -68,7 +75,9 @@ describe("Container Pipeline Submit class", function() {
 
         args = [
             canvasState,
-            0, // container_pk
+            $container_pk,
+            $memory,
+            $threads,
             $error // error outlet
         ];
 
@@ -89,10 +98,7 @@ describe("Container Pipeline Submit class", function() {
 
         let $dummy = $('#nonexistent');
         let bad_args = [
-            null, '', $dummy, $dummy,
-            null, $dummy, $dummy, null,
-            $dummy, $dummy, $dummy, $dummy,
-            "invalid argument (not callable)"
+            null, $dummy, $dummy, $dummy, $dummy
         ];
 
         afterEach(function() {
@@ -102,15 +108,10 @@ describe("Container Pipeline Submit class", function() {
         });
 
         for (let i = 0; i < arg_names.length; i++) {
-            if ([ 1, 4, 7 ].indexOf(i) > -1) continue;
             it(arg_names[i] + ' is not found', function () {
                 args[i] = bad_args[i];
             });
         }
-
-        it('container_pk is blank', function () {
-            args[1] = parseInt(undefined, 10);
-        });
 
     });
 
@@ -123,7 +124,6 @@ describe("Container Pipeline Submit class", function() {
         });
 
         it('all fields are set', function () {
-            args[1] = 99;
         });
 
     });
@@ -135,7 +135,7 @@ describe("Container Pipeline Submit class", function() {
         });
 
         beforeEach(function() {
-            args[1] = 42;  // container_pk
+            $container_pk.val('42');  // container_pk
             built_submit = buildPipelineSubmit.apply(null, args);
             jasmine.Ajax.install();
         });
@@ -155,7 +155,7 @@ describe("Container Pipeline Submit class", function() {
             expect(event.preventDefault).toHaveBeenCalled();
         });
 
-        it('should submit a new pipeline family and first revision', function() {
+        it('should submit an updated pipeline', function() {
             built_submit(new Event('submit'));
 
             // @types for JasmineAjaxRequest seems to be a bit spotty.
@@ -168,6 +168,8 @@ describe("Container Pipeline Submit class", function() {
             expect(requestData.pipeline.inputs[0].dataset_name).toEqual("raw_node");
             expect(requestData.pipeline.steps[0].driver).toEqual("method_node");
             expect(requestData.pipeline.outputs[0].dataset_name).toEqual("output_node");
+            expect(requestData.pipeline.default_config.memory).toEqual(400);
+            expect(requestData.pipeline.default_config.threads).toEqual(2);
         });
 
         it('should handle API errors for pipeline revision', function() {

@@ -39,6 +39,7 @@
     <!-- Method selector -->
     <div id="pipeline_ctrl">
         <ul id="id_ctrl_nav">
+            <li data-rel="#id_defaults_ctrl">Defaults</li>
             <li data-rel="#id_add_ctrl"><span class="icon">+</span><span class="longname"> Add Node</span></li>
             <li data-rel="#id_view_ctrl">View</li>
         </ul>
@@ -52,6 +53,7 @@
         </form>
 
         <input id="id_pipeline_action" value="revise" type="hidden">
+        {% include 'container/content_defaults_dialog.tpl.html'   with dlg_id="id_defaults_ctrl" %}
         {% include 'container/content_view_dialog.tpl.html'   with dlg_id="id_view_ctrl" %}
 
         <div id="id_add_ctrl" class="ctrl_menu">

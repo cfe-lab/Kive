@@ -1,17 +1,26 @@
 import { CanvasState } from "../canvas/drydock";
 import { RestApi } from "../rest_api.service";
 import { serializePipeline } from "./serializer";
+import {PipelineConfig} from "@container/io/PipelineApi";
 
 export function buildPipelineSubmit(
     canvasState: CanvasState,
-    container_pk: number,
+    $container_pk: JQuery,
+    $memory: JQuery, // in MB
+    $threads: JQuery,
     $error: JQuery) {
 
-    if (!container_pk && container_pk !== 0) {
-        throw 'Container primary key must be specified';
+    if ($container_pk.length === 0) {
+        throw 'Container primary key element could not be found.';
     }
     if (!(canvasState instanceof CanvasState)) {
         throw "Invalid object given as CanvasState.";
+    }
+    if ($memory.length === 0) {
+        throw "Memory element could not be found.";
+    }
+    if ($threads.length === 0) {
+        throw "Threads element could not be found.";
     }
     if ($error.length === 0) {
         throw "User error message element could not be found.";
@@ -24,8 +33,15 @@ export function buildPipelineSubmit(
         e.preventDefault(); // override form submit action
         clearErrors($error);
         try {
-            // @todo: action can also be 'add' when pipeline family exists with 0 revisions
             let form_data = serializePipeline(canvasState);
+            let container_pk = parseInt($container_pk.val(), 10),
+                memory = parseInt($memory.val(), 10),
+                threads = parseInt($threads.val(), 10);
+
+            form_data.pipeline.default_config = <PipelineConfig> {
+                memory: memory,
+                threads: threads
+            };
 
             submitPipelineAjax(container_pk, form_data, $error);
 
