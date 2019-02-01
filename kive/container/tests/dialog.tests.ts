@@ -269,8 +269,29 @@ describe("Container MethodDialog fixture", function() {
         expected_canvas.height = 82; // based on number of inputs and outputs.
         expected_method.draw(expected_ctx);
 
-        $input_names.val('in1 in2');
         dlg.activator.click();
+        $input_names.val('in1 in2');
+        $input_names.keyup();
+
+        (expect(canvas) as any).toImageDiffEqual(expected_canvas);
+    });
+
+    it('should refresh preview when output names change', function() {
+        expected_method = new MethodNode(
+            110.2775682,  // x
+            31,  // y (for 1 input and 1 output)
+            "#999",  // fill
+            null,  // label
+            [
+                { dataset_name: 'in1', source_step: 0, source_dataset_name: 'in1'}
+            ],  // inputs
+            ['out1']);  // outputs
+        expected_canvas.height = 70; // based on number of inputs and outputs.
+        expected_method.draw(expected_ctx);
+
+        dlg.activator.click();
+        $output_names.val('out1 '); // Should ignore trailing space.
+        $output_names.keyup();
 
         (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
@@ -327,11 +348,14 @@ describe("Container MethodDialog fixture", function() {
 
         expect($select_method.val()).toBe('prelim_map.py');
         expect($cp_hidden_input.val()).toBe('#0d8');
+        expect($input_names.val()).toBe('remap');
+        expect($output_names.val()).toBe('aligned conseq_ins failed_read');
+
 
         (expect(canvas) as any).toImageDiffEqual(expected_canvas);
     });
 
-    it('should not submit when required fields are missing', function() {
+    it('should not submit when method is missing', function() {
         dlg.activator.click();
 
         let canvas = imagediff.createCanvas(300, 150);
@@ -342,6 +366,38 @@ describe("Container MethodDialog fixture", function() {
         $select_method.val('');
         dlg.submit(canvasState);
         expect($select_method).toBeFocused();
+        expect($error).not.toBeEmpty();
+
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should not submit when inputs are missing', function() {
+        dlg.activator.click();
+
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        spyOn(canvasState, 'addShape');
+
+        $error.text('');
+        $input_names.val('');
+        dlg.submit(canvasState);
+        expect($input_names).toBeFocused();
+        expect($error).not.toBeEmpty();
+
+        expect(canvasState.addShape).not.toHaveBeenCalled();
+    });
+
+    it('should not submit when outputs are missing', function() {
+        dlg.activator.click();
+
+        let canvas = imagediff.createCanvas(300, 150);
+        let canvasState = new CanvasState(canvas, true, REDRAW_INTERVAL);
+        spyOn(canvasState, 'addShape');
+
+        $error.text('');
+        $output_names.val('');
+        dlg.submit(canvasState);
+        expect($output_names).toBeFocused();
         expect($error).not.toBeEmpty();
 
         expect(canvasState.addShape).not.toHaveBeenCalled();

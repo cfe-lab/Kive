@@ -260,22 +260,6 @@ abstract class NodePreviewDialog extends Dialog {
  * Includes name and compound datatype.
  */
 export class InputDialog extends NodePreviewDialog {
-    /*
-     * Shorthand HTML Template pasted here for convenience.
-     * It is not guaranteed to be current.
-     * Indentation takes the place of closing tags.
-
-    <div #id_input_ctrl .ctrl_menu>
-        <canvas>
-        <h3>Inputs</h3>
-        <form>
-            <input #id_datatype_name type="text">
-            <select #id_select_cdt .select-label>
-                <!-- compound data type <option>s -->
-            <input #id_cdt_button type="submit" value="Add Input">
-            <div #id_dt_error .errortext>
-
-    */
     private $error;
     private $input_name;
     private paired_node: RawNode;
@@ -450,40 +434,6 @@ var colourPickerFactory = (function() {
 });
 
 export class MethodDialog extends NodePreviewDialog {
-    /*
-     * Shorthand HTML Template pasted here for convenience.
-     * It is not guaranteed to be current.
-     * Indentation takes the place of closing tags.
-
-    <div #id_method_ctrl .ctrl_menu>
-        <canvas>
-        <h3>Methods</h3>
-        <form>
-            <input #id_select_colour type="hidden">
-            <div #colour_picker_menu>
-                <div .colour_picker_colour style="background-color: #999;">
-                <!-- ... more colours ... -->
-            <div .colour_picker_colour #colour_picker_pick style="background-color: #999;">
-
-            <input #id_method_name type="text" placeholder="Label">
-
-            <select #id_select_method_family>
-                <!-- ... method families ... -->
-            <div #id_method_revision_field>
-                <select #id_select_method>
-                    <!-- populated by ajax transaction -->
-
-            <div #id_method_delete_outputs_field>
-                <input #id_method_delete_outputs type="checkbox" checked>
-                <label for="id_method_delete_outputs">Save intermediate outputs of this step</label>
-                <div .expand_outputs_ctrl>▸ List outputs</div>
-                <fieldset #id_method_delete_outputs_details>
-                    <!-- ... <input type="checkbox"> ... -->
-
-            <input #id_method_button type="submit" value="Add Method">
-            <div #id_method_error .errortext>
-    */
-
     private $submit_button;
     private $select_method;
     private $input_names;
@@ -530,6 +480,10 @@ export class MethodDialog extends NodePreviewDialog {
         this.colour_picker.setCallback(
             () => this.triggerPreviewRefresh()
         );
+        this.$input_names.keyup(
+            () => this.triggerPreviewRefresh());
+        this.$output_names.keyup(
+            () => this.triggerPreviewRefresh());
     }
     
     /**
@@ -569,37 +523,10 @@ export class MethodDialog extends NodePreviewDialog {
         this.editing_node = node;
 
         this.$select_method.val(node.label);
+        this.$input_names.val(
+            node.in_magnets.map(magnet => magnet.label).join(" "));
         this.$output_names.val(node.outputs.join(" "));
         this.triggerPreviewRefresh();
-    }
-
-    /**
-     * Update the revisions menu.
-     * @param mf_id
-     *      The method family ID
-     * @returns
-     *      A jQuery Deferred object
-     */
-    private updateMethodRevisionsMenu(mf_id): JQueryPromise<void> {
-        if (mf_id !== '') {
-            // this.$revision_field.show().focus();
-            let request = $.getJSON("/api/methodfamilies/" + mf_id + "/methods/");
-            return request.done(result => {
-                let option_elements = result.map(revision =>
-                    $("<option>", {
-                        value: revision.id,
-                        title: revision.revision_desc
-                    }).text(
-                        revision.revision_number + ': ' + revision.revision_name
-                    )
-                );
-                this.$select_method.show().empty()
-                    .append(option_elements);
-                this.triggerPreviewRefresh();
-            });
-        }
-        // this.$revision_field.hide();
-        return $.ajax({}).fail(); // No method family chosen, never loads.
     }
 
     /**
@@ -635,11 +562,11 @@ export class MethodDialog extends NodePreviewDialog {
     }
 
     private buildOutputNames() {
-        return this.$output_names.val().split(/\s+/);
+        return this.$output_names.val().trim().split(/\s+/);
     }
 
     private buildInputCables() {
-        let input_names = this.$input_names.val().split(/\s+/);
+        let input_names = this.$input_names.val().trim().split(/\s+/);
         return input_names.map(
             name => ({
                 dataset_name: name
@@ -653,10 +580,12 @@ export class MethodDialog extends NodePreviewDialog {
      */
     submit(canvasState: CanvasState) {
         let node_label = this.$select_method.val();
+        let input_names = this.$input_names.val();
+        let output_names = this.$output_names.val();
         let pos = this.translateToOtherCanvas(canvasState);
         let is_unique = CanvasState.isUniqueName(canvasState.getInputNodes(), node_label);
 
-        if (node_label && is_unique) {
+        if (node_label && is_unique && input_names && output_names) {
             // user selected valid Method Revision
             let method = new MethodNode(
                 pos.left,
@@ -679,11 +608,17 @@ export class MethodDialog extends NodePreviewDialog {
             this.reset();
         } else if (!node_label) {
             // required field
-            this.$error.text("Method is required");
+            this.$error.text("Method is required.");
             this.$select_method.focus();
-        } else {
+        } else if (!is_unique) {
             this.$error.text('That name has already been used.');
             this.$select_method.focus();
+        } else if (!input_names) {
+            this.$error.text('Input names are required.');
+            this.$input_names.focus();
+        } else {
+            this.$error.text('Output names are required.');
+            this.$output_names.focus();
         }
     }
     
