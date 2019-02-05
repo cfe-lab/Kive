@@ -1,17 +1,20 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import errno
+import json
 import logging
 import os
 import re
 import sys
 from datetime import datetime, timedelta
+from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import mkdtemp, mkstemp
 import shutil
 import zipfile
 import tarfile
 import io
+from zipfile import ZipFile
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -146,6 +149,10 @@ class Container(AccessControl):
     def display_name(self):
         return '{}:{}'.format(self.family.name, self.tag)
 
+    @property
+    def file_path(self):
+        return os.path.join(settings.MEDIA_ROOT, self.file.name)
+
     class Meta:
         ordering = ['family__name', '-created']
 
@@ -267,6 +274,44 @@ class Container(AccessControl):
 
         return file_list
 
+    def get_content(self):
+        self.file.open()
+        try:
+            z = ZipFile(self.file)
+            last_entry = z.filelist[-1]
+            if re.match(r'kive/pipeline\d+\.json', last_entry.filename):
+                pipeline_json = z.read(last_entry)
+                pipeline = json.loads(pipeline_json)
+            else:
+                pipeline = dict(default_config=dict(memory=5000,
+                                                    threads=1),
+                                inputs=[],
+                                steps=[],
+                                outputs=[])
+            content = dict(files=sorted(entry.filename
+                                        for entry in z.filelist
+                                        if not entry.filename.startswith('kive/')),
+                           pipeline=pipeline)
+            return content
+        finally:
+            self.file.close()
+
+    def write_content(self, content):
+        pipeline_json = json.dumps(content['pipeline'])
+        self.file.open('r+')
+        try:
+            with ZipFile(self.file, 'a') as z:
+                file_names = set(entry.filename
+                                 for entry in z.filelist
+                                 if entry.filename.startswith('kive/pipeline'))
+                for i in count(1):
+                    file_name = 'kive/pipeline{}.json'.format(i)
+                    if file_name not in file_names:
+                        z.writestr(file_name, pipeline_json)
+                        break
+        finally:
+            self.file.close()
+
     def get_pipeline_json(self):
         """
         Retrieve the pipeline JSON file for this child container.
@@ -286,8 +331,8 @@ class Container(AccessControl):
                 raise ChildNotConfigured()
             # The `extractfile` method on a TarFile does not appear to be usable as a context manager,
             # so we do this the old-fashioned way.
+            json = single_file_extractor(pipeline_json_path)
             try:
-                json = single_file_extractor(pipeline_json_path)
                 return json.read()
             finally:
                 json.close()

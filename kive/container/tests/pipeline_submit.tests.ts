@@ -161,8 +161,8 @@ describe("Container Pipeline Submit class", function() {
             // @types for JasmineAjaxRequest seems to be a bit spotty.
             let request: any = jasmine.Ajax.requests.mostRecent();
 
-            expect(request.url).toBe("/api/containers/42/content");
-            expect(request.method).toBe('POST');
+            expect(request.url).toBe("/api/containers/42/content/");
+            expect(request.method).toBe('PUT');
 
             let requestData = request.data();
             expect(requestData.pipeline.inputs[0].dataset_name).toEqual("raw_node");

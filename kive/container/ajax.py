@@ -6,6 +6,7 @@ from wsgiref.util import FileWrapper
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.http import HttpResponse
+from django.http.response import HttpResponseBadRequest
 from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.decorators import action
@@ -205,6 +206,26 @@ class ContainerViewSet(CleanCreateModelMixin,
         return Response(ContainerAppSerializer(apps,
                                                context=dict(request=request),
                                                many=True).data)
+
+    # noinspection PyUnusedLocal
+    @action(detail=True, suffix='Content')
+    def content(self, request, pk=None):
+        container = self.get_object()
+        return Response(container.get_content())
+
+    # noinspection PyUnusedLocal
+    @content.mapping.put
+    def content_put(self, request, pk=None):
+        container = self.get_object()
+        content = request.data
+        status_code = HttpResponseBadRequest.status_code
+        if 'pipeline' not in content:
+            response_data = dict(pipeline=['This field is required.'])
+        else:
+            container.write_content(content)
+            response_data = container.get_content()
+            status_code = Response.status_code
+        return Response(response_data, status_code)
 
 
 class ContainerAppViewSet(CleanCreateModelMixin,

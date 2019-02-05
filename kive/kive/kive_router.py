@@ -27,9 +27,8 @@ class KiveRouter(routers.DefaultRouter):
             api_root_dict[prefix] = list_name.format(basename=basename)
             for methodname in dir(viewset):
                 attr = getattr(viewset, methodname)
-                httpmethods = getattr(attr, 'bind_to_methods', None)
                 detail = getattr(attr, 'detail', True)
-                if httpmethods:
+                if hasattr(attr, 'mapping'):
                     if methodname in known_actions:
                         raise ImproperlyConfigured(
                             'Cannot use @detail_route or @list_route '

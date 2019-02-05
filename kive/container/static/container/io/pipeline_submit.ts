@@ -51,9 +51,6 @@ export function buildPipelineSubmit(
     };
 }
 
-function getPermissionsArray($permissionsElement: JQuery) {
-    return $permissionsElement.find("option:selected").get().map(el => el.textContent);
-}
 function clearErrors($error) {
     $error.empty();
     $('#id_family_name, #id_family_desc, #id_revision_name, #id_revision_desc').removeClass('submit-error-missing');
@@ -89,8 +86,8 @@ function submitError(errors, $error) {
     setTimeout(() => $error.hide(), 8000);
 }
 function submitPipelineAjax(container_pk, form_data, $error) {
-    return RestApi.post(
-        '/api/containers/' + container_pk + '/content',
+    return RestApi.put(
+        '/api/containers/' + container_pk + '/content/',
         JSON.stringify(form_data),
         function() {
             $(window).off('beforeunload');

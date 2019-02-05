@@ -1,7 +1,7 @@
 binaryornot==0.4.4
 chardet==3.0.4
 Django==1.11.18
-djangorestframework==3.8.2
+djangorestframework==3.9.1
 funcsigs==1.0.2
 pbr==4.0.3
 psycopg2==2.7.3.2

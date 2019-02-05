@@ -5,12 +5,16 @@ import logging
 import os
 import re
 import shutil
+import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta
+from io import BytesIO
 from tempfile import NamedTemporaryFile
+from zipfile import ZipFile
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
+from django.core.files.base import ContentFile
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature
@@ -28,6 +32,294 @@ from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerTests(TestCase):
+    def create_zip_content(self, container):
+        bytes_file = BytesIO()
+        with ZipFile(bytes_file, "w") as f:
+            f.writestr("foo.txt", b"The first file.")
+            f.writestr("bar.txt", b"The second file.")
+        container.file = ContentFile(bytes_file.getvalue(), "container.zip")
+
+    def add_zip_content(self, container, filename, content):
+        with ZipFile(container.file_path, 'a') as f:
+            f.writestr(filename, content)
+
+    def test_default_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=5000,
+                                                                  threads=1),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        content = container.get_content()
+        self.assertEqual(expected_content, content)
+
+    def test_loaded_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        self.add_zip_content(container, "kive/pipeline1.json", """
+{
+    "default_config": {"memory": 200, "threads": 2},
+    "inputs": [],
+    "steps": [],
+    "outputs": []}
+""")
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        content = container.get_content()
+        self.assertEqual(expected_content, content)
+
+    def test_revised_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        self.add_zip_content(container, "kive/pipeline1.json", '"old content"')
+        self.add_zip_content(container, "kive/pipeline2.json", """
+{
+    "default_config": {"memory": 200, "threads": 2},
+    "inputs": [],
+    "steps": [],
+    "outputs": []}
+""")
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        content = container.get_content()
+        self.assertEqual(expected_content, content)
+
+    def test_content_order(self):
+        """ Zip index order matters, not file name. """
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        self.add_zip_content(container, "kive/pipeline2.json", '"old content"')
+        self.add_zip_content(container, "kive/pipeline1.json", """
+{
+    "default_config": {"memory": 200, "threads": 2},
+    "inputs": [],
+    "steps": [],
+    "outputs": []}
+""")
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        content = container.get_content()
+        self.assertEqual(expected_content, content)
+
+    def test_write_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        container.write_content(expected_content)
+        content = container.get_content()
+
+        self.assertEqual(expected_content, content)
+
+    def test_rewrite_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+        self.add_zip_content(container, "kive/pipeline1.json", '"old content"')
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        with warnings.catch_warnings():
+            # Register for warnings about duplicate file names.
+            warnings.showwarning = lambda message, *args: self.fail(message)
+            container.write_content(expected_content)
+        content = container.get_content()
+
+        self.assertEqual(expected_content, content)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerApiTests(BaseTestCases.ApiTestCase):
+    def create_zip_content(self):
+        bytes_file = BytesIO()
+        with ZipFile(bytes_file, "w") as f:
+            f.writestr("foo.txt", b"The first file.")
+            f.writestr("bar.txt", b"The second file.")
+        return bytes_file
+
+    def setUp(self):
+        super(ContainerApiTests, self).setUp()
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        self.test_container = Container.objects.create(family=family, user=user)
+
+        self.list_path = reverse("container-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_pk = self.test_container.pk
+        self.detail_path = reverse("container-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.content_path = reverse("container-content",
+                                    kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("container-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.content_view, _, _ = resolve(self.content_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        self.family_path = reverse("containerfamily-detail",
+                                   kwargs={'pk': family.pk})
+
+        self.image_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        self.assertTrue(os.path.exists(self.image_path), self.image_path)
+
+    def test_create_singularity(self):
+        request1 = self.factory.get(self.list_path)
+        force_authenticate(request1, user=self.kive_user)
+        start_count = len(self.list_view(request1).data)
+        expected_tag = "v1.0"
+        expected_description = 'A really cool container'
+
+        with open(self.image_path, 'rb') as f:
+            request2 = self.factory.post(self.list_path,
+                                         dict(tag=expected_tag,
+                                              family=self.family_path,
+                                              description=expected_description,
+                                              file_type=Container.SIMG,
+                                              file=f))
+
+            force_authenticate(request2, user=self.kive_user)
+            resp = self.list_view(request2).data
+
+        self.assertIn('id', resp)
+        self.assertEquals(resp['tag'], expected_tag)
+
+        request3 = self.factory.get(self.list_path)
+        force_authenticate(request3, user=self.kive_user)
+        resp = self.list_view(request3).data
+
+        self.assertEquals(len(resp), start_count + 1)
+        self.assertEquals(resp[0]['description'], expected_description)
+
+    def test_create_zip(self):
+        expected_tag = "v1.0"
+        z = self.create_zip_content()
+        z.seek(0)
+        request2 = self.factory.post(self.list_path,
+                                     dict(tag=expected_tag,
+                                          family=self.family_path,
+                                          parent=self.detail_path,
+                                          description='A really cool container',
+                                          file_type=Container.ZIP,
+                                          file=z))
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).data
+
+        self.assertIn('id', resp)
+        self.assertEquals(resp['tag'], expected_tag)
+
+    def test_get_content(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=5000,
+                                                                  threads=1),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        request1 = self.factory.get(self.content_path)
+        force_authenticate(request1, user=self.kive_user)
+        content = self.content_view(request1, pk=self.detail_pk).data
+
+        self.assertEqual(expected_content, content)
+
+    def test_put_content(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=400,
+                                                                  threads=3),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        request1 = self.factory.put(self.content_path,
+                                    expected_content,
+                                    format='json')
+        force_authenticate(request1, user=self.kive_user)
+        content = self.content_view(request1, pk=self.detail_pk).data
+
+        self.assertEqual(expected_content, content)
+
+    def test_put_bad_content(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        bad_content = {}
+        expected_content = dict(pipeline=["This field is required."])
+
+        request1 = self.factory.put(self.content_path,
+                                    bad_content,
+                                    format='json')
+        force_authenticate(request1, user=self.kive_user)
+        response = self.content_view(request1, pk=self.detail_pk)
+        content = response.data
+
+        self.assertEqual(expected_content, content)
+        self.assertEqual(400, response.status_code)
 
 
 @skipIfDBFeature('is_mocked')

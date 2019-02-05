@@ -44,11 +44,18 @@ class ContainerSerializer(AccessControlSerializer,
         source='family',
         slug_field='name',
         read_only=True)
+    parent = serializers.HyperlinkedRelatedField(
+        view_name='container-detail',
+        lookup_field='pk',
+        queryset=Container.objects.filter(file_type=Container.SIMG),
+        required=False)
     download_url = serializers.HyperlinkedIdentityField(
         view_name='container-download')
-    num_apps = serializers.IntegerField()
+    num_apps = serializers.IntegerField(read_only=True)
     app_list = serializers.HyperlinkedIdentityField(
         view_name='container-app-list')
+    content = serializers.HyperlinkedIdentityField(
+        view_name='container-content')
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='container-removal-plan')
 
@@ -60,7 +67,9 @@ class ContainerSerializer(AccessControlSerializer,
                   'absolute_url',
                   'family',
                   'family_name',
+                  'parent',
                   'file',
+                  'file_type',
                   'tag',
                   'description',
                   'md5',
@@ -70,6 +79,7 @@ class ContainerSerializer(AccessControlSerializer,
                   'users_allowed',
                   'groups_allowed',
                   'app_list',
+                  'content',
                   'removal_plan')
 
 

@@ -15,6 +15,18 @@ export class RestApi {
             .fail(failureCallback);
     }
 
+    public static put(url: string, data, successCallback: JQueryPromiseCallback<any> = () => {},
+                      failureCallback: JQueryPromiseCallback<any> = () => {}) {
+        return $.ajax({
+            type: "PUT",
+            url,
+            data,
+            contentType: "application/json" // data will not be parsed correctly without this
+        })
+            .done(successCallback)
+            .fail(failureCallback);
+    }
+
     public static post(url: string, data, successCallback: JQueryPromiseCallback<any> = () => {},
                        failureCallback: JQueryPromiseCallback<any> = () => {}) {
         return $.ajax({

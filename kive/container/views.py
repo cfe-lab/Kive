@@ -171,21 +171,7 @@ class ContainerContentUpdate(DetailView, AdminViewMixin):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerContentUpdate, self).get_context_data(**kwargs)
-        c = self.get_object()
-        content_files = c.get_file_list()
-        try:
-            pipeline_json = c.get_pipeline_json()
-        except ChildNotConfigured:
-            pipeline_json = json.dumps(
-                {
-                    "inputs": [],
-                    "steps": [],
-                    "outputs": []
-                }
-            )
-        pipeline_config = json.loads(pipeline_json)
-        content_json = json.dumps(dict(files=content_files,
-                                       pipeline=pipeline_config))
+        content_json = json.dumps(self.get_object().get_content())
         context['content_json'] = content_json
         return context
 
