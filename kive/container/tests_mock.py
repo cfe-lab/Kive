@@ -7,9 +7,9 @@ import zipfile
 import tarfile
 
 from django.contrib.auth.models import User
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, NON_FIELD_ERRORS
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
-from django.core.files.base import ContentFile, File
+from django.core.files.base import File
 from django.test import TestCase
 from django.urls import reverse, resolve
 from django_mock_queries.mocks import mocked_relations
@@ -20,6 +20,7 @@ from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
     ContainerArgument, ContainerRun, ContainerDataset
+from container.forms import ContainerForm
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -112,7 +113,7 @@ echo Hello World
         _, self.zip_archive = tempfile.mkstemp()
         _, self.tar_archive = tempfile.mkstemp()
         _, self.tgz_archive = tempfile.mkstemp()
-        with tempfile.NamedTemporaryFile() as f:
+        with tempfile.NamedTemporaryFile(mode="w") as f:
             f.write(hello_world_script)
             with zipfile.ZipFile(self.zip_archive, mode="w") as z:
                 z.write(f.name, arcname="hello_world.sh")
@@ -258,6 +259,124 @@ echo Hello World
         container.singularity_validated = True
         container.clean()
         mock_val.assert_not_called()
+
+
+class ContainerFormMockTests(TestCase):
+    def setUp(self):
+        super(ContainerFormMockTests, self).setUp()
+        self.alpine_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        self.everyone_permissions = [[], ["everyone"]]
+        self.form_data = {
+            "parent": None,
+            "tag": "v0.1",
+            "description": "Testing ContainerForm",
+            "permissions": self.everyone_permissions
+        }
+
+        hello_world_script = """\
+        #! /bin/bash
+        echo Hello World
+        """
+        _, self.zip_archive = tempfile.mkstemp()
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(hello_world_script)
+            with zipfile.ZipFile(self.zip_archive, mode="w") as z:
+                z.write(f.name, arcname="hello_world.sh")
+        self.zip_size = os.path.getsize(self.zip_archive)
+
+    def test_uploaded_invalid(self):
+        file_data = BytesIO(b'garbage content')
+        uploaded_file = InMemoryUploadedFile(
+            file=file_data,
+            field_name='some_field',
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=15,
+            charset=None,
+            content_type_extra={})
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="invalid_singularity_container"))
+
+    def test_uploaded_valid(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            file_data = BytesIO(alpine_file.read())
+
+        uploaded_file = InMemoryUploadedFile(
+            file=file_data,
+            field_name='some_field',
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=os.stat(self.alpine_path).st_size,
+            charset=None,
+            content_type_extra={})
+
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertTrue(form.is_valid())
+        self.assertTrue(form.instance.singularity_validated)
+
+    def test_temp_file_invalid(self):
+        file_data = b'garbage content'
+
+        uploaded_file = TemporaryUploadedFile(
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=15,
+            charset=None,
+            content_type_extra={})
+        # noinspection PyArgumentList,PyCallByClass
+        uploaded_file.file.write(file_data)
+
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="invalid_singularity_container"))
+
+    def test_temp_file_valid(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.simg',
+                content_type='application/octet-stream',
+                size=15,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = alpine_file
+
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            self.assertTrue(form.is_valid())
+            self.assertTrue(form.instance.singularity_validated)
+
+    def test_upload_archive_container(self):
+        """
+        Archive containers should not call any validation nor flag that the container has been validated.
+        :return:
+        """
+        parent = Container(id=41)  # FIXME continue from here, what needs to be done to get this to validate?
+
+        with open(self.zip_archive, 'rb') as z:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.zip',
+                content_type='application/octet-stream',
+                size=self.zip_size,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = z
+
+            self.form_data["parent"] = parent
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            print(form.errors.as_data())
+            self.assertTrue(form.is_valid())
+            self.assertFalse(form.instance.singularity_validated)
 
 
 @mocked_relations(Container,

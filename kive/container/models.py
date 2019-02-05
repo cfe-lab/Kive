@@ -9,7 +9,7 @@ import sys
 from datetime import datetime, timedelta
 from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
-from tempfile import mkdtemp, mkstemp
+from tempfile import mkdtemp, mkstemp, NamedTemporaryFile
 import shutil
 import zipfile
 import tarfile
@@ -25,6 +25,7 @@ from django.db.models.functions import Now
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
+from django.forms.fields import FileField as FileFormField
 
 from constants import maxlengths
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
@@ -72,6 +73,41 @@ class ContainerFamily(AccessControl):
         remove_helper(removal_plan)
 
 
+class ContainerFileFormField(FileFormField):
+    def to_python(self, data):
+        """ Checks that the file-upload data contains a valid container. """
+        f = super(ContainerFileFormField, self).to_python(data)
+        if f is None:
+            return None
+
+        # We need to get a file object to validate. We might have a path or we might
+        # have to read the data out of memory.
+        if hasattr(data, 'temporary_file_path'):
+            Container.validate_container(data.temporary_file_path())
+        else:
+            upload_name = getattr(data, 'name', 'container')
+            upload_base, upload_ext = os.path.splitext(upload_name)
+            with NamedTemporaryFile(prefix=upload_base,
+                                    suffix=upload_ext) as f_temp:
+                if hasattr(data, 'read'):
+                    f_temp.write(data.read())
+                else:
+                    f_temp.write(data['content'])
+                f_temp.flush()
+                self.validate_container(f_temp.name)
+
+        if hasattr(f, 'seek') and callable(f.seek):
+            f.seek(0)
+        return f
+
+
+class ContainerFileField(models.FileField):
+    def formfield(self, **kwargs):
+        # noinspection PyTypeChecker
+        kwargs.setdefault('form_class', ContainerFileFormField)
+        return super(ContainerFileField, self).formfield(**kwargs)
+
+
 class ContainerNotChild(Exception):
     pass
 
@@ -93,6 +129,14 @@ class Container(AccessControl):
         (TAR, "Tar"),
         (TGZ, "Gzipped tar")
     )
+
+    ACCEPTED_FILE_EXTENSIONS = {
+        ".simg": SIMG,
+        ".zip": ZIP,
+        ".tar": TAR,
+        ".tar.gz": TGZ,
+        ".tgz": TGZ
+    }
 
     DEFAULT_ERROR_MESSAGES = {
         'invalid_singularity_container': "Upload a valid Singularity container file.",
