@@ -63,6 +63,7 @@ kive/tests.js
 # VirtualBox shared folders
 /vagrant/.vagrant
 /vagrant_ubuntu/.vagrant
+/vagrant_centos_python3/.vagrant
 /vagrant_ubuntu/dumps
 /vagrant_ubuntu/db_data.sql
 /vagrant_ubuntu/docker

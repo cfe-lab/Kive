@@ -243,32 +243,40 @@ class ContainerTests(TestCase):
         self.assertEqual(expected_content, content)
 
     def test_extract_zip(self):
-        sandbox_path = mkdtemp(prefix='test_extract_zip',
-                               dir=ContainerRun.SANDBOX_ROOT)
-        user = User.objects.first()
-        family = ContainerFamily.objects.create(user=user)
-        container = Container.objects.create(family=family, user=user)
-        self.create_zip_content(container)
-        container.save()
+        run = ContainerRun()
+        run.create_sandbox(prefix='test_extract_zip')
+        sandbox_path = run.sandbox_path
+        try:
+            user = User.objects.first()
+            family = ContainerFamily.objects.create(user=user)
+            container = Container.objects.create(family=family, user=user)
+            self.create_zip_content(container)
+            container.save()
 
-        container.extract_archive(sandbox_path)
+            container.extract_archive(sandbox_path)
 
-        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
-        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
+            self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
+            self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
+        finally:
+            shutil.rmtree(sandbox_path)
 
     def test_extract_tar(self):
-        sandbox_path = mkdtemp(prefix='test_extract_zip',
-                               dir=ContainerRun.SANDBOX_ROOT)
-        user = User.objects.first()
-        family = ContainerFamily.objects.create(user=user)
-        container = Container.objects.create(family=family, user=user)
-        self.create_tar_content(container)
-        container.save()
+        run = ContainerRun()
+        run.create_sandbox(prefix='test_extract_tar')
+        sandbox_path = run.sandbox_path
+        try:
+            user = User.objects.first()
+            family = ContainerFamily.objects.create(user=user)
+            container = Container.objects.create(family=family, user=user)
+            self.create_tar_content(container)
+            container.save()
 
-        container.extract_archive(sandbox_path)
+            container.extract_archive(sandbox_path)
 
-        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
-        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
+            self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
+            self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
+        finally:
+            shutil.rmtree(sandbox_path)
 
 
 @skipIfDBFeature('is_mocked')

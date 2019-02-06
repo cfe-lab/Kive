@@ -17,7 +17,7 @@ import shutil
 import tarfile
 import io
 from zipfile import ZipFile, BadZipfile
-from collections import OrderedDict
+from collections import OrderedDict, namedtuple
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -299,7 +299,12 @@ class Container(AccessControl):
 
     @contextmanager
     def open_content(self, mode='r'):
-        file_mode = mode if mode != 'a' else 'r+'
+        if mode == 'r':
+            file_mode = 'rb'
+        elif mode == 'a':
+            file_mode = 'rb+'
+        else:
+            raise ValueError('Unsupported mode for archive content: {!r}.'.format(mode))
         self.file.open(file_mode)
         try:
             if self.file_type == Container.ZIP:
@@ -318,7 +323,7 @@ class Container(AccessControl):
     def get_content(self):
         with self.open_content() as archive:
             last_entry = archive.infolist()[-1]
-            if re.match(r'kive/pipeline\d+\.json', last_entry.filename):
+            if re.match(r'kive/pipeline\d+\.json', last_entry.name):
                 pipeline_json = archive.read(last_entry)
                 pipeline = json.loads(pipeline_json)
             else:
@@ -327,18 +332,18 @@ class Container(AccessControl):
                                 inputs=[],
                                 steps=[],
                                 outputs=[])
-            content = dict(files=sorted(entry.filename
+            content = dict(files=sorted(entry.name
                                         for entry in archive.infolist()
-                                        if not entry.filename.startswith('kive/')),
+                                        if not entry.name.startswith('kive/')),
                            pipeline=pipeline)
             return content
 
     def write_content(self, content):
         pipeline_json = json.dumps(content['pipeline'])
         with self.open_content('a') as archive:
-            file_names = set(entry.filename
+            file_names = set(entry.name
                              for entry in archive.infolist()
-                             if entry.filename.startswith('kive/pipeline'))
+                             if entry.name.startswith('kive/pipeline'))
             for i in count(1):
                 file_name = 'kive/pipeline{}.json'.format(i)
                 if file_name not in file_names:
@@ -408,6 +413,8 @@ class Container(AccessControl):
 
 
 class ZipHandler(object):
+    MemberInfo = namedtuple('MemberInfo', 'name original')
+
     def __init__(self, fileobj=None, mode='r', archive=None):
         if archive is None:
             archive = ZipFile(fileobj, mode)
@@ -417,17 +424,18 @@ class ZipHandler(object):
         self.archive.close()
 
     def read(self, info):
-        with self.archive.open(info) as f:
+        with self.archive.open(info.original) as f:
             return f.read()
 
     def write(self, file_name, content):
         self.archive.writestr(file_name, content)
 
-    def extractall(self, path, members=None):
-        self.archive.extractall(path, members)
+    def extractall(self, path):
+        self.archive.extractall(path)
 
     def infolist(self):
-        return self.archive.infolist()
+        return [ZipHandler.MemberInfo(info.filename, info)
+                for info in self.archive.infolist()]
 
 
 class TarHandler(ZipHandler):
@@ -437,7 +445,7 @@ class TarHandler(ZipHandler):
         super(TarHandler, self).__init__(fileobj, mode, archive)
 
     def read(self, info):
-        f = self.archive.extractfile(info)
+        f = self.archive.extractfile(info.original)
         try:
             return f.read()
         finally:
@@ -449,10 +457,8 @@ class TarHandler(ZipHandler):
         self.archive.addfile(tarinfo, BytesIO(content.encode('utf8')))
 
     def infolist(self):
-        members = self.archive.getmembers()
-        for member in members:
-            member.filename = member.name
-        return members
+        return [ZipHandler.MemberInfo(info.name, info)
+                for info in self.archive.getmembers()]
 
 
 class ContainerApp(models.Model):
@@ -758,14 +764,15 @@ class ContainerRun(Stopwatch, AccessControl):
             return ''
         return os.path.join(settings.MEDIA_ROOT, self.sandbox_path)
 
-    def create_sandbox(self):
+    def create_sandbox(self, prefix=None):
         sandbox_root = self.SANDBOX_ROOT
         try:
             os.mkdir(sandbox_root)
         except OSError as ex:
             if ex.errno != errno.EEXIST:
                 raise
-        prefix = 'user{}_run{}_'.format(self.user.username, self.pk)
+        if prefix is None:
+            prefix = 'user{}_run{}_'.format(self.user.username, self.pk)
         full_sandbox_path = mkdtemp(prefix=prefix, dir=sandbox_root)
         os.mkdir(os.path.join(full_sandbox_path, 'logs'))
         self.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
