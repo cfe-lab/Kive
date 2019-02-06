@@ -9,8 +9,9 @@ import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
-from tempfile import NamedTemporaryFile
+from tempfile import NamedTemporaryFile, mkstemp
 from zipfile import ZipFile
+
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -22,6 +23,8 @@ from django.test.client import Client
 from django.urls import reverse, resolve
 from django.utils import timezone
 from django.utils.timezone import make_aware, utc
+from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
+from django.core.exceptions import NON_FIELD_ERRORS
 from mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
@@ -30,6 +33,7 @@ from rest_framework.test import force_authenticate
 from container.management.commands import purge, runcontainer
 from container.models import ContainerFamily, ContainerApp, Container, \
     ContainerRun, ContainerArgument, Batch, ContainerLog
+from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
 
@@ -1619,3 +1623,152 @@ Purged 1 unregistered container file containing 400 bytes.
 
         self.assertEqual(Container.UPLOAD_DIR, path_prefix)
         self.assertLogStreamEqual(expected_log_messages, log_messages)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerFormMockTests(TestCase):
+    def setUp(self):
+        super(ContainerFormMockTests, self).setUp()
+        self.alpine_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        self.everyone_permissions = [[], ["everyone"]]
+        self.form_data = {
+            "parent": None,
+            "tag": "v0.1",
+            "description": "Testing ContainerForm",
+            "permissions": self.everyone_permissions
+        }
+
+        hello_world_script = """\
+        #! /bin/bash
+        echo Hello World
+        """
+        _, self.zip_archive = mkstemp()
+        with NamedTemporaryFile(mode="w") as f:
+            f.write(hello_world_script)
+            with ZipFile(self.zip_archive, mode="w") as z:
+                z.write(f.name, arcname="hello_world.sh")
+        self.zip_size = os.path.getsize(self.zip_archive)
+
+    def test_uploaded_invalid(self):
+        file_data = BytesIO(b'garbage content')
+        uploaded_file = InMemoryUploadedFile(
+            file=file_data,
+            field_name='some_field',
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=15,
+            charset=None,
+            content_type_extra={})
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="invalid_singularity_container"))
+
+    def test_uploaded_valid(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            file_data = BytesIO(alpine_file.read())
+
+        uploaded_file = InMemoryUploadedFile(
+            file=file_data,
+            field_name='some_field',
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=os.stat(self.alpine_path).st_size,
+            charset=None,
+            content_type_extra={})
+
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertTrue(form.is_valid())
+        self.assertTrue(form.instance.singularity_validated)
+
+    def test_temp_file_invalid(self):
+        file_data = b'garbage content'
+
+        uploaded_file = TemporaryUploadedFile(
+            name='example.simg',
+            content_type='application/octet-stream',
+            size=15,
+            charset=None,
+            content_type_extra={})
+        # noinspection PyArgumentList,PyCallByClass
+        uploaded_file.file.write(file_data)
+
+        form = ContainerForm(self.form_data, files={"file": uploaded_file})
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="invalid_singularity_container"))
+
+    def test_temp_file_valid(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.simg',
+                content_type='application/octet-stream',
+                size=15,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = alpine_file
+
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            self.assertTrue(form.is_valid())
+            self.assertTrue(form.instance.singularity_validated)
+
+    def test_bad_file_extension(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.simglolwut',
+                content_type='application/octet-stream',
+                size=15,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = alpine_file
+
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            self.assertFalse(form.is_valid())
+            self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="bad_extension"))
+
+    def test_upload_archive_container(self):
+        """
+        Archive containers should not call any validation nor flag that the container has been validated.
+        :return:
+        """
+        my_user = User(pk=1000)
+        my_user.save()
+
+        family = ContainerFamily(name="Dummy family", description="placeholder", user=my_user)
+        family.save()
+        with open(self.alpine_path, "rb") as f:
+            parent = Container(
+                id=41,
+                family=family,
+                file_type=Container.SIMG,
+                tag="v0.1",
+                description="parent",
+                user=my_user
+            )
+            parent.file.save("alpine.simg", File(f), save=True)
+
+        with open(self.zip_archive, 'rb') as z:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.zip',
+                content_type='application/octet-stream',
+                size=self.zip_size,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = z
+
+            self.form_data["parent"] = parent.pk
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            is_valid = form.is_valid()
+            self.assertTrue(is_valid)
+            self.assertFalse(hasattr(form.instance, "singularity_validated"))
