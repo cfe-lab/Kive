@@ -7,6 +7,8 @@ set -e
 
 cd /usr/local/share/Kive/vagrant
 ./centos_dependencies.bash
+sed -ie 's/python2.7/python3.6/' /etc/httpd/conf.d/001-kive.conf
+systemctl restart httpd
 
 echo ========== Installing Python 3 ==========
 yum install -q -y python36 python36-devel
