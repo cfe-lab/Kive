@@ -26,6 +26,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
 from django.forms.fields import FileField as FileFormField
+import django.utils.six as dsix
 
 from constants import maxlengths
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
@@ -141,6 +142,8 @@ class Container(AccessControl):
     )
 
     accepted_extensions = ACCEPTED_FILE_EXTENSIONS.keys()
+    if dsix.PY3:
+        accepted_extensions = list(accepted_extensions)
     accepted_extension_str = ", ".join(accepted_extensions[:-1])
     accepted_extension_str += ", or {}".format(accepted_extensions[-1])
 

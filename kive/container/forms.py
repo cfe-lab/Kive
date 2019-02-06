@@ -55,9 +55,6 @@ class ContainerForm(PermissionsForm):
             if upload_lower.endswith(ext):
                 file_type = Container.ACCEPTED_FILE_EXTENSIONS[ext]
         if file_type is None:
-            accepted_extensions = Container.ACCEPTED_FILE_EXTENSIONS.keys()
-            accepted_extension_str = ", ".join(accepted_extensions[:-1])
-            accepted_extension_str += ", or {}".format(accepted_extensions[-1])
             raise ValidationError(
                 Container.DEFAULT_ERROR_MESSAGES["bad_extension"],
                 code="bad_extension"

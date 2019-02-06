@@ -285,7 +285,7 @@ class ContainerFormMockTests(TestCase):
         echo Hello World
         """
         _, self.zip_archive = tempfile.mkstemp()
-        with tempfile.NamedTemporaryFile() as f:
+        with tempfile.NamedTemporaryFile(mode="w") as f:
             f.write(hello_world_script)
             with zipfile.ZipFile(self.zip_archive, mode="w") as z:
                 z.write(f.name, arcname="hello_world.sh")
