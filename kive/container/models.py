@@ -6,9 +6,12 @@ import logging
 import os
 import re
 import sys
+from contextlib import contextmanager
 from datetime import datetime, timedelta
+from io import BytesIO
 from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
+from tarfile import TarFile, TarInfo
 from tempfile import mkdtemp, mkstemp, NamedTemporaryFile
 import shutil
 import tarfile
@@ -282,59 +285,41 @@ class Container(AccessControl):
         return self.file_type == self.SIMG
 
     def extract_archive(self, extraction_path):
-        """
-        Extract this child container to the specified extraction path.
+        """ Extract this child container to the specified extraction path.
 
         Raises ContainerNotChild if this is not a child container.
 
-        :param extraction_path:
-        :return:
+        :param extraction_path: where to extract the contents
         """
         if self.can_be_parent():
             raise ContainerNotChild()
 
-        if self.file_type == self.ZIP:
-            with ZipFile(self.file) as z:
-                z.extractall(path=extraction_path)
+        with self.open_content() as archive:
+            archive.extractall(path=extraction_path)
 
-        elif self.file_type in (self.TAR, self.TGZ):
-            with tarfile.open(self.file.path, mode="r") as t:
-                t.extractall(path=extraction_path)
-
-    def get_file_list(self):
-        """
-        Retrieve the file list for this child container.
-
-        Raises ContainerNotChild if this is not a child container.
-        :return:
-        """
-        if self.can_be_parent():
-            raise ContainerNotChild()
-
-        file_list = []
-        if self.file_type == self.ZIP:
-            with ZipFile(self.file) as z:
-                file_info_list = z.infolist()
-                for file_info in file_info_list:
-                    if not file_info.filename.endswith("/"):  # file_info.is_dir() doesn't exist until Python 3.6
-                        file_list.append(file_info.filename)
-
-        elif self.file_type in (self.TAR, self.TGZ):
-            with tarfile.open(self.file.path, mode="r") as t:
-                file_info_list = t.getmembers()
-                for file_info in file_info_list:
-                    if file_info.isfile():
-                        file_list.append(file_info.name)
-
-        return file_list
+    @contextmanager
+    def open_content(self, mode='r'):
+        file_mode = mode if mode != 'a' else 'r+'
+        self.file.open(file_mode)
+        try:
+            if self.file_type == Container.ZIP:
+                archive = ZipHandler(self.file, mode)
+            elif self.file_type == Container.TAR:
+                archive = TarHandler(self.file, mode)
+            else:
+                raise ValueError(
+                    'Cannot open content for a {} container.'.format(
+                        self.file_type))
+            yield archive
+            archive.close()
+        finally:
+            self.file.close()
 
     def get_content(self):
-        self.file.open()
-        try:
-            z = ZipFile(self.file)
-            last_entry = z.filelist[-1]
+        with self.open_content() as archive:
+            last_entry = archive.infolist()[-1]
             if re.match(r'kive/pipeline\d+\.json', last_entry.filename):
-                pipeline_json = z.read(last_entry)
+                pipeline_json = archive.read(last_entry)
                 pipeline = json.loads(pipeline_json)
             else:
                 pipeline = dict(default_config=dict(memory=5000,
@@ -343,61 +328,22 @@ class Container(AccessControl):
                                 steps=[],
                                 outputs=[])
             content = dict(files=sorted(entry.filename
-                                        for entry in z.filelist
+                                        for entry in archive.infolist()
                                         if not entry.filename.startswith('kive/')),
                            pipeline=pipeline)
             return content
-        finally:
-            self.file.close()
 
     def write_content(self, content):
         pipeline_json = json.dumps(content['pipeline'])
-        self.file.open('r+')
-        try:
-            with ZipFile(self.file, 'a') as z:
-                file_names = set(entry.filename
-                                 for entry in z.filelist
-                                 if entry.filename.startswith('kive/pipeline'))
-                for i in count(1):
-                    file_name = 'kive/pipeline{}.json'.format(i)
-                    if file_name not in file_names:
-                        z.writestr(file_name, pipeline_json)
-                        break
-        finally:
-            self.file.close()
-
-    def get_pipeline_json(self):
-        """
-        Retrieve the pipeline JSON file for this child container.
-
-        Raises ContainerNotChild if this is not a child container.
-        Raises ChildNotConfigured if no such JSON is found.
-        :return:
-        """
-        if self.can_be_parent():
-            raise ContainerNotChild()
-
-        def check_and_extract(file_list, single_file_extractor):
-            base_dir = os.path.commonprefix(file_list)
-            # Look for a `pipeline.json` file in that base directory.
-            pipeline_json_path = os.path.join(base_dir, "pipeline.json")
-            if pipeline_json_path not in file_list:
-                raise ChildNotConfigured()
-            # The `extractfile` method on a TarFile does not appear to be usable as a context manager,
-            # so we do this the old-fashioned way.
-            json = single_file_extractor(pipeline_json_path)
-            try:
-                return json.read()
-            finally:
-                json.close()
-
-        if self.file_type == self.ZIP:
-            with ZipFile(self.file) as z:
-                return check_and_extract(z.namelist(), lambda x: z.open(x, mode="r"))
-
-        elif self.file_type in (self.TAR, self.TGZ):
-            with tarfile.open(self.file.path, mode="r") as t:
-                return check_and_extract(t.getnames(), t.extractfile)
+        with self.open_content('a') as archive:
+            file_names = set(entry.filename
+                             for entry in archive.infolist()
+                             if entry.filename.startswith('kive/pipeline'))
+            for i in count(1):
+                file_name = 'kive/pipeline{}.json'.format(i)
+                if file_name not in file_names:
+                    archive.write(file_name, pipeline_json)
+                    break
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))
@@ -459,6 +405,54 @@ class Container(AccessControl):
             file='').exclude(  # Purged for some reason
             file=None).aggregate(  # No file?
             models.Sum('file_size'))['file_size__sum'] or 0
+
+
+class ZipHandler(object):
+    def __init__(self, fileobj=None, mode='r', archive=None):
+        if archive is None:
+            archive = ZipFile(fileobj, mode)
+        self.archive = archive
+
+    def close(self):
+        self.archive.close()
+
+    def read(self, info):
+        with self.archive.open(info) as f:
+            return f.read()
+
+    def write(self, file_name, content):
+        self.archive.writestr(file_name, content)
+
+    def extractall(self, path, members=None):
+        self.archive.extractall(path, members)
+
+    def infolist(self):
+        return self.archive.infolist()
+
+
+class TarHandler(ZipHandler):
+    def __init__(self, fileobj=None, mode='r', archive=None):
+        if archive is None:
+            archive = TarFile(fileobj=fileobj, mode=mode)
+        super(TarHandler, self).__init__(fileobj, mode, archive)
+
+    def read(self, info):
+        f = self.archive.extractfile(info)
+        try:
+            return f.read()
+        finally:
+            f.close()
+
+    def write(self, file_name, content):
+        tarinfo = TarInfo(file_name)
+        tarinfo.size = len(content)
+        self.archive.addfile(tarinfo, BytesIO(content.encode('utf8')))
+
+    def infolist(self):
+        members = self.archive.getmembers()
+        for member in members:
+            member.filename = member.name
+        return members
 
 
 class ContainerApp(models.Model):
@@ -1047,17 +1041,6 @@ class ContainerLog(models.Model):
             long_text='').exclude(  # Already purged.
             long_text=None).aggregate(  # Short text.
             models.Sum('log_size'))['log_size__sum'] or 0
-
-    @staticmethod
-    def _currently_used_by_container():
-        """
-        A generator that produces the ContainerLogs being used by all active ContainerRuns.
-        :return:
-        """
-        active_runs = ContainerRun.objects.filter(state__in=ContainerRun.ACTIVE_STATES)
-        for run in active_runs:
-            for cr in run.logs.all():
-                yield cr
 
     def currently_being_used(self):
         """

@@ -9,7 +9,8 @@ import warnings
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
-from tempfile import NamedTemporaryFile, mkstemp
+from tarfile import TarFile, TarInfo
+from tempfile import NamedTemporaryFile, mkstemp, mkdtemp
 from zipfile import ZipFile
 
 
@@ -46,10 +47,31 @@ class ContainerTests(TestCase):
             f.writestr("foo.txt", b"The first file.")
             f.writestr("bar.txt", b"The second file.")
         container.file = ContentFile(bytes_file.getvalue(), "container.zip")
+        container.file_type = Container.ZIP
 
     def add_zip_content(self, container, filename, content):
         with ZipFile(container.file_path, 'a') as f:
             f.writestr(filename, content)
+
+    def create_tar_content(self, container):
+        bytes_file = BytesIO()
+        with TarFile(fileobj=bytes_file, mode="w") as f:
+            foo = BytesIO(b"The first file.")
+            foo_info = TarInfo('foo.txt')
+            foo_info.size = foo.tell()
+            f.addfile(foo_info, foo)
+            bar = BytesIO(b"The second file.")
+            bar_info = TarInfo('bar.txt')
+            bar_info.size = bar.tell()
+            f.addfile(bar_info, bar)
+        container.file = ContentFile(bytes_file.getvalue(), "container.tar")
+        container.file_type = Container.TAR
+
+    def add_tar_content(self, container, filename, content):
+        with TarFile(container.file_path, 'a') as f:
+            tarinfo = TarInfo(filename)
+            tarinfo.size = len(content)
+            f.addfile(tarinfo, BytesIO(content.encode('utf8')))
 
     def test_default_content(self):
         user = User.objects.first()
@@ -67,13 +89,36 @@ class ContainerTests(TestCase):
         content = container.get_content()
         self.assertEqual(expected_content, content)
 
-    def test_loaded_content(self):
+    def test_loaded_zip_content(self):
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
         container.save()
         self.add_zip_content(container, "kive/pipeline1.json", """
+{
+    "default_config": {"memory": 200, "threads": 2},
+    "inputs": [],
+    "steps": [],
+    "outputs": []}
+""")
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        content = container.get_content()
+        self.assertEqual(expected_content, content)
+
+    def test_loaded_tar_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_tar_content(container)
+        container.save()
+        self.add_tar_content(container, "kive/pipeline1.json", """
 {
     "default_config": {"memory": 200, "threads": 2},
     "inputs": [],
@@ -139,11 +184,29 @@ class ContainerTests(TestCase):
         content = container.get_content()
         self.assertEqual(expected_content, content)
 
-    def test_write_content(self):
+    def test_write_zip_content(self):
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
+        container.save()
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=200,
+                                                                  threads=2),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))
+
+        container.write_content(expected_content)
+        content = container.get_content()
+
+        self.assertEqual(expected_content, content)
+
+    def test_write_tar_content(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_tar_content(container)
         container.save()
         expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
@@ -178,6 +241,34 @@ class ContainerTests(TestCase):
         content = container.get_content()
 
         self.assertEqual(expected_content, content)
+
+    def test_extract_zip(self):
+        sandbox_path = mkdtemp(prefix='test_extract_zip',
+                               dir=ContainerRun.SANDBOX_ROOT)
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_zip_content(container)
+        container.save()
+
+        container.extract_archive(sandbox_path)
+
+        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
+        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
+
+    def test_extract_tar(self):
+        sandbox_path = mkdtemp(prefix='test_extract_zip',
+                               dir=ContainerRun.SANDBOX_ROOT)
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_tar_content(container)
+        container.save()
+
+        container.extract_archive(sandbox_path)
+
+        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'foo.txt')))
+        self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
 
 
 @skipIfDBFeature('is_mocked')
@@ -240,6 +331,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
 
             force_authenticate(request2, user=self.kive_user)
             resp = self.list_view(request2).data
+            request2.close()  # Closes uploaded temp files.
 
         self.assertIn('id', resp)
         self.assertEquals(resp['tag'], expected_tag)

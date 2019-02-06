@@ -48,7 +48,8 @@ class ContainerSerializer(AccessControlSerializer,
         view_name='container-detail',
         lookup_field='pk',
         queryset=Container.objects.filter(file_type=Container.SIMG),
-        required=False)
+        required=False,
+        allow_null=True)
     download_url = serializers.HyperlinkedIdentityField(
         view_name='container-download')
     num_apps = serializers.IntegerField(read_only=True)
