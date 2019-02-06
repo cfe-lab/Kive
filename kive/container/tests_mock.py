@@ -354,12 +354,42 @@ class ContainerFormMockTests(TestCase):
             self.assertTrue(form.is_valid())
             self.assertTrue(form.instance.singularity_validated)
 
+    def test_bad_file_extension(self):
+        with open(self.alpine_path, 'rb') as alpine_file:
+            uploaded_file = TemporaryUploadedFile(
+                name='example.simglolwut',
+                content_type='application/octet-stream',
+                size=15,
+                charset=None,
+                content_type_extra={})
+            # noinspection PyArgumentList
+            uploaded_file.file.close()
+            uploaded_file.file = alpine_file
+
+            form = ContainerForm(self.form_data, files={"file": uploaded_file})
+            self.assertFalse(form.is_valid())
+            self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="bad_extension"))
+
     def test_upload_archive_container(self):
         """
         Archive containers should not call any validation nor flag that the container has been validated.
         :return:
         """
-        parent = Container(id=41)  # FIXME continue from here, what needs to be done to get this to validate?
+        my_user = User(pk=1000)
+        my_user.save()
+
+        family = ContainerFamily(name="Dummy family", description="placeholder", user=my_user)
+        family.save()
+        with open(self.alpine_path, "rb") as f:
+            parent = Container(
+                id=41,
+                family=family,
+                file_type=Container.SIMG,
+                tag="v0.1",
+                description="parent",
+                user=my_user
+            )
+            parent.file.save("alpine.simg", File(f), save=True)
 
         with open(self.zip_archive, 'rb') as z:
             uploaded_file = TemporaryUploadedFile(
@@ -372,11 +402,11 @@ class ContainerFormMockTests(TestCase):
             uploaded_file.file.close()
             uploaded_file.file = z
 
-            self.form_data["parent"] = parent
+            self.form_data["parent"] = parent.pk
             form = ContainerForm(self.form_data, files={"file": uploaded_file})
-            print(form.errors.as_data())
-            self.assertTrue(form.is_valid())
-            self.assertFalse(form.instance.singularity_validated)
+            is_valid = form.is_valid()
+            self.assertTrue(is_valid)
+            self.assertFalse(hasattr(form.instance, "singularity_validated"))
 
 
 @mocked_relations(Container,

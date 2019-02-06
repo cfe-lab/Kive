@@ -11,10 +11,10 @@ from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tempfile import mkdtemp, mkstemp, NamedTemporaryFile
 import shutil
-import zipfile
 import tarfile
 import io
-from zipfile import ZipFile
+from zipfile import ZipFile, BadZipfile
+from collections import OrderedDict
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -130,20 +130,27 @@ class Container(AccessControl):
         (TGZ, "Gzipped tar")
     )
 
-    ACCEPTED_FILE_EXTENSIONS = {
-        ".simg": SIMG,
-        ".zip": ZIP,
-        ".tar": TAR,
-        ".tar.gz": TGZ,
-        ".tgz": TGZ
-    }
+    ACCEPTED_FILE_EXTENSIONS = OrderedDict(
+        [
+            (".simg", SIMG),
+            (".zip", ZIP),
+            (".tar", TAR),
+            (".tar.gz", TGZ),
+            (".tgz", TGZ)
+        ]
+    )
+
+    accepted_extensions = ACCEPTED_FILE_EXTENSIONS.keys()
+    accepted_extension_str = ", ".join(accepted_extensions[:-1])
+    accepted_extension_str += ", or {}".format(accepted_extensions[-1])
 
     DEFAULT_ERROR_MESSAGES = {
         'invalid_singularity_container': "Upload a valid Singularity container file.",
         'invalid_archive': "Upload a valid archive file.",
         'singularity_cannot_have_parent': "Singularity containers cannot have parents",
         'archive_must_have_parent': "Archive containers must have a valid Singularity container parent",
-        'parent_container_not_singularity': "Parent container must be a Singularity container"
+        'parent_container_not_singularity': "Parent container must be a Singularity container",
+        'bad_extension': "File must have one of the following: {}".format(accepted_extension_str)
     }
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
@@ -247,9 +254,9 @@ class Container(AccessControl):
             if self.file_type == Container.ZIP:
                 try:
                     with self.file:
-                        with zipfile.ZipFile(self.file):
+                        with ZipFile(self.file):
                             pass
-                except zipfile.BadZipfile:
+                except BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
@@ -284,7 +291,7 @@ class Container(AccessControl):
             raise ContainerNotChild()
 
         if self.file_type == self.ZIP:
-            with zipfile.ZipFile(self.file) as z:
+            with ZipFile(self.file) as z:
                 z.extractall(path=extraction_path)
 
         elif self.file_type in (self.TAR, self.TGZ):
@@ -303,7 +310,7 @@ class Container(AccessControl):
 
         file_list = []
         if self.file_type == self.ZIP:
-            with zipfile.ZipFile(self.file) as z:
+            with ZipFile(self.file) as z:
                 file_info_list = z.infolist()
                 for file_info in file_info_list:
                     if not file_info.filename.endswith("/"):  # file_info.is_dir() doesn't exist until Python 3.6
@@ -382,7 +389,7 @@ class Container(AccessControl):
                 json.close()
 
         if self.file_type == self.ZIP:
-            with zipfile.ZipFile(self.file) as z:
+            with ZipFile(self.file) as z:
                 return check_and_extract(z.namelist(), lambda x: z.open(x, mode="r"))
 
         elif self.file_type in (self.TAR, self.TGZ):

@@ -1,5 +1,6 @@
 from django import forms
 from django.forms.widgets import TextInput
+from django.core.exceptions import ValidationError
 
 import os
 import logging
@@ -29,13 +30,17 @@ class ContainerForm(PermissionsForm):
     class Meta(object):
         model = Container
         fields = ['file', 'parent', 'tag', 'description', 'permissions']
-        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))  # FIXME figure out a widget for parent
+        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10))) # FIXME figure out a widget for parent
+
+    def __init__(self, *args, **kwargs):
+        super(ContainerForm, self).__init__(*args, **kwargs)
+        self.file_type_detected = None
 
     def clean(self):
         """
         Perform Singularity container file validation (it's more efficient to do here than at the model level).
 
-        Fill in the file type as well.
+        Fill in the values for file and file_type.
         :return:
         """
         self.cleaned_data = super(ContainerForm, self).clean()
@@ -53,7 +58,10 @@ class ContainerForm(PermissionsForm):
             accepted_extensions = Container.ACCEPTED_FILE_EXTENSIONS.keys()
             accepted_extension_str = ", ".join(accepted_extensions[:-1])
             accepted_extension_str += ", or {}".format(accepted_extensions[-1])
-            raise ValueError("File extension must be one of {}".format(accepted_extension_str))
+            raise ValidationError(
+                Container.DEFAULT_ERROR_MESSAGES["bad_extension"],
+                code="bad_extension"
+            )
 
         if file_type == Container.SIMG:
             # We need to get a file object to validate. We might have a path or we might
@@ -73,8 +81,8 @@ class ContainerForm(PermissionsForm):
             # Annotate self.instance with a marker that we already validated the container.
             self.instance.singularity_validated = True
 
-        # Having figured out the file type, add it to self.cleaned_data.
-        self.cleaned_data["file_type"] = file_type
+        # Having figured out the file type, add it to self.instance manually.
+        self.instance.file_type = file_type
         return self.cleaned_data
 
 
