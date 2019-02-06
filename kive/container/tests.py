@@ -15,7 +15,7 @@ from zipfile import ZipFile
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
-from django.core.files.base import ContentFile
+from django.core.files.base import ContentFile, File
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase, skipIfDBFeature

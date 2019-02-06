@@ -18,10 +18,10 @@ echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu
 ./dbcreate.sh
 
-# Apache should be active on port 8080.
-# Launch development server on port 8000 like this:
+# Apache should be active on guest port 8080 (mapped to host port 8083).
+# Launch development server on guest port 8003 (mapped to host port 8003) like this:
 # sudo su kive
 # cd /usr/local/share/Kive/kive
 # . /opt/venv_kive/bin/activate
 # . ../vagrant_ubuntu/envvars.conf
-# ./manage.py runserver 0.0.0.0:8000
+# ./manage.py runserver 0.0.0.0:8003
