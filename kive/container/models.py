@@ -126,21 +126,17 @@ class Container(AccessControl):
     SIMG = "SIMG"
     ZIP = "ZIP"
     TAR = "TAR"
-    TGZ = "TGZ"
     SUPPORTED_FILE_TYPES = (
         (SIMG, "Singularity"),
         (ZIP, "Zip"),
-        (TAR, "Tar"),
-        (TGZ, "Gzipped tar")
+        (TAR, "Tar")
     )
 
     ACCEPTED_FILE_EXTENSIONS = OrderedDict(
         [
             (".simg", SIMG),
             (".zip", ZIP),
-            (".tar", TAR),
-            (".tar.gz", TGZ),
-            (".tgz", TGZ)
+            (".tar", TAR)
         ]
     )
 

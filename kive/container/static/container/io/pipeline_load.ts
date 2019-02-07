@@ -24,31 +24,43 @@ export class Pipeline {
      * See: /api/pipelines/
      *
      * @param container: serialized pipeline array
+     * @param $error: element to display error messages
      */
-    load(container: Container) {
+    load(container: Container, $error?: JQuery) {
         this.container = container;
         this.pipeline = container.pipeline;
         this.files = container.files;
         this.canvasState.reset();
 
-        this.buildInputs(this.pipeline);
-        this.buildSteps(this.pipeline);
-        this.buildOutputs(this.pipeline);
+        try {
+            this.buildInputs(this.pipeline);
+            this.buildSteps(this.pipeline);
+            this.buildOutputs(this.pipeline);
 
-        this.canvasState.has_unsaved_changes = false;
-        for (let shape of this.canvasState.shapes) {
-            shape.has_unsaved_changes = false;
+            this.canvasState.has_unsaved_changes = false;
+            for (let shape of this.canvasState.shapes) {
+                shape.has_unsaved_changes = false;
+            }
+        } catch (e) {
+            if ($error === undefined) {
+                throw e;
+            } else {
+                $error.text('Could not load pipeline.');
+                $error.show();
+                setTimeout(() => $error.hide(), 8000);
+            }
+            this.canvasState.reset();
         }
     }
 
-    loadFromString(container_data: string) {
+    loadFromString(container_data: string, $error?: JQuery) {
         let container_json;
         try {
             container_json = JSON.parse(container_data);
         } catch (e) {
             throw "Pipeline could not be loaded: JSON parse error";
         }
-        this.load(container_json);
+        this.load(container_json, $error);
     }
 
     /**

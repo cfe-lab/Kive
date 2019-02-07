@@ -5,6 +5,8 @@ import { serializePipeline } from "@container/io/serializer";
 import * as imagediff from 'imagediff';
 
 describe("Container pipeline functions", function() {
+    let $error: JQuery;
+
     beforeEach(function() {
         let width = 600,
             height = 300;
@@ -13,6 +15,7 @@ describe("Container pipeline functions", function() {
         this.rawCanvas = imagediff.createCanvas(width, height);
         this.canvas = new CanvasWrapper(this.rawCanvas);
         this.canvasState = new CanvasState(this.rawCanvas, true);
+        $error = $('<div>').appendTo('body').hide();
 
         this.api_pipeline = {
             "files": [
@@ -115,11 +118,12 @@ describe("Container pipeline functions", function() {
 
     afterEach(function() {
         expect('Suppress SPEC HAS NO EXPECTATIONS').toBeDefined();
+        $error.remove();
     });
 
     function loadApiPipeline(canvasState, pipeline) {
-        var ppln = new Pipeline(canvasState);
-        ppln.load(pipeline);
+        let ppln = new Pipeline(canvasState);
+        ppln.load(pipeline, $error);
         return ppln;
     }
 
@@ -129,12 +133,12 @@ describe("Container pipeline functions", function() {
         });
 
         it('should draw pipeline from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
         });
 
         it('should autolayout from API', function() {
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
             this.canvasState.autoLayout();
         });
@@ -142,7 +146,7 @@ describe("Container pipeline functions", function() {
         it('should find pipeline nodes from API', function() {
             loadApiPipeline(this.canvasState, this.api_pipeline);
 
-            var input1  = this.canvasState.findNodeByLabel('input1'),
+            let input1  = this.canvasState.findNodeByLabel('input1'),
                 input2  = this.canvasState.findNodeByLabel('input2'),
                 prelim  = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap   = this.canvasState.findNodeByLabel('remap.py'),
@@ -164,6 +168,34 @@ describe("Container pipeline functions", function() {
             expect(umfasq2).toBeDefined();
             expect(jmguire).toBeUndefined();
         });
+
+        it('should load invalid pipeline and complain', function() {
+            let bad_container = {
+                files: ["foo.txt"],
+                pipeline: "not at all what should be here"
+            };
+
+            loadApiPipeline(this.canvasState, bad_container);
+
+            expect($error).toContainText("Could not load pipeline.");
+            expect($error).toBeVisible();
+        });
+
+        it('should reset after invalid pipeline', function() {
+            let bad_container = {
+                files: ["foo.txt"],
+                pipeline: {
+                    inputs: [{
+                        dataset_name: "in_csv"
+                    }],
+                    steps: "What is this mess?"
+                }
+            };
+
+            loadApiPipeline(this.canvasState, bad_container);
+
+            expect(this.canvasState.shapes.length).toBe(0);
+        });
     });
 
     describe('Connections', function(){
@@ -171,7 +203,7 @@ describe("Container pipeline functions", function() {
         it('should connect inputs to methods API', function(){
             loadApiPipeline(this.canvasState, this.api_pipeline);
 
-            var input1 = this.canvasState.findNodeByLabel('input1'),
+            let input1 = this.canvasState.findNodeByLabel('input1'),
                 input2 = this.canvasState.findNodeByLabel('input2'),
                 prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
@@ -186,7 +218,7 @@ describe("Container pipeline functions", function() {
         it('should connect methods API', function(){
             loadApiPipeline(this.canvasState, this.api_pipeline);
 
-            var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
+            let prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
 
             expect(prelim.isConnectedTo(remap)).toBe(true);
@@ -195,7 +227,7 @@ describe("Container pipeline functions", function() {
         it('should connect methods to outputs API', function(){
             loadApiPipeline(this.canvasState, this.api_pipeline);
 
-            var remap   = this.canvasState.findNodeByLabel('remap.py'),
+            let remap   = this.canvasState.findNodeByLabel('remap.py'),
                 remapc  = this.canvasState.findNodeByLabel('remap_counts'),
                 remapcs = this.canvasState.findNodeByLabel('remap_conseq'),
                 remapp  = this.canvasState.findNodeByLabel('remap'),
@@ -214,13 +246,13 @@ describe("Container pipeline functions", function() {
     describe('Structure', function(){
 
         it('should have correct properties for inputs API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
 
-            var input1 = this.canvasState.findNodeByLabel('prelim_map.py'),
+            let input1 = this.canvasState.findNodeByLabel('prelim_map.py'),
                 input2 = this.canvasState.findNodeByLabel('input2');
 
-            var i1keys = Object.keys(input1),
+            let i1keys = Object.keys(input1),
                 i2keys = Object.keys(input2);
 
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
@@ -230,13 +262,13 @@ describe("Container pipeline functions", function() {
         });
 
         it('should have correct properties for steps API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
 
-            var prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
+            let prelim = this.canvasState.findNodeByLabel('prelim_map.py'),
                 remap  = this.canvasState.findNodeByLabel('remap.py');
 
-            var i1keys = Object.keys(prelim),
+            let i1keys = Object.keys(prelim),
                 i2keys = Object.keys(remap);
 
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
@@ -249,13 +281,13 @@ describe("Container pipeline functions", function() {
         });
 
         it('should have correct properties for output API', function(){
-            var pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
+            let pipeline = loadApiPipeline(this.canvasState, this.api_pipeline);
             pipeline.draw();
 
-            var remapc  = this.canvasState.findNodeByLabel('remap_counts'),
+            let remapc  = this.canvasState.findNodeByLabel('remap_counts'),
                 remapcs = this.canvasState.findNodeByLabel('remap_conseq');
 
-            var i1keys = Object.keys(remapc),
+            let i1keys = Object.keys(remapc),
                 i2keys = Object.keys(remapcs);
 
             $.each(['x', 'y', 'dx', 'dy', 'fill', 'label'], function(_, key){
@@ -288,14 +320,14 @@ describe("Container pipeline functions", function() {
         });
 
         it('should match original pipeline inputs', function(){
-            var self = this,
+            let self = this,
                 serialized = loadAndSerialize(
                     this.canvasState,
                     this.api_pipeline
                 );
 
             $.each(serialized.pipeline.inputs, function(index, ser_input){
-                var api_input = self.api_pipeline.pipeline.inputs[index];
+                let api_input = self.api_pipeline.pipeline.inputs[index];
 
                 expect(ser_input.dataset_name).toBe(api_input.dataset_name);
                 expect(ser_input.x).toBeCloseTo(api_input.x, 8);

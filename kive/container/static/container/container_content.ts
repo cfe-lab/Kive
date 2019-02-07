@@ -46,9 +46,10 @@ let text = $("#initial_data").text();
 let loader = new Pipeline(canvasState);
 let $memory = $("#id_memory");
 let $threads = $("#id_threads");
+let $error = $('#id_submit_error');
 if (text) {
     loader.setRevertCtrl('#id_revert');
-    loader.loadFromString(text);
+    loader.loadFromString(text, $error);
     loader.draw();
     $(canvas).hide().fadeIn();
 }
@@ -136,7 +137,7 @@ $('#id_pipeline_form').submit(buildPipelineSubmit(
     $('#id_container_pk'),
     $memory,
     $threads,
-    $('#id_submit_error')
+    $error
 ));
 
 /**
