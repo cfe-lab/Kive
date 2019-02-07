@@ -8,10 +8,13 @@ set -e
 cd /usr/local/share/Kive/vagrant
 ./centos_dependencies.bash
 sed -ie 's/python2.7/python3.6/' /etc/httpd/conf.d/001-kive.conf
-systemctl restart httpd
 
 echo ========== Installing Python 3 ==========
-yum install -q -y python36 python36-devel
+yum install -q -y centos-release-scl
+yum install -q -y python36 python36-devel rh-python36-mod_wsgi
+cp /opt/rh/httpd24/root/usr/lib64/httpd/modules/mod_rh-python36-wsgi.so /lib64/httpd/modules
+cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/httpd/conf.modules.d
+systemctl restart httpd
 ${PYTHON} -m venv /opt/venv_kive
 
 ./kive_setup.bash requirements-dev.py34.txt
