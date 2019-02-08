@@ -32,6 +32,7 @@ from django.forms.fields import FileField as FileFormField
 import django.utils.six as dsix
 
 from constants import maxlengths
+from file_access_utils import compute_md5
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import file_access_utils
@@ -240,9 +241,8 @@ class Container(AccessControl):
             if not getattr(self, "singularity_validated", False):
                 fd, file_path = mkstemp()
                 with io.open(fd, mode="w+b") as f:
-                    with self.file:
-                        for chunk in self.file.chunks():
-                            f.write(chunk)
+                    for chunk in self.file.chunks():
+                        f.write(chunk)
 
                 Container.validate_singularity_container(file_path)
                 os.remove(file_path)
@@ -257,21 +257,33 @@ class Container(AccessControl):
 
             if self.file_type == Container.ZIP:
                 try:
-                    with self.file:
-                        with ZipFile(self.file):
-                            pass
+                    with ZipFile(self.file):
+                        pass
                 except BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
             else:  # this is either a tarfile or a gzipped tar file
                 try:
-                    with self.file:
-                        with tarfile.open(fileobj=self.file, mode="r"):
-                            pass
+                    with tarfile.open(fileobj=self.file, mode="r"):
+                        pass
                 except tarfile.ReadError:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
+
+        # Leave the file open and ready to go for whatever comes next in the processing.
+        self.file.open()  # seeks to the 0 position if it's still open
+
+    def set_md5(self):
+        """
+        Set this instance's md5 attribute.  Note that this does not save the instance.
+
+        This leaves self.file open and seek'd to the 0 position.
+        :return:
+        """
+        self.file.open()  # seeks to 0 if it was already open
+        self.md5 = compute_md5(self.file)
+        self.file.open()  # leave it as we found it
 
     def __str__(self):
         return self.display_name

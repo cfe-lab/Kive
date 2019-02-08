@@ -84,22 +84,23 @@ class ContainerCreate(CreateView, AdminViewMixin):
     def form_valid(self, form):
         form.instance.user = self.request.user
         form.instance.family_id = self.kwargs['family_id']
+        form.instance.set_md5()
 
         # We need to get a file object to validate. We might have a path or we
         # might have to read the data out of memory.
-        container_file = form.files['file']
-        if hasattr(container_file, 'temporary_file_path'):
-            with open(container_file.temporary_file_path()) as f:
-                md5 = compute_md5(f)
-        else:
-            if hasattr(container_file, 'read'):
-                f = BytesIO(container_file.read())
-            else:
-                f = BytesIO(container_file['content'])
-            md5 = compute_md5(f)
-            if hasattr(container_file, 'seek') and callable(container_file.seek):
-                container_file.seek(0)
-        form.instance.md5 = md5
+        # container_file = form.files['file']
+        # if hasattr(container_file, 'temporary_file_path'):
+        #     with open(container_file.temporary_file_path()) as f:
+        #         md5 = compute_md5(f)
+        # else:
+        #     if hasattr(container_file, 'read'):
+        #
+        #         f = BytesIO(container_file.read())
+        #     else:
+        #         f = BytesIO(container_file['content'])
+        #     md5 = compute_md5(f)
+        #     if hasattr(container_file, 'seek') and callable(container_file.seek):
+        #         container_file.seek(0)
 
         response = super(ContainerCreate, self).form_valid(form)
         with transaction.atomic():

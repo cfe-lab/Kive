@@ -58,6 +58,7 @@ class ContainerForm(PermissionsForm):
         for ext in Container.ACCEPTED_FILE_EXTENSIONS:
             if upload_lower.endswith(ext):
                 file_type = Container.ACCEPTED_FILE_EXTENSIONS[ext]
+                break
         if file_type is None:
             raise ValidationError(
                 Container.DEFAULT_ERROR_MESSAGES["bad_extension"],
@@ -78,6 +79,9 @@ class ContainerForm(PermissionsForm):
                         f_temp.write(the_file['content'])
                     f_temp.flush()
                     Container.validate_singularity_container(f_temp.name)
+
+                if hasattr(the_file, 'seek') and callable(the_file.seek):
+                    the_file.seek(0)
 
             # Annotate self.instance with a marker that we already validated the container.
             self.instance.singularity_validated = True
