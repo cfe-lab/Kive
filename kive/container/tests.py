@@ -1069,7 +1069,7 @@ class RunContainerTests(TestCase):
             parent=old_container,
             family=old_container.family,
             user=old_container.user,
-            tag='zip_test',
+            tag='tar_test',
             file_type=Container.TAR)
         container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
         container.write_content(content)
@@ -1077,12 +1077,12 @@ class RunContainerTests(TestCase):
         run.app.write_inputs('names_csv')
         run.app.write_outputs('greetings_csv')
         run.save()
-        expected_greetings = '''\
-greeting\r
-"Howdy, Alice"\r
-"Howdy, Bob"\r
-"Howdy, Carolyn"\r
-"Howdy, Darius"\r
+        expected_greetings = b'''\
+greeting
+"Howdy, Alice"
+"Howdy, Bob"
+"Howdy, Carolyn"
+"Howdy, Darius"
 '''
         expected_stderr = """\
 ========
@@ -1101,6 +1101,94 @@ Processing step 1: greetings.py
             argument__type=ContainerArgument.OUTPUT).dataset
         greetings = output_dataset.dataset_file.read()
         self.assertEqual(expected_greetings, greetings)
+
+    def test_run_multistep_archive(self):
+        pairs_text = """\
+x,y
+0,1
+1,1
+1,2
+2,3
+"""
+        expected_summary = b"""\
+sum,product,bigger
+1,0,sum
+2,1,sum
+3,2,sum
+5,6,product
+"""
+        source_path = os.path.abspath(os.path.join(__file__,
+                                                   '..',
+                                                   '..',
+                                                   '..',
+                                                   'samplecode',
+                                                   'singularity'))
+        content = dict(pipeline=dict(
+            inputs=[dict(dataset_name="pairs_csv")],
+            steps=[dict(driver="sums_and_products.py",
+                        inputs=[dict(dataset_name="pairs_csv",
+                                     source_step=0,
+                                     source_dataset_name="pairs_csv")],
+                        outputs=["sums_csv"]),
+                   dict(driver="sum_summary.py",
+                        inputs=[dict(dataset_name="sums_csv",
+                                     source_step=1,
+                                     source_dataset_name="sums_csv")],
+                        outputs=["summary_csv"])],
+            outputs=[dict(dataset_name="summary_csv",
+                          source_step=2,
+                          source_dataset_name="summary_csv")]))
+        tar_data = BytesIO()
+        with TarFile(fileobj=tar_data, mode='w') as t:
+            for script_name in ('sums_and_products.py', 'sum_summary.py'):
+                with open(os.path.join(source_path, script_name), 'rb') as f:
+                    script_text = f.read()
+                    script_text = b'#!/usr/bin/env python\n' + script_text
+                tar_info = TarInfo(script_name)
+                tar_info.mode = 0o777
+                tar_info.size = len(script_text)
+                t.addfile(tar_info, BytesIO(script_text))
+        tar_data.seek(0)
+        run = ContainerRun.objects.get(name='fixture run')
+        old_container = run.app.container
+        container = Container.objects.create(
+            parent=old_container,
+            family=old_container.family,
+            user=old_container.user,
+            tag='multi_test',
+            file_type=Container.TAR)
+        container.file.save('test_multi.tar', ContentFile(tar_data.getvalue()))
+        container.write_content(content)
+        run.app = container.apps.create(memory=200, threads=1)
+        run.app.write_inputs('pairs_csv')
+        run.app.write_outputs('summary_csv')
+        pairs_dataset = Dataset.objects.create(user=run.user, name='pairs.csv')
+        pairs_dataset.dataset_file.save('pairs.csv', ContentFile(pairs_text))
+        run_input = run.datasets.get()
+        run_input.dataset = pairs_dataset
+        run_input.argument = run.app.arguments.get(type=ContainerArgument.INPUT)
+        run_input.save()
+        run.save()
+        expected_stderr = """\
+========
+Processing step 1: sums_and_products.py
+========
+========
+Processing step 2: sum_summary.py
+========
+"""
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        stderr_log = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stderr, stderr_log.read(1000))
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        output_dataset = run.datasets.get(
+            argument__type=ContainerArgument.OUTPUT).dataset
+        summary = output_dataset.dataset_file.read()
+        self.assertEqual(expected_summary, summary)
 
     def test_already_started(self):
         """ Pretend that another instance of the command already started. """

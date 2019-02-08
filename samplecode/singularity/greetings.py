@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser, FileType
 from csv import DictReader, DictWriter
 
@@ -13,7 +14,9 @@ def parse_args():
 def main():
     args = parse_args()
     reader = DictReader(args.names_csv)
-    writer = DictWriter(args.greetings_csv, ['greeting'])
+    writer = DictWriter(args.greetings_csv,
+                        ['greeting'],
+                        lineterminator=os.linesep)
     writer.writeheader()
     for row in reader:
         writer.writerow(dict(greeting='Hello, ' + row['name']))

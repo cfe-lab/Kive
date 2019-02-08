@@ -26,16 +26,3 @@ sudo chown -R kive:kive /var/kive
 sudo -u kive /opt/venv_kive/bin/python ../kive/manage.py migrate
 
 echo "Created kive database."
-
-# Enable the vagrant user to access Postgres as the `kive` user.
-mv /var/lib/pgsql/data/pg_ident.conf /var/lib/pgsql/data/pg_ident.conf.orig
-mv /var/lib/pgsql/data/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf.orig
-cp /usr/local/share/Kive/vagrant/pg_ident.conf /var/lib/pgsql/data/pg_ident.conf
-cp /usr/local/share/Kive/vagrant/pg_hba.conf /var/lib/pgsql/data/pg_hba.conf
-chown postgres:postgres /var/lib/pgsql/data/pg_ident.conf
-chown postgres:postgres /var/lib/pgsql/data/pg_hba.conf
-chmod 600 /var/lib/pgsql/data/pg_ident.conf
-chmod 600 /var/lib/pgsql/data/pg_hba.conf
-systemctl reload postgresql
-
-echo "The default vagrant user can now access Postgres as kive."

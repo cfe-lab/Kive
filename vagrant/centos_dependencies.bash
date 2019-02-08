@@ -8,6 +8,16 @@ cd /root
 echo ========== Installing PostgreSQL ==========
 yum install -q -y postgresql-server postgresql-contrib
 postgresql-setup initdb
+
+# Order matters for access rules.
+sudo sed -i '0,/^local/s/^local/local all kive      peer map=vagrantkive\n&/' \
+    /var/lib/pgsql/data/pg_hba.conf
+
+echo "
+# MAPNAME       SYSTEM-USERNAME         PG-USERNAME
+vagrantkive     vagrant                 kive
+vagrantkive     kive                    kive
+" >> /var/lib/pgsql/data/pg_ident.conf
 systemctl enable postgresql
 systemctl start postgresql
 
@@ -114,3 +124,7 @@ sed -e 's/Listen 80$/Listen 8080/' \
     -e 's/Group apache$/Group kive/' -i /etc/httpd/conf/httpd.conf
 systemctl enable httpd
 systemctl start httpd
+
+echo ========= Configuring vagrant user ===========
+cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> ~vagrant/.bash_profile
+echo ". /opt/venv_kive/bin/activate" >> ~vagrant/.bash_profile
