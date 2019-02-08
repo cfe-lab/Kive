@@ -10,9 +10,8 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
 from tarfile import TarFile, TarInfo
-from tempfile import NamedTemporaryFile, mkstemp, mkdtemp
+from tempfile import NamedTemporaryFile, mkstemp
 from zipfile import ZipFile
-
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -1034,6 +1033,74 @@ class RunContainerTests(TestCase):
         expected_groups = [('Everyone', )]
         dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
         self.assertEqual(expected_groups, dataset_groups)
+
+    def test_run_archive(self):
+        greetings_path = os.path.abspath(os.path.join(__file__,
+                                                      '..',
+                                                      '..',
+                                                      '..',
+                                                      'samplecode',
+                                                      'singularity',
+                                                      'greetings.py'))
+        with open(greetings_path, 'rb') as f:
+            script_text = f.read()
+            script_text = script_text.replace(b'Hello,', b'Howdy,')
+            script_text = b'#!/usr/bin/env python\n' + script_text
+        content = dict(pipeline=dict(
+            inputs=[dict(dataset_name="names_csv")],
+            steps=[dict(driver="greetings.py",
+                        inputs=[dict(dataset_name="names_csv",
+                                     source_step=0,
+                                     source_dataset_name="names_csv")],
+                        outputs=["greetings_csv"])],
+            outputs=[dict(dataset_name="greetings_csv",
+                          source_step=1,
+                          source_dataset_name="greetings_csv")]))
+        tar_data = BytesIO()
+        with TarFile(fileobj=tar_data, mode='w') as t:
+            tar_info = TarInfo('greetings.py')
+            tar_info.mode = 0o777
+            tar_info.size = len(script_text)
+            t.addfile(tar_info, BytesIO(script_text))
+        tar_data.seek(0)
+        run = ContainerRun.objects.get(name='fixture run')
+        old_container = run.app.container
+        container = Container.objects.create(
+            parent=old_container,
+            family=old_container.family,
+            user=old_container.user,
+            tag='zip_test',
+            file_type=Container.TAR)
+        container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
+        container.write_content(content)
+        run.app = container.apps.create(memory=200, threads=1)
+        run.app.write_inputs('names_csv')
+        run.app.write_outputs('greetings_csv')
+        run.save()
+        expected_greetings = '''\
+greeting\r
+"Howdy, Alice"\r
+"Howdy, Bob"\r
+"Howdy, Carolyn"\r
+"Howdy, Darius"\r
+'''
+        expected_stderr = """\
+========
+Processing step 1: greetings.py
+========
+"""
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        stderr_log = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stderr, stderr_log.read(1000))
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        output_dataset = run.datasets.get(
+            argument__type=ContainerArgument.OUTPUT).dataset
+        greetings = output_dataset.dataset_file.read()
+        self.assertEqual(expected_greetings, greetings)
 
     def test_already_started(self):
         """ Pretend that another instance of the command already started. """

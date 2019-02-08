@@ -291,7 +291,16 @@ class Container(AccessControl):
             raise ContainerNotChild()
 
         with self.open_content() as archive:
-            archive.extractall(path=extraction_path)
+            all_members = archive.infolist()
+            members = [member
+                       for member in all_members
+                       if not member.name.startswith('kive/pipeline')]
+            last_member = all_members[-1]
+            members.append(last_member)
+            archive.extractall(extraction_path, members)
+            old_name = os.path.join(extraction_path, last_member.name)
+            new_name = os.path.join(extraction_path, 'kive', 'pipeline.json')
+            os.rename(old_name, new_name)
 
     @contextmanager
     def open_content(self, mode='r'):
@@ -426,8 +435,12 @@ class ZipHandler(object):
     def write(self, file_name, content):
         self.archive.writestr(file_name, content)
 
-    def extractall(self, path):
-        self.archive.extractall(path)
+    def extractall(self, path, members=None):
+        if members is None:
+            original_members = None
+        else:
+            original_members = [member.original for member in members]
+        self.archive.extractall(path, original_members)
 
     def infolist(self):
         return [ZipHandler.MemberInfo(info.filename, info)

@@ -101,7 +101,8 @@ class Command(BaseCommand):
                 # This is a child container to be run inside another Singularity container.
                 bin_dir = os.path.join(run.full_sandbox_path, "bin")
                 run.app.container.extract_archive(os.path.join(run.full_sandbox_path, "bin"))
-                with open(os.path.join(bin_dir, "pipeline.json"), "r") as f:
+                pipeline_path = os.path.join(bin_dir, "kive", "pipeline.json")
+                with open(pipeline_path, "r") as f:
                     instructions = json.loads(f.read())
                 run.return_code = self.run_pipeline(
                     instructions,
@@ -109,8 +110,8 @@ class Command(BaseCommand):
                     stdout,
                     stderr,
                     bin_dir,
-                    os.path.join(run.full_sandbox_path, "inputs"),
-                    os.path.join(run.full_sandbox_path, "outputs")
+                    os.path.join(run.full_sandbox_path, "input"),
+                    os.path.join(run.full_sandbox_path, "output")
                 )
         run.state = ContainerRun.SAVING
 
@@ -238,7 +239,7 @@ class Command(BaseCommand):
         file_map = [inputs_map]
 
         final_return_code = 0
-        for idx, step in enumerate(instructions["steps"]):
+        for idx, step in enumerate(instructions["steps"], 1):
             step_header = "========\nProcessing step {}: {}\n========\n".format(idx, step["driver"])
             standard_out.write(step_header)
             standard_err.write(step_header)
@@ -250,35 +251,38 @@ class Command(BaseCommand):
             executable = os.path.join(internal_binary_dir, step["driver"])
             input_paths = []
             for input_dict in step["inputs"]:
-                input_paths.append(file_map[input_dict["source_step"]][input_dict["source_dataset_name"]])
+                source_step = input_dict["source_step"]
+                source_dataset_name = input_dict["source_dataset_name"]
+                step_outputs = file_map[source_step]
+                internal_path, external_path = step_outputs[source_dataset_name]
+                input_paths.append(internal_path)
             outputs_map = {}
-            for step_num, dataset_name in step["outputs"]:
-                file_name = "step{}_{}".format(step_num, dataset_name)
+            for dataset_name in step["outputs"]:
+                file_name = "step{}_{}".format(idx, dataset_name)
                 outputs_map[dataset_name] = (
                     os.path.join(internal_outputs_dir, file_name),
                     os.path.join(external_outputs_dir, file_name)
                 )
             file_map.append(outputs_map)
 
-            output_paths = [outputs_map[x][0] for _, x in step["outputs"]]
+            output_paths = [outputs_map[x][0] for x in step["outputs"]]
             execution_args = [
                 "singularity",
                 "exec",
-                parent_container_path,
-                "--B",
-                extracted_archive_dir,
-                internal_binary_dir,
-                "--B",
-                external_inputs_dir,
-                internal_inputs_dir,
-                "--B",
-                external_outputs_dir,
-                internal_outputs_dir,
+                "-B",
+                extracted_archive_dir + ':' + internal_binary_dir,
+                "-B",
+                external_inputs_dir + ':' + internal_inputs_dir,
+                "-B",
+                external_outputs_dir + ':' + internal_outputs_dir,
                 "--pwd",
                 internal_working_dir,
+                parent_container_path,
                 executable
             ]
-            step_return_code = call(execution_args + input_paths + output_paths)
+            all_args = [str(arg)
+                        for arg in execution_args + input_paths + output_paths]
+            step_return_code = call(all_args)
             if step_return_code != 0:
                 final_return_code = step_return_code
                 break
