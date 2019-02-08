@@ -1084,11 +1084,7 @@ greeting
 "Howdy, Carolyn"
 "Howdy, Darius"
 '''
-        expected_stderr = """\
-========
-Processing step 1: greetings.py
-========
-"""
+        expected_stderr = ""
 
         call_command('runcontainer', str(run.id))
 
@@ -1101,6 +1097,66 @@ Processing step 1: greetings.py
             argument__type=ContainerArgument.OUTPUT).dataset
         greetings = output_dataset.dataset_file.read()
         self.assertEqual(expected_greetings, greetings)
+
+    def test_step_stdout(self):
+        greetings_path = os.path.abspath(os.path.join(__file__,
+                                                      '..',
+                                                      '..',
+                                                      '..',
+                                                      'samplecode',
+                                                      'singularity',
+                                                      'greetings.py'))
+        with open(greetings_path, 'rb') as f:
+            script_text = b'#!/usr/bin/env python\nprint("Starting up.")\n'
+            script_text += f.read()
+        content = dict(pipeline=dict(
+            inputs=[dict(dataset_name="names_csv")],
+            steps=[dict(driver="greetings.py",
+                        inputs=[dict(dataset_name="names_csv",
+                                     source_step=0,
+                                     source_dataset_name="names_csv")],
+                        outputs=["greetings_csv"])],
+            outputs=[dict(dataset_name="greetings_csv",
+                          source_step=1,
+                          source_dataset_name="greetings_csv")]))
+        tar_data = BytesIO()
+        with TarFile(fileobj=tar_data, mode='w') as t:
+            tar_info = TarInfo('greetings.py')
+            tar_info.mode = 0o777
+            tar_info.size = len(script_text)
+            t.addfile(tar_info, BytesIO(script_text))
+        tar_data.seek(0)
+        run = ContainerRun.objects.get(name='fixture run')
+        old_container = run.app.container
+        container = Container.objects.create(
+            parent=old_container,
+            family=old_container.family,
+            user=old_container.user,
+            tag='tar_test',
+            file_type=Container.TAR)
+        container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
+        container.write_content(content)
+        run.app = container.apps.create(memory=200, threads=1)
+        run.app.write_inputs('names_csv')
+        run.app.write_outputs('greetings_csv')
+        run.save()
+        expected_stdout = """\
+========
+Processing step 1: greetings.py
+========
+Starting up.
+"""
+        expected_stderr = ""
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        stderr_log = run.logs.get(type=ContainerLog.STDERR)
+        self.assertEqual(expected_stderr, stderr_log.read(1000))
+        stdout_log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual(expected_stdout, stdout_log.read(1000))
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
 
     def test_run_multistep_archive(self):
         pairs_text = """\
@@ -1169,14 +1225,7 @@ sum,product,bigger
         run_input.argument = run.app.arguments.get(type=ContainerArgument.INPUT)
         run_input.save()
         run.save()
-        expected_stderr = """\
-========
-Processing step 1: sums_and_products.py
-========
-========
-Processing step 2: sum_summary.py
-========
-"""
+        expected_stderr = ""
 
         call_command('runcontainer', str(run.id))
 

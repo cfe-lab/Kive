@@ -239,10 +239,11 @@ class Command(BaseCommand):
         file_map = [inputs_map]
 
         final_return_code = 0
+        log_path = os.path.dirname(standard_out.name)
         for idx, step in enumerate(instructions["steps"], 1):
-            step_header = "========\nProcessing step {}: {}\n========\n".format(idx, step["driver"])
-            standard_out.write(step_header)
-            standard_err.write(step_header)
+            step_header = "========\nProcessing step {}: {}\n========\n".format(
+                idx,
+                step["driver"])
 
             # Each step is a dictionary with fields:
             # - driver (the executable)
@@ -282,7 +283,20 @@ class Command(BaseCommand):
             ]
             all_args = [str(arg)
                         for arg in execution_args + input_paths + output_paths]
-            step_return_code = call(all_args)
+            step_stdout_path = os.path.join(log_path, 'step_{}_stdout.txt'.format(idx))
+            step_stderr_path = os.path.join(log_path, 'step_{}_stderr.txt'.format(idx))
+            with open(step_stdout_path, 'w') as step_stdout, \
+                    open(step_stderr_path, 'w') as step_stderr:
+                step_return_code = call(all_args,
+                                        stdout=step_stdout,
+                                        stderr=step_stderr)
+            for step_path, main_file in ((step_stdout_path, standard_out),
+                                         (step_stderr_path, standard_err)):
+                log_size = os.stat(step_path).st_size
+                if log_size:
+                    main_file.write(step_header)
+                    with open(step_path) as step_file:
+                        shutil.copyfileobj(step_file, main_file)
             if step_return_code != 0:
                 final_return_code = step_return_code
                 break
