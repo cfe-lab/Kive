@@ -296,11 +296,15 @@ class Container(AccessControl):
                        for member in all_members
                        if not member.name.startswith('kive/pipeline')]
             last_member = all_members[-1]
-            members.append(last_member)
+            if last_member.name.startswith('kive/pipeline'):
+                members.append(last_member)
+            else:
+                last_member = None
             archive.extractall(extraction_path, members)
-            old_name = os.path.join(extraction_path, last_member.name)
-            new_name = os.path.join(extraction_path, 'kive', 'pipeline.json')
-            os.rename(old_name, new_name)
+            if last_member is not None:
+                old_name = os.path.join(extraction_path, last_member.name)
+                new_name = os.path.join(extraction_path, 'kive', 'pipeline.json')
+                os.rename(old_name, new_name)
 
     @contextmanager
     def open_content(self, mode='r'):
