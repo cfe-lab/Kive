@@ -110,7 +110,6 @@ echo Hello World
 """
         _, self.zip_archive = tempfile.mkstemp()
         _, self.tar_archive = tempfile.mkstemp()
-        _, self.tgz_archive = tempfile.mkstemp()
         with tempfile.NamedTemporaryFile(mode="w") as f:
             f.write(hello_world_script)
             with zipfile.ZipFile(self.zip_archive, mode="w") as z:
@@ -119,14 +118,10 @@ echo Hello World
             with tarfile.open(self.tar_archive, mode="w") as t:
                 t.add(f.name, arcname="hello_world.sh")
 
-            with tarfile.open(self.tgz_archive, mode="w:gz") as tgz:
-                tgz.add(f.name, arcname="hello_world.sh")
-
     def tearDown(self):
         os.remove(self.useless_file)
         os.remove(self.zip_archive)
         os.remove(self.tar_archive)
-        os.remove(self.tgz_archive)
 
     def test_validate_singularity_container_pass(self):
         """
@@ -238,13 +233,6 @@ echo Hello World
         :return:
         """
         self.bad_archive_test_helper(Container.TAR)
-
-    def test_bad_tgz_archive(self):
-        """
-        A bad tgz archive file fails validation.
-        :return:
-        """
-        self.bad_archive_test_helper(Container.TGZ)
 
     @patch("container.models.Container.validate_singularity_container")
     def test_skip_singularity_validation(self, mock_val):
