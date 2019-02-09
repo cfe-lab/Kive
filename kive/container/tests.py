@@ -213,11 +213,13 @@ class ContainerTests(TestCase):
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
+        expected_apps_count = 0  # Pipeline is incomplete, so no app created.
 
         container.write_content(expected_content)
         content = container.get_content()
 
         self.assertEqual(expected_content, content)
+        self.assertEqual(expected_apps_count, container.apps.count())
 
     def test_rewrite_content(self):
         user = User.objects.first()
@@ -240,6 +242,40 @@ class ContainerTests(TestCase):
         content = container.get_content()
 
         self.assertEqual(expected_content, content)
+
+    def test_write_content_and_app(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_tar_content(container)
+        container.save()
+        expected_content = dict(
+            files=["bar.txt", "foo.txt"],
+            pipeline=dict(default_config=dict(memory=200,
+                                              threads=2),
+                          inputs=[dict(dataset_name='in1')],
+                          steps=[dict(driver='foo.txt',
+                                      inputs=[dict(dataset_name="in1",
+                                                   source_step=0,
+                                                   source_dataset_name="in1")],
+                                      outputs=["out1"])],
+                          outputs=[dict(dataset_name="out1",
+                                        source_step=1,
+                                        source_dataset_name="out1")]))
+        expected_apps_count = 1
+        expected_memory = 200
+        expected_threads = 2
+        expected_inputs = "in1"
+        expected_outputs = "out1"
+
+        container.write_content(expected_content)
+
+        self.assertEqual(expected_apps_count, container.apps.count())
+        app = container.apps.first()
+        self.assertEqual(expected_memory, app.memory)
+        self.assertEqual(expected_threads, app.threads)
+        self.assertEqual(expected_inputs, app.inputs)
+        self.assertEqual(expected_outputs, app.outputs)
 
     def test_extract_zip(self):
         run = ContainerRun()
@@ -1059,7 +1095,6 @@ class RunContainerTests(TestCase):
         tar_data = BytesIO()
         with TarFile(fileobj=tar_data, mode='w') as t:
             tar_info = TarInfo('greetings.py')
-            tar_info.mode = 0o777
             tar_info.size = len(script_text)
             t.addfile(tar_info, BytesIO(script_text))
         tar_data.seek(0)
@@ -1122,7 +1157,6 @@ greeting
         tar_data = BytesIO()
         with TarFile(fileobj=tar_data, mode='w') as t:
             tar_info = TarInfo('greetings.py')
-            tar_info.mode = 0o777
             tar_info.size = len(script_text)
             t.addfile(tar_info, BytesIO(script_text))
         tar_data.seek(0)
@@ -1201,7 +1235,6 @@ sum,product,bigger
                     script_text = f.read()
                     script_text = b'#!/usr/bin/env python\n' + script_text
                 tar_info = TarInfo(script_name)
-                tar_info.mode = 0o777
                 tar_info.size = len(script_text)
                 t.addfile(tar_info, BytesIO(script_text))
         tar_data.seek(0)

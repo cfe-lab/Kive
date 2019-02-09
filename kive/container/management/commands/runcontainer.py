@@ -250,6 +250,9 @@ class Command(BaseCommand):
             # - inputs (a list of (step_num, dataset_name) pairs)
             # - outputs (a list of dataset_names)
             executable = os.path.join(internal_binary_dir, step["driver"])
+            driver_external_path = os.path.join(extracted_archive_dir,
+                                                step["driver"])
+            os.chmod(driver_external_path, 0o777)
             input_paths = []
             for input_dict in step["inputs"]:
                 source_step = input_dict["source_step"]

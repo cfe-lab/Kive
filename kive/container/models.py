@@ -167,10 +167,12 @@ class Container(AccessControl):
         default=SIMG,
         max_length=20)
 
-    parent = models.ForeignKey("Container",
-                               related_name="children",
-                               null=True,
-                               blank=True)
+    parent = models.ForeignKey(
+        "Container",
+        related_name="children",
+        null=True,
+        blank=True,
+        help_text='Singularity container that an archive container runs in')
 
     tag = models.CharField('Tag',
                            help_text='Git tag or revision name',
@@ -348,7 +350,8 @@ class Container(AccessControl):
             return content
 
     def write_content(self, content):
-        pipeline_json = json.dumps(content['pipeline'])
+        pipeline = content['pipeline']
+        pipeline_json = json.dumps(pipeline)
         with self.open_content('a') as archive:
             file_names = set(entry.name
                              for entry in archive.infolist()
@@ -358,6 +361,21 @@ class Container(AccessControl):
                 if file_name not in file_names:
                     archive.write(file_name, pipeline_json)
                     break
+        # Totally basic validation for now.
+        is_valid = min(len(pipeline['inputs']),
+                       len(pipeline['steps']),
+                       len(pipeline['outputs'])) > 0
+        if is_valid:
+            self.apps.all().delete()
+            default_config = pipeline['default_config']
+            app = self.apps.create(memory=default_config['memory'],
+                                   threads=default_config['threads'])
+            input_names = ' '.join(entry['dataset_name']
+                                   for entry in pipeline['inputs'])
+            output_names = ' '.join(entry['dataset_name']
+                                    for entry in pipeline['outputs'])
+            app.write_inputs(input_names)
+            app.write_outputs(output_names)
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))

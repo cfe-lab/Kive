@@ -27,10 +27,14 @@ class ContainerFamilyForm(PermissionsForm):
 
 
 class ContainerForm(PermissionsForm):
+    parent = forms.ModelChoiceField(
+       help_text=Container.parent.field.help_text,
+       queryset=Container.objects.filter(file_type=Container.SIMG))
+
     class Meta(object):
         model = Container
         fields = ['file', 'parent', 'tag', 'description', 'permissions']
-        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10))) # FIXME figure out a widget for parent
+        widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
 
     def __init__(self, *args, **kwargs):
         super(ContainerForm, self).__init__(*args, **kwargs)

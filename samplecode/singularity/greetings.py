@@ -6,7 +6,7 @@ from csv import DictReader, DictWriter
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument('names_csv', type=FileType())
-    parser.add_argument('greetings_csv', type=FileType('wb'))
+    parser.add_argument('greetings_csv', type=FileType('w'))
 
     return parser.parse_args()
 
