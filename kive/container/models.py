@@ -285,6 +285,18 @@ class Container(AccessControl):
         self.md5 = compute_md5(self.file)
         self.file.open()  # leave it as we found it
 
+    def validate_md5(self):
+        """
+        Compute the MD5 and check that it is as expected.
+        :return:
+        """
+        with self.file:
+            current_md5 = compute_md5(self.file)
+        if current_md5 != self.md5:
+            raise ValueError(
+                "Container {} file MD5 has changed (original {}, current {})".format(self, self.md5, current_md5)
+            )
+
     def __str__(self):
         return self.display_name
 

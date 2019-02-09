@@ -12,7 +12,9 @@ python setup.py install
 cd ..
 mkdir --parents /var/kive/media_root
 chown -R kive:kive /var/kive
-chmod go-rx /var/kive
+chmod -R 770 /var/kive
+chmod -R g+s /var/kive
+usermod -a -G kive vagrant
 ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r $REQUIREMENTS
 if [ ! -f kive/kive/settings.py ]; then

@@ -108,10 +108,12 @@ echo ========== Installing Apache ==========
 # httpd is already installed.
 yum install -q -y mod_wsgi
 
-useradd --system kive
+useradd --system --key UMASK=002 kive
 mkdir /home/kive /etc/kive /var/log/kive
 chown kive:kive /home/kive /etc/kive /var/log/kive
-chmod go-rx /home/kive /etc/kive /var/log/kive
+chmod go-rx /home/kive
+chmod 770 /etc/kive /var/log/kive
+chmod g+s /etc/kive /var/log/kive
 
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
 sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd

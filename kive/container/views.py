@@ -83,7 +83,7 @@ class ContainerCreate(CreateView, AdminViewMixin):
 
     def form_valid(self, form):
         form.instance.user = self.request.user
-        form.instance.family_id = self.kwargs['family_id']
+        form.instance.family = ContainerFamily.objects.get(pk=self.kwargs['family_id'])
         form.instance.set_md5()
 
         # We need to get a file object to validate. We might have a path or we

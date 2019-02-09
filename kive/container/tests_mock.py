@@ -243,7 +243,9 @@ echo Hello World
         """
         container = Container(id=42, file_type=Container.SIMG)
         container.singularity_validated = True
-        container.clean()
+        with open(self.alpine_path, 'rb') as alpine_file:
+            container.file = File(alpine_file)
+            container.clean()
         mock_val.assert_not_called()
 
 
