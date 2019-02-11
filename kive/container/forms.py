@@ -26,7 +26,7 @@ class ContainerFamilyForm(PermissionsForm):
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
 
 
-class ContainerForm(PermissionsForm):
+class ContainerUpdateForm(PermissionsForm):
     parent = forms.ModelChoiceField(
         help_text=Container.parent.field.help_text,
         queryset=Container.objects.filter(file_type=Container.SIMG),
@@ -34,8 +34,16 @@ class ContainerForm(PermissionsForm):
 
     class Meta(object):
         model = Container
-        fields = ['file', 'parent', 'tag', 'description', 'permissions']
+        fields = ['parent', 'tag', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
+
+
+class ContainerForm(ContainerUpdateForm):
+    """
+    Form for creation of a Container.
+    """
+    class Meta(ContainerUpdateForm.Meta):
+        fields = ['file'] + ContainerUpdateForm.Meta.fields
 
     def __init__(self, *args, **kwargs):
         super(ContainerForm, self).__init__(*args, **kwargs)
@@ -90,13 +98,6 @@ class ContainerForm(PermissionsForm):
         # Having figured out the file type, add it to self.instance manually.
         self.instance.file_type = file_type
         return self.cleaned_data
-
-
-class ContainerUpdateForm(ContainerForm):
-    def __init__(self, *args, **kwargs):
-        super(ContainerUpdateForm, self).__init__(*args, **kwargs)
-        self.fields.pop('file')
-
 
 class ContainerAppForm(forms.ModelForm):
     inputs = forms.CharField(
