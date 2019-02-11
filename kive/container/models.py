@@ -140,6 +140,7 @@ class Container(AccessControl):
             (".tar", TAR)
         ]
     )
+    DEFAULT_APP_CONFIG = dict(memory=5000, threads=1)
 
     accepted_extensions = ACCEPTED_FILE_EXTENSIONS.keys()
     if dsix.PY3:
@@ -362,8 +363,7 @@ class Container(AccessControl):
                 pipeline_json = archive.read(last_entry)
                 pipeline = json.loads(pipeline_json)
             else:
-                pipeline = dict(default_config=dict(memory=5000,
-                                                    threads=1),
+                pipeline = dict(default_config=self.DEFAULT_APP_CONFIG,
                                 inputs=[],
                                 steps=[],
                                 outputs=[])
@@ -391,7 +391,8 @@ class Container(AccessControl):
                        len(pipeline['outputs'])) > 0
         if is_valid:
             self.apps.all().delete()
-            default_config = pipeline['default_config']
+            default_config = pipeline.get('default_config',
+                                          self.DEFAULT_APP_CONFIG)
             app = self.apps.create(memory=default_config['memory'],
                                    threads=default_config['threads'])
             input_names = ' '.join(entry['dataset_name']

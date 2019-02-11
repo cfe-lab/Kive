@@ -28,8 +28,9 @@ class ContainerFamilyForm(PermissionsForm):
 
 class ContainerForm(PermissionsForm):
     parent = forms.ModelChoiceField(
-       help_text=Container.parent.field.help_text,
-       queryset=Container.objects.filter(file_type=Container.SIMG))
+        help_text=Container.parent.field.help_text,
+        queryset=Container.objects.filter(file_type=Container.SIMG),
+        required=False)
 
     class Meta(object):
         model = Container
