@@ -273,6 +273,7 @@ class Command(BaseCommand):
             execution_args = [
                 "singularity",
                 "exec",
+                "--contain",
                 "-B",
                 extracted_archive_dir + ':' + internal_binary_dir,
                 "-B",
@@ -286,6 +287,9 @@ class Command(BaseCommand):
             ]
             all_args = [str(arg)
                         for arg in execution_args + input_paths + output_paths]
+            command_path = os.path.join(log_path, 'step_{}_command.txt'.format(idx))
+            with open(command_path, 'w') as f:
+                f.write(' '.join(all_args))
             step_stdout_path = os.path.join(log_path, 'step_{}_stdout.txt'.format(idx))
             step_stderr_path = os.path.join(log_path, 'step_{}_stderr.txt'.format(idx))
             with open(step_stdout_path, 'w') as step_stdout, \
