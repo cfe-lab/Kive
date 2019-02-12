@@ -78,7 +78,8 @@ class Command(BaseCommand):
                                     z)
                     for dependency in method.dependencies.all():
                         code_resource_revision = dependency.requirement
-                        install_path = os.path.join(dependency.path, dependency.filename)
+                        install_path = os.path.join(dependency.path,
+                                                    dependency.get_filename())
                         self.add_script(code_resource_revision,
                                         install_path,
                                         copied_paths,
@@ -112,6 +113,7 @@ class Command(BaseCommand):
                 container.write_content(dict(pipeline=pipeline_config))
                 container.created = pipeline.revision_DateTime
                 container.save()
+                print('Created container id', container.id)
 
     def build_pipeline_config(self, pipeline):
         max_memory = max_threads = 1

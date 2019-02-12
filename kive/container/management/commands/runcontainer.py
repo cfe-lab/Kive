@@ -106,7 +106,7 @@ class Command(BaseCommand):
                     instructions = json.loads(f.read())
                 run.return_code = self.run_pipeline(
                     instructions,
-                    run.app.container.parent.file.path,
+                    run,
                     stdout,
                     stderr,
                     bin_dir,
@@ -199,7 +199,7 @@ class Command(BaseCommand):
 
     def run_pipeline(self,
                      instructions,
-                     parent_container_path,
+                     run,
                      standard_out,
                      standard_err,
                      extracted_archive_dir,
@@ -213,7 +213,7 @@ class Command(BaseCommand):
         Run the pipeline dictated in the instructions.
 
         :param instructions:
-        :param parent_container_path: absolute path to the parent container in which to run the pipeline
+        :param run: run to execute
         :param standard_out: a writable file-like object to write stdout to
         :param standard_err: similarly for stderr
         :param extracted_archive_dir:
@@ -262,7 +262,9 @@ class Command(BaseCommand):
                 input_paths.append(internal_path)
             outputs_map = {}
             for dataset_name in step["outputs"]:
-                file_name = "step{}_{}".format(idx, dataset_name)
+                file_name = self.build_dataset_name(
+                    run,
+                    "step{}_{}".format(idx, dataset_name))
                 outputs_map[dataset_name] = (
                     os.path.join(internal_outputs_dir, file_name),
                     os.path.join(external_outputs_dir, file_name)
@@ -282,7 +284,7 @@ class Command(BaseCommand):
                 external_outputs_dir + ':' + internal_outputs_dir,
                 "--pwd",
                 internal_working_dir,
-                parent_container_path,
+                run.app.container.parent.file.path,
                 executable
             ]
             all_args = [str(arg)
