@@ -636,7 +636,7 @@ class SlurmDummyTests(TestCase):
         expected_py2_error = (
             '[Errno 2] No such file or directory: echoxxx Lorem ipsum')
         expected_py3_error = (
-            "[Errno 2] No such file or directory: 'echoxxx': echoxxx Lorem ipsum")
+            "[Errno 2] No such file or directory: 'echoxxx': echoxxx Lorem ipsum: 'echoxxx'")
         with self.assertRaises(OSError) as context:
             slurmlib.multi_check_output(['echoxxx', 'Lorem', 'ipsum'])
         got_err = str(context.exception)

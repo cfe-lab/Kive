@@ -8,7 +8,7 @@ from datetime import datetime
 try:
     from os import scandir
 except ImportError:
-    import scandir
+    from scandir import scandir
 
 import bisect
 import csv
@@ -45,7 +45,7 @@ def iter_walk(dirname, exclude_set, grace_time_limit_ts, logger):
     """
     (yield)
     try:
-        for dir_entry in scandir.scandir(dirname):
+        for dir_entry in scandir(dirname):
             if (not dir_entry.name.startswith(".")) and dir_entry.path not in exclude_set:
                 try:
                     if dir_entry.is_file():
