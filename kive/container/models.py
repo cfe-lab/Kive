@@ -142,6 +142,10 @@ class Container(AccessControl):
     )
     DEFAULT_APP_CONFIG = dict(memory=5000, threads=1)
 
+    EMPTY = "empty"
+    INCOMPLETE = "incomplete"
+    VALID = "valid"
+
     accepted_extensions = ACCEPTED_FILE_EXTENSIONS.keys()
     if dsix.PY3:
         accepted_extensions = list(accepted_extensions)
@@ -252,7 +256,7 @@ class Container(AccessControl):
             if self.parent is None:
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["archive_must_have_parent"],
                                       code="archive_must_have_parent")
-            elif not self.parent.can_be_parent():
+            elif not self.parent.is_singularity():
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["parent_container_not_singularity"],
                                       code="parent_container_not_singularity")
 
@@ -304,7 +308,7 @@ class Container(AccessControl):
     def __repr__(self):
         return 'Container(id={})'.format(self.pk)
 
-    def can_be_parent(self):
+    def is_singularity(self):
         return self.file_type == self.SIMG
 
     def extract_archive(self, extraction_path):
@@ -314,7 +318,7 @@ class Container(AccessControl):
 
         :param extraction_path: where to extract the contents
         """
-        if self.can_be_parent():
+        if self.is_singularity():
             raise ContainerNotChild()
 
         with self.open_content() as archive:
@@ -362,15 +366,18 @@ class Container(AccessControl):
             if re.match(r'kive/pipeline\d+\.json', last_entry.name):
                 pipeline_json = archive.read(last_entry)
                 pipeline = json.loads(pipeline_json)
+                pipeline_state = self.VALID if self.pipeline_valid(pipeline) else self.INCOMPLETE
             else:
                 pipeline = dict(default_config=self.DEFAULT_APP_CONFIG,
                                 inputs=[],
                                 steps=[],
                                 outputs=[])
+                pipeline_state = self.EMPTY
             content = dict(files=sorted(entry.name
                                         for entry in archive.infolist()
                                         if not entry.name.startswith('kive/')),
-                           pipeline=pipeline)
+                           pipeline=pipeline,
+                           state=pipeline_state)
             return content
 
     def write_content(self, content):
@@ -385,11 +392,7 @@ class Container(AccessControl):
                 if file_name not in file_names:
                     archive.write(file_name, pipeline_json)
                     break
-        # Totally basic validation for now.
-        is_valid = min(len(pipeline['inputs']),
-                       len(pipeline['steps']),
-                       len(pipeline['outputs'])) > 0
-        if is_valid:
+        if self.pipeline_valid(pipeline):
             self.apps.all().delete()
             default_config = pipeline.get('default_config',
                                           self.DEFAULT_APP_CONFIG)
@@ -401,6 +404,18 @@ class Container(AccessControl):
                                     for entry in pipeline['outputs'])
             app.write_inputs(input_names)
             app.write_outputs(output_names)
+
+    @staticmethod
+    def pipeline_valid(pipeline):
+        """
+        True if the specified pipeline is valid; False otherwise.
+        :param pipeline:
+        :return:
+        """
+        # Totally basic validation for now.
+        return min(len(pipeline['inputs']),
+                   len(pipeline['steps']),
+                   len(pipeline['outputs'])) > 0
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))

@@ -82,12 +82,24 @@
 </form>
 
 {% if object %}
+    {% if not object.is_singularity %}
     <h3>Pipeline:</h3>
-    <a class="button" href="content"><span class="button-lbl">Revise</span></a>
+    <a class="button" href="content"><span class="button-lbl">
+        {% if pipeline_state == "valid" %}
+            Revise
+        {% elif pipeline_state == "empty" %}
+            Create
+        {% else %}
+            Continue editing
+        {% endif %}
+    </span></a>
+    {% endif %}
 
     <h3>Apps in the Container:</h3>
+    {% if object.is_singularity %}
     <a class="button" href="app_add">+&ensp;<span class="button-lbl">Create
         a new app</span></a>
+    {% endif %}
 
     <div id="asf">
         <form class="asf-form">

@@ -111,6 +111,7 @@ class ContainerCreate(CreateView, AdminViewMixin):
 
 @method_decorator(dev_decorators, name='dispatch')
 class ContainerUpdate(UpdateView, AdminViewMixin):
+
     model = Container
     form_class = ContainerUpdateForm
 
@@ -140,6 +141,13 @@ class ContainerUpdate(UpdateView, AdminViewMixin):
                 raise
             file_size = 'missing'
         context['file_size'] = file_size
+
+        context['pipeline_state'] = None
+        context['file_type'] = self.object.file_type
+        if self.object.file_type != Container.SIMG:
+            pipeline_content = self.object.get_content()
+            context['pipeline_state'] = pipeline_content['state']
+
         return context
 
     def get_form_kwargs(self):

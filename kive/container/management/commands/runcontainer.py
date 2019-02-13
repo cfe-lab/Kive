@@ -93,7 +93,7 @@ class Command(BaseCommand):
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
         with open(stdout_path, 'w') as stdout, open(stderr_path, 'w') as stderr:
-            if run.app.container.can_be_parent():
+            if run.app.container.is_singularity():
                 # This is a Singularity container.
                 command = self.build_command(run)
                 run.return_code = call(command, stdout=stdout, stderr=stderr)
