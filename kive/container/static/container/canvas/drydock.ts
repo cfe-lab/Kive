@@ -1440,18 +1440,18 @@ export class CanvasState {
     assertIntegrity() {
         let expected_num_shapes = this.inputs.length + this.outputs.length + this.methods.length;
 
-        if (this.shapes.length === 0) {
-            throw "Pipeline is empty";
-        }
-        if (this.inputs.length === 0) {
-            throw "Pipeline has no inputs";
-        }
-        if (this.methods.length === 0) {
-            throw "Pipeline has no methods";
-        }
-        if (this.outputs.length === 0) {
-            throw "Pipeline has no outputs";
-        }
+        // if (this.shapes.length === 0) {
+        //     throw "Pipeline is empty";
+        // }
+        // if (this.inputs.length === 0) {
+        //     throw "Pipeline has no inputs";
+        // }
+        // if (this.methods.length === 0) {
+        //     throw "Pipeline has no methods";
+        // }
+        // if (this.outputs.length === 0) {
+        //     throw "Pipeline has no outputs";
+        // }
 
         if (expected_num_shapes > this.shapes.length) {
             throw 'Pipeline has more nodes than it knows about!';
@@ -1470,10 +1470,10 @@ export class CanvasState {
                 throw 'Invalid amount of magnets for input node ' + shape.label;
             }
 
-            // is this magnet connected?
-            if (shape.out_magnets[0].connected.length === 0) {
-                throw 'Disconnected input node ' + shape.label;
-            }
+            // // is this magnet connected?
+            // if (shape.out_magnets[0].connected.length === 0) {
+            //     throw 'Disconnected input node ' + shape.label;
+            // }
         }
 
         for (let shape of this.outputs) {
@@ -1487,29 +1487,29 @@ export class CanvasState {
                 throw 'Invalid amount of magnets for output node ' + shape.label;
             }
 
-            // is this magnet connected?
-            if (shape.in_magnets[0].connected.length === 0) {
-                throw 'Disconnected output node ' + shape.label;
-            }
+            // // is this magnet connected?
+            // if (shape.in_magnets[0].connected.length === 0) {
+            //     throw 'Disconnected output node ' + shape.label;
+            // }
         }
 
         for (let shape of this.methods) {
             // <any> type so that TS compiler doesn't detect a tautology here.
             if (!CanvasState.isMethodNode(<any> shape)) {
-                throw 'Invalid output detected: ' + shape.label;
+                throw 'Invalid method detected: ' + shape.label;
             }
-            let empty_out_magnets_list = shape.out_magnets
-                .filter(el => el.connected.length === 0)
-                .map(el => el.label)
-                .join(', ');
-            if (empty_out_magnets_list.length) {
-                throw 'Step ' + shape.label + ' has unused outputs ' + empty_out_magnets_list;
-            }
-            let empty_in_magnets_list = shape.in_magnets
-                .filter(el => el.connected.length === 0);
-            if (empty_in_magnets_list.length) {
-                throw 'Step ' + shape.label + ' has unused inputs';
-            }
+            // let empty_out_magnets_list = shape.out_magnets
+            //     .filter(el => el.connected.length === 0)
+            //     .map(el => el.label)
+            //     .join(', ');
+            // if (empty_out_magnets_list.length) {
+            //     throw 'Step ' + shape.label + ' has unused outputs ' + empty_out_magnets_list;
+            // }
+            // let empty_in_magnets_list = shape.in_magnets
+            //     .filter(el => el.connected.length === 0);
+            // if (empty_in_magnets_list.length) {
+            //     throw 'Step ' + shape.label + ' has unused inputs';
+            // }
         }
     }
 
