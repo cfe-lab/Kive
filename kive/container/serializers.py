@@ -83,6 +83,12 @@ class ContainerSerializer(AccessControlSerializer,
                   'content',
                   'removal_plan')
 
+    def create(self, validated_data):
+        container = super(ContainerSerializer, self).create(validated_data)
+        if container.file_type != Container.SIMG:
+            container.create_app_from_content()
+        return container
+
 
 class ContainerAppSerializer(serializers.ModelSerializer):
     absolute_url = URLField(source='get_absolute_url', read_only=True)

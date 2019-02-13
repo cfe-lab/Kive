@@ -26,6 +26,7 @@ from portal.models import parse_file_size
 # error - summary of unregistered files, can't meet purge target, or can't purge
 # warning - list each unregistered file
 # info - summary of regular purge
+# debug - list each purged file, summary even when nothing purged
 logger = logging.getLogger(__name__)
 
 

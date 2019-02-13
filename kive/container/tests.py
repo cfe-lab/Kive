@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
+import json
 import logging
 import os
 import re
@@ -38,6 +39,50 @@ from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
 
 
+def create_tar_content(container=None, content=None):
+    """ Create a tar file for an archive container.
+
+    :param container: the container to attach this file to (not saved)
+    :param content: the JSON content to write into the container
+    :returns: a BytesIO object with the tar file contents
+    """
+    bytes_file = BytesIO()
+    with TarFile(fileobj=bytes_file, mode="w") as f:
+        foo = BytesIO(b"The first file.")
+        foo_info = TarInfo('foo.txt')
+        foo_info.size = len(foo.getvalue())
+        f.addfile(foo_info, foo)
+        bar = BytesIO(b"The second file.")
+        bar_info = TarInfo('bar.txt')
+        bar_info.size = len(bar.getvalue())
+        f.addfile(bar_info, bar)
+        if content is not None:
+            pipeline = BytesIO(json.dumps(content['pipeline']).encode('utf8'))
+            pipeline_info = TarInfo('kive/pipeline1.json')
+            pipeline_info.size = len(pipeline.getvalue())
+            f.addfile(pipeline_info, pipeline)
+    if container is not None:
+        container.file = ContentFile(bytes_file.getvalue(), "container.tar")
+        container.file_type = Container.TAR
+    return bytes_file
+
+
+def create_valid_tar_content():
+    return create_tar_content(content=dict(
+        files=["bar.txt", "foo.txt"],
+        pipeline=dict(default_config=dict(memory=200,
+                                          threads=2),
+                      inputs=[dict(dataset_name='in1')],
+                      steps=[dict(driver='foo.txt',
+                                  inputs=[dict(dataset_name="in1",
+                                               source_step=0,
+                                               source_dataset_name="in1")],
+                                  outputs=["out1"])],
+                      outputs=[dict(dataset_name="out1",
+                                    source_step=1,
+                                    source_dataset_name="out1")])))
+
+
 @skipIfDBFeature('is_mocked')
 class ContainerTests(TestCase):
     def create_zip_content(self, container):
@@ -53,18 +98,7 @@ class ContainerTests(TestCase):
             f.writestr(filename, content)
 
     def create_tar_content(self, container):
-        bytes_file = BytesIO()
-        with TarFile(fileobj=bytes_file, mode="w") as f:
-            foo = BytesIO(b"The first file.")
-            foo_info = TarInfo('foo.txt')
-            foo_info.size = foo.tell()
-            f.addfile(foo_info, foo)
-            bar = BytesIO(b"The second file.")
-            bar_info = TarInfo('bar.txt')
-            bar_info.size = bar.tell()
-            f.addfile(bar_info, bar)
-        container.file = ContentFile(bytes_file.getvalue(), "container.tar")
-        container.file_type = Container.TAR
+        create_tar_content(container)
 
     def add_tar_content(self, container, filename, content):
         with TarFile(container.file_path, 'a') as f:
@@ -277,6 +311,55 @@ class ContainerTests(TestCase):
         self.assertEqual(expected_inputs, app.inputs)
         self.assertEqual(expected_outputs, app.outputs)
 
+    def test_create_content_and_app(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        parent = Container.objects.create(family=family, user=user)
+        tar_bytes = create_valid_tar_content()
+
+        client = Client()
+        client.force_login(user)
+        expected_inputs = 'in1'
+        expected_outputs = 'out1'
+
+        response = client.post(reverse('container_add',
+                                       kwargs=dict(family_id=family.id)),
+                               dict(tag='test',
+                                    parent=parent.id,
+                                    file=ContentFile(tar_bytes.getvalue(),
+                                                     "container.tar")))
+        if response.status_code != 302:
+            self.assertEqual({}, response.context['form'].errors)
+        new_container = Container.objects.first()
+        app, = new_container.apps.all()
+        self.assertEqual(expected_inputs, app.inputs)
+        self.assertEqual(expected_outputs, app.outputs)
+
+    def test_create_singularity_no_app(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        image_path = os.path.abspath(os.path.join(__file__,
+                                                  '..',
+                                                  '..',
+                                                  '..',
+                                                  'samplecode',
+                                                  'singularity',
+                                                  'python2-alpine-trimmed.simg'))
+        expected_app_count = 0
+
+        client = Client()
+        client.force_login(user)
+
+        with open(image_path, 'rb') as f:
+            response = client.post(reverse('container_add',
+                                           kwargs=dict(family_id=family.id)),
+                                   dict(tag='test',
+                                        file=File(f)))
+        if response.status_code != 302:
+            self.assertEqual({}, response.context['form'].errors)
+        new_container = Container.objects.first()
+        self.assertEqual(expected_app_count, new_container.apps.count())
+
     def test_extract_zip(self):
         run = ContainerRun()
         run.create_sandbox(prefix='test_extract_zip')
@@ -459,6 +542,25 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
 
         self.assertEqual(expected_content, content)
         self.assertEqual(400, response.status_code)
+
+    def test_create_tar_with_app(self):
+        tar_bytes = create_valid_tar_content()
+        request2 = self.factory.post(self.list_path,
+                                     dict(tag='v1.0',
+                                          family=self.family_path,
+                                          parent=self.detail_path,
+                                          description='A really cool container',
+                                          file_type=Container.TAR,
+                                          file=ContentFile(tar_bytes.getvalue(),
+                                                           "container.tar")))
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).data
+
+        self.assertIn('id', resp)
+        container_id = resp['id']
+        container = Container.objects.get(id=container_id)
+        self.assertEqual(1, container.apps.count())
 
 
 @skipIfDBFeature('is_mocked')

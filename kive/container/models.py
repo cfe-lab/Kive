@@ -262,16 +262,28 @@ class Container(AccessControl):
 
             if self.file_type == Container.ZIP:
                 try:
-                    with ZipFile(self.file):
-                        pass
+                    was_closed = self.file.closed
+                    self.file.open()
+                    try:
+                        with ZipFile(self.file):
+                            pass
+                    finally:
+                        if was_closed:
+                            self.file.close()
                 except BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
             else:  # this is either a tarfile or a gzipped tar file
                 try:
-                    with tarfile.open(fileobj=self.file, mode="r"):
-                        pass
+                    was_closed = self.file.closed
+                    self.file.open()
+                    try:
+                        with tarfile.open(fileobj=self.file, mode="r"):
+                            pass
+                    finally:
+                        if was_closed:
+                            self.file.close()
                 except tarfile.ReadError:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
@@ -345,6 +357,7 @@ class Container(AccessControl):
             file_mode = 'rb+'
         else:
             raise ValueError('Unsupported mode for archive content: {!r}.'.format(mode))
+        was_closed = self.file.closed
         self.file.open(file_mode)
         try:
             if self.file_type == Container.ZIP:
@@ -358,7 +371,8 @@ class Container(AccessControl):
             yield archive
             archive.close()
         finally:
-            self.file.close()
+            if was_closed:
+                self.file.close()
 
     def get_content(self):
         with self.open_content() as archive:
@@ -392,6 +406,16 @@ class Container(AccessControl):
                 if file_name not in file_names:
                     archive.write(file_name, pipeline_json)
                     break
+        self.create_app_from_content(content)
+
+    def create_app_from_content(self, content=None):
+        """ Creat an app based on the content configuration.
+
+        :raises ValueError: if this is not an archive container
+        """
+        if content is None:
+            content = self.get_content()
+        pipeline = content['pipeline']
         if self.pipeline_valid(pipeline):
             self.apps.all().delete()
             default_config = pipeline.get('default_config',

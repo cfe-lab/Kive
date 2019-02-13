@@ -3,7 +3,6 @@ from __future__ import unicode_literals
 
 import json
 import os
-from io import BytesIO
 
 import errno
 from django.conf import settings
@@ -21,8 +20,7 @@ import rest_framework.reverse
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument, ContainerLog, Batch, ChildNotConfigured
-from file_access_utils import compute_md5
+    ContainerRun, ContainerArgument, ContainerLog, Batch
 from portal.views import developer_check, AdminViewMixin
 
 dev_decorators = [login_required, user_passes_test(developer_check)]
@@ -90,6 +88,8 @@ class ContainerCreate(CreateView, AdminViewMixin):
         with transaction.atomic():
             self.object.grant_from_json(form.cleaned_data["permissions"])
             self.object.validate_restrict_access([self.object.family])
+            if self.object.file_type != Container.SIMG:
+                self.object.create_app_from_content()
         return response
 
     def get_success_url(self):
