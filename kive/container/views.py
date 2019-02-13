@@ -145,8 +145,7 @@ class ContainerUpdate(UpdateView, AdminViewMixin):
         context['pipeline_state'] = None
         context['file_type'] = self.object.file_type
         if self.object.file_type != Container.SIMG:
-            pipeline_content = self.object.get_content()
-            context['pipeline_state'] = pipeline_content['state']
+            context['pipeline_state'] = self.object.get_pipeline_state()
 
         return context
 

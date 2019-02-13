@@ -374,24 +374,23 @@ class Container(AccessControl):
             if was_closed:
                 self.file.close()
 
-    def get_content(self):
+    def get_content(self, add_default=True):
         with self.open_content() as archive:
             last_entry = archive.infolist()[-1]
             if re.match(r'kive/pipeline\d+\.json', last_entry.name):
                 pipeline_json = archive.read(last_entry)
                 pipeline = json.loads(pipeline_json)
-                pipeline_state = self.VALID if self.pipeline_valid(pipeline) else self.INCOMPLETE
-            else:
+            elif add_default:
                 pipeline = dict(default_config=self.DEFAULT_APP_CONFIG,
                                 inputs=[],
                                 steps=[],
                                 outputs=[])
-                pipeline_state = self.EMPTY
+            else:
+                return None
             content = dict(files=sorted(entry.name
                                         for entry in archive.infolist()
                                         if not entry.name.startswith('kive/')),
-                           pipeline=pipeline,
-                           state=pipeline_state)
+                           pipeline=pipeline)
             return content
 
     def write_content(self, content):
@@ -407,6 +406,15 @@ class Container(AccessControl):
                     archive.write(file_name, pipeline_json)
                     break
         self.create_app_from_content(content)
+
+    def get_pipeline_state(self):
+        content = self.get_content(add_default=False)
+        if content is None:
+            return self.EMPTY
+        pipeline = content['pipeline']
+        if self.pipeline_valid(pipeline):
+            return self.VALID
+        return self.INCOMPLETE
 
     def create_app_from_content(self, content=None):
         """ Creat an app based on the content configuration.
@@ -436,10 +444,14 @@ class Container(AccessControl):
         :param pipeline:
         :return:
         """
-        # Totally basic validation for now.
-        return min(len(pipeline['inputs']),
-                   len(pipeline['steps']),
-                   len(pipeline['outputs'])) > 0
+        # noinspection PyBroadException
+        try:
+            # Totally basic validation for now.
+            return min(len(pipeline['inputs']),
+                       len(pipeline['steps']),
+                       len(pipeline['outputs'])) > 0
+        except Exception:
+            return False
 
     def get_absolute_url(self):
         return reverse('container_update', kwargs=dict(pk=self.pk))

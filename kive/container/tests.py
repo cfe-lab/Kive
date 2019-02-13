@@ -67,8 +67,8 @@ def create_tar_content(container=None, content=None):
     return bytes_file
 
 
-def create_valid_tar_content():
-    return create_tar_content(content=dict(
+def create_valid_tar_content(container=None):
+    return create_tar_content(container, content=dict(
         files=["bar.txt", "foo.txt"],
         pipeline=dict(default_config=dict(memory=200,
                                           threads=2),
@@ -395,6 +395,42 @@ class ContainerTests(TestCase):
             self.assertTrue(os.path.exists(os.path.join(sandbox_path, 'bar.txt')))
         finally:
             shutil.rmtree(sandbox_path)
+
+    def test_pipeline_state_valid(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        create_valid_tar_content(container)
+        container.save()
+        expected_pipeline_state = Container.VALID
+
+        pipeline_state = container.get_pipeline_state()
+
+        self.assertEqual(expected_pipeline_state, pipeline_state)
+
+    def test_pipeline_state_incomplete(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        create_tar_content(container, dict(pipeline='This is not a pipeline!'))
+        container.save()
+        expected_pipeline_state = Container.INCOMPLETE
+
+        pipeline_state = container.get_pipeline_state()
+
+        self.assertEqual(expected_pipeline_state, pipeline_state)
+
+    def test_pipeline_state_empty(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        create_tar_content(container)
+        container.save()
+        expected_pipeline_state = Container.EMPTY
+
+        pipeline_state = container.get_pipeline_state()
+
+        self.assertEqual(expected_pipeline_state, pipeline_state)
 
 
 @skipIfDBFeature('is_mocked')
