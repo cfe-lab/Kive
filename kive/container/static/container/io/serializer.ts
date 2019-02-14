@@ -110,28 +110,34 @@ function serializeSteps(pipeline_steps: MethodNode[], canvas_dimensions: [ numbe
 }
 
 function serializeInMagnets(in_magnets: Magnet[], pipeline_steps: MethodNode[]): DataSource[] {
-    let serialized_cables = [];
+    let serialized_inputs = [];
 
     // retrieve Connectors
     for (let j = 0; j < in_magnets.length; j++) {
         let magnet = in_magnets[j];
 
         if (magnet.connected.length === 0) {
-            continue;
+            serialized_inputs[j] = {
+                source_dataset_name: null,
+                source_step: null,
+                dataset_name: magnet.label
+            };
         }
+        else {
+            let connector = magnet.connected[0];
+            let source = magnet.connected[0].source.parent;
 
-        let connector = magnet.connected[0];
-        let source = magnet.connected[0].source.parent;
-
-        serialized_cables[j] = {
-            source_dataset_name: connector.source.label,
-            dataset_name: connector.dest.label,
-            source_step: CanvasState.isMethodNode(source)
-                ? pipeline_steps.indexOf(source) + 1
-                : 0};
+            serialized_inputs[j] = {
+                source_dataset_name: connector.source.label,
+                dataset_name: connector.dest.label,
+                source_step: CanvasState.isMethodNode(source)
+                    ? pipeline_steps.indexOf(source) + 1
+                    : 0
+            };
+        }
     }
 
-    return serialized_cables;
+    return serialized_inputs;
 }
 
 function serializeOutcables(
@@ -145,16 +151,28 @@ function serializeOutcables(
     // Construct outputs
     for (let i = 0; i < pipeline_outputs.length; i++) {
         let output = pipeline_outputs[i];
-        let connector = output.in_magnets[0].connected[0];
-        let source_step = connector.source.parent;
+        let magnet = output.in_magnets[0];
+        if (magnet.connected.length === 0) {
+            serialized_outputs[i] = {
+                source_dataset_name: null,
+                source_step: null,
+                dataset_name: output.label,
+                x: output.x / x_ratio,
+                y: output.y / y_ratio
+            };
+        }
+        else {
+            let connector = magnet.connected[0];
+            let source_step = connector.source.parent;
 
-        serialized_outputs[i] = {
-            dataset_name: output.label,
-            source_step: pipeline_steps.indexOf(source_step) + 1, // 1-index
-            source_dataset_name: connector.source.label, // magnet label
-            x: output.x / x_ratio,
-            y: output.y / y_ratio
-        };
+            serialized_outputs[i] = {
+                dataset_name: output.label,
+                source_step: pipeline_steps.indexOf(source_step) + 1, // 1-index
+                source_dataset_name: connector.source.label, // magnet label
+                x: output.x / x_ratio,
+                y: output.y / y_ratio
+            };
+        }
     }
     return serialized_outputs;
 }

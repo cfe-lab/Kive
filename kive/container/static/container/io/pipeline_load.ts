@@ -45,7 +45,7 @@ export class Pipeline {
             if ($error === undefined) {
                 throw e;
             } else {
-                $error.text('Could not load pipeline.');
+                $error.text('Could not load pipeline: ' + e);
                 $error.show();
                 setTimeout(() => $error.hide(), 8000);
             }
@@ -184,7 +184,10 @@ export class Pipeline {
                 }
 
                 // cable from pipeline input, identified by dataset_name
-                if (cable.source_step === 0) {
+                if (cable.source_step === null) {
+                    continue;
+                }
+                else if (cable.source_step === 0) {
 
                     // Find the source for this
                     source = this.canvasState.shapes.filter(
@@ -240,6 +243,19 @@ export class Pipeline {
 
         for (let output_idx in pipeline.outputs) {
             let outcable = pipeline.outputs[output_idx];
+
+            let output_node = new OutputNode(
+                outcable.x * x_ratio,
+                outcable.y * y_ratio,
+                outcable.dataset_name
+            );
+            this.canvasState.addShape(output_node);
+
+            // Skip if this is not wired.
+            if (outcable.source_step === null) {
+                continue;
+            }
+
             // identify source Method
             let source = this.canvasState.shapes[method_node_offset + outcable.source_step - 1];
 
@@ -247,13 +263,6 @@ export class Pipeline {
             for (let magnet of source.out_magnets) {
                 if (magnet.label === outcable.source_dataset_name) {
                     let connector = new Connector(magnet);
-                    let output_node = new OutputNode(
-                        outcable.x * x_ratio,
-                        outcable.y * y_ratio,
-                        outcable.dataset_name
-                    );
-
-                    this.canvasState.addShape(output_node);
 
                     connector.x = outcable.x * x_ratio;
                     connector.y = outcable.y * y_ratio;
