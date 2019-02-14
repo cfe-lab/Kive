@@ -45,7 +45,7 @@ export class Pipeline {
             if ($error === undefined) {
                 throw e;
             } else {
-                $error.text('Could not load pipeline: ' + e);
+                $error.text('Could not load pipeline.');
                 $error.show();
                 setTimeout(() => $error.hide(), 8000);
             }
