@@ -124,12 +124,12 @@ class ChildNotConfigured(Exception):
 
 class PipelineCompletionStatus(object):
     def __init__(self, pipeline):
-        self.no_inputs = False
-        self.no_steps = False
-        self.no_outputs = False
+        self.has_inputs = False
+        self.has_steps = False
+        self.has_outputs = False
         self.inputs_not_connected = []
         self.dangling_outputs = []
-        self.assess_pipeline_completion()
+        self.assess_pipeline_completion(pipeline)
 
     def add_unfed_input(self, step_num, dataset_name):
         self.inputs_not_connected.append((step_num, dataset_name))
@@ -138,9 +138,9 @@ class PipelineCompletionStatus(object):
         self.dangling_outputs.append(dataset_name)
 
     def is_complete(self):
-        return (not self.no_inputs
-                and not self.no_steps
-                and not self.no_outputs
+        return (self.has_inputs
+                and self.has_steps
+                and self.has_outputs
                 and len(self.inputs_not_connected) == 0
                 and len(self.dangling_outputs) == 0)
 
@@ -150,12 +150,12 @@ class PipelineCompletionStatus(object):
         :param pipeline:
         :return:
         """
-        if len(pipeline["inputs"]) == 0:
-            self.no_inputs = True
-        if len(pipeline["steps"]) == 0:
-            self.no_steps = True
-        if len(pipeline["outputs"]) == 0:
-            self.no_outputs
+        if len(pipeline["inputs"]) > 0:
+            self.has_inputs = True
+        if len(pipeline["steps"]) > 0:
+            self.has_steps = True
+        if len(pipeline["outputs"]) > 0:
+            self.has_outputs = True
 
         # Construct a dataset mapping to check for unfed inputs and dangling outputs.
         usable_inputs = []  # list of dicts

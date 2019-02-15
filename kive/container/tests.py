@@ -33,7 +33,7 @@ from rest_framework.test import force_authenticate
 
 from container.management.commands import purge, runcontainer
 from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerArgument, Batch, ContainerLog
+    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
@@ -2247,3 +2247,260 @@ class ContainerFormMockTests(TestCase):
             is_valid = form.is_valid()
             self.assertTrue(is_valid)
             self.assertFalse(hasattr(form.instance, "singularity_validated"))
+
+
+class PipelineCompletionStatusTests(TestCase):
+    """
+    Tests that a pipeline is correctly marked as complete or not complete.
+    """
+    def test_empty_pipeline(self):
+        empty_pipeline = {
+            "inputs": [],
+            "steps": [],
+            "outputs": []
+        }
+        pcs = PipelineCompletionStatus(empty_pipeline)
+        self.assertFalse(pcs.has_inputs)
+        self.assertFalse(pcs.has_steps)
+        self.assertFalse(pcs.has_outputs)
+        self.assertEqual(0, len(pcs.inputs_not_connected))
+        self.assertEqual(0, len(pcs.dangling_outputs))
+
+    def test_only_inputs(self):
+        pipeline_only_inputs = {
+            "inputs": [
+                {
+                    "dataset_name": "input1",
+                    "x": 0.2,
+                    "y": 0.2
+                }
+            ],
+            "steps": [],
+            "outputs": []
+        }
+        pcs = PipelineCompletionStatus(pipeline_only_inputs)
+        self.assertTrue(pcs.has_inputs)
+        self.assertFalse(pcs.has_steps)
+        self.assertFalse(pcs.has_outputs)
+        self.assertEqual(0, len(pcs.inputs_not_connected))
+        self.assertEqual(0, len(pcs.dangling_outputs))
+
+    def test_only_steps(self):
+        pipeline_only_steps = {
+            "inputs": [],
+            "steps": [
+                {
+                    "driver": "filter_quality.sh",
+                    "inputs": [
+                        {
+                            "dataset_name": "quality_csv",
+                            "source_step": None,
+                            "source_dataset_name": None
+                        }
+                    ],
+                    "outputs": ["bad_cycles_csv"]
+                }
+            ],
+            "outputs": []
+        }
+        pcs = PipelineCompletionStatus(pipeline_only_steps)
+        self.assertFalse(pcs.has_inputs)
+        self.assertTrue(pcs.has_steps)
+        self.assertFalse(pcs.has_outputs)
+        self.assertListEqual(
+            pcs.inputs_not_connected,
+            [(1, "quality_csv")]
+        )
+        self.assertEqual(0, len(pcs.dangling_outputs))
+
+    def test_only_outputs(self):
+        pipeline_only_outputs = {
+            "inputs": [],
+            "steps": [],
+            "outputs": [
+                {
+                    "dataset_name": "bad_cycles_csv",
+                    "source_step": None,
+                    "source_dataset_name": None,
+                    "x": 0.8,
+                    "y": 0.8
+                }
+            ]
+        }
+        pcs = PipelineCompletionStatus(pipeline_only_outputs)
+        self.assertFalse(pcs.has_inputs)
+        self.assertFalse(pcs.has_steps)
+        self.assertTrue(pcs.has_outputs)
+        self.assertEqual(len(pcs.inputs_not_connected), 0)
+        self.assertListEqual(pcs.dangling_outputs, ["bad_cycles_csv"])
+
+    def test_no_connections(self):
+        pipeline_unconnected = {
+            "inputs": [
+                {
+                    "dataset_name": "quality_csv",
+                    "x": 0.426540479529696,
+                    "y": 0.345062429057889
+                }
+            ],
+            "steps": [
+                {
+                    "driver": "filter_quality.sh",
+                    "inputs": [
+                        {
+                            "dataset_name": "quality_csv",
+                            "source_step": None,
+                            "source_dataset_name": None
+                        }
+                    ],
+                    "outputs": ["bad_cycles_csv"],
+                    "x": 0.501879443635952,
+                    "y": 0.497715260532689,
+                    "fill_colour": ""
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "bad_cycles_csv",
+                    "source_step": None,
+                    "source_dataset_name": None,
+                    "x": 0.588014776534994,
+                    "y": 0.640181611804767
+                }
+            ]
+        }
+        pcs = PipelineCompletionStatus(pipeline_unconnected)
+        self.assertTrue(pcs.has_inputs)
+        self.assertTrue(pcs.has_steps)
+        self.assertTrue(pcs.has_outputs)
+        self.assertListEqual(
+            pcs.inputs_not_connected,
+            [(1, "quality_csv")]
+        )
+        self.assertListEqual(pcs.dangling_outputs, ["bad_cycles_csv"])
+
+    def test_dangling_output(self):
+        pipeline_unconnected = {
+            "inputs": [
+                {
+                    "dataset_name": "quality_csv",
+                    "x": 0.426540479529696,
+                    "y": 0.345062429057889
+                }
+            ],
+            "steps": [
+                {
+                    "driver": "filter_quality.sh",
+                    "inputs": [
+                        {
+                            "dataset_name": "quality_csv",
+                            "source_step": 0,
+                            "source_dataset_name": "quality_csv"
+                        }
+                    ],
+                    "outputs": ["bad_cycles_csv"],
+                    "x": 0.501879443635952,
+                    "y": 0.497715260532689,
+                    "fill_colour": ""
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "bad_cycles_csv",
+                    "source_step": None,
+                    "source_dataset_name": None,
+                    "x": 0.588014776534994,
+                    "y": 0.640181611804767
+                }
+            ]
+        }
+        pcs = PipelineCompletionStatus(pipeline_unconnected)
+        self.assertTrue(pcs.has_inputs)
+        self.assertTrue(pcs.has_steps)
+        self.assertTrue(pcs.has_outputs)
+        self.assertListEqual(pcs.inputs_not_connected, [])
+        self.assertListEqual(pcs.dangling_outputs, ["bad_cycles_csv"])
+
+    def test_unfed_input(self):
+        pipeline_unconnected = {
+            "inputs": [
+                {
+                    "dataset_name": "quality_csv",
+                    "x": 0.426540479529696,
+                    "y": 0.345062429057889
+                }
+            ],
+            "steps": [
+                {
+                    "driver": "filter_quality.sh",
+                    "inputs": [
+                        {
+                            "dataset_name": "quality_csv",
+                            "source_step": None,
+                            "source_dataset_name": None
+                        }
+                    ],
+                    "outputs": ["bad_cycles_csv"],
+                    "x": 0.501879443635952,
+                    "y": 0.497715260532689,
+                    "fill_colour": ""
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "bad_cycles_csv",
+                    "source_step": 1,
+                    "source_dataset_name": "bad_cycles_csv",
+                    "x": 0.588014776534994,
+                    "y": 0.640181611804767
+                }
+            ]
+        }
+        pcs = PipelineCompletionStatus(pipeline_unconnected)
+        self.assertTrue(pcs.has_inputs)
+        self.assertTrue(pcs.has_steps)
+        self.assertTrue(pcs.has_outputs)
+        self.assertListEqual(pcs.inputs_not_connected, [(1, "quality_csv")])
+        self.assertListEqual(pcs.dangling_outputs, [])
+
+    def test_good_pipeline(self):
+        good_pipeline = {
+            "inputs": [
+                {
+                    "dataset_name": "quality_csv",
+                    "x": 0.426540479529696,
+                    "y": 0.345062429057889
+                }
+            ],
+            "steps": [
+                {
+                    "driver": "filter_quality.sh",
+                    "inputs": [
+                        {
+                            "dataset_name": "quality_csv",
+                            "source_step": 0,
+                            "source_dataset_name": "quality_csv"
+                        }
+                    ],
+                    "outputs": ["bad_cycles_csv"],
+                    "x": 0.501879443635952,
+                    "y": 0.497715260532689,
+                    "fill_colour": ""
+                }
+            ],
+            "outputs": [
+                {
+                    "dataset_name": "bad_cycles_csv",
+                    "source_step": 1,
+                    "source_dataset_name": "bad_cycles_csv",
+                    "x": 0.588014776534994,
+                    "y": 0.640181611804767
+                }
+            ]
+        }
+        pcs = PipelineCompletionStatus(good_pipeline)
+        self.assertTrue(pcs.has_inputs)
+        self.assertTrue(pcs.has_steps)
+        self.assertTrue(pcs.has_outputs)
+        self.assertListEqual(pcs.inputs_not_connected, [])
+        self.assertListEqual(pcs.dangling_outputs, [])
