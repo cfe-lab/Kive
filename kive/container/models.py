@@ -501,10 +501,7 @@ class Container(AccessControl):
         """
         # noinspection PyBroadException
         try:
-            # TODO: use a PipelineCompletionStatus object here
-            return min(len(pipeline['inputs']),
-                       len(pipeline['steps']),
-                       len(pipeline['outputs'])) > 0
+            return PipelineCompletionStatus(pipeline).is_complete()
         except Exception:
             return False
 
