@@ -122,6 +122,60 @@ class ChildNotConfigured(Exception):
     pass
 
 
+class PipelineCompletionStatus(object):
+    def __init__(self, pipeline):
+        self.no_inputs = False
+        self.no_steps = False
+        self.no_outputs = False
+        self.inputs_not_connected = []
+        self.dangling_outputs = []
+        self.assess_pipeline_completion()
+
+    def add_unfed_input(self, step_num, dataset_name):
+        self.inputs_not_connected.append((step_num, dataset_name))
+
+    def add_dangling_output(self, dataset_name):
+        self.dangling_outputs.append(dataset_name)
+
+    def is_complete(self):
+        return (not self.no_inputs
+                and not self.no_steps
+                and not self.no_outputs
+                and len(self.inputs_not_connected) == 0
+                and len(self.dangling_outputs) == 0)
+
+    def assess_pipeline_completion(self, pipeline):
+        """
+        Check that the specified pipeline is complete, returning a list of things that must still be satisfied.
+        :param pipeline:
+        :return:
+        """
+        if len(pipeline["inputs"]) == 0:
+            self.no_inputs = True
+        if len(pipeline["steps"]) == 0:
+            self.no_steps = True
+        if len(pipeline["outputs"]) == 0:
+            self.no_outputs
+
+        # Construct a dataset mapping to check for unfed inputs and dangling outputs.
+        usable_inputs = []  # list of dicts
+        pipeline_inputs = [x["dataset_name"] for x in pipeline["inputs"]]
+        usable_inputs.append(pipeline_inputs)
+
+        for i, step_dict in enumerate(pipeline["steps"], start=1):
+            # Check for unfed inputs.
+            for input_dict in step_dict["inputs"]:
+                if input_dict["source_step"] is None:
+                    self.add_unfed_input(i, input_dict["dataset_name"])
+            # Add the step outputs to the list of usable inputs.
+            usable_inputs.append(step_dict["outputs"])
+
+        # Check for dangling outputs.
+        for output_dict in pipeline["outputs"]:
+            if output_dict["source_step"] is None:
+                self.add_dangling_output(output_dict["dataset_name"])
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
@@ -447,7 +501,7 @@ class Container(AccessControl):
         """
         # noinspection PyBroadException
         try:
-            # Totally basic validation for now.
+            # TODO: use a PipelineCompletionStatus object here
             return min(len(pipeline['inputs']),
                        len(pipeline['steps']),
                        len(pipeline['outputs'])) > 0
