@@ -173,24 +173,10 @@ class Command(BaseCommand):
             except (OSError, IOError) as ex:
                 if ex.errno != errno.ENOENT:
                     raise
-        # noinspection PyUnresolvedReferences,PyProtectedMember
-        short_size = ContainerLog._meta.get_field('short_text').max_length
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
-            file_path = os.path.join(logs_path, file_name)
-            file_size = os.lstat(file_path).st_size
-            with open(file_path) as f:
-                if file_size <= short_size:
-                    long_text = None
-                    short_text = f.read(short_size)
-                else:
-                    short_text = ''
-                    long_text = File(f)
-                log = run.logs.create(type=log_type, short_text=short_text)
-                if long_text is not None:
-                    upload_name = 'run_{}_{}'.format(run.id, file_name)
-                    log.long_text.save(upload_name, long_text)
+            run.load_log(os.path.join(logs_path, file_name), log_type)
 
         run.state = (ContainerRun.COMPLETE
                      if run.return_code == 0
@@ -275,6 +261,7 @@ class Command(BaseCommand):
             execution_args = [
                 "singularity",
                 "exec",
+                '--cleanenv',
                 "--contain",
                 "-B",
                 extracted_archive_dir + ':' + internal_binary_dir,

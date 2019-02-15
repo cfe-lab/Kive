@@ -86,6 +86,7 @@ mkdir /var/log/slurm /var/run/slurm /var/lib/slurm
 chown slurm:slurm /var/log/slurm/ /var/run/slurm/ /var/lib/slurm
 chown -R slurm:slurm /etc/slurm/
 chmod o-r /etc/slurm/slurmdbd.conf
+echo "d /var/run/slurm 0755 slurm slurm" > /usr/lib/tmpfiles.d/slurm.conf
 sed -i -e 's|/var/run/slurmdbd.pid|/var/run/slurm/slurmdbd.pid|' \
     /usr/lib/systemd/system/slurmdbd.service
 sed -i -e 's|/var/run/slurmctld.pid|/var/run/slurm/slurmctld.pid|' \

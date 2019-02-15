@@ -22,6 +22,7 @@ from collections import OrderedDict, namedtuple
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.files import File
 from django.core.validators import RegexValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Now
@@ -823,6 +824,7 @@ class ContainerRun(Stopwatch, AccessControl):
         help_text="True if the outputs or logs were redacted for sensitive data")
 
     datasets = None  # Filled in later by Django.
+    logs = None  # Filled in later by Django.
 
     sandbox_size = models.BigIntegerField(
         blank=True,
@@ -957,6 +959,9 @@ class ContainerRun(Stopwatch, AccessControl):
 
         for run_dataset in self.datasets.all():
             if run_dataset.argument.type == ContainerArgument.OUTPUT:
+                if getattr(run_dataset.dataset, 'file_source', None) is not None:
+                    # Dataset was converted from an old run. Don't remove it.
+                    continue
                 run_dataset.dataset.build_removal_plan(removal_plan)
 
         return removal_plan
@@ -979,6 +984,24 @@ class ContainerRun(Stopwatch, AccessControl):
         for file_path in sandbox_files:
             size_accumulator += os.path.getsize(file_path)
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
+
+    def load_log(self, file_path, log_type):
+        # noinspection PyUnresolvedReferences,PyProtectedMember
+        short_size = ContainerLog._meta.get_field('short_text').max_length
+        file_size = os.lstat(file_path).st_size
+        with open(file_path) as f:
+            if file_size <= short_size:
+                long_text = None
+                short_text = f.read(short_size)
+            else:
+                short_text = ''
+                long_text = File(f)
+            log = self.logs.create(type=log_type, short_text=short_text)
+            if long_text is not None:
+                upload_name = 'run_{}_{}'.format(
+                    self.pk,
+                    os.path.basename(file_path))
+                log.long_text.save(upload_name, long_text)
 
     @classmethod
     def set_sandbox_sizes(cls):
