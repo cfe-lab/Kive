@@ -12,7 +12,7 @@ from io import BytesIO
 from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 from tarfile import TarFile, TarInfo
-from tempfile import mkdtemp, mkstemp, NamedTemporaryFile
+from tempfile import mkdtemp, mkstemp
 import shutil
 import tarfile
 import io
@@ -29,11 +29,10 @@ from django.db.models.functions import Now
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
-from django.forms.fields import FileField as FileFormField
 import django.utils.six as dsix
 
 from constants import maxlengths
-from file_access_utils import compute_md5
+from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import file_access_utils
@@ -77,41 +76,6 @@ class ContainerFamily(AccessControl):
     def remove(self):
         removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
-
-
-class ContainerFileFormField(FileFormField):
-    def to_python(self, data):
-        """ Checks that the file-upload data contains a valid container. """
-        f = super(ContainerFileFormField, self).to_python(data)
-        if f is None:
-            return None
-
-        # We need to get a file object to validate. We might have a path or we might
-        # have to read the data out of memory.
-        if hasattr(data, 'temporary_file_path'):
-            Container.validate_container(data.temporary_file_path())
-        else:
-            upload_name = getattr(data, 'name', 'container')
-            upload_base, upload_ext = os.path.splitext(upload_name)
-            with NamedTemporaryFile(prefix=upload_base,
-                                    suffix=upload_ext) as f_temp:
-                if hasattr(data, 'read'):
-                    f_temp.write(data.read())
-                else:
-                    f_temp.write(data['content'])
-                f_temp.flush()
-                self.validate_container(f_temp.name)
-
-        if hasattr(f, 'seek') and callable(f.seek):
-            f.seek(0)
-        return f
-
-
-class ContainerFileField(models.FileField):
-    def formfield(self, **kwargs):
-        # noinspection PyTypeChecker
-        kwargs.setdefault('form_class', ContainerFileFormField)
-        return super(ContainerFileField, self).formfield(**kwargs)
 
 
 class ContainerNotChild(Exception):
@@ -286,6 +250,11 @@ class Container(AccessControl):
             raise ValidationError(cls.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
                                   code='invalid_singularity_container')
 
+    def save(self, *args, **kwargs):
+        if not self.md5:
+            self.set_md5()
+        super(Container, self).save(*args, **kwargs)
+
     def clean(self):
         """
         Confirm that the file is of the correct type.
@@ -300,7 +269,7 @@ class Container(AccessControl):
             # this step, we check for an "already validated" flag.
             if not getattr(self, "singularity_validated", False):
                 fd, file_path = mkstemp()
-                with io.open(fd, mode="w+b") as f:
+                with use_field_file(self.file), io.open(fd, mode="w+b") as f:
                     for chunk in self.file.chunks():
                         f.write(chunk)
 
@@ -317,34 +286,22 @@ class Container(AccessControl):
 
             if self.file_type == Container.ZIP:
                 try:
-                    was_closed = self.file.closed
-                    self.file.open()
-                    try:
+                    with use_field_file(self.file):
                         with ZipFile(self.file):
                             pass
-                    finally:
-                        if was_closed:
-                            self.file.close()
                 except BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
 
-            else:  # this is either a tarfile or a gzipped tar file
+            else:
+                assert self.file_type == Container.TAR
                 try:
-                    was_closed = self.file.closed
-                    self.file.open()
-                    try:
+                    with use_field_file(self.file):
                         with tarfile.open(fileobj=self.file, mode="r"):
                             pass
-                    finally:
-                        if was_closed:
-                            self.file.close()
                 except tarfile.ReadError:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                           code="invalid_archive")
-
-        # Leave the file open and ready to go for whatever comes next in the processing.
-        self.file.open()  # seeks to the 0 position if it's still open
 
     def set_md5(self):
         """
@@ -353,9 +310,10 @@ class Container(AccessControl):
         This leaves self.file open and seek'd to the 0 position.
         :return:
         """
-        self.file.open()  # seeks to 0 if it was already open
-        self.md5 = compute_md5(self.file)
-        self.file.open()  # leave it as we found it
+        if not self.file:
+            return
+        with use_field_file(self.file):
+            self.md5 = compute_md5(self.file)
 
     def validate_md5(self):
         """
@@ -412,9 +370,7 @@ class Container(AccessControl):
             file_mode = 'rb+'
         else:
             raise ValueError('Unsupported mode for archive content: {!r}.'.format(mode))
-        was_closed = self.file.closed
-        self.file.open(file_mode)
-        try:
+        with use_field_file(self.file, file_mode):
             if self.file_type == Container.ZIP:
                 archive = ZipHandler(self.file, mode)
             elif self.file_type == Container.TAR:
@@ -425,9 +381,6 @@ class Container(AccessControl):
                         self.file_type))
             yield archive
             archive.close()
-        finally:
-            if was_closed:
-                self.file.close()
 
     def get_content(self, add_default=True):
         with self.open_content() as archive:
@@ -460,6 +413,7 @@ class Container(AccessControl):
                 if file_name not in file_names:
                     archive.write(file_name, pipeline_json)
                     break
+        self.set_md5()
         self.create_app_from_content(content)
 
     def get_pipeline_state(self):

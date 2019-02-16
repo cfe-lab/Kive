@@ -13,11 +13,11 @@ import shutil
 import stat
 import time
 import io
+from contextlib import contextmanager
 from operator import itemgetter
 
 from django.conf import settings
 from django.utils import timezone
-from django.core.files.base import File
 import django.utils.six as dsix
 from django.db import transaction
 
@@ -203,6 +203,7 @@ def copyfile(src, dst, follow_symlinks=True):
     with python2.7, with the exception of the buffer size
     used in copying the file contents.
     """
+    # noinspection PyUnresolvedReferences,PyProtectedMember
     if shutil._samefile(src, dst):
         raise SameFileError("{!r} and {!r} are the same file".format(src, dst))
 
@@ -443,6 +444,7 @@ def purge_unregistered_files(directory_to_scan, class_to_check, file_attr, bytes
             relative_path = os.path.relpath(absolute_path, settings.MEDIA_ROOT)
             all_files.append((absolute_path, mod_time, size, relative_path))
 
+    # noinspection PyTypeChecker
     all_files = sorted(all_files, key=itemgetter(1))
 
     bytes_purged = 0
@@ -468,3 +470,25 @@ def purge_unregistered_files(directory_to_scan, class_to_check, file_attr, bytes
             break
 
     return bytes_purged, files_purged, known_files, still_new
+
+
+@contextmanager
+def use_field_file(field_file, mode='rb'):
+    """ Context manager for FieldFile objects.
+
+    Tries to leave a file object in the same state it was in when the context
+    manager started.
+    It's hard to tell when to close a FieldFile object. It opens implicitly
+    when you first read from it. Sometimes, it's an in-memory file object, and
+    it can't be reopened.
+    """
+    was_closed = field_file.closed
+    field_file.open(mode)
+    start_position = field_file.tell()
+    try:
+        yield field_file
+    finally:
+        if was_closed:
+            field_file.close()
+        else:
+            field_file.seek(start_position)

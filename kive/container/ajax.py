@@ -223,6 +223,7 @@ class ContainerViewSet(CleanCreateModelMixin,
             response_data = dict(pipeline=['This field is required.'])
         else:
             container.write_content(content)
+            container.save()
             response_data = container.get_content()
             status_code = Response.status_code
         return Response(response_data, status_code)

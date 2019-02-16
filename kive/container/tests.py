@@ -334,6 +334,8 @@ class ContainerTests(TestCase):
         app, = new_container.apps.all()
         self.assertEqual(expected_inputs, app.inputs)
         self.assertEqual(expected_outputs, app.outputs)
+        self.assertNotEqual('', new_container.md5)
+        self.assertIsNotNone(new_container.md5)
 
     def test_create_singularity_no_app(self):
         user = User.objects.first()
@@ -504,6 +506,8 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals(len(resp), start_count + 1)
         self.assertEquals(resp[0]['description'], expected_description)
+        self.assertNotEquals(resp[0]['md5'], '')
+        self.assertIsNotNone(resp[0]['md5'])
 
     def test_create_zip(self):
         expected_tag = "v1.0"
@@ -546,6 +550,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         self.test_container.file.save(
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
+        old_md5 = self.test_container.md5
         expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=400,
                                                                   threads=3),
@@ -560,6 +565,10 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         content = self.content_view(request1, pk=self.detail_pk).data
 
         self.assertEqual(expected_content, content)
+        self.test_container.refresh_from_db()
+        new_md5 = self.test_container.md5
+        self.assertNotEqual('', new_md5)
+        self.assertNotEqual(old_md5, new_md5)
 
     def test_put_bad_content(self):
         self.test_container.file_type = Container.ZIP

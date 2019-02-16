@@ -82,7 +82,6 @@ class ContainerCreate(CreateView, AdminViewMixin):
     def form_valid(self, form):
         form.instance.user = self.request.user
         form.instance.family = ContainerFamily.objects.get(pk=self.kwargs['family_id'])
-        form.instance.set_md5()
 
         response = super(ContainerCreate, self).form_valid(form)
         with transaction.atomic():
