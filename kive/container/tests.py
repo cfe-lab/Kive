@@ -1073,6 +1073,70 @@ class ContainerRunTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
+class ContainerLogTests(TestCase):
+    fixtures = ['container_run']
+
+    def setUp(self):
+        super(ContainerLogTests, self).setUp()
+        install_fixture_files('container_run')
+
+    def test_detail_view(self):
+        run = ContainerRun.objects.get(id=1)
+        log = run.logs.create(type=ContainerLog.STDOUT, short_text='.'*1001)
+
+        client = Client()
+        client.force_login(run.user)
+        response = client.get(reverse('container_log_detail',
+                                      kwargs=dict(pk=log.pk)))
+
+        self.assertEqual(200, response.status_code)
+
+    def test_short(self):
+        run = ContainerRun.objects.get(id=1)
+        log = run.logs.create(type=ContainerLog.STDOUT, short_text='.'*101)
+        expected_display = '.' * 101
+        expected_size_display = '101\xa0bytes'
+
+        self.assertEqual(expected_display, log.preview)
+        self.assertEqual(expected_size_display, log.size_display)
+
+    def test_trimmed(self):
+        run = ContainerRun.objects.get(id=1)
+        log = run.logs.create(type=ContainerLog.STDOUT, short_text='.'*1001)
+        expected_display = '.' * 1000 + '[...download to see the remaining 1\xa0byte.]'
+        expected_size_display = '1001\xa0bytes'
+
+        self.assertEqual(expected_display, log.preview)
+        self.assertEqual(expected_size_display, log.size_display)
+
+    def test_long(self):
+        run = ContainerRun.objects.get(id=1)
+        log = run.logs.create(type=ContainerLog.STDOUT)
+        os.makedirs(ContainerRun.SANDBOX_ROOT)
+        log_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'example.log')
+        with open(log_path, 'wb+') as f:
+            f.write(b'.'*2001)
+            long_text = File(f)
+            log.long_text.save('example.log', long_text)
+
+        expected_display = '.' * 1000 + '[...download to see the remaining 1001\xa0bytes.]'
+        expected_size_display = '2.0\xa0KB'
+
+        self.assertEqual(expected_display, log.preview)
+        self.assertEqual(expected_size_display, log.size_display)
+
+    def test_purged(self):
+        run = ContainerRun.objects.get(id=1)
+        log = run.logs.create(type=ContainerLog.STDOUT, log_size=2001)
+
+        expected_display = '[purged]'
+        expected_size_display = 'missing'
+
+        self.assertEqual(expected_display, log.preview)
+        self.assertEqual(expected_size_display, log.size_display)
+
+
+@skipIfDBFeature('is_mocked')
 class BatchApiTests(BaseTestCases.ApiTestCase):
     def setUp(self):
         super(BatchApiTests, self).setUp()

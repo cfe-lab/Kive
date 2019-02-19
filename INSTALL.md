@@ -4,11 +4,12 @@ Installation Instructions
 Prerequisites
 -------------
 
-Before installing Kive, you need to install some other software.
+Before installing Kive, you need to install some other software. See the
+requirements.txt file for recommended versions.
 
-* Python 2.x (version 2.7 or higher) - unfortunately we do not support Python 3.x.
-* Django (version 1.9 or higher)
-* the Django REST framework (version 3.3 or higher)
+* Python 2.x (version 2.7 or higher) - we are converting to Python 3.
+* Django
+* the Django REST framework
 * PostgreSQL
 * psycopg2 (Python library for interfacing with PostgreSQL)
 * scandir (python module for efficient scanning of a filesystem)

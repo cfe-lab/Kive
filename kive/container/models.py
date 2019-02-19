@@ -27,6 +27,7 @@ from django.core.validators import RegexValidator, MinValueValidator
 from django.db import models, transaction
 from django.db.models.functions import Now
 from django.dispatch import receiver
+from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
 from django.utils import timezone
 import django.utils.six as dsix
@@ -1139,6 +1140,39 @@ class ContainerLog(models.Model):
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
+
+    @property
+    def size(self):
+        """ Check the size of the log, either short or long.
+
+        :return: the size from whichever log is used, or None if the log was
+            purged.
+        """
+        if self.long_text:
+            return self.long_text.size
+        if self.log_size:
+            return None
+        # noinspection PyTypeChecker
+        return len(self.short_text)
+
+    @property
+    def size_display(self):
+        log_size = self.size
+        if log_size is None:
+            return 'missing'
+        return filesizeformat(log_size)
+
+    @property
+    def preview(self):
+        display_limit = 1000
+        log_size = self.size
+        if log_size is None:
+            return '[purged]'
+        display = self.read(display_limit)
+        if log_size > display_limit:
+            display += '[...download to see the remaining {}.]'.format(
+                filesizeformat(log_size - display_limit))
+        return display
 
     def read(self, size=None):
         if self.long_text:

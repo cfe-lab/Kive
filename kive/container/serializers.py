@@ -2,7 +2,7 @@ from rest_framework import serializers
 from rest_framework.fields import URLField
 
 from container.models import ContainerFamily, Container, ContainerApp, ContainerRun, Batch, ContainerDataset, \
-    ContainerArgument
+    ContainerArgument, ContainerLog
 from kive.serializers import AccessControlSerializer
 from librarian.models import Dataset
 
@@ -244,6 +244,8 @@ class ContainerRunSerializer(AccessControlSerializer,
                                           write_only=True)
     dataset_list = serializers.HyperlinkedIdentityField(
         view_name='containerrun-dataset-list')
+    log_list = serializers.HyperlinkedIdentityField(
+        view_name='containerrun-log-list')
     absolute_url = URLField(source='get_absolute_url', read_only=True)
     app = serializers.HyperlinkedRelatedField(
         view_name='containerapp-detail',
@@ -297,6 +299,7 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'groups_allowed',
                   'removal_plan',
                   'dataset_list',
+                  'log_list',
                   'datasets')
 
     def create(self, validated_data):
@@ -310,6 +313,24 @@ class ContainerRunSerializer(AccessControlSerializer,
             dataset['run'] = run
             dataset_serializer.create(dataset)
         return run
+
+
+class ContainerLogSerializer(serializers.ModelSerializer):
+    run = serializers.HyperlinkedRelatedField(
+        view_name='containerrun-detail',
+        lookup_field='pk',
+        queryset=ContainerRun.objects.all())
+    download_url = serializers.HyperlinkedIdentityField(
+        view_name='containerlog-download')
+
+    class Meta:
+        model = ContainerLog
+        fields = ('id',
+                  'url',
+                  'download_url',
+                  'run',
+                  'type',
+                  'size')
 
 
 class BatchSerializer(AccessControlSerializer,

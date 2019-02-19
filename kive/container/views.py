@@ -300,15 +300,11 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
                 input_count += 1
         log_names = dict(ContainerLog.TYPES)
         for log in self.object.logs.order_by('type'):
-            if log.long_text:
-                log_size = log.long_text.size
-            else:
-                log_size = len(log.short_text)
             data_entries.insert(input_count, dict(
                 type='Log',
                 url=log.get_absolute_url(),
                 name=log_names[log.type],
-                size=filesizeformat(log_size),
+                size=log.size_display,
                 created=self.object.end_time))
         context['data_entries'] = data_entries
         return context
@@ -326,3 +322,10 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
 @method_decorator(login_required, name='dispatch')
 class ContainerLogDetail(DetailView):
     model = ContainerLog
+
+    def get_context_data(self, **kwargs):
+        context = super(ContainerLogDetail, self).get_context_data(**kwargs)
+        if self.object.size:
+            context['download_url'] = reverse('containerlog-download',
+                                              kwargs=dict(pk=self.object.pk))
+        return context
