@@ -278,3 +278,16 @@ methods.
 
 Upload some input datasets to Kive, then try launching your container. If it
 fails, look at the stderr log to see what went wrong.
+
+### Reusing the Wiring
+Once your scripts are wired into a pipeline, Kive adds a `pipeline.json` file
+to your archive. You can use that when you copy your pipeline to another copy
+of Kive, or when you upload a new version of your scripts.
+
+To copy your pipeline to another copy of Kive, download the archive file and
+upload it to another copy of Kive. Then you won't need to redo the wiring.
+
+To reuse the wiring with a new version of your scripts, download the archive
+file, and extract the last `pipeline.json` file. Rename it to
+`kive/pipeline1.json` and add it the archive file with the new version of your
+scripts. Then upload the archive file.
