@@ -25,6 +25,7 @@ From: python:2.7.15-alpine3.6
 
 %post
     # Trim a bunch of extra features to reduce image size by about 25%.
+    # This is totally optional!
     cd /usr/local/lib/python2.7
     rm -r site-packages/* ensurepip hotshot distutils curses
     cd lib-dynload
