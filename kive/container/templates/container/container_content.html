@@ -45,16 +45,22 @@
         </ul>
 
         <form id="id_pipeline_form">{% csrf_token %}
-            <div id="form_ctrl">
-                <input type="submit" id="id_submit_button" value="Submit">
-                <div class="indicator-light"> </div>
-                <div class="errortext" id="id_submit_error"></div>
-            </div>
+            <table id="form_ctrls"><tr>
+                <td><span id="form_ctrl">
+                    <input type="submit" id="id_submit_button" value="Save">
+                    <div class="indicator-light"> </div>
+                    <div class="errortext" id="id_submit_error"></div>
+                </span></td>
+                <td>
+                    <input type="submit" id="id_submit_as_button" value="Save as...">
+                </td>
+            </tr></table>
         </form>
 
         <input id="id_pipeline_action" value="revise" type="hidden">
         {% include 'container/content_defaults_dialog.tpl.html'   with dlg_id="id_defaults_ctrl" %}
         {% include 'container/content_view_dialog.tpl.html'   with dlg_id="id_view_ctrl" %}
+        {% include 'container/content_save_as_dialog.tpl.html'   with dlg_id="id_save_as_ctrl" %}
 
         <div id="id_add_ctrl" class="ctrl_menu">
             <ul>

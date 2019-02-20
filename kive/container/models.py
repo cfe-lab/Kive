@@ -399,7 +399,8 @@ class Container(AccessControl):
             content = dict(files=sorted(entry.name
                                         for entry in archive.infolist()
                                         if not entry.name.startswith('kive/')),
-                           pipeline=pipeline)
+                           pipeline=pipeline,
+                           id=self.pk)
             return content
 
     def create_new_pipeline_revision(self, tag=None, description=None):

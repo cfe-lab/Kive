@@ -79,6 +79,7 @@ export class Dialog {
             this.show();
             // do not bubble up (which would hit document.click again)
             e.stopPropagation();
+            e.preventDefault();
         });
         // capture mouse/key events
         jqueryRef.on('click mousedown keydown', e => e.stopPropagation() );

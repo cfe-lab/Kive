@@ -120,6 +120,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
 
         content = container.get_content()
+        content.pop('id')
         self.assertEqual(expected_content, content)
 
     def test_loaded_zip_content(self):
@@ -143,6 +144,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
 
         content = container.get_content()
+        content.pop('id')
         self.assertEqual(expected_content, content)
 
     def test_loaded_tar_content(self):
@@ -166,6 +168,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
 
         content = container.get_content()
+        content.pop('id')
         self.assertEqual(expected_content, content)
 
     def test_revised_content(self):
@@ -190,6 +193,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
 
         content = container.get_content()
+        content.pop('id')
         self.assertEqual(expected_content, content)
 
     def test_content_order(self):
@@ -215,6 +219,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
 
         content = container.get_content()
+        content.pop('id')
         self.assertEqual(expected_content, content)
 
     def test_write_zip_content(self):
@@ -233,6 +238,7 @@ class ContainerTests(TestCase):
 
         container.write_content(expected_content)
         content = container.get_content()
+        content.pop('id')
 
         self.assertEqual(expected_content, content)
         self.assertEqual(expected_apps_count, container.apps.count())
@@ -253,6 +259,7 @@ class ContainerTests(TestCase):
 
         container.write_content(expected_content)
         content = container.get_content()
+        content.pop('id')
 
         self.assertEqual(expected_content, content)
         self.assertEqual(expected_apps_count, container.apps.count())
@@ -276,6 +283,7 @@ class ContainerTests(TestCase):
             warnings.showwarning = lambda message, *args: self.fail(message)
             container.write_content(expected_content)
         content = container.get_content()
+        content.pop('id')
 
         self.assertEqual(expected_content, content)
 
@@ -607,6 +615,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         request1 = self.factory.get(self.content_path)
         force_authenticate(request1, user=self.kive_user)
         content = self.content_view(request1, pk=self.detail_pk).data
+        content.pop('id')
 
         self.assertEqual(expected_content, content)
 
@@ -621,7 +630,8 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
                                                                   threads=3),
                                               inputs=[],
                                               steps=[],
-                                              outputs=[]))
+                                              outputs=[]),
+                                id=self.test_container.id)
 
         request1 = self.factory.put(self.content_path,
                                     expected_content,
@@ -642,6 +652,89 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             ContentFile(self.create_zip_content().getvalue()))
         bad_content = {}
         expected_content = dict(pipeline=["This field is required."])
+
+        request1 = self.factory.put(self.content_path,
+                                    bad_content,
+                                    format='json')
+        force_authenticate(request1, user=self.kive_user)
+        response = self.content_view(request1, pk=self.detail_pk)
+        content = response.data
+
+        self.assertEqual(expected_content, content)
+        self.assertEqual(400, response.status_code)
+
+    def test_write_content_copy(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.tag = 'v1'
+        self.test_container.description = 'v1 description'
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        put_content = dict(pipeline=dict(default_config=dict(memory=400,
+                                                             threads=3),
+                                         inputs=[],
+                                         steps=[],
+                                         outputs=[]),
+                           new_tag='v2')
+        expected_content = dict(files=["bar.txt", "foo.txt"],
+                                pipeline=dict(default_config=dict(memory=400,
+                                                                  threads=3),
+                                              inputs=[],
+                                              steps=[],
+                                              outputs=[]))  # id not shown here
+
+        request1 = self.factory.put(self.content_path,
+                                    put_content,
+                                    format='json')
+        force_authenticate(request1, user=self.kive_user)
+        content = self.content_view(request1, pk=self.detail_pk).data
+
+        new_container_id = content.pop('id')
+        self.assertNotEqual(self.test_container.id, new_container_id)  # New record
+        self.assertEqual(expected_content, content)
+        new_container = Container.objects.get(id=new_container_id)
+        self.assertEqual('v2', new_container.tag)
+        self.assertEqual('v1 description', new_container.description)
+        self.assertNotEqual(self.test_container.file.path, new_container.file.path)
+
+    def test_write_content_copy_with_description(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.tag = 'v1'
+        self.test_container.description = 'v1 description'
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        put_content = dict(pipeline=dict(default_config=dict(memory=400,
+                                                             threads=3),
+                                         inputs=[],
+                                         steps=[],
+                                         outputs=[]),
+                           new_tag='v2',
+                           new_description='v2 description')
+
+        request1 = self.factory.put(self.content_path,
+                                    put_content,
+                                    format='json')
+        force_authenticate(request1, user=self.kive_user)
+        content = self.content_view(request1, pk=self.detail_pk).data
+
+        new_container = Container.objects.get(id=content['id'])
+        self.assertEqual('v2', new_container.tag)
+        self.assertEqual('v2 description', new_container.description)
+
+    def test_write_content_duplicate_tag(self):
+        self.test_container.file_type = Container.ZIP
+        self.test_container.tag = 'v1'
+        self.test_container.file.save(
+            'test.zip',
+            ContentFile(self.create_zip_content().getvalue()))
+        bad_content = dict(pipeline=dict(default_config=dict(memory=400,
+                                                             threads=3),
+                                         inputs=[],
+                                         steps=[],
+                                         outputs=[]),
+                           new_tag='v1')  # Duplicate tag!
+        expected_content = dict(new_tag=["Tag already exists."])
 
         request1 = self.factory.put(self.content_path,
                                     bad_content,

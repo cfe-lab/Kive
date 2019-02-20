@@ -44,6 +44,7 @@ CanvasListeners.initResizeListeners(canvasState);
  */
 let text = $("#initial_data").text();
 let loader = new Pipeline(canvasState);
+let $containerPk = $('#id_container_pk');
 let $memory = $("#id_memory");
 let $threads = $("#id_threads");
 let $error = $('#id_submit_error');
@@ -88,6 +89,8 @@ pipelineCheckCompleteness();
 let $ctrl_nav = $("#id_ctrl_nav");
 let $add_menu = $('#id_add_ctrl');
 let $view_menu = $('#id_view_ctrl');
+let $save_as_ctrl = $('#id_save_as_ctrl');
+let $submit_as_ctrl = $('#id_submit_as_button');
 
 /* anonymous */       new Dialog( $('#id_defaults_ctrl'), $ctrl_nav.find("li[data-rel='#id_defaults_ctrl']") );
 /* anonymous */       new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
@@ -98,6 +101,7 @@ let method_dialog = new MethodDialog(
     $add_menu.find("li[data-rel='#id_method_ctrl']"),
     loader.container);
 let output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
+let save_as_dialog = new Dialog( $save_as_ctrl, $submit_as_ctrl );
 
 $add_menu.click('li', function() { add_menu.hide(); });
 
@@ -132,13 +136,27 @@ $view_menu.find('#autolayout_btn').click(
 /**
  * Part 5/8: Initialize the submission of this page
  */
-$('#id_pipeline_form').submit(buildPipelineSubmit(
+$('#form_ctrl').click(buildPipelineSubmit(
     canvasState,
-    $('#id_container_pk'),
+    $containerPk,
     $memory,
     $threads,
     $error
 ));
+$('#id_confirm_save_as').click(buildPipelineSubmit(
+    canvasState,
+    $containerPk,
+    $memory,
+    $threads,
+    $error,
+    $('#id_new_tag'),
+    $('#id_new_description'),
+    save_as_dialog
+));
+$('#id_cancel_save_as').click(function(e) {
+    e.preventDefault();
+    save_as_dialog.cancel();
+});
 
 /**
  * Part 6/8: Initialize context menu and register actions

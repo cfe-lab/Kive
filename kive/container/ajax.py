@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from datetime import datetime, timedelta
 from wsgiref.util import FileWrapper
 
+from django.core.files.base import File
 from django.db.models import Q
 from django.db.models.aggregates import Count
 from django.http import HttpResponse
@@ -12,6 +13,8 @@ from django.utils import timezone
 from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
+from rest_framework.renderers import JSONRenderer
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
@@ -21,6 +24,7 @@ from container.serializers import ContainerFamilySerializer, \
     ContainerSerializer, ContainerAppSerializer, \
     ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
     ContainerArgumentSerializer, ContainerDatasetSerializer, ContainerLogSerializer
+from file_access_utils import use_field_file
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination, \
     IsGrantedReadCreate, GrantedModelMixin, IsGrantedReadOnly
@@ -137,12 +141,43 @@ class ContainerChoiceViewSet(ReadOnlyModelViewSet, SearchableModelMixin):
             description__icontains=value))
 
 
+class ContainerRenderer(JSONRenderer):
+    """ Render the Raw data form for content_put to hold current content. """
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        if renderer_context['view'].action == 'content_put':
+            data = dict(renderer_context['response'].data)
+
+            # Remove ignored fields.
+            data.pop('files', None)
+            data.pop('id', None)
+
+            # Add new fields that trigger a copy.
+            data['new_tag'] = None
+            data['new_description'] = None
+        rendered = super(ContainerRenderer, self).render(data, accepted_media_type, renderer_context)
+        return rendered
+
+
+class ContainerJSONParser(JSONParser):
+    renderer_class = ContainerRenderer
+
+
 class ContainerViewSet(CleanCreateModelMixin,
                        RemovableModelViewSet,
                        SearchableModelMixin):
     """ A Singularity container.
 
-    Query parameters:
+    Extra actions:
+
+    * Container Apps - a list of apps in this container
+    * Download - download the container file
+    * Container Removal Plan - standard removal plan, including child records
+    * Container Content - pipeline definition for archive containers. You can
+        also PUT to this endpoint to update the pipeline definition. If your
+        PUT data includes `new_tag`, then it will write the new pipeline to
+        a copy of the container.
+
+    Container list query parameters:
 
     * is_granted - true For administrators, this limits the list to only include
         records that the user has been explicitly granted access to. For other
@@ -169,6 +204,7 @@ class ContainerViewSet(CleanCreateModelMixin,
     serializer_class = ContainerSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)
     pagination_class = StandardPagination
+    parser_classes = [ContainerJSONParser, FormParser, MultiPartParser]
     filters = dict(
         family_id=lambda queryset, value: queryset.filter(
             family_id=value),
@@ -220,9 +256,20 @@ class ContainerViewSet(CleanCreateModelMixin,
         container = self.get_object()
         content = request.data
         status_code = HttpResponseBadRequest.status_code
+        new_tag = content.get('new_tag')
+        new_description = content.get('new_description')
         if 'pipeline' not in content:
             response_data = dict(pipeline=['This field is required.'])
+        elif new_tag and Container.objects.filter(tag=new_tag).exists():
+            response_data = dict(new_tag=['Tag already exists.'])
         else:
+            if new_tag:
+                container.pk = None  # Saves a copy.
+                container.tag = new_tag
+                if new_description:
+                    container.description = new_description
+                with use_field_file(container.file):
+                    container.file.save(container.file.name, File(container.file))
             container.write_content(content)
             container.save()
             response_data = container.get_content()

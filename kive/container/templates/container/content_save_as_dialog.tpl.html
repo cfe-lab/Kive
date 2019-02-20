@@ -1,0 +1,20 @@
+<div id="{{ dlg_id }}" class="ctrl_menu">
+    <h3>Copy</h3>
+    <p>Copy to a new container.</p>
+
+    <h5>New tag</h5>
+    <input id="id_new_tag"
+           maxlength="128"
+           name="tag"
+           type="text"
+           value="{{ object.tag }}">
+    <h5>New description</h5>
+    <textarea id="id_new_description"
+              rows="5"
+              maxlength="1000"
+              name="description">{{ object.description }}</textarea>
+
+    <button id="id_confirm_save_as">OK</button>
+
+    <button id="id_cancel_save_as">Cancel</button>
+</div>

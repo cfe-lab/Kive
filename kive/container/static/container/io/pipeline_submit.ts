@@ -2,13 +2,17 @@ import { CanvasState } from "../canvas/drydock";
 import { RestApi } from "../rest_api.service";
 import { serializePipeline } from "./serializer";
 import {PipelineConfig} from "@container/io/PipelineApi";
+import {Dialog} from "@container/pipeline_dialogs";
 
 export function buildPipelineSubmit(
     canvasState: CanvasState,
     $container_pk: JQuery,
     $memory: JQuery, // in MB
     $threads: JQuery,
-    $error: JQuery) {
+    $error: JQuery,
+    $new_tag?: JQuery,
+    $new_description?: JQuery,
+    $save_as_dialog?: Dialog) {
 
     if ($container_pk.length === 0) {
         throw 'Container primary key element could not be found.';
@@ -24,6 +28,12 @@ export function buildPipelineSubmit(
     }
     if ($error.length === 0) {
         throw "User error message element could not be found.";
+    }
+    if ($new_tag !== undefined && $new_tag.length === 0) {
+        throw "New tag element could not be found.";
+    }
+    if ($new_description !== undefined && $new_description.length === 0) {
+        throw "New description element could not be found.";
     }
 
     /*
@@ -42,11 +52,18 @@ export function buildPipelineSubmit(
                 memory: memory,
                 threads: threads
             };
+            if ($new_tag !== undefined) {
+                form_data.new_tag = $new_tag.val();
+                form_data.new_description = $new_description.val();
+            }
 
             submitPipelineAjax(container_pk, form_data, $error);
 
         } catch (e) {
             submitError(e, $error);
+        }
+        if ($save_as_dialog !== undefined) {
+            $save_as_dialog.hide();
         }
     };
 }
@@ -89,9 +106,9 @@ function submitPipelineAjax(container_pk, form_data, $error) {
     return RestApi.put(
         '/api/containers/' + container_pk + '/content/',
         JSON.stringify(form_data),
-        function() {
+        function(data) {
             $(window).off('beforeunload');
-            window.location.href = '/container_update/' + container_pk;
+            window.location.href = '/container_update/' + data.id;
         },
         function (xhr, status, error) {
             let json = xhr.responseJSON;

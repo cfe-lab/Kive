@@ -10,6 +10,9 @@ export interface PipelineData {
 export interface Container {
     files: string[];
     pipeline: PipelineData;
+    id?: number;
+    new_tag?: string;
+    new_description?: string;
 }
 export interface PipelineConfig {
     parent_family: string;
