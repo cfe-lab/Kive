@@ -86,7 +86,7 @@ class ContainerSerializer(AccessControlSerializer,
     def create(self, validated_data):
         container = super(ContainerSerializer, self).create(validated_data)
         if container.file_type != Container.SIMG:
-            container.update_content_or_create_new_container()
+            container.create_app_from_content()
         return container
 
 

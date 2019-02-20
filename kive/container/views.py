@@ -88,7 +88,7 @@ class ContainerCreate(CreateView, AdminViewMixin):
             self.object.grant_from_json(form.cleaned_data["permissions"])
             self.object.validate_restrict_access([self.object.family])
             if self.object.file_type != Container.SIMG:
-                self.object.update_content_or_create_new_container()
+                self.object.create_app_from_content()
         return response
 
     def get_success_url(self):

@@ -19,7 +19,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, Batch, ContainerArgument, ContainerDataset, ContainerLog
+    ContainerRun, Batch, ContainerArgument, ContainerDataset, ContainerLog, ExistingRunsError
 from container.serializers import ContainerFamilySerializer, \
     ContainerSerializer, ContainerAppSerializer, \
     ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
@@ -263,17 +263,26 @@ class ContainerViewSet(CleanCreateModelMixin,
         elif new_tag and Container.objects.filter(tag=new_tag).exists():
             response_data = dict(new_tag=['Tag already exists.'])
         else:
-            if new_tag:
+            if not new_tag:
+                permissions_copy = None
+            else:
+                permissions_copy = (list(container.users_allowed.all()),
+                                    list(container.groups_allowed.all()))
                 container.pk = None  # Saves a copy.
                 container.tag = new_tag
                 if new_description:
                     container.description = new_description
                 with use_field_file(container.file):
                     container.file.save(container.file.name, File(container.file))
-            container.write_content(content)
-            container.save()
-            response_data = container.get_content()
-            status_code = Response.status_code
+            try:
+                container.write_content(content)
+                container.save()
+                if permissions_copy:
+                    container.grant_from_permissions_list(permissions_copy)
+                response_data = container.get_content()
+                status_code = Response.status_code
+            except ExistingRunsError as ex:
+                response_data = dict(pipeline=[ex.args[0]])
         return Response(response_data, status_code)
 
 

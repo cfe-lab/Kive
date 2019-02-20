@@ -141,6 +141,13 @@ class PipelineCompletionStatus(object):
                 self.add_dangling_output(output_dict["dataset_name"])
 
 
+class ExistingRunsError(Exception):
+    def __init__(self, message=None):
+        if message is None:
+            message = 'Container has runs. Save changes as a new container.'
+        super(ExistingRunsError, self).__init__(message)
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
@@ -403,62 +410,10 @@ class Container(AccessControl):
                            id=self.pk)
             return content
 
-    def create_new_pipeline_revision(self, tag=None, description=None):
-        """
-        Create a new Container that is a copy of this one.
-
-        :return:
-        """
-        new_revision = Container(
-            user=self.user,
-            family=self.family,
-            file_type=self.file_type,
-            parent=self.parent,
-            tag=tag,
-            description=description if description is not None else self.description
-        )
-        with use_field_file(self.file):
-            new_revision.file.save(self.file.name, self.file, save=True)
-        new_revision.copy_permissions(self)
-        return new_revision
-
-    def update_content_or_create_new_container(self, content=None):
-        """
-        Updates the content of this archive container if possible; otherwise creates a new one.
-
-        :return: the resulting container (either this one or the new one)
-        """
-        if content is None:
-            content = self.get_content()
-        pipeline = content['pipeline']
-        if not self.pipeline_valid(pipeline):
-            return
-
-        # Protect this with a transaction so that it fails if someone uses this archive container.
-        resulting_container = self
-        with transaction.atomic():
-            if self.apps.exists() and self.apps.first().has_been_used():
-                new_tag = content["new_tag"]
-                new_description = content["new_description"]
-                resulting_container = self.create_new_pipeline_revision(new_tag, new_description)
-
-            resulting_container.apps.all().delete()
-            default_config = pipeline.get('default_config',
-                                          self.DEFAULT_APP_CONFIG)
-            app = resulting_container.apps.create(memory=default_config['memory'],
-                                   threads=default_config['threads'])
-            input_names = ' '.join(entry['dataset_name']
-                                   for entry in pipeline['inputs'])
-            output_names = ' '.join(entry['dataset_name']
-                                    for entry in pipeline['outputs'])
-            app.write_inputs(input_names)
-            app.write_outputs(output_names)
-
-        # Write the content to the container.
-        resulting_container.write_content(content)
-        return resulting_container
-
     def write_content(self, content):
+        related_runs = ContainerRun.objects.filter(app__in=self.apps.all())
+        if related_runs.exists():
+            raise ExistingRunsError()
         pipeline = content['pipeline']
         pipeline_json = json.dumps(pipeline)
         with self.open_content('a') as archive:
@@ -471,6 +426,7 @@ class Container(AccessControl):
                     archive.write(file_name, pipeline_json)
                     break
         self.set_md5()
+        self.create_app_from_content(content)
 
     def get_pipeline_state(self):
         content = self.get_content(add_default=False)
@@ -480,6 +436,27 @@ class Container(AccessControl):
         if self.pipeline_valid(pipeline):
             return self.VALID
         return self.INCOMPLETE
+
+    def create_app_from_content(self, content=None):
+        """ Create an app based on the content configuration.
+
+        :raises ValueError: if this is not an archive container
+        """
+        if content is None:
+            content = self.get_content()
+        pipeline = content['pipeline']
+        if self.pipeline_valid(pipeline):
+            self.apps.all().delete()
+            default_config = pipeline.get('default_config',
+                                          self.DEFAULT_APP_CONFIG)
+            app = self.apps.create(memory=default_config['memory'],
+                                   threads=default_config['threads'])
+            input_names = ' '.join(entry['dataset_name']
+                                   for entry in pipeline['inputs'])
+            output_names = ' '.join(entry['dataset_name']
+                                    for entry in pipeline['outputs'])
+            app.write_inputs(input_names)
+            app.write_outputs(output_names)
 
     @staticmethod
     def pipeline_valid(pipeline):
@@ -723,13 +700,6 @@ class ContainerApp(models.Model):
     def remove(self):
         removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
-
-    def has_been_used(self):
-        """
-        True if this app has ever been used; False otherwise.
-        :return:
-        """
-        return self.runs.exists()
 
 
 class ContainerArgument(models.Model):

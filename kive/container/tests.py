@@ -33,7 +33,7 @@ from rest_framework.test import force_authenticate
 
 from container.management.commands import purge, runcontainer
 from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus
+    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus, ExistingRunsError
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
@@ -234,14 +234,12 @@ class ContainerTests(TestCase):
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
-        expected_apps_count = 0  # write_content does not create an app
 
         container.write_content(expected_content)
         content = container.get_content()
         content.pop('id')
 
         self.assertEqual(expected_content, content)
-        self.assertEqual(expected_apps_count, container.apps.count())
 
     def test_write_tar_content(self):
         user = User.objects.first()
@@ -255,7 +253,7 @@ class ContainerTests(TestCase):
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
-        expected_apps_count = 0  # write_content does not create an app
+        expected_apps_count = 0  # Pipeline is incomplete, so no app created.
 
         container.write_content(expected_content)
         content = container.get_content()
@@ -313,7 +311,7 @@ class ContainerTests(TestCase):
         expected_inputs = "in1"
         expected_outputs = "out1"
 
-        container.update_content_or_create_new_container(expected_content)
+        container.write_content(expected_content)
 
         self.assertEqual(expected_apps_count, container.apps.count())
         app = container.apps.first()
@@ -330,7 +328,6 @@ class ContainerTests(TestCase):
         self.create_tar_content(container)
         container.save()
         updated_content = dict(
-            files=["bar.txt", "foo.txt"],
             pipeline=dict(default_config=dict(memory=200,
                                               threads=2),
                           inputs=[dict(dataset_name='in1')],
@@ -342,7 +339,9 @@ class ContainerTests(TestCase):
                           outputs=[dict(dataset_name="out1",
                                         source_step=1,
                                         source_dataset_name="out1")]))
-        container.update_content_or_create_new_container(updated_content)
+        container.write_content(updated_content)
+        container.save()
+        old_md5 = container.md5
         app = container.apps.first()
         app.runs.create(
             name="foo",
@@ -350,11 +349,8 @@ class ContainerTests(TestCase):
             user=user
         )
 
-        # Now, update the content.  This should create a new container.
+        # Now, update the content.  This should complain about the run.
         updated_content = dict(
-            files=["bar.txt", "foo.txt"],
-            new_tag="updated",
-            new_description="foo",
             pipeline=dict(default_config=dict(memory=200,
                                               threads=2),
                           inputs=[dict(dataset_name='input1')],
@@ -366,23 +362,12 @@ class ContainerTests(TestCase):
                           outputs=[dict(dataset_name="output1",
                                         source_step=1,
                                         source_dataset_name="out1")]))
-        updated_container = container.update_content_or_create_new_container(updated_content)
+        with self.assertRaises(ExistingRunsError):
+            container.write_content(updated_content)
 
-        expected_apps_count = 1
-        expected_memory = 200
-        expected_threads = 2
-        expected_inputs = "input1"
-        expected_outputs = "output1"
+        container.refresh_from_db()
 
-        self.assertEqual(expected_apps_count, updated_container.apps.count())
-        self.assertNotEqual(updated_container.pk, container.pk)
-        self.assertEqual("updated", updated_container.tag)
-        self.assertEqual("foo", updated_container.description)
-        app = updated_container.apps.first()
-        self.assertEqual(expected_memory, app.memory)
-        self.assertEqual(expected_threads, app.threads)
-        self.assertEqual(expected_inputs, app.inputs)
-        self.assertEqual(expected_outputs, app.outputs)
+        self.assertEqual(old_md5, container.md5)
 
     def test_create_content_and_app(self):
         user = User.objects.first()
@@ -764,6 +749,47 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         container_id = resp['id']
         container = Container.objects.get(id=container_id)
         self.assertEqual(1, container.apps.count())
+
+    def test_write_content_existing_run(self):
+        tar_bytes = create_valid_tar_content()
+        request1 = self.factory.post(self.list_path,
+                                     dict(tag='v1.0',
+                                          family=self.family_path,
+                                          parent=self.detail_path,
+                                          description='A really cool container',
+                                          file_type=Container.TAR,
+                                          file=ContentFile(tar_bytes.getvalue(),
+                                                           "container.tar")))
+
+        force_authenticate(request1, user=self.kive_user)
+        container_id = self.list_view(request1).data['id']
+        container = Container.objects.get(id=container_id)
+        app = container.apps.first()
+        app.runs.create(
+            name="foo",
+            state=ContainerRun.NEW,
+            user=self.kive_user)
+
+        put_content = dict(pipeline=dict(default_config=dict(memory=400,
+                                                             threads=3),
+                                         inputs=[],
+                                         steps=[],
+                                         outputs=[]))
+        expected_content = dict(
+            pipeline=["Container has runs. Save changes as a new container."])
+
+        content_path = reverse("container-content",
+                               kwargs={'pk': container_id})
+        content_view, _, _ = resolve(content_path)
+        request2 = self.factory.put(content_path,
+                                    put_content,
+                                    format='json')
+        force_authenticate(request2, user=self.kive_user)
+        response2 = content_view(request2, pk=container_id)
+        content = response2.data
+
+        self.assertEqual(expected_content, content)
+        self.assertEqual(400, response2.status_code)
 
 
 @skipIfDBFeature('is_mocked')
