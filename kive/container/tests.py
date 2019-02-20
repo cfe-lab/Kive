@@ -229,11 +229,13 @@ class ContainerTests(TestCase):
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
+        expected_apps_count = 0  # write_content does not create an app
 
         container.write_content(expected_content)
         content = container.get_content()
 
         self.assertEqual(expected_content, content)
+        self.assertEqual(expected_apps_count, container.apps.count())
 
     def test_write_tar_content(self):
         user = User.objects.first()
@@ -247,7 +249,7 @@ class ContainerTests(TestCase):
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
-        expected_apps_count = 0  # Pipeline is incomplete, so no app created.
+        expected_apps_count = 0  # write_content does not create an app
 
         container.write_content(expected_content)
         content = container.get_content()
@@ -277,7 +279,8 @@ class ContainerTests(TestCase):
 
         self.assertEqual(expected_content, content)
 
-    def test_write_content_and_app(self):
+    def test_write_complete_content(self):
+        """Writing a proper pipeline both updates the content and creates a new app."""
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
@@ -302,10 +305,72 @@ class ContainerTests(TestCase):
         expected_inputs = "in1"
         expected_outputs = "out1"
 
-        container.write_content(expected_content)
+        container.update_content_or_create_new_container(expected_content)
 
         self.assertEqual(expected_apps_count, container.apps.count())
         app = container.apps.first()
+        self.assertEqual(expected_memory, app.memory)
+        self.assertEqual(expected_threads, app.threads)
+        self.assertEqual(expected_inputs, app.inputs)
+        self.assertEqual(expected_outputs, app.outputs)
+
+    def test_write_complete_content_to_container_with_existing_runs(self):
+        """Writing a proper pipeline to a container that has existing runs creates a new container."""
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_tar_content(container)
+        container.save()
+        updated_content = dict(
+            files=["bar.txt", "foo.txt"],
+            pipeline=dict(default_config=dict(memory=200,
+                                              threads=2),
+                          inputs=[dict(dataset_name='in1')],
+                          steps=[dict(driver='foo.txt',
+                                      inputs=[dict(dataset_name="in1",
+                                                   source_step=0,
+                                                   source_dataset_name="in1")],
+                                      outputs=["out1"])],
+                          outputs=[dict(dataset_name="out1",
+                                        source_step=1,
+                                        source_dataset_name="out1")]))
+        container.update_content_or_create_new_container(updated_content)
+        app = container.apps.first()
+        app.runs.create(
+            name="foo",
+            state=ContainerRun.NEW,
+            user=user
+        )
+
+        # Now, update the content.  This should create a new container.
+        updated_content = dict(
+            files=["bar.txt", "foo.txt"],
+            new_tag="updated",
+            new_description="foo",
+            pipeline=dict(default_config=dict(memory=200,
+                                              threads=2),
+                          inputs=[dict(dataset_name='input1')],
+                          steps=[dict(driver='foo.txt',
+                                      inputs=[dict(dataset_name="in1",
+                                                   source_step=0,
+                                                   source_dataset_name="input1")],
+                                      outputs=["out1"])],
+                          outputs=[dict(dataset_name="output1",
+                                        source_step=1,
+                                        source_dataset_name="out1")]))
+        updated_container = container.update_content_or_create_new_container(updated_content)
+
+        expected_apps_count = 1
+        expected_memory = 200
+        expected_threads = 2
+        expected_inputs = "input1"
+        expected_outputs = "output1"
+
+        self.assertEqual(expected_apps_count, updated_container.apps.count())
+        self.assertNotEqual(updated_container.pk, container.pk)
+        self.assertEqual("updated", updated_container.tag)
+        self.assertEqual("foo", updated_container.description)
+        app = updated_container.apps.first()
         self.assertEqual(expected_memory, app.memory)
         self.assertEqual(expected_threads, app.threads)
         self.assertEqual(expected_inputs, app.inputs)
