@@ -125,12 +125,15 @@ class BaseTestCases(object):
             Test that the API URL is correctly defined and requires a logged-in user.
             """
             # First try to access while not logged in.
+            # noinspection PyUnresolvedReferences
             request = self.factory.get(self.list_path)
+            # noinspection PyUnresolvedReferences
             response = self.list_view(request)
             self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
 
             # Now log in and check that "detail" is not passed in the response.
             force_authenticate(request, user=self.kive_user)
+            # noinspection PyUnresolvedReferences
             response = self.list_view(request)
             self.assertNotIn('detail', response.data)
 
@@ -205,11 +208,13 @@ class BaseTestCases(object):
             self.assertTrue(run.is_successful())
 
 
+# noinspection PyUnusedLocal
 def dummy_file(content, name='dummy_file', mode='rb'):
     """ Create an in-memory, file-like object.
 
     :param str content: the contents of the file
     :param str name: a name for the file
+    :param str mode: the mode to open the file (ignored)
     :return: an object that looks like an open file handle.
     """
 
@@ -282,15 +287,19 @@ def strip_removal_plan(plan):
 
 
 @contextmanager
-def capture_log_stream(log_level, logger_name):
+def capture_log_stream(log_level, *logger_names):
     mocked_stderr = StringIO()
     stream_handler = logging.StreamHandler(mocked_stderr)
-    logger = logging.getLogger(logger_name)
-    logger.addHandler(stream_handler)
-    old_level = logger.level
-    logger.level = log_level
+    old_levels = {}
+    loggers = {}
+    for logger_name in logger_names:
+        logger = logging.getLogger(logger_name)
+        logger.addHandler(stream_handler)
+        old_levels[logger_name] = logger.level
+        logger.level = log_level
     try:
         yield mocked_stderr
     finally:
-        logger.removeHandler(stream_handler)
-        logger.level = old_level
+        for logger_name, logger in loggers.items():
+            logger.removeHandler(stream_handler)
+            logger.level = old_levels[logger_name]

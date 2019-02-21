@@ -36,7 +36,6 @@ from constants import maxlengths
 from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
-import file_access_utils
 import container.deffile as deffile
 
 logger = logging.getLogger(__name__)
@@ -578,30 +577,6 @@ class Container(AccessControl):
         for file_name in os.listdir(absolute_root):
             yield os.path.join(relative_root, file_name)
 
-    @classmethod
-    def set_file_sizes(cls):
-        """ Set all missing file sizes. """
-        to_set = cls.objects.filter(
-            file__isnull=False,
-            file_size__isnull=True).exclude(file='')
-        for x in to_set:
-            try:
-                x.file_size = x.file.size
-                x.save()
-            except OSError:
-                logger.error('Failed to set file size for container id %d.',
-                             x.id,
-                             exc_info=True)
-
-    @classmethod
-    def known_storage_used(cls):
-        """ Get the total amount of active storage recorded. """
-
-        return cls.objects.exclude(
-            file='').exclude(  # Purged for some reason
-            file=None).aggregate(  # No file?
-            models.Sum('file_size'))['file_size__sum'] or 0
-
 
 class ZipHandler(object):
     MemberInfo = namedtuple('MemberInfo', 'name original')
@@ -921,7 +896,7 @@ class ContainerRun(Stopwatch, AccessControl):
 
     sandbox_purged = models.BooleanField(
         default=False,
-        help_text="True if the sandbox has already been purged, False otherwise."
+        help_text="No longer used. Sandbox path is blank when purged."
     )
 
     class Meta(object):
@@ -1059,20 +1034,6 @@ class ContainerRun(Stopwatch, AccessControl):
         removal_plan = self.build_removal_plan()
         remove_helper(removal_plan)
 
-    def calculate_sandbox_size(self):
-        """
-        Compute the size of this ContainerRun's sandbox and Slurm logs.
-        :return int: size
-        """
-        assert not self.sandbox_purged
-        size_accumulator = 0
-        sandbox_files = (os.path.join(root, file_name)
-                         for root, _, files in os.walk(self.full_sandbox_path)
-                         for file_name in files)
-        for file_path in sandbox_files:
-            size_accumulator += os.path.getsize(file_path)
-        return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
-
     def load_log(self, file_path, log_type):
         # noinspection PyUnresolvedReferences,PyProtectedMember
         short_size = ContainerLog._meta.get_field('short_text').max_length
@@ -1091,39 +1052,15 @@ class ContainerRun(Stopwatch, AccessControl):
                     os.path.basename(file_path))
                 log.long_text.save(upload_name, long_text)
 
-    @classmethod
-    def set_sandbox_sizes(cls):
-        runs_to_size = cls.objects.filter(
-            end_time__isnull=False,
-            sandbox_size__isnull=True,
-            sandbox_purged=False).exclude(sandbox_path='')
-        for run in runs_to_size:
-            run.sandbox_size = run.calculate_sandbox_size()
-            run.save()
-
-    @classmethod
-    def known_storage_used(cls):
-        """ Get the total amount of active storage recorded. """
-
-        return cls.objects.filter(
-            sandbox_purged=False).aggregate(
-            models.Sum('sandbox_size'))['sandbox_size__sum'] or 0
-
     def delete_sandbox(self):
-        """
-        Delete the sandbox.
-
-        Note that this does *not* set self.purged to True.
-        :return:
-        """
-        assert not self.sandbox_purged
+        assert self.sandbox_path
         shutil.rmtree(self.full_sandbox_path)
+        self.sandbox_path = ''
 
     @classmethod
     def find_unneeded(cls):
         """ A queryset of records that could be purged. """
-        return cls.objects.filter(sandbox_purged=False,
-                                  sandbox_size__isnull=False).exclude(
+        return cls.objects.filter(sandbox_size__isnull=False).exclude(
             sandbox_path='')
 
     @classmethod
@@ -1267,47 +1204,6 @@ class ContainerLog(models.Model):
         return self.short_text[:size]
 
     @classmethod
-    def total_storage_used(cls):
-        """
-        Return the number of bytes used by all ContainerLogs.
-        :return:
-        """
-        return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
-
-    @classmethod
-    def set_log_sizes(cls):
-        """
-        Scan through all logs that do not have their log sizes set and set them.
-        :return:
-        """
-        logs_to_set = cls.objects.filter(
-            long_text__isnull=False,
-            log_size__isnull=True).exclude(long_text='')
-        for log in logs_to_set:
-            with transaction.atomic():
-                try:
-                    log.log_size = log.long_text.size
-                    log.save()
-                except ValueError:
-                    # This has somehow disappeared in the interim, so pass.
-                    pass
-
-    @classmethod
-    def known_storage_used(cls):
-        """ Get the total amount of active storage recorded. """
-        return cls.objects.exclude(
-            long_text='').exclude(  # Already purged.
-            long_text=None).aggregate(  # Short text.
-            models.Sum('log_size'))['log_size__sum'] or 0
-
-    def currently_being_used(self):
-        """
-        Returns True if this is currently in use by an active ContainerRun; False otherwise.
-        :return:
-        """
-        return self.run.state in ContainerRun.ACTIVE_STATES
-
-    @classmethod
     def find_unneeded(cls):
         """ A queryset of records that could be purged. """
         return cls.objects.exclude(
@@ -1325,45 +1221,3 @@ class ContainerLog(models.Model):
 
         for file_name in os.listdir(absolute_root):
             yield os.path.join(relative_root, file_name)
-
-    @classmethod
-    def purge_registered_logs(cls, bytes_to_purge, date_cutoff=None):
-        """
-        Purge ContainerLogs in chronological order until the target number of bytes is achieved.
-
-        If date_cutoff is specified, retain files newer than this.
-
-        :param bytes_to_purge:
-        :param date_cutoff: a datetime object
-        :return:
-        """
-        # Exclude Datasets that are currently in use or have no file (i.e. had short logs or their log was already
-        # purged).
-        expendable_logs = cls.objects.exclude(
-            run__state__in=ContainerRun.ACTIVE_STATES,
-            long_text__isnull=True
-        )
-        if date_cutoff is not None:
-            expendable_logs = expendable_logs.exclude(run__end_time__gte=date_cutoff)
-
-        return file_access_utils.purge_registered_files(expendable_logs, "long_text", bytes_to_purge)
-
-    @classmethod
-    def purge_unregistered_logs(cls, bytes_to_purge=None, date_cutoff=None):
-        """
-        Clean up files in the ContainerLog folder that do not belong to any known ContainerLogs.
-
-        Files are removed in order from oldest to newest.  If date_cutoff is specified then
-        anything newer than it is not deleted.
-
-        :param bytes_to_purge: a target number of bytes to remove.  If this is None, just remove everything.
-        :param date_cutoff: a datetime object.
-        :return:
-        """
-        return file_access_utils.purge_unregistered_files(
-            os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR),
-            cls,
-            "long_text",
-            bytes_to_purge=bytes_to_purge,
-            date_cutoff=date_cutoff
-        )

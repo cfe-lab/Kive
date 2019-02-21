@@ -1923,11 +1923,8 @@ class PurgeTests(TestCase):
             os.remove(os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR, 'README.md'))
         except OSError:
             pass
-        for run in ContainerRun.objects.filter(
-                sandbox_purged=False).exclude(
-                sandbox_path=''):
+        for run in ContainerRun.objects.exclude(sandbox_path=''):
             run.delete_sandbox()
-            run.sandbox_purged = True
             run.save()
         for log in ContainerLog.objects.exclude(long_text='').exclude(
                 long_text=None):
@@ -1946,7 +1943,7 @@ class PurgeTests(TestCase):
         purge.Command().handle(start=50, stop=50)
 
         run.refresh_from_db()
-        self.assertFalse(run.sandbox_purged)
+        self.assertNotEqual('', run.sandbox_path)
         self.assertTrue(os.path.exists(run.full_sandbox_path))
         self.assertIsNone(run.sandbox_size)
 
@@ -1958,8 +1955,8 @@ class PurgeTests(TestCase):
 
         run1.refresh_from_db()
         run2.refresh_from_db()
-        self.assertFalse(run1.sandbox_purged)
-        self.assertFalse(run2.sandbox_purged)
+        self.assertNotEqual('', run1.sandbox_path)
+        self.assertNotEqual('', run2.sandbox_path)
         self.assertTrue(os.path.exists(run1.full_sandbox_path))
         self.assertEqual(100, run1.sandbox_size)
 
@@ -1972,21 +1969,22 @@ class PurgeTests(TestCase):
         purge.Command().handle(start=400, stop=400)
 
         run.refresh_from_db()
-        self.assertFalse(run.sandbox_purged)
         self.assertIsNone(run.sandbox_size)
 
     def test_purge_folder(self):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+        run1_path = run1.full_sandbox_path
+        run2_path = run2.full_sandbox_path
 
         purge.Command().handle(start=500, stop=500)
 
         run1.refresh_from_db()
         run2.refresh_from_db()
-        self.assertTrue(run1.sandbox_purged)
-        self.assertFalse(run2.sandbox_purged)
-        self.assertFalse(os.path.exists(run1.full_sandbox_path))
-        self.assertTrue(os.path.exists(run2.full_sandbox_path))
+        self.assertEqual('', run1.sandbox_path)
+        self.assertNotEqual('', run2.sandbox_path)
+        self.assertFalse(os.path.exists(run1_path))
+        self.assertTrue(os.path.exists(run2_path))
         self.assertEqual(200, run1.sandbox_size)
 
     def test_purge_start(self):
@@ -1997,8 +1995,8 @@ class PurgeTests(TestCase):
 
         run1.refresh_from_db()
         run2.refresh_from_db()
-        self.assertFalse(run1.sandbox_purged)
-        self.assertFalse(run2.sandbox_purged)
+        self.assertNotEqual('', run1.sandbox_path)
+        self.assertNotEqual('', run2.sandbox_path)
 
     def test_purge_stop(self):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
@@ -2008,8 +2006,8 @@ class PurgeTests(TestCase):
 
         run1.refresh_from_db()
         run2.refresh_from_db()
-        self.assertTrue(run1.sandbox_purged)
-        self.assertTrue(run2.sandbox_purged)
+        self.assertEqual('', run1.sandbox_path)
+        self.assertEqual('', run2.sandbox_path)
 
     def test_unregistered_folder(self):
         run = self.create_sandbox(size=500)
@@ -2022,7 +2020,7 @@ class PurgeTests(TestCase):
         purge.Command().handle(start=400, stop=400, synch=True)
 
         run.refresh_from_db()
-        self.assertFalse(run.sandbox_purged)  # registered sandboxes skipped
+        self.assertNotEqual('', run.sandbox_path)  # registered sandboxes skipped
         self.assertFalse(os.path.exists(left_overs_path))
         self.assertTrue(os.path.exists(run.full_sandbox_path))
 
@@ -2154,7 +2152,7 @@ Purged 11 unregistered container run files containing 11.0 KB.
 
         run.refresh_from_db()
         dataset = run.datasets.filter(argument__type='O').get().dataset
-        self.assertTrue(run.sandbox_purged)
+        self.assertEqual('', run.sandbox_path)
         self.assertNotEqual('', dataset.dataset_file)  # Not purged.
 
     def test_sandbox_and_output(self):
@@ -2165,7 +2163,7 @@ Purged 11 unregistered container run files containing 11.0 KB.
 
         run.refresh_from_db()
         dataset = run.datasets.filter(argument__type='O').get().dataset
-        self.assertTrue(run.sandbox_purged)
+        self.assertEqual('', run.sandbox_path)
         self.assertEqual('', dataset.dataset_file)  # Purged.
 
     def test_debug_logging_datasets(self):
@@ -2185,13 +2183,78 @@ Purged 1 dataset containing 200 bytes from a minute ago.
 
         self.assertLogStreamEqual(expected_messages, log_messages)
 
+    def test_missing_dataset_file(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        run.delete_sandbox()
+        dataset = Dataset.objects.create(
+            user=run.user,
+            dataset_file='Datasets/2019_02/does_not_exist.txt',
+            date_created=timezone.now() - timedelta(minutes=1))
+        argument = run.app.arguments.get(type='O')
+        run.datasets.create(argument=argument,
+                            dataset=dataset)
+
+        expected_messages = u"""\
+Missing dataset file 'Datasets/2019_02/does_not_exist.txt' from a minute ago.
+Missing 1 dataset file from a minute ago.
+"""
+        with self.capture_log_stream(logging.WARN) as mocked_stderr:
+            purge.Command().handle()
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test_multiple_dataset_files_missing(self):
+        run1 = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        run1.delete_sandbox()
+        dataset = Dataset.objects.create(
+            user=run1.user,
+            dataset_file='Datasets/2019_02/does_not_exist.txt',
+            date_created=timezone.now() - timedelta(minutes=1))
+        argument = run1.app.arguments.get(type='O')
+        run1.datasets.create(argument=argument,
+                             dataset=dataset)
+        run2 = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        run2.delete_sandbox()
+        dataset = Dataset.objects.create(
+            user=run2.user,
+            dataset_file='Datasets/2019_02/also_gone.txt',
+            date_created=timezone.now() - timedelta(minutes=5))
+        argument = run2.app.arguments.get(type='O')
+        run2.datasets.create(argument=argument,
+                             dataset=dataset)
+
+        expected_messages = u"""\
+Missing 2 dataset files from 5 minutes ago to a minute ago.
+"""
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle()
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
+    def test(self):
+        run = self.create_sandbox(size=100, age=timedelta(minutes=1))
+        self.create_outputs(run, output_size=200, age=timedelta(minutes=1))
+        stdout_log = run.logs.get(type=ContainerLog.STDOUT)
+        stdout_log.long_text = 'ContainerLogs/does_not_exist.txt'
+        stdout_log.save()
+
+        expected_messages = u"""\
+Missing containerlog file 'ContainerLogs/does_not_exist.txt' from a minute ago.
+Missing 1 containerlog file from a minute ago.
+"""
+        with self.capture_log_stream(logging.WARN) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertLogStreamEqual(expected_messages, log_messages)
+
     def test_ignore_sandboxes_already_purged(self):
         run1 = self.create_sandbox(size=1000, age=timedelta(minutes=1))
         self.create_sandbox(size=100, age=timedelta(minutes=1))
-        ContainerRun.set_sandbox_sizes()
-        run1.refresh_from_db()
+        run1.sandbox_size = 1000
         run1.delete_sandbox()
-        run1.sandbox_purged = True
         run1.save()
 
         expected_messages = u"""\
@@ -2235,10 +2298,8 @@ Cannot reduce storage to 500 bytes: 1000 bytes of datasets.
         self.create_outputs(run, output_size=1000, age=timedelta(minutes=1))
 
         run.delete_sandbox()
-        run.sandbox_purged = True
         run.save()
-        Dataset.set_dataset_sizes()
-        dataset = Dataset.objects.get(dataset_size=1000)
+        dataset = run.datasets.get(argument__type='O').dataset
         dataset.dataset_file.delete()
 
         expected_messages = u"""\
@@ -2314,7 +2375,7 @@ Purged 11 container runs containing 1.1 KB from 12 minutes ago to 2 minutes ago.
 
         run.refresh_from_db()
         log.refresh_from_db()
-        self.assertTrue(run.sandbox_purged)
+        self.assertEqual('', run.sandbox_path)
         self.assertEqual('', log.long_text)  # Purged.
         self.assertFalse(os.path.exists(log_path))
 
@@ -2325,7 +2386,6 @@ Purged 11 container runs containing 1.1 KB from 12 minutes ago to 2 minutes ago.
                             stdout_size=2100,
                             age=timedelta(minutes=10))
         run.delete_sandbox()
-        run.sandbox_purged = True
         run.save()
         expected_messages = u"""\
 Starting purge.
@@ -2338,7 +2398,6 @@ Purged 1 dataset containing 200 bytes from 10 minutes ago.
             purge.Command().handle(start=0, stop=0)
             log_messages = mocked_stderr.getvalue()
 
-        self.maxDiff = 1200
         self.assertLogStreamEqual(expected_messages, log_messages)
 
     def test_synch_container_log(self):

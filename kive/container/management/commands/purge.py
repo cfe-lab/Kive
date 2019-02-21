@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import errno
 import logging
 import os
 import shutil
@@ -13,6 +14,7 @@ from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import models
 from django.db.models.expressions import Value, F
+from django.db.models.fields.files import FieldFile
 from django.db.models.functions import Now
 
 from django.template.defaultfilters import filesizeformat, pluralize
@@ -114,17 +116,22 @@ class Command(BaseCommand):
               sandbox_aging,
               batch_size):
         logger.debug('Starting purge.')
-        Container.set_file_sizes()
-        container_total = Container.known_storage_used()
-
-        ContainerRun.set_sandbox_sizes()
-        sandbox_total = ContainerRun.known_storage_used()
-
-        ContainerLog.set_log_sizes()
-        log_total = ContainerLog.known_storage_used()
-
-        Dataset.set_dataset_sizes()
-        dataset_total = Dataset.known_storage_used()
+        container_total = self.set_file_sizes(Container,
+                                              'file',
+                                              'file_size',
+                                              'created')
+        sandbox_total = self.set_file_sizes(ContainerRun,
+                                            'sandbox_path',
+                                            'sandbox_size',
+                                            'end_time')
+        log_total = self.set_file_sizes(ContainerLog,
+                                        'long_text',
+                                        'log_size',
+                                        'run__end_time')
+        dataset_total = self.set_file_sizes(Dataset,
+                                            'dataset_file',
+                                            'dataset_size',
+                                            'date_created')
 
         total_storage = remaining_storage = (
                 container_total + sandbox_total + log_total + dataset_total)
@@ -183,7 +190,6 @@ class Command(BaseCommand):
                                      run.id,
                                      run.sandbox_path,
                                      exc_info=True)
-                    run.sandbox_purged = True  # Don't try to purge it again.
                     run.save()
                 elif entry_type == 'l':
                     log = ContainerLog.objects.get(id=entry_id)
@@ -238,14 +244,76 @@ class Command(BaseCommand):
                         filesizeformat(bytes_removed),
                         date_range)
         if remaining_storage > stop:
-            # Refresh totals, because new records may have appeared.
-            container_total = Container.known_storage_used()
-            dataset_total = Dataset.known_storage_used()
             storage_text = self.summarize_storage(container_total,
                                                   dataset_total)
             logger.error('Cannot reduce storage to %s: %s.',
                          filesizeformat(stop),
                          storage_text)
+
+    def set_file_sizes(self, model, file_field, size_field, date_field):
+        """
+        Scan through all model rows that do not have their sizes set and set them.
+        :return: the total storage used by all files referenced by rows in the
+            model
+        """
+        rows_to_set = model.objects.filter(
+            **{file_field+'__isnull': False,
+               size_field+'__isnull': True}).exclude(
+            **{file_field: ''}).exclude(
+            **{date_field: None}).annotate(extra__date=F(date_field))
+        model_name = getattr(model, '_meta').model_name
+        min_missing_date = max_missing_date = None
+        missing_count = 0
+        for row in rows_to_set:
+            f = getattr(row, file_field)
+            try:
+                if isinstance(f, FieldFile):
+                    file_size = f.size
+                else:
+                    file_size = self.scan_folder_size(f)
+            except OSError as ex:
+                if ex.errno != errno.ENOENT:
+                    raise
+                file_size = 0
+                row_date = row.extra__date
+                logger.warn('Missing %s file %r from %s.',
+                            model_name,
+                            str(f.name),
+                            naturaltime(row_date))
+                if min_missing_date is None or row_date < min_missing_date:
+                    min_missing_date = row_date
+                if max_missing_date is None or max_missing_date < row_date:
+                    max_missing_date = row_date
+                missing_count += 1
+            setattr(row, size_field, file_size)
+            row.save()
+        if missing_count:
+            start_text = naturaltime(min_missing_date)
+            end_text = naturaltime(max_missing_date)
+            date_range = (start_text
+                          if start_text == end_text
+                          else start_text + ' to ' + end_text)
+            logger.error('Missing %d %s file%s from %s.',
+                         missing_count,
+                         model_name,
+                         pluralize(missing_count),
+                         date_range)
+
+        # Get the total amount of active storage recorded.
+        return model.objects.exclude(
+            **{file_field: ''}).exclude(  # Already purged.
+            **{file_field: None}).aggregate(  # Not used.
+            models.Sum(size_field))[size_field + "__sum"] or 0
+
+    def scan_folder_size(self, folder_path):
+        full_path = os.path.join(settings.MEDIA_ROOT, folder_path)
+        size_accumulator = 0
+        sandbox_files = (os.path.join(root, file_name)
+                         for root, _, files in os.walk(full_path)
+                         for file_name in files)
+        for file_path in sandbox_files:
+            size_accumulator += os.path.getsize(file_path)
+        return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
     def summarize_storage(self,
                           container_total,

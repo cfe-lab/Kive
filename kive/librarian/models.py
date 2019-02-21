@@ -39,11 +39,11 @@ import transformation.models
 import datachecking.models
 import metadata.models
 import archive.exceptions
+import archive.models
 import librarian.signals
 from constants import maxlengths, runcomponentstates
 from datachecking.models import BadData
 import six
-from container.models import ContainerRun
 
 import file_access_utils
 
@@ -1329,48 +1329,6 @@ class Dataset(metadata.models.AccessControl):
                         yield eri.dataset
                     for ero in execrecord.execrecordouts.all():
                         yield ero.dataset
-
-    def currently_being_used(self):
-        """
-        Returns True if this is currently in use by an active ContainerRun; False otherwise.
-        :return:
-        """
-        active_containers = self.containers.filter(run__state__in=ContainerRun.ACTIVE_STATES)
-        return active_containers.exists()
-
-    @classmethod
-    def total_storage_used(cls):
-        """
-        Return the number of bytes used by all Datasets.
-        :return:
-        """
-        return file_access_utils.total_storage_used(os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR))
-
-    @classmethod
-    def known_storage_used(cls):
-        """ Get the total amount of active storage recorded. """
-        return cls.objects.exclude(
-            dataset_file='').exclude(  # Already purged.
-            dataset_file=None).aggregate(  # External file.
-            models.Sum("dataset_size"))["dataset_size__sum"] or 0
-
-    @classmethod
-    def set_dataset_sizes(cls):
-        """
-        Scan through all Datasets that do not have their sizes set and set them.
-        :return:
-        """
-        datasets_to_set = cls.objects.filter(
-            dataset_file__isnull=False,
-            dataset_size__isnull=True).exclude(dataset_file='')
-        for ds in datasets_to_set:
-            with transaction.atomic():
-                try:
-                    ds.dataset_size = ds.dataset_file.size
-                    ds.save()
-                except ValueError:
-                    # This has somehow disappeared in the interim, so pass.
-                    pass
 
     @classmethod
     def find_unneeded(cls):
