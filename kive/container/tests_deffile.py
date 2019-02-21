@@ -5,7 +5,7 @@ from __future__ import unicode_literals
 from django.test import TestCase
 
 import container.deffile as deffile
-
+from container.models import PipelineCompletionStatus
 
 deffile_01 = """# Generate the Singularity container to run MiCall on Kive.\nBootstrap: docker\nFrom: python:2.7.15-alpine3.6\n
 %help\n    Minimal example that can run simple Python scripts under Kive.\n
@@ -31,9 +31,10 @@ class DefFileTest(TestCase):
     def test_parse01(self):
         """Retrieve app information from a legal singularity def file."""
         lverb = False
-        app_dct = deffile.parse_string(deffile_01)
-        assert len(app_dct) == 2, "two expected"
-        for appname, app in app_dct.items():
+        app_lst = deffile.parse_string(deffile_01)
+        assert isinstance(app_lst, list), "list expected"
+        assert len(app_lst) == 2, "two expected"
+        for app in app_lst:
             assert isinstance(app, deffile.appinfo), "appinfo expected"
             inp, outp = app.get_IO_args()
             assert inp is not None, "inp key expected"
@@ -135,6 +136,7 @@ the help line
         """Keywords of no interest to us should be be silently ignored.
         get_IO_args() should return (None, None) when KIVE_INPUTS and KIVE_OUTPUTS
         entries are missing.
+        Dito get_num_threads() and get_memory().
         """
         faulty = """
 %labels
@@ -148,13 +150,60 @@ gggg
 %runscript
    bash echo 'hello world'
 """
-        app_dct = deffile.parse_string(faulty)
-        assert len(app_dct) == 1, "one expected"
-        app = app_dct['main']
+        app_lst = deffile.parse_string(faulty)
+        assert isinstance(app_lst, list), "list expected"
+        assert len(app_lst) == 1, "one expected"
+        app = app_lst[0]
         assert isinstance(app, deffile.appinfo), "appinfo expected"
         # print("mainapp: {}".format(app))
         iotup = app.get_IO_args()
         assert iotup == (None, None), "none expected"
+        assert app.get_num_threads() is None, "none expected"
+        assert app.get_memory() is None, "none expected"
         dct = app.get_label_dict()
         assert isinstance(dct, dict), "dict expected"
         assert sorted(dct.keys()) == ['BLA', 'GOO'], "wrong dict keys"
+
+    def test_valid_pipeline01(self):
+        """appinfo.as_dict() should return a dict describing a pipeline
+        that can be validated successfully."""
+        app_lst = deffile.parse_string(deffile_01)
+        assert isinstance(app_lst, list), "list expected"
+        assert len(app_lst) == 2, "two expected"
+        for app in app_lst:
+            pp_dct = app.as_pipeline_dict()
+            assert isinstance(pp_dct, dict), "dict expected"
+            # print("BLA {}".format(pp_dct))
+            # exp_keys = frozenset(['appname', 'helpstring', 'runstring', 'labeldict'])
+            # assert set(dd.keys()) == exp_keys, "unexpected dict keys"
+            pd = PipelineCompletionStatus(pp_dct)
+            if not pd.is_complete():
+                print("Pipeline [] Failed".format(app.name))
+                print('has inputs{}, steps {}, outputs {}'.format(pd.has_inputs,
+                                                                  pd.has_steps,
+                                                                  pd.has_outputs))
+                print("has inp_not_conn {}, has dangly out {}".format(pd.inputs_not_connected,
+                                                                      pd.dangling_outputs))
+                raise RuntimeError('pipeline dict failed muster')
+
+    def test_valid_pipeline02(self):
+        ok_01 = """
+%labels
+   GOO hello goo
+   BLA hello bla
+   KIVE_THREADS 100
+   KIVE_MEMORY 1000
+%help
+   the simple
+   help line
+%bla
+gggg
+%runscript
+   bash echo 'hello world'
+"""
+        app_lst = deffile.parse_string(ok_01)
+        assert isinstance(app_lst, list), "list expected"
+        assert len(app_lst) == 1, "one expected"
+        app = app_lst[0]
+        assert app.get_num_threads() == '100', "100 expected"
+        assert app.get_memory() == '1000', "1000 expected"

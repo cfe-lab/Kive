@@ -72,8 +72,21 @@ class appinfo:
         return (self._labdct.get("KIVE_INPUTS", None),
                 self._labdct.get("KIVE_OUTPUTS", None))
 
+    def get_num_threads(self):
+        """Return the value (string) of KIVE_THREADS or None if this label is not defined."""
+        if self.err or self._labdct is None:
+            return None
+        return self._labdct.get("KIVE_THREADS", None)
+
+    def get_memory(self):
+        """Return the value (string) of KIVE_MEMORY or None if this label is not defined."""
+        if self.err or self._labdct is None:
+            return None
+        return self._labdct.get("KIVE_MEMORY", None)
+
     def get_label_dict(self):
-        """Return all labels defined to this app in the form a dict[labelname]: label value (string).
+        """Return all labels defined to this app in the form of a
+        dict[labelname]: label value (string).
         Return None if no labels were previously successfully set.
         """
         if self.err:
@@ -89,6 +102,28 @@ class appinfo:
         if self.err or self.runstr is None:
             return None
         return "\n".join(self.runstr)
+
+    def as_dict(self):
+        """Return the appinfo as a dict."""
+        return dict(appname=self.name,
+                    helpstring=self.get_helpstring(),
+                    runstring=self.get_runstring(),
+                    labeldict=self.get_label_dict())
+
+    def as_pipeline_dict(self):
+        """Return the appinfo as a dict describing a pipeline.
+        The app is described as having a single step.
+        """
+        dd = self.as_dict()
+        inp_str, out_str = self.get_IO_args()
+        inp_str = inp_str or ""
+        out_str = out_str or ""
+        inp_lst = [dict(dataset_name=inp_name, source_step=i) for i, inp_name in enumerate(inp_str.split(), start=1)]
+        out_lst = [dict(dataset_name=inp_name, source_step=i) for i, inp_name in enumerate(out_str.split(), start=1)]
+        dd['inputs'] = inp_lst
+        dd['outputs'] = out_lst
+        dd['steps'] = [dict(inputs=inp_lst, outputs=out_lst)]
+        return dd
 
 
 _setter_funk_dct = {}
@@ -125,4 +160,4 @@ def parse_string(instr):
     for app in appdct.values():
         if app.is_faulty():
             raise RuntimeError("faulty app {}".format(app.name))
-    return appdct
+    return list(appdct.values())

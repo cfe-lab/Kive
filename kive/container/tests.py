@@ -396,6 +396,8 @@ class ContainerTests(TestCase):
         self.assertIsNotNone(new_container.md5)
 
     def test_create_singularity_no_app(self):
+        """Adding a singularity container without an app should succeed.
+        The singularity image is in Kive/samplecode"""
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         image_path = os.path.abspath(os.path.join(__file__,
