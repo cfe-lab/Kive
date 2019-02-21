@@ -35,7 +35,7 @@
     {
         "fields": {
             "argument": 1, 
-            "created": "2019-01-08T23:22:28.431Z", 
+            "created": "2019-02-21T01:42:24.271Z", 
             "dataset": 1, 
             "name": "", 
             "run": 1
@@ -57,12 +57,15 @@
     }, 
     {
         "fields": {
-            "created": "2019-01-08T23:22:28.404Z", 
+            "created": "2019-02-21T01:42:24.125Z", 
             "description": "", 
             "family": 1, 
             "file": "Containers/kive-default.simg", 
+            "file_size": null, 
+            "file_type": "SIMG", 
             "groups_allowed": [], 
-            "md5": "", 
+            "md5": "8dab0b3c7b7d812f0ba4819664be8acb", 
+            "parent": null, 
             "tag": "vFixture", 
             "user": 1, 
             "users_allowed": []
@@ -84,7 +87,7 @@
             "sandbox_path": "", 
             "sandbox_purged": false, 
             "sandbox_size": null, 
-            "slurm_job_id": null, 
+            "slurm_job_id": 6, 
             "start_time": null, 
             "state": "N", 
             "stopped_by": null, 
@@ -99,7 +102,7 @@
         "fields": {
             "MD5_checksum": "06f7204f2679744fd76e6b111dc506ba", 
             "_redacted": false, 
-            "dataset_file": "Datasets/2019_01/example_names.csv", 
+            "dataset_file": "Datasets/2019_02/example_names.csv", 
             "dataset_size": null, 
             "date_created": "2000-01-01T00:00:00Z", 
             "description": "", 
@@ -108,7 +111,7 @@
             "file_source": null, 
             "groups_allowed": [], 
             "is_external_missing": false, 
-            "last_time_checked": "2019-01-08T23:22:28.412Z", 
+            "last_time_checked": "2019-02-21T01:42:24.139Z", 
             "name": "names.csv", 
             "user": 1, 
             "users_allowed": []

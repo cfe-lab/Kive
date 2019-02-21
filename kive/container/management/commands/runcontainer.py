@@ -92,6 +92,12 @@ class Command(BaseCommand):
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
+
+        container_to_run = run.app.container
+        container_to_run.validate_md5()
+        if not container_to_run.is_singularity():
+            container_to_run.parent.validate_md5()
+
         with open(stdout_path, 'w') as stdout, open(stderr_path, 'w') as stderr:
             if run.app.container.is_singularity():
                 # This is a Singularity container.

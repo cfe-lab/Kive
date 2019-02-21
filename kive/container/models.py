@@ -876,12 +876,13 @@ class ContainerRun(Stopwatch, AccessControl):
              force_insert=False,
              force_update=False,
              using=None,
-             update_fields=None):
+             update_fields=None,
+             schedule=True):
         super(ContainerRun, self).save(force_insert,
                                        force_update,
                                        using,
                                        update_fields)
-        if self.state == self.NEW and not self.sandbox_path:
+        if schedule and self.state == self.NEW and not self.sandbox_path:
             transaction.on_commit(self.schedule)
 
     @property

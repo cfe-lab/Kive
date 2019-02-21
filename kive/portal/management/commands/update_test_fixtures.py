@@ -1256,10 +1256,17 @@ class ContainerRunBuilder(FixtureBuilder):
             __file__,
             '../../../../../samplecode/singularity/host_input/example_names.csv'))
         family = ContainerFamily.objects.create(name='fixture family', user=user)
+        container_path = os.path.abspath(os.path.join(
+            __file__,
+            '../../../../../samplecode/singularity/python2-alpine-trimmed.simg'))
+        with open(container_path, "rb") as f:
+            container_md5 = compute_md5(f)
         container = family.containers.create(
             tag='vFixture',
             user=user,
-            file='Containers/kive-default.simg')
+            file='Containers/kive-default.simg',
+            md5=container_md5
+        )
         app = container.apps.create()
         arg1 = app.arguments.create(type=ContainerArgument.INPUT,
                                     name='names_csv',
@@ -1271,6 +1278,8 @@ class ContainerRunBuilder(FixtureBuilder):
                                          name='names.csv',
                                          user=user)
         run = app.runs.create(name='fixture run', user=user)
+        run.sandbox_path = ""  # blank this out as it won't be accessible in testing anyway
+        run.save(schedule=False)  # scheduling would overwrite sandbox_path
         run.datasets.create(argument=arg1, dataset=dataset)
 
         upload_path = os.path.join(settings.MEDIA_ROOT, Container.UPLOAD_DIR)

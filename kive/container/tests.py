@@ -1465,7 +1465,20 @@ class RunContainerTests(TestCase):
         dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
         self.assertEqual(expected_groups, dataset_groups)
 
-    def test_run_archive(self):
+    def test_run_bad_md5(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        everyone = Group.objects.get(name='Everyone')
+        run.groups_allowed.clear()
+        run.groups_allowed.add(everyone)
+
+        # Tamper with the file.
+        run.app.container.file.save("tampered", ContentFile(b"foo"), save=True)
+
+        with self.assertRaises(ValueError):
+            call_command('runcontainer', str(run.id))
+
+    @staticmethod
+    def _test_run_archive_preamble():
         greetings_path = os.path.abspath(os.path.join(__file__,
                                                       '..',
                                                       '..',
@@ -1503,10 +1516,16 @@ class RunContainerTests(TestCase):
             file_type=Container.TAR)
         container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
         container.write_content(content)
+        container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('names_csv')
         run.app.write_outputs('greetings_csv')
         run.save()
+
+        return run, container, old_container
+
+    def test_run_archive(self):
+        run, container, old_container = self._test_run_archive_preamble()
         expected_greetings = b'''\
 greeting
 "Howdy, Alice"
@@ -1527,6 +1546,20 @@ greeting
             argument__type=ContainerArgument.OUTPUT).dataset
         greetings = output_dataset.dataset_file.read()
         self.assertEqual(expected_greetings, greetings)
+
+    def test_run_archive_bad_md5(self):
+        """Running an archive container with a bad MD5 should raise ValueError."""
+        run, container, old_container = self._test_run_archive_preamble()
+        container.file.save("tampered", ContentFile(b"foo"), save=True)
+        with self.assertRaises(ValueError):
+            call_command('runcontainer', str(run.id))
+
+    def test_run_archive_parent_bad_md5(self):
+        """Running an archive container whose parent has a bad MD5 should raise ValueError."""
+        run, container, old_container = self._test_run_archive_preamble()
+        old_container.file.save("tampered", ContentFile(b"foo"), save=True)
+        with self.assertRaises(ValueError):
+            call_command('runcontainer', str(run.id))
 
     def test_step_stdout(self):
         greetings_path = os.path.abspath(os.path.join(__file__,
@@ -1565,6 +1598,7 @@ greeting
             file_type=Container.TAR)
         container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
         container.write_content(content)
+        container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('names_csv')
         run.app.write_outputs('greetings_csv')
@@ -1643,6 +1677,7 @@ sum,product,bigger
             file_type=Container.TAR)
         container.file.save('test_multi.tar', ContentFile(tar_data.getvalue()))
         container.write_content(content)
+        container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('pairs_csv')
         run.app.write_outputs('summary_csv')
