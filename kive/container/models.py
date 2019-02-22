@@ -502,7 +502,7 @@ class Container(AccessControl):
                 help_str = appinfo.get_helpstring() or ""
                 # attach the help string of the default app to the container's description
                 if dbname == "" and help_str != "":
-                    self.description += "\n" + help_str
+                    self.description = help_str if self.description == "" else self.description + "\n" + help_str
                     self.save()
                 newdb_app = self.apps.create(name=dbname,
                                              description=help_str,
