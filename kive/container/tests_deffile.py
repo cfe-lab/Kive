@@ -205,5 +205,9 @@ gggg
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 1, "one expected"
         app = app_lst[0]
-        assert app.get_num_threads() == '100', "100 expected"
-        assert app.get_memory() == '1000', "1000 expected"
+        n_thread = app.get_num_threads()
+        assert isinstance(n_thread, int), "int expected"
+        assert n_thread == 100, "100 expected"
+        n_mem = app.get_memory()
+        assert isinstance(n_mem, int), "int expected"
+        assert n_mem == 1000, "1000 expected"

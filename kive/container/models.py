@@ -37,8 +37,11 @@ from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import file_access_utils
+import container.deffile as deffile
 
 logger = logging.getLogger(__name__)
+
+SINGULARITY_COMMAND = 'singularity'
 
 
 class ContainerFamily(AccessControl):
@@ -181,6 +184,7 @@ class Container(AccessControl):
 
     DEFAULT_ERROR_MESSAGES = {
         'invalid_singularity_container': "Upload a valid Singularity container file.",
+        'invalid_singularity_deffile': "Upload a valid Singularity container file (problem with deffile).",
         'invalid_archive': "Upload a valid archive file.",
         'singularity_cannot_have_parent': "Singularity containers cannot have parents",
         'archive_must_have_parent': "Archive containers must have a valid Singularity container parent",
@@ -252,7 +256,7 @@ class Container(AccessControl):
         :return:
         """
         try:
-            check_output(['singularity', 'check', file_path], stderr=STDOUT)
+            check_output([SINGULARITY_COMMAND, 'check', file_path], stderr=STDOUT)
         except CalledProcessError as ex:
             logger.warning('Invalid container file:\n%s', ex.output)
             raise ValidationError(cls.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
@@ -391,11 +395,46 @@ class Container(AccessControl):
             archive.close()
 
     def get_content(self, add_default=True):
+        """Read the pipeline definitions, aka content, from an archive file (tar or zip)
+        or a singularity image file.
+        """
+        if self.is_singularity():
+            return self.get_singularity_content()
+        else:
+            return self.get_archive_content(add_default)
+
+    def get_singularity_content(self):
+        """Determine pipeline definitions from a singularity file.
+        """
+        file_path = self.file_path
+        try:
+            json_data = check_output([SINGULARITY_COMMAND, 'inspect',
+                                      '-d', '-j', file_path], stderr=STDOUT)
+        except CalledProcessError as ex:
+            logger.warning('Invalid container file:\n%s', ex.output)
+            raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
+                                  code='invalid_singularity_container')
+        sing_data = json.loads(json_data.decode('utf-8'))
+        try:
+            def_file_str = sing_data['data']['attributes']['deffile']
+        except KeyError:
+            logger.warning('Invalid container file (deffile 01) :\n%s', ex.output)
+            raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
+                                  code='invalid_singularity_deffile')
+        try:
+            appinfo_lst = deffile.parse_string(def_file_str)
+        except RuntimeError as e:
+            logger.warning('Invalid container file (deffile 02) :\n%s', ex.output, e)
+            raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
+                                  code='invalid_singularity_deffile')
+        return dict(cont_type='singularity', applist=appinfo_lst)
+
+    def get_archive_content(self, add_default):
         with self.open_content() as archive:
             last_entry = archive.infolist()[-1]
             if re.match(r'kive/pipeline\d+\.json', last_entry.name):
                 pipeline_json = archive.read(last_entry)
-                pipeline = json.loads(pipeline_json)
+                pipeline = json.loads(pipeline_json.decode('utf-8'))
             elif add_default:
                 pipeline = dict(default_config=self.DEFAULT_APP_CONFIG,
                                 inputs=[],
@@ -407,7 +446,8 @@ class Container(AccessControl):
                                         for entry in archive.infolist()
                                         if not entry.name.startswith('kive/')),
                            pipeline=pipeline,
-                           id=self.pk)
+                           id=self.pk,
+                           cont_type='arch')
             return content
 
     def write_content(self, content):
@@ -438,25 +478,52 @@ class Container(AccessControl):
         return self.INCOMPLETE
 
     def create_app_from_content(self, content=None):
-        """ Create an app based on the content configuration.
-
-        :raises ValueError: if this is not an archive container
+        """Create apps based on the content configuration.
+        This method handles archive as well as singularity images.
         """
+        content = content or self.get_content()
         if content is None:
-            content = self.get_content()
-        pipeline = content['pipeline']
-        if self.pipeline_valid(pipeline):
+            logger.warning("failed to obtain content from container")
+            return
+        ctype = content.get('cont_type', None)
+        if ctype is None:
+            logger.error("no cont_type entry in content")
+            return
+        if ctype == 'singularity':
+            default_config = self.DEFAULT_APP_CONFIG
+            appinfo_lst = content['applist']
             self.apps.all().delete()
-            default_config = pipeline.get('default_config',
-                                          self.DEFAULT_APP_CONFIG)
-            app = self.apps.create(memory=default_config['memory'],
-                                   threads=default_config['threads'])
-            input_names = ' '.join(entry['dataset_name']
-                                   for entry in pipeline['inputs'])
-            output_names = ' '.join(entry['dataset_name']
-                                    for entry in pipeline['outputs'])
-            app.write_inputs(input_names)
-            app.write_outputs(output_names)
+            for appinfo in appinfo_lst:
+                num_threads = appinfo.get_num_threads() or default_config['threads']
+                memory = appinfo.get_memory() or default_config['memory']
+                inpargs, outargs = appinfo.get_IO_args()
+                inpargs = inpargs or ""
+                outargs = outargs or ""
+                dbname = appinfo.name if appinfo.name != 'main' else ""
+                help_str = appinfo.get_helpstring() or ""
+                newdb_app = self.apps.create(name=dbname,
+                                             description=help_str,
+                                             threads=num_threads,
+                                             memory=memory)
+                newdb_app.write_inputs(inpargs)
+                newdb_app.write_outputs(outargs)
+        elif ctype == 'arch':
+            # arch container
+            pipeline = content['pipeline']
+            if self.pipeline_valid(pipeline):
+                default_config = pipeline.get('default_config',
+                                              self.DEFAULT_APP_CONFIG)
+                self.apps.all().delete()
+                app = self.apps.create(memory=default_config['memory'],
+                                       threads=default_config['threads'])
+                input_names = ' '.join(entry['dataset_name']
+                                       for entry in pipeline['inputs'])
+                output_names = ' '.join(entry['dataset_name']
+                                        for entry in pipeline['outputs'])
+                app.write_inputs(input_names)
+                app.write_outputs(output_names)
+        else:
+            logger.error('unknown cont_type {}'.format(ctype))
 
     @staticmethod
     def pipeline_valid(pipeline):

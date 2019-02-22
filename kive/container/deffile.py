@@ -73,16 +73,18 @@ class appinfo:
                 self._labdct.get("KIVE_OUTPUTS", None))
 
     def get_num_threads(self):
-        """Return the value (string) of KIVE_THREADS or None if this label is not defined."""
+        """Return the value (int) of KIVE_THREADS or None if this label is not defined."""
         if self.err or self._labdct is None:
             return None
-        return self._labdct.get("KIVE_THREADS", None)
+        strval = self._labdct.get("KIVE_THREADS", None)
+        return int(strval) if strval is not None else None
 
     def get_memory(self):
-        """Return the value (string) of KIVE_MEMORY or None if this label is not defined."""
+        """Return the value (int) of KIVE_MEMORY or None if this label is not defined."""
         if self.err or self._labdct is None:
             return None
-        return self._labdct.get("KIVE_MEMORY", None)
+        strval = self._labdct.get("KIVE_MEMORY", None)
+        return int(strval) if strval is not None else None
 
     def get_label_dict(self):
         """Return all labels defined to this app in the form of a
@@ -138,11 +140,10 @@ def parse_string(instr):
     """Parse a string read from a singularity definition file, returning a list
     of appinfo instances.
     The main, default application of the container has the name 'main'.
-    If no apps are defined, this will be only appinfo instance in the returned list.
-
+    If no separate apps are defined, this will be the only appinfo instance in the returned list.
+    If no appinfo instances can be determined from the deffile, an empty list is returned.
     Raises:
-       RuntimeError: if an error occurred parsing the input string, or if no appinfo
-          instances were determined from this string.
+       RuntimeError: if an error occurred parsing the input string.
     """
     appdct = {}
     for chunk in chunk_string(instr):
@@ -155,8 +156,6 @@ def parse_string(instr):
             else:
                 my_app = appdct[appname] = appinfo(appname)
             _setter_funk_dct[got_kw](my_app, chunk[1:])
-    if len(appdct) == 0:
-        raise RuntimeError("no appinfo instances could be determined")
     for app in appdct.values():
         if app.is_faulty():
             raise RuntimeError("faulty app {}".format(app.name))
