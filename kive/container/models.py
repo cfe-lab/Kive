@@ -409,21 +409,21 @@ class Container(AccessControl):
         try:
             json_data = check_output([SINGULARITY_COMMAND, 'inspect',
                                       '-d', '-j', file_path], stderr=STDOUT)
-        except CalledProcessError as ex:
-            logger.warning('Invalid container file:\n%s', ex.output)
+        except CalledProcessError:
+            logger.warning('Invalid container file', exc_info=True)
             raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
                                   code='invalid_singularity_container')
         sing_data = json.loads(json_data.decode('utf-8'))
         try:
             def_file_str = sing_data['data']['attributes']['deffile']
         except KeyError:
-            logger.warning('Invalid container file (deffile 01) :\n%s', ex.output)
+            logger.warning('Invalid container file (deffile 01)', exc_info=True)
             raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
                                   code='invalid_singularity_deffile')
         try:
             appinfo_lst = deffile.parse_string(def_file_str)
-        except RuntimeError as e:
-            logger.warning('Invalid container file (deffile 02) :\n%s', ex.output, e)
+        except RuntimeError:
+            logger.warning('Invalid container file (deffile 02)', exc_info=True)
             raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
                                   code='invalid_singularity_deffile')
         return dict(cont_type='singularity', applist=appinfo_lst)
@@ -518,8 +518,10 @@ class Container(AccessControl):
                 self.apps.all().delete()
                 app = self.apps.create(memory=default_config['memory'],
                                        threads=default_config['threads'])
+                # noinspection PyTypeChecker
                 input_names = ' '.join(entry['dataset_name']
                                        for entry in pipeline['inputs'])
+                # noinspection PyTypeChecker
                 output_names = ' '.join(entry['dataset_name']
                                         for entry in pipeline['outputs'])
                 app.write_inputs(input_names)
