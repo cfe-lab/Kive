@@ -435,7 +435,7 @@ class ContainerTests(TestCase):
     def test_extract_zip(self):
         run = ContainerRun()
         run.create_sandbox(prefix='test_extract_zip')
-        sandbox_path = run.sandbox_path
+        sandbox_path = run.full_sandbox_path
         try:
             user = User.objects.first()
             family = ContainerFamily.objects.create(user=user)
@@ -453,7 +453,7 @@ class ContainerTests(TestCase):
     def test_extract_tar(self):
         run = ContainerRun()
         run.create_sandbox(prefix='test_extract_tar')
-        sandbox_path = run.sandbox_path
+        sandbox_path = run.full_sandbox_path
         try:
             user = User.objects.first()
             family = ContainerFamily.objects.create(user=user)

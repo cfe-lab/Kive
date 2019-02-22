@@ -75,7 +75,7 @@ export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars
 systemctl restart apache2
 
 echo ========== Installing virtualenv ==========
-curl --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
+curl -Ss --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
 tar xfz virtualenv-15.1.0.tar.gz
 python pypa-virtualenv-bcc2a4c/virtualenv.py /opt/venv_kive
 rm -r pypa-virtualenv-bcc2a4c/ virtualenv-15.1.0.tar.gz
