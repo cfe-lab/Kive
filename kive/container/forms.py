@@ -99,6 +99,7 @@ class ContainerForm(ContainerUpdateForm):
         self.instance.file_type = file_type
         return self.cleaned_data
 
+
 class ContainerAppForm(forms.ModelForm):
     inputs = forms.CharField(
         widget=TextInput(attrs=dict(size=50)),

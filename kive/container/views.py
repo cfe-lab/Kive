@@ -200,7 +200,9 @@ class ContainerAppCreate(CreateView, ArgumentWriterMixin):
 
     def get_context_data(self, **kwargs):
         context = super(ContainerAppCreate, self).get_context_data(**kwargs)
-        context['container_id'] = self.kwargs['container_id']
+        container_id = self.kwargs['container_id']
+        context['container_id'] = container_id
+        context['container_name'] = str(Container.objects.get(id=container_id))
         return context
 
 
@@ -216,6 +218,7 @@ class ContainerAppUpdate(UpdateView, ArgumentWriterMixin, AdminViewMixin):
     def get_context_data(self, **kwargs):
         context = super(ContainerAppUpdate, self).get_context_data(**kwargs)
         context['container_id'] = self.object.container_id
+        context['container_name'] = str(self.object.container)
 
         form = context['form']
         form.initial['inputs'] = self.object.inputs
