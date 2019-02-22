@@ -605,68 +605,36 @@ procedure follows the standard instructions for Django.  The first thing you
 need to do is to make a copy of `/kive/settings_default.py` called
 `/kive/settings.py` (remember, all paths are relative to `/kive` so we mean
 `/kive/kive/settings_default.py`).  This is a standard step in the
-installation of a Django project where you configure project settings.  Within
-the `DATABASES['default']` dictionary, modify the respective values to indicate
-the type, location, and access credentials of your database.  For example, using
-postgres as your database engine, you would specify
-`'django.db.backends.postgresql_psycopg2'` under the `ENGINE` key, and the name
-of the database Kive is to use under the key `NAME` (e.g. `'kive'`).
-This is a database that must be created by an administrator prior to using
-Kive.
+installation of a Django project where you configure project settings. The
+settings in the file are overridden by environment variables. Go through the
+file to see which environment variables you need to set, then set them for the
+Apache `httpd` process and the Kive purge processes. On a workstation, you
+might need to set them for your `manage.py runserver` command.
 
-In production, you must generate a new secret key for the server. The easiest
-way to do that is to let Django create a new project, copy the key, then delete
-the new project.
+The `httpd` process reads its environment variables from `/etc/apache2/envvars`
+or `/etc/sysconfig/httpd`. The purge processes read most of their settings from
+`/etc/kive/kive_purge.conf`, and a few extra settings from
+`/etc/systemd/system/kive*.service`.
 
-    cd ~/junk # Go to some safe directory to create a new project.
-    django-admin startproject django_scratch
-    grep SECRET_KEY django_scratch/django_scratch/settings.py # copy to Kive
-    rm -R django_scratch
+Apache logging requires some extra configuration to let the log files roll over
+safely. Kive errors will get written to standard error, which is handled by
+Apache's [`ErrorLog` configuration] in `/etc/httpd/conf/httpd.conf`. That can
+be configured to use [piped logs], and piped through the
+[`rotate logs` program]. You should probably also configure the access log to
+roll over. It uses the `CustomLog` entry.
 
-Set `MEDIA_ROOT` to the absolute path of a directory that can hold all the
-working files for the server and any uploaded files. Create the directory if it
-doesn't already exist.
+See the Vagrant scripts for some examples of how to configure Kive.
 
-Set `STATIC_ROOT` to the absolute path of a directory that can hold static files
-for the web server to serve. You don't need this setting for a development
-server on your workstation.
-
-You may also wish to modify the `TIME_ZONE` setting to your region, although 
-this localization is not strictly necessary.
-
-It's easiest to leave `DEBUG` set to `True` for developer workstations. In
+It's easiest to leave `KIVE_DEBUG` set to `True` for developer workstations. In
 production, definitely set it to `False`. However, that means you'll have to set
-`ALLOWED_HOSTS` to `['your-domain.com']`, or `['localhost']` for a developer
+`KIVE_ALLOWED_HOSTS` to `["your-domain.com"]`, or `["localhost"]` for a developer
 workstation. When you launch the server on a developer workstation that's not
 in debug mode, you'll also need to call `./manage.py runserver --insecure`.
 That lets it serve static files.
 
-#### Enabling Kive to run code as an unprivileged user
-
-Assuming that you've set up an unprivileged user as in the "Restricted user 
-for running sandboxes" section, enable running code as this user by 
-setting the value of `KIVE_SANDBOX_WORKER_ACCOUNT` and `KIVE_PROCESSING_GROUP` to the
-appropriate values (e.g. `sandboxworker` and `kiveprocessing`, if you followed the
-above instructions exactly).
-
-If this is a fresh install, Kive will make sure the `Sandboxes` directory is readable
-and writable by the appropriate users and groups.  However, if not, then you must
-make these changes manually (you may need to use `sudo` for these commands)
-
-    chgrp -R kiveprocessing [MEDIA_ROOT]/Sandboxes
-    chmod -R g+w [MEDIA_ROOT]/Sandboxes
-    find [MEDIA_ROOT]/Sandboxes -type d -exec chmod g+s {} \;
-    
-Additionally, if you were previously using `apache` to launch the fleet and you've switched
-to using another account called `kiveuser`, you should also change the permissions on the other
-data directories so that `kiveuser` can access them, as previously they likely belonged solely
-to `apache`.  If all your Kive users belong to group `kive`, then:
-
-    chgrp -R kive [MEDIA_ROOT]/CodeResources
-    chmod -R g+w [MEDIA_ROOT]/CodeResources
-    find [MEDIA_ROOT]/CodeResources -type d -exec chmod g+s {} \;
-    
-and repeat this for `Datasets` and `Logs`.
+[`ErrorLog` configuration]: https://httpd.apache.org/docs/2.4/mod/core.html#errorlog
+[piped logs]: https://httpd.apache.org/docs/2.4/logs.html#piped
+[`rotatelogs` program]: https://httpd.apache.org/docs/2.4/programs/rotatelogs.html
 
 Creating database tables
 ------------------------

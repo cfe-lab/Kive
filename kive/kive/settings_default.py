@@ -118,8 +118,9 @@ STATICFILES_FINDERS = (
     # 'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
 
-# Make this unique, and don't share it with anybody. Call
-# get_random_secret_key() to generate a new one, then set environment variable.
+# Make this unique, and don't share it with anybody. Call this to generate a
+# new one, then set environment variable:
+# ./manage.py shell -c "import django; print(django.core.management.utils.get_random_secret_key())"
 SECRET_KEY = os.environ.get('KIVE_SECRET_KEY')
 IS_RANDOM_KEY = SECRET_KEY is None
 if IS_RANDOM_KEY:

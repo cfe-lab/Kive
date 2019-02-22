@@ -118,13 +118,17 @@ chmod g+s /etc/kive /var/log/kive
 
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
 sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd
-echo "KIVE_LOG=/var/log/kive/kive_apache.log" >> /etc/sysconfig/httpd
 # KIVE_SECRET_KEY gets added to /etc/sysconfig/httpd in the Kive section below.
 
+cp /usr/local/share/Kive/vagrant/purge_apache_logs /usr/sbin
+chmod +x,g-w,o-w /usr/sbin/purge_apache_logs
 chmod g-r,o-r /etc/sysconfig/httpd
 sed -e 's/Listen 80$/Listen 8080/' \
     -e 's/User apache$/User kive/' \
-    -e 's/Group apache$/Group kive/' -i /etc/httpd/conf/httpd.conf
+    -e 's/Group apache$/Group kive/' \
+    -e 's#ErrorLog "logs/error_log"#ErrorLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/error_log.%Y-%m-%d-%H_%M_%S 15M"#' \
+    -e 's#CustomLog "logs/access_log" combined#CustomLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/access_log.%Y-%m-%d-%H_%M_%S 15M" combined#' \
+    -i /etc/httpd/conf/httpd.conf
 systemctl enable httpd
 systemctl start httpd
 

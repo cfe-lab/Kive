@@ -66,7 +66,6 @@ sed -ie 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-availab
 sed -ie 's/Listen 80$/Listen 8080/' /etc/apache2/ports.conf
 cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/apache2/envvars
 echo "
-export KIVE_LOG=/var/log/kive/kive_apache.log
 export APACHE_RUN_USER=kive
 export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars
 # KIVE_SECRET_KEY gets added to /etc/apache2/envvars in the Kive section below.
