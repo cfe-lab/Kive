@@ -35,7 +35,7 @@
     {
         "fields": {
             "argument": 1, 
-            "created": "2019-02-21T01:42:24.271Z", 
+            "created": "2019-02-22T00:14:26.864Z", 
             "dataset": 1, 
             "name": "", 
             "run": 1
@@ -57,7 +57,7 @@
     }, 
     {
         "fields": {
-            "created": "2019-02-21T01:42:24.125Z", 
+            "created": "2019-02-22T00:14:26.778Z", 
             "description": "", 
             "family": 1, 
             "file": "Containers/kive-default.simg", 
@@ -87,7 +87,7 @@
             "sandbox_path": "", 
             "sandbox_purged": false, 
             "sandbox_size": null, 
-            "slurm_job_id": 6, 
+            "slurm_job_id": null, 
             "start_time": null, 
             "state": "N", 
             "stopped_by": null, 
@@ -111,7 +111,7 @@
             "file_source": null, 
             "groups_allowed": [], 
             "is_external_missing": false, 
-            "last_time_checked": "2019-02-21T01:42:24.139Z", 
+            "last_time_checked": "2019-02-22T00:14:26.794Z", 
             "name": "names.csv", 
             "user": 1, 
             "users_allowed": []

@@ -1279,6 +1279,7 @@ class ContainerRunBuilder(FixtureBuilder):
                                          user=user)
         run = app.runs.create(name='fixture run', user=user)
         run.sandbox_path = ""  # blank this out as it won't be accessible in testing anyway
+        run.slurm_job_id = None  # this also would cause tests to fail on a fresh system
         run.save(schedule=False)  # scheduling would overwrite sandbox_path
         run.datasets.create(argument=arg1, dataset=dataset)
 
