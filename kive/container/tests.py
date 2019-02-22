@@ -19,6 +19,7 @@ from django.contrib.auth.models import User, Group
 from django.core.files.base import ContentFile, File
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.core.exceptions import ValidationError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
@@ -499,10 +500,73 @@ class ContainerTests(TestCase):
         create_tar_content(container)
         container.save()
         expected_pipeline_state = Container.EMPTY
-
         pipeline_state = container.get_pipeline_state()
-
         self.assertEqual(expected_pipeline_state, pipeline_state)
+
+    def test_faulty_sing_content01(self):
+        """get_singularity_content() should raise the appropriate ValidationError
+        when presented with a non singularity file.
+        """
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        # tarfile is not a singularity container
+        self.create_tar_content(container)
+        container.save()
+        with self.assertRaises(ValidationError):
+            container.get_singularity_content()
+
+    @patch('container.models.check_output')
+    def test_sing_no_deffile(self, mock_check_output):
+        # singularity container without a deffile
+        # this output taken from 'singularity inspect -d -j ubuntu.simg'
+        mock_check_output.return_value = b"""
+{
+    "data": {
+        "attributes": {
+            "deffile": null
+        },
+        "type": "container"
+    }
+}
+"""
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        got_cont = container.get_singularity_content()
+        exp_cont = {'applist': [], 'cont_type': u'singularity'}
+        self.assertEqual(got_cont, exp_cont)
+
+    @patch('container.models.Container.get_singularity_content')
+    def test_sing_app_from_content(self, mock_get_singularity_content):
+        mock_get_singularity_content.return_value = None
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        # should just return...
+        container.create_app_from_content()
+        # this too
+        mock_get_singularity_content.return_value = {'cont_type': u'UNKNOWN'}
+        container.create_app_from_content()
+
+    @patch('container.models.check_output')
+    def test_sing_faulty_deffile(self, mock_check_output):
+        # singularity container with a faulty deffile
+        mock_check_output.return_value = b"""
+{
+    "data": {
+        "attributes": {
+            "deffile": "%apphelp bla"
+       },
+        "type": "container"
+    }
+}
+"""
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        with self.assertRaises(ValidationError):
+            container.get_singularity_content()
 
 
 @skipIfDBFeature('is_mocked')

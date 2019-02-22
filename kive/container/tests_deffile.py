@@ -186,6 +186,29 @@ gggg
                                                                       pd.dangling_outputs))
                 raise RuntimeError('pipeline dict failed muster')
 
+    def test_repr01(self):
+        app_lst = deffile.parse_string(deffile_01)
+        s = ""
+        for app in app_lst:
+            s += "{}: {}".format(app.name, app)
+
+    def test_get_IO(self):
+        """Getting argument from an un-initialised app should return None"""
+        app = deffile.appinfo('bla')
+        iotup = app.get_IO_args()
+        assert iotup == (None, None), "none expected"
+        assert app.get_num_threads() is None, "none expected"
+        assert app.get_memory() is None, "none expected"
+        lab_dct = app.get_label_dict()
+        assert lab_dct is None, "none expected"
+        h_str = app.get_helpstring()
+        assert h_str is None, "none expected"
+        r_str = app.get_runstring()
+        assert r_str is None, "none expected"
+        app.err = True
+        lab_dct = app.get_label_dict()
+        assert lab_dct is None, "none expected"
+
     def test_valid_pipeline02(self):
         ok_01 = """
 %labels

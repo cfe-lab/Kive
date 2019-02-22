@@ -404,6 +404,10 @@ class Container(AccessControl):
 
     def get_singularity_content(self):
         """Determine pipeline definitions from a singularity file.
+        We need to extract and parse a deffile from the image for this to work.
+        If its not a singularity file: raise a ValidationError
+        If there is no deffile: do not complain (there are no apps defined)
+        If the deffile cannot be parsed: raise a ValidationError
         """
         file_path = self.file_path
         try:
@@ -414,18 +418,18 @@ class Container(AccessControl):
             raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
                                   code='invalid_singularity_container')
         sing_data = json.loads(json_data.decode('utf-8'))
-        try:
-            def_file_str = sing_data['data']['attributes']['deffile']
-        except KeyError:
-            logger.warning('Invalid container file (deffile 01)', exc_info=True)
-            raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
-                                  code='invalid_singularity_deffile')
-        try:
-            appinfo_lst = deffile.parse_string(def_file_str)
-        except RuntimeError:
-            logger.warning('Invalid container file (deffile 02)', exc_info=True)
-            raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
-                                  code='invalid_singularity_deffile')
+        def_file_str = sing_data['data']['attributes']['deffile']
+        # if the container was not made using a deffile, this will be None.
+        # In this case, return an empty applist.
+        if def_file_str is None:
+            appinfo_lst = []
+        else:
+            try:
+                appinfo_lst = deffile.parse_string(def_file_str)
+            except RuntimeError:
+                logger.warning('Invalid container file:', exc_info=True)
+                raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
+                                      code='invalid_singularity_deffile')
         return dict(cont_type='singularity', applist=appinfo_lst)
 
     def get_archive_content(self, add_default):
