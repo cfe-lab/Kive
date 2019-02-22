@@ -1721,8 +1721,6 @@ sum,product,bigger
             user=run.user,
             file_handle=ContentFile(pairs_text.encode("utf-8"), name="pairs.csv")
         )
-        # pairs_dataset = Dataset.objects.create(user=run.user, name='pairs.csv')
-        # pairs_dataset.dataset_file.save('pairs.csv', ContentFile(pairs_text))
         run_input = run.datasets.get()
         run_input.dataset = pairs_dataset
         run_input.argument = run.app.arguments.get(type=ContainerArgument.INPUT)
