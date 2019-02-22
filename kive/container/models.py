@@ -491,9 +491,8 @@ class Container(AccessControl):
             return
         if ctype == 'singularity':
             default_config = self.DEFAULT_APP_CONFIG
-            appinfo_lst = content['applist']
             self.apps.all().delete()
-            for appinfo in appinfo_lst:
+            for appinfo in content['applist']:
                 num_threads = appinfo.get_num_threads() or default_config['threads']
                 memory = appinfo.get_memory() or default_config['memory']
                 inpargs, outargs = appinfo.get_IO_args()
@@ -501,6 +500,10 @@ class Container(AccessControl):
                 outargs = outargs or ""
                 dbname = appinfo.name if appinfo.name != 'main' else ""
                 help_str = appinfo.get_helpstring() or ""
+                # attach the help string of the default app to the container's description
+                if dbname == "" and help_str != "":
+                    self.description += "\n" + help_str
+                    self.save()
                 newdb_app = self.apps.create(name=dbname,
                                              description=help_str,
                                              threads=num_threads,
