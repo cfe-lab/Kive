@@ -1483,6 +1483,23 @@ class RunContainerTests(TestCase):
         dataset_groups = list(output_dataset.groups_allowed.values_list('name'))
         self.assertEqual(expected_groups, dataset_groups)
 
+    def test_run_input_bad_md5(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        everyone = Group.objects.get(name='Everyone')
+        run.groups_allowed.clear()
+        run.groups_allowed.add(everyone)
+
+        # Tamper with the file.
+        input_containerdataset = run.datasets.get(
+            argument__type=ContainerArgument.INPUT,
+            argument__position=1
+        )
+        input_dataset = input_containerdataset.dataset
+        input_dataset.dataset_file.save("tampered", ContentFile(b"foo"), save=True)
+
+        with self.assertRaises(ValueError):
+            call_command('runcontainer', str(run.id))
+
     def test_run_bad_md5(self):
         run = ContainerRun.objects.get(name='fixture run')
         everyone = Group.objects.get(name='Everyone')
@@ -1699,8 +1716,13 @@ sum,product,bigger
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('pairs_csv')
         run.app.write_outputs('summary_csv')
-        pairs_dataset = Dataset.objects.create(user=run.user, name='pairs.csv')
-        pairs_dataset.dataset_file.save('pairs.csv', ContentFile(pairs_text))
+        pairs_dataset = Dataset.create_dataset(
+            file_path=None,
+            user=run.user,
+            file_handle=ContentFile(pairs_text, name="pairs.csv")
+        )
+        # pairs_dataset = Dataset.objects.create(user=run.user, name='pairs.csv')
+        # pairs_dataset.dataset_file.save('pairs.csv', ContentFile(pairs_text))
         run_input = run.datasets.get()
         run_input.dataset = pairs_dataset
         run_input.argument = run.app.arguments.get(type=ContainerArgument.INPUT)

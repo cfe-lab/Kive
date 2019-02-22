@@ -93,6 +93,18 @@ class Command(BaseCommand):
         stdout_path = os.path.join(logs_path, 'stdout.txt')
         stderr_path = os.path.join(logs_path, 'stderr.txt')
 
+        for input_cd in run.datasets.filter(argument__type=ContainerArgument.INPUT):
+            input_dataset = input_cd.dataset
+            current_md5 = input_dataset.compute_md5()
+            if current_md5 != input_dataset.MD5_checksum:
+                raise ValueError(
+                    "Dataset with pk={} has an inconsistent checksum (original {}; current {})".format(
+                        input_dataset.pk,
+                        input_dataset.MD5_checksum,
+                        current_md5
+                    )
+                )
+
         container_to_run = run.app.container
         container_to_run.validate_md5()
         if not container_to_run.is_singularity():
