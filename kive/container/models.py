@@ -498,7 +498,7 @@ class Container(AccessControl):
             for appinfo in content['applist']:
                 num_threads = appinfo.get_num_threads() or default_config['threads']
                 memory = appinfo.get_memory() or default_config['memory']
-                inpargs, outargs = appinfo.get_IO_args()
+                inpargs, outargs = appinfo.get_io_args()
                 inpargs = inpargs or ""
                 outargs = outargs or ""
                 dbname = appinfo.name if appinfo.name != 'main' else ""

@@ -35,8 +35,8 @@ class DefFileTest(TestCase):
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 2, "two expected"
         for app in app_lst:
-            assert isinstance(app, deffile.appinfo), "appinfo expected"
-            inp, outp = app.get_IO_args()
+            assert isinstance(app, deffile.AppInfo), "appinfo expected"
+            inp, outp = app.get_io_args()
             assert inp is not None, "inp key expected"
             assert outp is not None, "outp key expected"
             if lverb:
@@ -134,7 +134,7 @@ the help line
 
     def test_ignore01(self):
         """Keywords of no interest to us should be be silently ignored.
-        get_IO_args() should return (None, None) when KIVE_INPUTS and KIVE_OUTPUTS
+        get_io_args() should return (None, None) when KIVE_INPUTS and KIVE_OUTPUTS
         entries are missing.
         Dito get_num_threads() and get_memory().
         """
@@ -154,9 +154,9 @@ gggg
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 1, "one expected"
         app = app_lst[0]
-        assert isinstance(app, deffile.appinfo), "appinfo expected"
+        assert isinstance(app, deffile.AppInfo), "appinfo expected"
         # print("mainapp: {}".format(app))
-        iotup = app.get_IO_args()
+        iotup = app.get_io_args()
         assert iotup == (None, None), "none expected"
         assert app.get_num_threads() is None, "none expected"
         assert app.get_memory() is None, "none expected"
@@ -165,7 +165,7 @@ gggg
         assert sorted(dct.keys()) == ['BLA', 'GOO'], "wrong dict keys"
 
     def test_valid_pipeline01(self):
-        """appinfo.as_dict() should return a dict describing a pipeline
+        """AppInfo.as_dict() should return a dict describing a pipeline
         that can be validated successfully."""
         app_lst = deffile.parse_string(deffile_01)
         assert isinstance(app_lst, list), "list expected"
@@ -192,10 +192,10 @@ gggg
         for app in app_lst:
             s += "{}: {}".format(app.name, app)
 
-    def test_get_IO(self):
+    def test_get_io(self):
         """Getting argument from an un-initialised app should return None"""
-        app = deffile.appinfo('bla')
-        iotup = app.get_IO_args()
+        app = deffile.AppInfo('bla')
+        iotup = app.get_io_args()
         assert iotup == (None, None), "none expected"
         assert app.get_num_threads() is None, "none expected"
         assert app.get_memory() is None, "none expected"
@@ -234,3 +234,30 @@ gggg
         n_mem = app.get_memory()
         assert isinstance(n_mem, int), "int expected"
         assert n_mem == 1000, "1000 expected"
+
+    def test_chunk_string01(self):
+        t1 = r"""\
+# hello
+%start
+one\
+two\
+three
+%stop
+"""
+        # NOTE: leading white space before %start
+        t2 = r"""\
+# hello
+  %start
+one\
+two\
+three
+# ignore this line
+%stop
+"""
+        e_lst = [[u'%start', u'one two three'], [u'%stop']]
+        for inp_str, exp_lst in [(t1, e_lst),
+                                 (t2, e_lst)]:
+            chk_lst = deffile.chunk_string(inp_str)
+            # print("CHUNK 02 {}".format(chk_lst))
+            self.assertEqual(chk_lst, exp_lst)
+        # assert False, "force fail"
