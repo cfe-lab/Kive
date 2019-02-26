@@ -142,8 +142,16 @@ To provide more features like error handling and help, use [the `argparse` modul
 [the `argparse` module]: https://docs.python.org/3/library/argparse.html
 
 ## Singularity Images
-There's a full example of a Singularity image in the [`samplecode/singularity`]
-folder. Read the [Singularity documentation] for all the details, but here are
+When you upload a Singularity image, Kive will try to extract information about how
+this image can be run at a later stage from the image itself. This can be more time-efficient
+to the user than defining the various apps with input and outputs via the user interface.
+Essentially, Kive does this by extracting the `Singularity` definition file that was used
+to build the image from the image itself, and looking for Kive-specific keywords in it.
+Note that a singularity file created directly from a docker image will not have such a file,
+in which case this automatic detection will not work (you must make the app definitions yourself
+in the Kive GUI). There's a full example of a Singularity image and a Singularity definition file
+in the [`samplecode/singularity`] folder.
+Read the [Singularity documentation] for all the details, but here are
 the key features that Kive cares about:
 
 * `%runscript` - defines the command that will run for this container's default
@@ -157,8 +165,8 @@ the key features that Kive cares about:
         your command expects. Separate them with spaces.
     * `KIVE_OUTPUTS` - these are just names to tell Kive how many output files
         your command expects. Separate them with spaces.
-    * `KIVE_MEMORY` - the number of megabytes of memory to allocate. If
-    singularity uses more than this, the job will be cancelled.
+    * `KIVE_MEMORY` - the number of megabytes of memory to allocate when your
+	job runs. If singularity uses more than this, the job will be cancelled by slurm.
     * `KIVE_THREADS` - the number of processors the job will use at one time.
     Kive can't explicitly check this, but you risk overloading the servers if
     your job uses more processors than it asks for.
@@ -168,8 +176,13 @@ the key features that Kive cares about:
     description.
 * `%apphelp` - describes another app. This gets copied to the app description.
 
+In other words, if there is a main, 'default' app without a name, then the entries
+and labels from %runscript, %labels and %help are used for that app. You can have
+any number of additional uniquely named apps defined in the same way using the
+%apprun, %applabels and %apphelp entries.
+
 ### Building a Singularity Image
-Once you've written the `Singularity` file, build the image with a command like
+Once you've written the `Singularity` definition file, build the image with a command like
 this:
 
     sudo rm -f my_app.simg && sudo singularity build my_app.simg Singularity
@@ -220,7 +233,7 @@ build a basic Singularity container from a popular docker image like this:
     sudo singularity pull docker://python:3
 
 Then upload `python-3.simg` as a Singularity container using the instructions
-above. You don't need to define any apps for this container. You also don't
+above. You don't need to define any apps for this container. Neither do you
 need to install Docker, because Singularity can convert the Docker image for
 you.
 

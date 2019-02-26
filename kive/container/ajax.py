@@ -253,12 +253,16 @@ class ContainerViewSet(CleanCreateModelMixin,
     # noinspection PyUnusedLocal
     @content.mapping.put
     def content_put(self, request, pk=None):
+        """Handle a container content put request.
+        The container may not be a singularity container."""
         container = self.get_object()
         content = request.data
         status_code = HttpResponseBadRequest.status_code
         new_tag = content.get('new_tag')
         new_description = content.get('new_description')
-        if 'pipeline' not in content:
+        if container.is_singularity():
+            response_data = dict(message='Cannot put a singularity container.')
+        elif 'pipeline' not in content:
             response_data = dict(pipeline=['This field is required.'])
         elif new_tag and Container.objects.filter(tag=new_tag).exists():
             response_data = dict(new_tag=['Tag already exists.'])
@@ -275,7 +279,7 @@ class ContainerViewSet(CleanCreateModelMixin,
                 with use_field_file(container.file):
                     container.file.save(container.file.name, File(container.file))
             try:
-                container.write_content(content)
+                container.write_archive_content(content)
                 container.save()
                 if permissions_copy:
                     container.grant_from_permissions_list(permissions_copy)

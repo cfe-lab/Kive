@@ -113,8 +113,7 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
         container.save()
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=5000,
                                                                   threads=1),
                                               inputs=[],
@@ -138,8 +137,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -163,8 +161,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -189,8 +186,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -216,8 +212,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -234,15 +229,14 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
         container.save()
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
                                               steps=[],
                                               outputs=[]))
 
-        container.write_content(expected_content)
+        container.write_archive_content(expected_content)
         content = container.get_content()
         content.pop('id')
 
@@ -254,8 +248,7 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_tar_content(container)
         container.save()
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -263,7 +256,7 @@ class ContainerTests(TestCase):
                                               outputs=[]))
         expected_apps_count = 0  # Pipeline is incomplete, so no app created.
 
-        container.write_content(expected_content)
+        container.write_archive_content(expected_content)
         content = container.get_content()
         content.pop('id')
 
@@ -277,8 +270,7 @@ class ContainerTests(TestCase):
         self.create_zip_content(container)
         container.save()
         self.add_zip_content(container, "kive/pipeline1.json", '"old content"')
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -288,7 +280,7 @@ class ContainerTests(TestCase):
         with warnings.catch_warnings():
             # Register for warnings about duplicate file names.
             warnings.showwarning = lambda message, *args: self.fail(message)
-            container.write_content(expected_content)
+            container.write_archive_content(expected_content)
         content = container.get_content()
         content.pop('id')
 
@@ -302,7 +294,6 @@ class ContainerTests(TestCase):
         self.create_tar_content(container)
         container.save()
         expected_content = dict(
-            cont_type='arch',
             files=["bar.txt", "foo.txt"],
             pipeline=dict(default_config=dict(memory=200,
                                               threads=2),
@@ -321,7 +312,7 @@ class ContainerTests(TestCase):
         expected_inputs = "in1"
         expected_outputs = "out1"
 
-        container.write_content(expected_content)
+        container.write_archive_content(expected_content)
 
         self.assertEqual(expected_apps_count, container.apps.count())
         app = container.apps.first()
@@ -338,7 +329,6 @@ class ContainerTests(TestCase):
         self.create_tar_content(container)
         container.save()
         updated_content = dict(
-            cont_type='arch',
             pipeline=dict(default_config=dict(memory=200,
                                               threads=2),
                           inputs=[dict(dataset_name='in1')],
@@ -350,7 +340,7 @@ class ContainerTests(TestCase):
                           outputs=[dict(dataset_name="out1",
                                         source_step=1,
                                         source_dataset_name="out1")]))
-        container.write_content(updated_content)
+        container.write_archive_content(updated_content)
         container.save()
         old_md5 = container.md5
         app = container.apps.first()
@@ -374,7 +364,7 @@ class ContainerTests(TestCase):
                                         source_step=1,
                                         source_dataset_name="out1")]))
         with self.assertRaises(ExistingRunsError):
-            container.write_content(updated_content)
+            container.write_archive_content(updated_content)
 
         container.refresh_from_db()
 
@@ -534,7 +524,7 @@ class ContainerTests(TestCase):
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         got_cont = container.get_singularity_content()
-        exp_cont = {'applist': [], 'cont_type': u'singularity'}
+        exp_cont = {'applist': []}
         self.assertEqual(got_cont, exp_cont)
 
     @patch('container.models.Container.get_singularity_content')
@@ -546,7 +536,7 @@ class ContainerTests(TestCase):
         # should just return...
         container.create_app_from_content()
         # this too
-        mock_get_singularity_content.return_value = {'cont_type': u'UNKNOWN'}
+        mock_get_singularity_content.return_value = {}
         container.create_app_from_content()
 
     @patch('container.models.check_output')
@@ -666,8 +656,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         self.test_container.file.save(
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=5000,
                                                                   threads=1),
                                               inputs=[],
@@ -687,8 +676,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
         old_md5 = self.test_container.md5
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=400,
                                                                   threads=3),
                                               inputs=[],
@@ -726,23 +714,21 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual(expected_content, content)
         self.assertEqual(400, response.status_code)
 
-    def test_write_content_copy(self):
+    def test_write_archive_content_copy(self):
         self.test_container.file_type = Container.ZIP
         self.test_container.tag = 'v1'
         self.test_container.description = 'v1 description'
         self.test_container.file.save(
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
-        put_content = dict(cont_type='arch',
-                           pipeline=dict(
+        put_content = dict(pipeline=dict(
                                          default_config=dict(memory=400,
                                                              threads=3),
                                          inputs=[],
                                          steps=[],
                                          outputs=[]),
                            new_tag='v2')
-        expected_content = dict(cont_type='arch',
-                                files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=["bar.txt", "foo.txt"],
                                 pipeline=dict(default_config=dict(memory=400,
                                                                   threads=3),
                                               inputs=[],
@@ -1748,7 +1734,7 @@ class RunContainerTests(TestCase):
             tag='tar_test',
             file_type=Container.TAR)
         container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
-        container.write_content(content)
+        container.write_archive_content(content)
         container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('names_csv')
@@ -1830,7 +1816,7 @@ greeting
             tag='tar_test',
             file_type=Container.TAR)
         container.file.save('test_howdy.tar', ContentFile(tar_data.getvalue()))
-        container.write_content(content)
+        container.write_archive_content(content)
         container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('names_csv')
@@ -1909,7 +1895,7 @@ sum,product,bigger
             tag='multi_test',
             file_type=Container.TAR)
         container.file.save('test_multi.tar', ContentFile(tar_data.getvalue()))
-        container.write_content(content)
+        container.write_archive_content(content)
         container.save()
         run.app = container.apps.create(memory=200, threads=1)
         run.app.write_inputs('pairs_csv')

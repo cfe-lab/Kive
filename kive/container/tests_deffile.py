@@ -5,9 +5,8 @@ from __future__ import unicode_literals
 from django.test import TestCase
 
 import container.deffile as deffile
-from container.models import PipelineCompletionStatus
 
-deffile_01 = """# Generate the Singularity container to run MiCall on Kive.\nBootstrap: docker\nFrom: python:2.7.15-alpine3.6\n
+_DEFFILE_01 = """# Generate the Singularity container to run MiCall on Kive.\nBootstrap: docker\nFrom: python:2.7.15-alpine3.6\n
 %help\n    Minimal example that can run simple Python scripts under Kive.\n
     The main app generates \"Hello, World!\" messages for a list of names.\n
 %labels\n    MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
@@ -31,7 +30,7 @@ class DefFileTest(TestCase):
     def test_parse01(self):
         """Retrieve app information from a legal singularity def file."""
         lverb = False
-        app_lst = deffile.parse_string(deffile_01)
+        app_lst = deffile.parse_string(_DEFFILE_01)
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 2, "two expected"
         for app in app_lst:
@@ -43,8 +42,8 @@ class DefFileTest(TestCase):
                 print("{}: {} -> {}".format(app.name, inp, outp))
                 print("   run: {}".format(app.get_runstring()))
                 print("  help: {}".format(app.get_helpstring()))
-                for k, v in app.get_label_dict().items():
-                    print("   label: {}: {}".format(k, v))
+                for k, val in app.get_label_dict().items():
+                    print("   label: {}: {}".format(k, val))
             # --
         # assert False, "force fail"
 
@@ -164,30 +163,8 @@ gggg
         assert isinstance(dct, dict), "dict expected"
         assert sorted(dct.keys()) == ['BLA', 'GOO'], "wrong dict keys"
 
-    def test_valid_pipeline01(self):
-        """AppInfo.as_dict() should return a dict describing a pipeline
-        that can be validated successfully."""
-        app_lst = deffile.parse_string(deffile_01)
-        assert isinstance(app_lst, list), "list expected"
-        assert len(app_lst) == 2, "two expected"
-        for app in app_lst:
-            pp_dct = app.as_pipeline_dict()
-            assert isinstance(pp_dct, dict), "dict expected"
-            # print("BLA {}".format(pp_dct))
-            # exp_keys = frozenset(['appname', 'helpstring', 'runstring', 'labeldict'])
-            # assert set(dd.keys()) == exp_keys, "unexpected dict keys"
-            pd = PipelineCompletionStatus(pp_dct)
-            if not pd.is_complete():
-                print("Pipeline [] Failed".format(app.name))
-                print('has inputs{}, steps {}, outputs {}'.format(pd.has_inputs,
-                                                                  pd.has_steps,
-                                                                  pd.has_outputs))
-                print("has inp_not_conn {}, has dangly out {}".format(pd.inputs_not_connected,
-                                                                      pd.dangling_outputs))
-                raise RuntimeError('pipeline dict failed muster')
-
     def test_repr01(self):
-        app_lst = deffile.parse_string(deffile_01)
+        app_lst = deffile.parse_string(_DEFFILE_01)
         s = ""
         for app in app_lst:
             s += "{}: {}".format(app.name, app)
@@ -254,9 +231,22 @@ three
 # ignore this line
 %stop
 """
+        # no labels in the string at all...
+        t3 = r"""\
+
+hello
+
+"""
+        # an empty string
+        t4 = r"""\
+
+
+"""
         e_lst = [[u'%start', u'one two three'], [u'%stop']]
         for inp_str, exp_lst in [(t1, e_lst),
-                                 (t2, e_lst)]:
+                                 (t2, e_lst),
+                                 (t3, []),
+                                 (t4, [])]:
             chk_lst = deffile.chunk_string(inp_str)
             # print("CHUNK 02 {}".format(chk_lst))
             self.assertEqual(chk_lst, exp_lst)

@@ -2,22 +2,29 @@
 """Parse Singularity definition files for information about
 installed apps etc."""
 
-label_set = frozenset(["%applabels", "%labels"])
-help_set = frozenset(["%apphelp", "%help"])
-run_set = frozenset(["%apprun",   "%runscript"])
-my_kw_set = label_set | help_set | run_set
+
+_LABEL_SET = frozenset(["%applabels", "%labels"])
+_HELP_SET = frozenset(["%apphelp", "%help"])
+_RUN_SET = frozenset(["%apprun", "%runscript"])
+_MY_KW_SET = _LABEL_SET | _HELP_SET | _RUN_SET
 
 
 def chunk_string(instr):
+    """Convert a single multi-line string into a list of chunks (= list of strings.)
+    The beginning of each chunk is denoted by a keyword beginning with '%'.
+    Empty lines are ignored.
+    Continuation lines (backslash and en of a line) are honoured.
+    """
     # treat lines ending in '\' as continuation lines
     instr = instr.replace('\\\n', ' ')
-    ll = [l.strip() for l in instr.splitlines() if not l.startswith('#') and len(l) > 0]
-    ndxlst = [ndx for ndx, l in enumerate(ll) if l.startswith('%')]
-    ndxlst.append(len(ll))
-    return [ll[strt:stop] for strt, stop in [(ndxlst[nn], ndxlst[nn+1]) for nn in range(len(ndxlst)-1)]]
+    ll_lst = [l.strip() for l in instr.splitlines() if not l.startswith('#') and len(l) > 0]
+    ndxlst = [ndx for ndx, l in enumerate(ll_lst) if l.startswith('%')] + [len(ll_lst)]
+    return [ll_lst[strt:stop] for strt, stop in [(ndxlst[nn], ndxlst[nn+1]) for nn in range(len(ndxlst)-1)]]
 
 
 class AppInfo:
+    """Collect all information needed for a container app. This information is extracted
+    from a singularity def file."""
     def __init__(self, name):
         self.name = name
         self.helpstr = None
@@ -25,13 +32,15 @@ class AppInfo:
         self._labdct = None
         self.err = False
 
-    def _set_help(self, helpstr):
+    def set_help(self, helpstr):
+        """Set the help information of this app."""
         if self.helpstr is None:
             self.helpstr = helpstr
         else:
             self.err = True
 
-    def _set_label(self, labelstr):
+    def set_label(self, labelstr):
+        """Set the label information of this app."""
         if self._labdct is not None:
             self.err = True
             return
@@ -50,16 +59,18 @@ class AppInfo:
             labdct[k] = v
         self._labdct = labdct
 
-    def _set_run(self, runstr):
+    def set_run(self, runstr):
+        """Set the run information. This can only occur once."""
         if self.runstr is None:
             self.runstr = runstr
         else:
             self.err = True
 
     def is_faulty(self):
+        """Return true if some inconsistency occurred in the app definition."""
         return self.err or self.helpstr is None or\
-              self._labdct is None or\
-              self.runstr is None
+            self._labdct is None or\
+            self.runstr is None
 
     def __repr__(self):
         inp, outp = self.get_io_args()
@@ -67,7 +78,7 @@ class AppInfo:
 
     def get_io_args(self):
         """Return a tuple (input_arg_string, output_arg_str).
-        Return None in those places if KIVE_INPUTS or KIVE_OUTPUTS is not defined.
+        Return  in those places if KIVE_INPUTS or KIVE_OUTPUTS is not defined.
         E.g. if we have inputs but no defined outputs, we will return ('input_args', None) .
         """
         if self.err or self._labdct is None:
@@ -99,44 +110,24 @@ class AppInfo:
         return self._labdct
 
     def get_helpstring(self):
+        """Return the help string (which can be on multiple lines) as a single string"""
         if self.err or self.helpstr is None:
             return None
         return "\n".join(self.helpstr)
 
     def get_runstring(self):
+        """Return the singularity container run string (used to lauch the app or container)"""
         if self.err or self.runstr is None:
             return None
         return "\n".join(self.runstr)
 
-    def as_dict(self):
-        """Return the appinfo as a dict."""
-        return dict(appname=self.name,
-                    helpstring=self.get_helpstring(),
-                    runstring=self.get_runstring(),
-                    labeldict=self.get_label_dict())
 
-    def as_pipeline_dict(self):
-        """Return the appinfo as a dict describing a pipeline.
-        The app is described as having a single step.
-        """
-        dd = self.as_dict()
-        inp_str, out_str = self.get_io_args()
-        inp_str = inp_str or ""
-        out_str = out_str or ""
-        inp_lst = [dict(dataset_name=inp_name, source_step=i) for i, inp_name in enumerate(inp_str.split(), start=1)]
-        out_lst = [dict(dataset_name=inp_name, source_step=i) for i, inp_name in enumerate(out_str.split(), start=1)]
-        dd['inputs'] = inp_lst
-        dd['outputs'] = out_lst
-        dd['steps'] = [dict(inputs=inp_lst, outputs=out_lst)]
-        return dd
-
-
-_setter_funk_dct = {}
-for fset, funk in [(help_set, AppInfo._set_help),
-                   (label_set, AppInfo._set_label),
-                   (run_set, AppInfo._set_run)]:
+_SETTER_FUNK_DCT = {}
+for fset, funk in [(_HELP_SET, AppInfo.set_help),
+                   (_LABEL_SET, AppInfo.set_label),
+                   (_RUN_SET, AppInfo.set_run)]:
     for ftk in fset:
-        _setter_funk_dct[ftk] = funk
+        _SETTER_FUNK_DCT[ftk] = funk
 
 
 def parse_string(instr):
@@ -153,12 +144,12 @@ def parse_string(instr):
         hed_info = chunk[0].split()
         got_kw = hed_info[0]
         appname = hed_info[1] if len(hed_info) > 1 else 'main'
-        if got_kw in my_kw_set:
+        if got_kw in _MY_KW_SET:
             if appname in appdct:
                 my_app = appdct[appname]
             else:
                 my_app = appdct[appname] = AppInfo(appname)
-            _setter_funk_dct[got_kw](my_app, chunk[1:])
+            _SETTER_FUNK_DCT[got_kw](my_app, chunk[1:])
     for app in appdct.values():
         if app.is_faulty():
             raise RuntimeError("faulty app {}".format(app.name))

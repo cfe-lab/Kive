@@ -8,14 +8,14 @@ import re
 import sys
 from contextlib import contextmanager
 from datetime import datetime, timedelta
-from io import BytesIO
 from itertools import count
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
+import tarfile
 from tarfile import TarFile, TarInfo
 from tempfile import mkdtemp, mkstemp
 import shutil
-import tarfile
 import io
+from io import BytesIO
 from zipfile import ZipFile, BadZipfile
 from collections import OrderedDict, namedtuple
 
@@ -399,8 +399,7 @@ class Container(AccessControl):
         """
         if self.is_singularity():
             return self.get_singularity_content()
-        else:
-            return self.get_archive_content(add_default)
+        return self.get_archive_content(add_default)
 
     def get_singularity_content(self):
         """Determine pipeline definitions from a singularity file.
@@ -430,7 +429,7 @@ class Container(AccessControl):
                 logger.warning('Invalid container file:', exc_info=True)
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
                                       code='invalid_singularity_deffile')
-        return dict(cont_type='singularity', applist=appinfo_lst)
+        return dict(applist=appinfo_lst)
 
     def get_archive_content(self, add_default):
         with self.open_content() as archive:
@@ -449,11 +448,14 @@ class Container(AccessControl):
                                         for entry in archive.infolist()
                                         if not entry.name.startswith('kive/')),
                            pipeline=pipeline,
-                           id=self.pk,
-                           cont_type='arch')
+                           id=self.pk)
             return content
 
-    def write_content(self, content):
+    def write_archive_content(self, content):
+        """Write the contents of an archive (i.e. non singularity) container.
+        This method is typically called with a content dict taken from an ajax request.
+        Singularity containers are not made this way.
+        """
         related_runs = ContainerRun.objects.filter(app__in=self.apps.all())
         if related_runs.exists():
             raise ExistingRunsError()
@@ -483,37 +485,39 @@ class Container(AccessControl):
     def create_app_from_content(self, content=None):
         """Create apps based on the content configuration.
         This method handles archive as well as singularity images.
+
+        In the case of singularity images:
+         if applist is None: no changes are made to current apps of a container.
+        if applist is []: all apps are deleted.
         """
         content = content or self.get_content()
         if content is None:
             logger.warning("failed to obtain content from container")
             return
-        ctype = content.get('cont_type', None)
-        if ctype is None:
-            logger.error("no cont_type entry in content")
-            return
-        if ctype == 'singularity':
-            default_config = self.DEFAULT_APP_CONFIG
-            self.apps.all().delete()
-            for appinfo in content['applist']:
-                num_threads = appinfo.get_num_threads() or default_config['threads']
-                memory = appinfo.get_memory() or default_config['memory']
-                inpargs, outargs = appinfo.get_io_args()
-                inpargs = inpargs or ""
-                outargs = outargs or ""
-                dbname = appinfo.name if appinfo.name != 'main' else ""
-                help_str = appinfo.get_helpstring() or ""
-                # attach the help string of the default app to the container's description
-                if dbname == "" and help_str != "":
-                    self.description = help_str if self.description == "" else self.description + "\n" + help_str
-                    self.save()
-                newdb_app = self.apps.create(name=dbname,
-                                             description=help_str,
-                                             threads=num_threads,
-                                             memory=memory)
-                newdb_app.write_inputs(inpargs)
-                newdb_app.write_outputs(outargs)
-        elif ctype == 'arch':
+        if self.is_singularity():
+            app_lst = content.get('applist', None)
+            if app_lst is not None:
+                default_config = self.DEFAULT_APP_CONFIG
+                self.apps.all().delete()
+                for appinfo in app_lst:
+                    num_threads = appinfo.get_num_threads() or default_config['threads']
+                    memory = appinfo.get_memory() or default_config['memory']
+                    inpargs, outargs = appinfo.get_io_args()
+                    inpargs = inpargs or "input_txt"
+                    outargs = outargs or "output_txt"
+                    dbname = appinfo.name if appinfo.name != 'main' else ""
+                    help_str = appinfo.get_helpstring() or ""
+                    # attach the help string of the default app to the container's description
+                    if dbname == "" and help_str != "":
+                        self.description = help_str if self.description == "" else self.description + "\n" + help_str
+                        self.save()
+                    newdb_app = self.apps.create(name=dbname,
+                                                 description=help_str,
+                                                 threads=num_threads,
+                                                 memory=memory)
+                    newdb_app.write_inputs(inpargs)
+                    newdb_app.write_outputs(outargs)
+        else:
             # arch container
             pipeline = content['pipeline']
             if self.pipeline_valid(pipeline):
@@ -530,8 +534,6 @@ class Container(AccessControl):
                                         for entry in pipeline['outputs'])
                 app.write_inputs(input_names)
                 app.write_outputs(output_names)
-        else:
-            logger.error('unknown cont_type {}'.format(ctype))
 
     @staticmethod
     def pipeline_valid(pipeline):
@@ -1240,8 +1242,8 @@ class ContainerLog(models.Model):
         """ A queryset of records that could be purged. """
         return cls.objects.exclude(
             long_text=None).exclude(  # short log
-            long_text='').exclude(  # purged log
-            log_size=None)  # new log
+                long_text='').exclude(  # purged log
+                    log_size=None)  # new log
 
     @classmethod
     def scan_file_names(cls):
