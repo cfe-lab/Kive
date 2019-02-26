@@ -328,11 +328,12 @@ class ContainerRunSerializer(AccessControlSerializer,
             dataset['run'] = run
             dataset_serializer.create(dataset)
         if original_run is not None:
-            for original_dataset in original_run.datasets.filter(
+            for container_dataset in original_run.datasets.filter(
                     argument__type='I'):
-                original_dataset.id = None  # Make a copy.
-                original_dataset.run = run
-                original_dataset.save()
+                container_dataset.id = None  # Make a copy.
+                container_dataset.dataset = container_dataset.find_rerun_dataset()
+                container_dataset.run = run
+                container_dataset.save()
         return run
 
 

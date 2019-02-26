@@ -1147,6 +1147,24 @@ class ContainerDataset(models.Model):
                     'argument__position',
                     'argument__name')
 
+    def find_rerun_dataset(self):
+        """ Find the dataset, or the matching dataset from a rerun.
+
+        :return: the dataset, if found, otherwise None.
+        """
+        if self.dataset.has_data():
+            return self.dataset
+
+        output_container_dataset = self.dataset.containers.get(
+            argument__type=ContainerArgument.OUTPUT)
+        output_argument = output_container_dataset.argument
+        for rerun in output_container_dataset.run.reruns.all():
+            rerun_container_dataset = rerun.datasets.get(argument=output_argument)
+            dataset = rerun_container_dataset.find_rerun_dataset()
+            if dataset is not None:
+                return dataset
+        return None
+
 
 class ContainerLog(models.Model):
     UPLOAD_DIR = 'ContainerLogs'

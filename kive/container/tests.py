@@ -1014,7 +1014,10 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         container = Container.objects.create(family=family, user=user)
         app = ContainerApp.objects.create(container=container, name='test')
         arg = app.arguments.create(type=ContainerArgument.INPUT)
-        dataset = Dataset.create_empty(user=user)
+        app.arguments.create(type=ContainerArgument.OUTPUT)
+        dataset = Dataset.objects.create(user=user)
+        content_file = ContentFile('a,b\n0,9')
+        dataset.dataset_file.save('in1.csv', content_file)
         self.test_run = app.runs.create(user=user)
         self.test_run.datasets.create(argument=arg, dataset=dataset)
 
@@ -1125,6 +1128,63 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         run_dataset = run.datasets.get()
         self.assertEqual(input_argument.id, run_dataset.argument_id)
         self.assertEqual(input_dataset.id, run_dataset.dataset_id)
+
+    def test_add_rerun_find_input(self):
+        app = self.test_run.app
+        input_argument = app.arguments.get(type=ContainerArgument.INPUT)
+        output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
+
+        content_file = ContentFile('x,y\n1,2')
+        output1 = Dataset.objects.create(user=self.test_run.user, name='output1')
+        output1.dataset_file.save('example.csv', content_file)
+        self.test_run.datasets.create(argument=output_argument, dataset=output1)
+
+        # run2 consumes an output from self.test_run
+        run2 = ContainerRun.objects.create(user=self.test_run.user,
+                                           app=self.test_run.app,
+                                           state=ContainerRun.FAILED)
+        run2.datasets.create(argument=input_argument, dataset=output1)
+
+        # Purge the input to run 2.
+        output1.dataset_file.delete()
+
+        # run3 is a rerun of self.test_run to reproduce the input for run 2.
+        run3 = ContainerRun.objects.create(user=self.test_run.user,
+                                           name='source rerun',
+                                           app=self.test_run.app,
+                                           original_run=self.test_run,
+                                           state=ContainerRun.COMPLETE)
+        output1b = Dataset.objects.create(user=self.test_run.user, name='output1b')
+        output1b.dataset_file.save('example_b.csv', content_file)
+        run3.datasets.create(argument=output_argument, dataset=output1b)
+
+        # Now we request a rerun of run 2.
+        run2_path = reverse("containerrun-detail", kwargs={'pk': run2.id})
+        request1 = self.factory.get(self.list_path)
+        force_authenticate(request1, user=self.kive_user)
+        start_count = len(self.list_view(request1).data)
+
+        request2 = self.factory.post(
+            self.list_path,
+            dict(name='my rerun',
+                 original_run=run2_path),
+            format="json")
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).render().data
+
+        self.assertIn('id', resp)
+        self.assertEquals(resp['name'], "my rerun")
+
+        request3 = self.factory.get(self.list_path)
+        force_authenticate(request3, user=self.kive_user)
+        resp = self.list_view(request3).data
+        resp_run = resp[0]
+
+        self.assertEquals(len(resp), start_count + 1)
+        run = ContainerRun.objects.get(id=resp_run['id'])
+        run_dataset = run.datasets.get()
+        self.assertEqual(output1b.id, run_dataset.dataset_id)
 
     @patch('container.models.check_output')
     def test_slurm_ended(self, mock_check_output):
