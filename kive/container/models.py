@@ -816,6 +816,9 @@ class Batch(AccessControl):
     class Meta(object):
         ordering = ('-id',)
 
+    def __str__(self):
+        return self.name or 'Batch {}'.format(self.pk)
+
     @property
     def absolute_url(self):
         return reverse('batch_update', kwargs=dict(pk=self.pk))
@@ -900,13 +903,18 @@ class ContainerRun(Stopwatch, AccessControl):
         help_text="Size of the sandbox in bytes.  If null, this has not been computed yet."
     )
 
-    sandbox_purged = models.BooleanField(
-        default=False,
-        help_text="No longer used. Sandbox path is blank when purged."
-    )
+    original_run = models.ForeignKey(
+        'ContainerRun',
+        help_text="This run is a rerun of the original.",
+        null=True,
+        blank=True,
+        related_name="reruns")
 
     class Meta(object):
         ordering = ('-submit_time',)
+
+    def __str__(self):
+        return self.name or 'Container run {}'.format(self.pk)
 
     def __repr__(self):
         return 'ContainerRun(id={!r})'.format(self.pk)

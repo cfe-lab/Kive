@@ -81,36 +81,22 @@
 
             event.preventDefault();
 
-            $.get(run.url + 'dataset_list/').fail(function () {
-                window.alert("Failed to fetch inputs.");
-            }).done(function (data) {
-                var inputs = [];
-                $.each(data, function(i, run_dataset) {
-                    if (run_dataset.argument_type === "I") {
-                        inputs.push({
-                            argument: run_dataset.argument,
-                            dataset: run_dataset.dataset
-                        });
-                    }
-                });
-                $.ajax({
-                    url: run_table.list_url,
-                    method: "POST",
-                    data: JSON.stringify({
-                        name: run.name,
-                        app:run.app,
-                        description: run.description,
-                        users_allowed: run.users_allowed,
-                        groups_allowed: run.groups_allowed,
-                        datasets: inputs
-                    }),
-                    contentType: "application/json",
-                    processData: false
-                }).fail(function () {
-                    window.alert("Failed to create run.");
-                }).done(function () {
-                    run_table.reloadTable();
-                })
+            $.ajax({
+                url: run_table.list_url,
+                method: "POST",
+                data: JSON.stringify({
+                    name: run.name,
+                    original_run:run.url,
+                    description: run.description,
+                    users_allowed: run.users_allowed,
+                    groups_allowed: run.groups_allowed
+                }),
+                contentType: "application/json",
+                processData: false
+            }).fail(function () {
+                window.alert("Failed to create run.");
+            }).done(function () {
+                run_table.reloadTable();
             });
         }
 	};

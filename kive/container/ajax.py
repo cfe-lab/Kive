@@ -431,6 +431,21 @@ class ContainerRunPermission(permissions.BasePermission):
         return request.method in permissions.SAFE_METHODS
 
 
+class ContainerRunRenderer(JSONRenderer):
+    """ Render the Raw data form for content_put to hold current content. """
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        if renderer_context['view'].action == 'partial_update':
+            data = dict(is_stop_requested=False)
+        rendered = super(ContainerRunRenderer, self).render(data,
+                                                            accepted_media_type,
+                                                            renderer_context)
+        return rendered
+
+
+class ContainerRunJSONParser(JSONParser):
+    renderer_class = ContainerRunRenderer
+
+
 class ContainerRunViewSet(CleanCreateModelMixin,
                           RemovableModelViewSet,
                           SearchableModelMixin):
@@ -484,6 +499,7 @@ class ContainerRunViewSet(CleanCreateModelMixin,
     serializer_class = ContainerRunSerializer
     permission_classes = (permissions.IsAuthenticated, ContainerRunPermission)
     pagination_class = StandardPagination
+    parser_classes = [ContainerRunJSONParser, FormParser, MultiPartParser]
     filters = dict(
         smart=lambda queryset, value: queryset.filter(
             Q(name__icontains=value) |

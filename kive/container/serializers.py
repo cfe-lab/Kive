@@ -250,7 +250,8 @@ class ContainerRunSerializer(AccessControlSerializer,
     app = serializers.HyperlinkedRelatedField(
         view_name='containerapp-detail',
         lookup_field='pk',
-        queryset=ContainerApp.objects.all())
+        queryset=ContainerApp.objects.all(),
+        required=False)
     app_name = serializers.SlugRelatedField(
         source='app',
         slug_field='display_name',
@@ -268,6 +269,11 @@ class ContainerRunSerializer(AccessControlSerializer,
         source='batch',
         slug_field='absolute_url',
         read_only=True)
+    original_run = serializers.HyperlinkedRelatedField(
+        view_name='containerrun-detail',
+        lookup_field='pk',
+        queryset=ContainerRun.objects.all(),
+        required=False)
     stopped_by = serializers.SlugRelatedField(
         slug_field='username',
         read_only=True)
@@ -284,6 +290,7 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'batch',
                   'batch_name',
                   'batch_absolute_url',
+                  'original_run',
                   'app',
                   'app_name',
                   'state',
@@ -301,17 +308,31 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'dataset_list',
                   'log_list',
                   'datasets')
+        read_only_fields = ('state',
+                            'slurm_job_id',
+                            'return_code',
+                            'start_time',
+                            'end_time')
 
     def create(self, validated_data):
         """Create a Run and the inputs it contains."""
         datasets = validated_data.pop("datasets", [])
 
+        original_run = validated_data.get('original_run')
+        if original_run is not None:
+            validated_data['app'] = original_run.app
         run = super(ContainerRunSerializer, self).create(validated_data)
         run.validate_restrict_access(run.get_access_limits())
         dataset_serializer = ContainerDatasetSerializer()
         for dataset in datasets:
             dataset['run'] = run
             dataset_serializer.create(dataset)
+        if original_run is not None:
+            for original_dataset in original_run.datasets.filter(
+                    argument__type='I'):
+                original_dataset.id = None  # Make a copy.
+                original_dataset.run = run
+                original_dataset.save()
         return run
 
 

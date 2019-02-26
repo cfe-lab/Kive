@@ -1052,6 +1052,80 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_count = ContainerRun.objects.all().count()
         self.assertEquals(end_count, start_count - 1)
 
+    def test_add(self):
+        request1 = self.factory.get(self.list_path)
+        force_authenticate(request1, user=self.kive_user)
+        start_count = len(self.list_view(request1).data)
+
+        input_argument = self.test_run.app.arguments.get(
+            type=ContainerArgument.INPUT)
+        input_dataset = self.test_run.datasets.get(
+            argument=input_argument).dataset
+        app_url = rest_reverse('containerapp-detail',
+                               kwargs=dict(pk=self.test_run.app_id))
+        arg_url = rest_reverse('containerargument-detail',
+                               kwargs=dict(pk=input_argument.id))
+        dataset_url = rest_reverse('dataset-detail',
+                                   kwargs=dict(pk=input_dataset.pk))
+        request2 = self.factory.post(
+            self.list_path,
+            dict(name='my run',
+                 description='A really cool run',
+                 app=app_url,
+                 datasets=[dict(argument=arg_url,
+                                dataset=dataset_url)]),
+            format="json")
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).render().data
+
+        self.assertIn('id', resp)
+        self.assertEquals(resp['name'], "my run")
+
+        request3 = self.factory.get(self.list_path)
+        force_authenticate(request3, user=self.kive_user)
+        resp = self.list_view(request3).data
+        resp_run = resp[0]
+
+        self.assertEquals(len(resp), start_count + 1)
+        self.assertEquals(resp_run['description'], "A really cool run")
+
+    def test_add_rerun(self):
+        request1 = self.factory.get(self.list_path)
+        force_authenticate(request1, user=self.kive_user)
+        start_count = len(self.list_view(request1).data)
+
+        input_argument = self.test_run.app.arguments.get(
+            type=ContainerArgument.INPUT)
+        input_dataset = self.test_run.datasets.get(
+            argument=input_argument).dataset
+        app_url = rest_reverse('containerapp-detail',
+                               kwargs=dict(pk=self.test_run.app_id))
+        request2 = self.factory.post(
+            self.list_path,
+            dict(name='my rerun',
+                 original_run=self.detail_path),
+            format="json")
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).render().data
+
+        self.assertIn('id', resp)
+        self.assertEquals(resp['name'], "my rerun")
+
+        request3 = self.factory.get(self.list_path)
+        force_authenticate(request3, user=self.kive_user)
+        resp = self.list_view(request3).data
+        resp_run = resp[0]
+
+        self.assertEquals(len(resp), start_count + 1)
+        expected_app_url = request3.build_absolute_uri(app_url)
+        self.assertEquals(expected_app_url, resp_run['app'])
+        run = ContainerRun.objects.get(id=resp_run['id'])
+        run_dataset = run.datasets.get()
+        self.assertEqual(input_argument.id, run_dataset.argument_id)
+        self.assertEqual(input_dataset.id, run_dataset.dataset_id)
+
     @patch('container.models.check_output')
     def test_slurm_ended(self, mock_check_output):
         ContainerRun.objects.update(slurm_job_id=None)
