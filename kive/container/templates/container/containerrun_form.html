@@ -143,12 +143,18 @@
         <th>Name</th>
         <th>Size</th>
         <th>Date</th>
+        {% if object.original_run %}
+            <th>Changed?</th>
+        {% endif %}
     </tr>
 {% for data_entry in data_entries %}
     <tr><td>{{ data_entry.type }}</td>
         <td><a href="{{ data_entry.url }}">{{ data_entry.name }}</a></td>
         <td>{{ data_entry.size }}</td>
         <td>{{ data_entry.created }}</td>
+        {% if object.original_run %}
+            <td>{{ data_entry.is_changed }}</td>
+        {% endif %}
     </tr>
 {% endfor %}
 </table>

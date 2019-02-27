@@ -1044,8 +1044,11 @@ class ContainerRun(Stopwatch, AccessControl):
         """
         reruns_needed = set()
         if self.original_run:
+            filled_argument_ids = self.datasets.values('argument_id')
+            unfilled_input_arguments = self.app.arguments.filter(
+                type=ContainerArgument.INPUT).exclude(id__in=filled_argument_ids)
             for container_dataset in self.original_run.datasets.filter(
-                    argument__type='I'):
+                    argument__in=unfilled_input_arguments):
                 rerun_dataset, source_run = container_dataset.find_rerun_dataset()
                 if rerun_dataset is None:
                     reruns_needed.add(source_run)

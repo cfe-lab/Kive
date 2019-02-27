@@ -2451,6 +2451,39 @@ what up
         run_dataset = run4.datasets.get(argument__type=ContainerArgument.INPUT)
         self.assertEqual(output1b.id, run_dataset.dataset_id)
 
+    def test_rerun_input_exists(self):
+        run1 = ContainerRun.objects.get(name='fixture run')
+        app = run1.app
+        input_argument = app.arguments.get(type=ContainerArgument.INPUT)
+        output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
+
+        content_file = ContentFile('x,y\n1,2')
+        output1 = Dataset.objects.create(user=run1.user, name='output1')
+        output1.dataset_file.save('example.csv', content_file)
+        output1.set_MD5(output1.dataset_file.path)
+        output1.save()
+        run1.datasets.create(argument=output_argument, dataset=output1)
+
+        # run2 consumes an output from run1
+        run2 = ContainerRun.objects.create(user=run1.user,
+                                           app=run1.app,
+                                           state=ContainerRun.FAILED)
+        run2.datasets.create(argument=input_argument, dataset=output1)
+
+        # run4 is a rerun of run 2, and the one we are going to execute.
+        run4 = ContainerRun.objects.create(user=run2.user,
+                                           app=run2.app,
+                                           original_run=run2)
+        # Inputs have not been purged, so no extra reruns needed.
+        reruns_needed = run4.create_inputs_from_original_run()
+        self.assertEqual(set(), reruns_needed)
+
+        call_command('runcontainer', str(run4.id))
+
+        run4.refresh_from_db()
+        run_dataset = run4.datasets.get(argument__type=ContainerArgument.INPUT)
+        self.assertEqual(output1.id, run_dataset.dataset_id)
+
     def test_rerun_input_missing(self):
         run1 = ContainerRun.objects.get(name='fixture run')
         app = run1.app

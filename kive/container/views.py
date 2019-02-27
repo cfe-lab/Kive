@@ -292,12 +292,19 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
         type_names = dict(ContainerArgument.TYPES)
         input_count = 0
         for run_dataset in self.object.datasets.all():
-            data_entries.append(dict(
-                type=type_names[run_dataset.argument.type],
-                url=run_dataset.dataset.get_view_url(),
-                name=run_dataset.dataset.name,
-                size=run_dataset.dataset.get_formatted_filesize(),
-                created=run_dataset.dataset.date_created))
+            data_entry = dict(type=type_names[run_dataset.argument.type],
+                              url=run_dataset.dataset.get_view_url(),
+                              name=run_dataset.dataset.name,
+                              size=run_dataset.dataset.get_formatted_filesize(),
+                              created=run_dataset.dataset.date_created)
+            if self.object.original_run:
+                original_container_dataset = self.object.original_run.datasets.get(
+                    argument=run_dataset.argument)
+                original_dataset = original_container_dataset.dataset
+                original_md5 = original_dataset.MD5_checksum
+                is_changed = original_md5 == run_dataset.dataset.MD5_checksum
+                data_entry['is_changed'] = 'no' if is_changed else 'YES'
+            data_entries.append(data_entry)
             if run_dataset.argument.type == ContainerArgument.INPUT:
                 input_count += 1
         log_names = dict(ContainerLog.TYPES)
