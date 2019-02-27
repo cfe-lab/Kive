@@ -242,11 +242,22 @@ hello
 
 
 """
+        # NOTE: leading white space before # line
+        t5 = r"""\
+# hello
+  %start
+one\
+two\
+three
+  # ignore this line
+%stop
+"""
         e_lst = [[u'%start', u'one two three'], [u'%stop']]
         for inp_str, exp_lst in [(t1, e_lst),
                                  (t2, e_lst),
                                  (t3, []),
-                                 (t4, [])]:
+                                 (t4, []),
+                                 (t5, e_lst)]:
             chk_lst = deffile.chunk_string(inp_str)
             # print("CHUNK 02 {}".format(chk_lst))
             self.assertEqual(chk_lst, exp_lst)

@@ -13,11 +13,12 @@ def chunk_string(instr):
     """Convert a single multi-line string into a list of chunks (= list of strings.)
     The beginning of each chunk is denoted by a keyword beginning with '%'.
     Empty lines are ignored.
-    Continuation lines (backslash and en of a line) are honoured.
+    Continuation lines (backslash at end of a line) are honoured.
+    Comment lines (first non-space character is '#') are ignored.
     """
     # treat lines ending in '\' as continuation lines
     instr = instr.replace('\\\n', ' ')
-    ll_lst = [l.strip() for l in instr.splitlines() if not l.startswith('#') and len(l) > 0]
+    ll_lst = [l for l in [l.strip() for l in instr.splitlines() if l] if not l.startswith('#')]
     ndxlst = [ndx for ndx, l in enumerate(ll_lst) if l.startswith('%')] + [len(ll_lst)]
     return [ll_lst[strt:stop] for strt, stop in [(ndxlst[nn], ndxlst[nn+1]) for nn in range(len(ndxlst)-1)]]
 
