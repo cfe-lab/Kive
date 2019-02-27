@@ -13,6 +13,7 @@ from io import BytesIO
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
 from zipfile import ZipFile
+from filecmp import cmp
 
 from django.conf import settings
 from django.contrib.auth.models import User, Group
@@ -1850,6 +1851,39 @@ greeting
         greetings = output_dataset.dataset_file.read()
         self.assertEqual(expected_greetings, greetings)
 
+    def test_run_archive_step_directories(self):
+        run, container, old_container = self._test_run_archive_preamble()
+
+        call_command('runcontainer', str(run.id))
+
+        # Check that the appropriate directories were created.
+        run.refresh_from_db()
+
+        input_dir = os.path.join(run.full_sandbox_path, "input")
+        self.assertTrue(os.path.isdir(input_dir))
+        input_names_csv = os.path.join(input_dir, "names_csv")
+        self.assertTrue(os.path.isfile(input_names_csv))
+
+        step1_input_dir = os.path.join(run.full_sandbox_path, "step1", "input")
+        self.assertTrue(os.path.isdir(step1_input_dir))
+        step1_input_names_csv = os.path.join(step1_input_dir, "names_csv")
+        self.assertTrue(os.path.isfile(step1_input_names_csv))
+        self.assertTrue(cmp(input_names_csv, step1_input_names_csv))
+
+        step1_output_dir = os.path.join(run.full_sandbox_path, "step1", "output")
+        self.assertTrue(os.path.isdir(step1_output_dir))
+        step1_output_greetings_csv = os.path.join(step1_output_dir, "step1_greetings_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(step1_output_greetings_csv))
+
+        output_dir = os.path.join(run.full_sandbox_path, "output")
+        self.assertTrue(os.path.isdir(output_dir))  # this should be empty
+        self.assertEqual(os.listdir(output_dir), [])
+
+        upload_dir = os.path.join(run.full_sandbox_path, "upload")
+        final_greetings_csv = os.path.join(upload_dir, "greetings_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(final_greetings_csv))
+        self.assertTrue(cmp(step1_output_greetings_csv, final_greetings_csv))
+
     def test_run_archive_bad_md5(self):
         """Running an archive container with a bad MD5 should raise ValueError."""
         run, container, old_container = self._test_run_archive_preamble()
@@ -1924,20 +1958,13 @@ Starting up.
         self.assertEqual(expected_stdout, stdout_log.read(1000))
         self.assertEqual(ContainerRun.COMPLETE, run.state)
 
-    def test_run_multistep_archive(self):
+    def _test_run_multistep_archive_helper(self):
         pairs_text = """\
 x,y
 0,1
 1,1
 1,2
 2,3
-"""
-        expected_summary = b"""\
-sum,product,bigger
-1,0,sum
-2,1,sum
-3,2,sum
-5,6,product
 """
         source_path = os.path.abspath(os.path.join(__file__,
                                                    '..',
@@ -1994,10 +2021,20 @@ sum,product,bigger
         run_input.argument = run.app.arguments.get(type=ContainerArgument.INPUT)
         run_input.save()
         run.save()
+        return run
+
+    def test_run_multistep_archive(self):
+        run = self._test_run_multistep_archive_helper()
+        expected_summary = b"""\
+sum,product,bigger
+1,0,sum
+2,1,sum
+3,2,sum
+5,6,product
+"""
         expected_stderr = ""
 
         call_command('runcontainer', str(run.id))
-
         run.refresh_from_db()
 
         stderr_log = run.logs.get(type=ContainerLog.STDERR)
@@ -2007,6 +2044,237 @@ sum,product,bigger
             argument__type=ContainerArgument.OUTPUT).dataset
         summary = output_dataset.dataset_file.read()
         self.assertEqual(expected_summary, summary)
+
+    def test_run_multistep_archive_input_output_directories(self):
+        run = self._test_run_multistep_archive_helper()
+        call_command('runcontainer', str(run.id))
+        run.refresh_from_db()
+
+        input_dir = os.path.join(run.full_sandbox_path, "input")
+        self.assertTrue(os.path.isdir(input_dir))
+        input_pairs_csv = os.path.join(input_dir, "pairs_csv")
+        self.assertTrue(os.path.isfile(input_pairs_csv))
+
+        step1_input_dir = os.path.join(run.full_sandbox_path, "step1", "input")
+        self.assertTrue(os.path.isdir(step1_input_dir))
+        step1_input_pairs_csv = os.path.join(step1_input_dir, "pairs_csv")
+        self.assertTrue(os.path.isfile(step1_input_pairs_csv))
+        self.assertTrue(cmp(input_pairs_csv, step1_input_pairs_csv))
+
+        step1_output_dir = os.path.join(run.full_sandbox_path, "step1", "output")
+        self.assertTrue(os.path.isdir(step1_output_dir))
+        step1_output_sums_csv = os.path.join(step1_output_dir, "step1_sums_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(step1_output_sums_csv))
+
+        step2_input_dir = os.path.join(run.full_sandbox_path, "step2", "input")
+        self.assertTrue(os.path.isdir(step2_input_dir))
+        step2_input_sums_csv = os.path.join(step2_input_dir, "sums_csv")
+        self.assertTrue(os.path.isfile(step2_input_sums_csv))
+        self.assertTrue(cmp(step1_output_sums_csv, step2_input_sums_csv))
+
+        step2_output_dir = os.path.join(run.full_sandbox_path, "step2", "output")
+        self.assertTrue(os.path.isdir(step2_output_dir))
+        step2_output_summary_csv = os.path.join(step2_output_dir, "step2_summary_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(step2_output_summary_csv))
+
+        output_dir = os.path.join(run.full_sandbox_path, "output")
+        self.assertTrue(os.path.isdir(output_dir))  # this should be empty
+        self.assertEqual(os.listdir(output_dir), [])
+
+        upload_dir = os.path.join(run.full_sandbox_path, "upload")
+        final_summary_csv = os.path.join(upload_dir, "summary_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(final_summary_csv))
+        self.assertTrue(cmp(step2_output_summary_csv, final_summary_csv))
+
+    def test_multiple_inputs_and_outputs_directories(self):
+        names_text = """\
+name
+Alice
+Bob
+Carol
+David
+"""
+        raw_salutations_text = """\
+raw_salutation
+hi
+hola
+bye
+what up
+"""
+        source_path = os.path.abspath(os.path.join(__file__,
+                                                   '..',
+                                                   '..',
+                                                   '..',
+                                                   'samplecode',
+                                                   'singularity'))
+        content = dict(pipeline=dict(
+            inputs=[dict(dataset_name="names_csv"),
+                    dict(dataset_name="raw_salutations_csv")],
+            steps=[dict(driver="hello_goodbye_converter.py",
+                        inputs=[dict(dataset_name="raw_salutations_csv",
+                                     source_step=0,
+                                     source_dataset_name="raw_salutations_csv")],
+                        outputs=["regularized_salutations_csv", "opposite_csv"]),
+                   dict(driver="salutations.py",
+                        inputs=[dict(dataset_name="names_csv",
+                                     source_step=0,
+                                     source_dataset_name="names_csv"),
+                                dict(dataset_name="regularized_salutations_csv",
+                                     source_step=1,
+                                     source_dataset_name="regularized_salutations_csv"),
+                                ],
+                        outputs=["formatted_salutations_csv"]),
+                   dict(driver="salutations.py",
+                        inputs=[dict(dataset_name="names_csv",
+                                     source_step=0,
+                                     source_dataset_name="names_csv"),
+                                dict(dataset_name="opposite_csv",
+                                     source_step=1,
+                                     source_dataset_name="opposite_csv"),
+                                ],
+                        outputs=["opposite_formatted_salutations_csv"]),
+                   ],
+            outputs=[dict(dataset_name="salutation_and_name_csv",
+                          source_step=2,
+                          source_dataset_name="formatted_salutations_csv"),
+                     dict(dataset_name="opposite_salutation_and_name_csv",
+                          source_step=3,
+                          source_dataset_name="opposite_formatted_salutations_csv")]))
+        tar_data = BytesIO()
+        with TarFile(fileobj=tar_data, mode='w') as t:
+            for script_name in ('hello_goodbye_converter.py', 'salutations.py'):
+                with open(os.path.join(source_path, script_name), 'rb') as f:
+                    script_text = f.read()
+                tar_info = TarInfo(script_name)
+                tar_info.size = len(script_text)
+                t.addfile(tar_info, BytesIO(script_text))
+        tar_data.seek(0)
+
+        cf = ContainerFamily.objects.get(name="fixture family")
+        parent = cf.containers.get(tag="vFixture")
+
+        # Make a new archive container for this archive container.
+        container = Container.objects.create(
+            parent=parent,
+            family=cf,
+            user=parent.user,
+            tag='multistep_multiinput_multioutput',
+            file_type=Container.TAR)
+        container.file.save('test_multi.tar', ContentFile(tar_data.getvalue()))
+        container.write_content(content)
+        container.save()
+
+        archive_app = container.apps.create(memory=200, threads=1)
+        archive_app.write_inputs('names_csv raw_salutations_csv')
+        archive_app.write_outputs('salutation_and_name_csv opposite_salutation_and_name_csv')
+        names_dataset = Dataset.create_dataset(
+            file_path=None,
+            user=container.user,
+            file_handle=ContentFile(names_text.encode("utf-8"), name="names.csv")
+        )
+        raw_salutations_dataset = Dataset.create_dataset(
+            file_path=None,
+            user=container.user,
+            file_handle=ContentFile(raw_salutations_text.encode("utf-8"), name="raw_salutations.csv")
+        )
+
+        run = archive_app.runs.create(
+            name="PipelineRun",
+            user=container.user
+        )
+        run.datasets.create(
+            argument=archive_app.arguments.get(type=ContainerArgument.INPUT, position=1),
+            dataset=names_dataset
+        )
+        run.datasets.create(
+            argument=archive_app.arguments.get(type=ContainerArgument.INPUT, position=2),
+            dataset=raw_salutations_dataset
+        )
+        run.save(schedule=False)
+
+        # Run it!
+        call_command('runcontainer', str(run.id))
+        run.refresh_from_db()
+
+        # Check that the input directory is in order.
+        input_dir = os.path.join(run.full_sandbox_path, "input")
+        self.assertTrue(os.path.isdir(input_dir))
+        input_names_csv = os.path.join(input_dir, "names_csv")
+        self.assertTrue(os.path.isfile(input_names_csv))
+        input_raw_salutations_csv = os.path.join(input_dir, "raw_salutations_csv")
+        self.assertTrue(os.path.isfile(input_raw_salutations_csv))
+
+        # Check that the step 1 directory is in order.
+        step1_input_dir = os.path.join(run.full_sandbox_path, "step1", "input")
+        self.assertTrue(os.path.isdir(step1_input_dir))
+        step1_input_raw_salutations_csv = os.path.join(step1_input_dir, "raw_salutations_csv")
+        self.assertTrue(os.path.isfile(step1_input_raw_salutations_csv))
+
+        step1_output_dir = os.path.join(run.full_sandbox_path, "step1", "output")
+        step1_output_regularized_salutations_csv = os.path.join(
+            step1_output_dir,
+            "step1_regularized_salutations_{}.csv".format(run.pk)
+        )
+        step1_output_opposite_csv = os.path.join(
+            step1_output_dir,
+            "step1_opposite_{}.csv".format(run.pk)
+        )
+        self.assertTrue(os.path.isdir(step1_output_dir))
+        self.assertTrue(os.path.isfile(step1_output_regularized_salutations_csv))
+        self.assertTrue(os.path.isfile(step1_output_opposite_csv))
+
+        # Check step 2's directory.
+        step2_input_dir = os.path.join(run.full_sandbox_path, "step2", "input")
+        self.assertTrue(os.path.isdir(step2_input_dir))
+        step2_input_names_csv = os.path.join(step2_input_dir, "names_csv")
+        step2_input_regularized_salutations_csv = os.path.join(step2_input_dir, "regularized_salutations_csv")
+        self.assertTrue(os.path.isfile(step2_input_names_csv))
+        self.assertTrue(os.path.isfile(step2_input_regularized_salutations_csv))
+        self.assertTrue(cmp(input_names_csv, step2_input_names_csv))
+        self.assertTrue(cmp(step2_input_regularized_salutations_csv, step1_output_regularized_salutations_csv))
+
+        step2_output_dir = os.path.join(run.full_sandbox_path, "step2", "output")
+        self.assertTrue(os.path.isdir(step2_output_dir))
+        step2_output_formatted_salutations_csv = os.path.join(
+            step2_output_dir,
+            "step2_formatted_salutations_{}.csv".format(run.pk)
+        )
+        self.assertTrue(os.path.isfile(step2_output_formatted_salutations_csv))
+
+        # Check step 3's directory.
+        step3_input_dir = os.path.join(run.full_sandbox_path, "step3", "input")
+        self.assertTrue(os.path.isdir(step3_input_dir))
+        step3_input_names_csv = os.path.join(step3_input_dir, "names_csv")
+        step3_input_opposite_csv = os.path.join(step3_input_dir, "opposite_csv")
+        self.assertTrue(os.path.isfile(step3_input_names_csv))
+        self.assertTrue(os.path.isfile(step3_input_opposite_csv))
+        self.assertTrue(cmp(input_names_csv, step3_input_names_csv))
+        self.assertTrue(cmp(step3_input_opposite_csv, step1_output_opposite_csv))
+
+        step3_output_dir = os.path.join(run.full_sandbox_path, "step3", "output")
+        self.assertTrue(os.path.isdir(step3_output_dir))
+        step3_output_opposite_formatted_salutations_csv = os.path.join(
+            step3_output_dir,
+            "step3_opposite_formatted_salutations_{}.csv".format(run.pk)
+        )
+        self.assertTrue(os.path.isfile(step3_output_opposite_formatted_salutations_csv))
+
+        # Lastly check that the output directory is fine.
+        output_dir = os.path.join(run.full_sandbox_path, "output")
+        self.assertTrue(os.path.isdir(output_dir))  # this should be empty
+        self.assertEqual(os.listdir(output_dir), [])
+
+        upload_dir = os.path.join(run.full_sandbox_path, "upload")
+        final_formatted_salutations_csv = os.path.join(upload_dir, "salutation_and_name_{}.csv".format(run.pk))
+        self.assertTrue(os.path.isfile(final_formatted_salutations_csv))
+        self.assertTrue(cmp(step2_output_formatted_salutations_csv, final_formatted_salutations_csv))
+
+        final_opposite_formatted_salutations = os.path.join(
+            upload_dir,
+            "opposite_salutation_and_name_{}.csv".format(run.pk)
+        )
+        self.assertTrue(os.path.isfile(final_opposite_formatted_salutations))
+        self.assertTrue(cmp(step3_output_opposite_formatted_salutations_csv, final_opposite_formatted_salutations))
 
     def test_already_started(self):
         """ Pretend that another instance of the command already started. """

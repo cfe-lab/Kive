@@ -233,15 +233,12 @@ class Command(BaseCommand):
         """
         # The instructions take the form of a Python representation of a pipeline JSON file.
         # We keep track of what files were produced by what steps in file_map, which is a list of dictionaries.
-        # Each dictionary maps dataset_name -|-> (internal path, external path), and the step index is their
+        # Each dictionary maps dataset_name -|-> external path, and the step index is their
         # position in the list.
         inputs_map = {}
         for input_dict in instructions["inputs"]:
             # This dictionary has a field called "dataset_name".
-            inputs_map[input_dict["dataset_name"]] = (
-                os.path.join(internal_inputs_dir, input_dict["dataset_name"]),
-                os.path.join(external_inputs_dir, input_dict["dataset_name"])
-            )  # the second isn't needed but we keep it for consistency
+            inputs_map[input_dict["dataset_name"]] = os.path.join(external_inputs_dir, input_dict["dataset_name"])
         file_map = [inputs_map]
 
         final_return_code = 0
@@ -250,6 +247,11 @@ class Command(BaseCommand):
             step_header = "========\nProcessing step {}: {}\n========\n".format(
                 idx,
                 step["driver"])
+
+            external_step_input_dir = os.path.join(run.full_sandbox_path, "step{}".format(idx), "input")
+            external_step_output_dir = os.path.join(run.full_sandbox_path, "step{}".format(idx), "output")
+            os.makedirs(external_step_input_dir)
+            os.makedirs(external_step_output_dir)
 
             # Each step is a dictionary with fields:
             # - driver (the executable)
@@ -264,20 +266,19 @@ class Command(BaseCommand):
                 source_step = input_dict["source_step"]
                 source_dataset_name = input_dict["source_dataset_name"]
                 step_outputs = file_map[source_step]
-                internal_path, external_path = step_outputs[source_dataset_name]
-                input_paths.append(internal_path)
+                external_path = step_outputs[source_dataset_name]
+                os.link(external_path, os.path.join(external_step_input_dir, input_dict["dataset_name"]))
+                input_paths.append(os.path.join(internal_inputs_dir, input_dict["dataset_name"]))
             outputs_map = {}
+            output_paths = []
             for dataset_name in step["outputs"]:
                 file_name = self.build_dataset_name(
                     run,
                     "step{}_{}".format(idx, dataset_name))
-                outputs_map[dataset_name] = (
-                    os.path.join(internal_outputs_dir, file_name),
-                    os.path.join(external_outputs_dir, file_name)
-                )
+                output_paths.append(os.path.join(internal_outputs_dir, file_name))
+                outputs_map[dataset_name] = os.path.join(external_step_output_dir, file_name)
             file_map.append(outputs_map)
 
-            output_paths = [outputs_map[x][0] for x in step["outputs"]]
             execution_args = [
                 "singularity",
                 "exec",
@@ -286,9 +287,9 @@ class Command(BaseCommand):
                 "-B",
                 extracted_archive_dir + ':' + internal_binary_dir,
                 "-B",
-                external_inputs_dir + ':' + internal_inputs_dir,
+                external_step_input_dir + ':' + internal_inputs_dir,
                 "-B",
-                external_outputs_dir + ':' + internal_outputs_dir,
+                external_step_output_dir + ':' + internal_outputs_dir,
                 "--pwd",
                 internal_working_dir,
                 run.app.container.parent.file.path,
@@ -326,6 +327,6 @@ class Command(BaseCommand):
                 final_output_path = os.path.join(external_outputs_dir, output["dataset_name"])
                 source_step = output["source_step"]
                 source_dataset_name = output["source_dataset_name"]
-                os.link(file_map[source_step][source_dataset_name][1], final_output_path)
+                os.link(file_map[source_step][source_dataset_name], final_output_path)
 
         return final_return_code
