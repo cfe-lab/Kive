@@ -177,9 +177,9 @@ the key features that Kive cares about:
 * `%apphelp` - describes another app. This gets copied to the app description.
 
 In other words, if there is a main, 'default' app without a name, then the entries
-and labels from %runscript, %labels and %help are used for that app. You can have
+and labels from `%runscript`, `%labels` and `%help` are used for that app. You can have
 any number of additional uniquely named apps defined in the same way using the
-%apprun, %applabels and %apphelp entries.
+`%apprun`, `%applabels` and `%apphelp` entries.
 
 ### Building a Singularity Image
 Once you've written the `Singularity` definition file, build the image with a command like

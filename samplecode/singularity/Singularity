@@ -19,6 +19,8 @@ From: python:2.7.15-alpine3.6
     MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
     KIVE_INPUTS names_csv
     KIVE_OUTPUTS greetings_csv
+    KIVE_THREADS 1
+    KIVE_MEMORY 200
 
 %files
     *.py /usr/local/share
@@ -47,6 +49,9 @@ From: python:2.7.15-alpine3.6
 %applabels sums_and_products
     KIVE_INPUTS input_csv
     KIVE_OUTPUTS output_csv
+    # Threads defaults to 1, so you can leave it out.
+    # Memory defaults to 5000MB, so you should probably use something smaller.
+    KIVE_MEMORY 200
 
 %apprun sums_and_products
     /usr/local/bin/python /usr/local/share/sums_and_products.py "$@"
