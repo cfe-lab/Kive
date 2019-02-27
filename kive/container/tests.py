@@ -2161,7 +2161,7 @@ what up
             tag='multistep_multiinput_multioutput',
             file_type=Container.TAR)
         container.file.save('test_multi.tar', ContentFile(tar_data.getvalue()))
-        container.write_content(content)
+        container.write_archive_content(content)
         container.save()
 
         archive_app = container.apps.create(memory=200, threads=1)
