@@ -7,7 +7,6 @@ import shutil
 from subprocess import call
 import json
 
-from django.core.files import File
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -77,6 +76,9 @@ class Command(BaseCommand):
             # This should only be needed during tests.
             run.create_sandbox()
 
+        reruns_needed = run.create_inputs_from_original_run()
+        if reruns_needed:
+            raise RuntimeError('Inputs missing from reruns.')
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
         for dataset in run.datasets.all():

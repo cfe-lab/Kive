@@ -498,6 +498,9 @@ class ContainerRunViewSet(CleanCreateModelMixin,
     Parameter for a PATCH:
 
     * is_stop_requested(=true) - the Run is marked for stopping.
+
+    If you POST to the list with original_run set, then all other fields are
+    ignored, and a straight rerun is created.
     """
     queryset = ContainerRun.objects.all()
     serializer_class = ContainerRunSerializer

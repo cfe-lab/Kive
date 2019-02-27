@@ -1080,6 +1080,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEquals(resp_run['description'], "A really cool run")
 
     def test_add_rerun(self):
+        self.test_run.name = 'original name'
+        self.test_run.save()
         request1 = self.factory.get(self.list_path)
         force_authenticate(request1, user=self.kive_user)
         start_count = len(self.list_view(request1).data)
@@ -1092,7 +1094,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
                                kwargs=dict(pk=self.test_run.app_id))
         request2 = self.factory.post(
             self.list_path,
-            dict(name='my rerun',
+            dict(name='ignored name',
                  original_run=self.detail_path),
             format="json")
 
@@ -1100,7 +1102,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['name'], "my rerun")
+        self.assertEquals("original name (rerun)", resp['name'])
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
@@ -1115,7 +1117,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual(input_argument.id, run_dataset.argument_id)
         self.assertEqual(input_dataset.id, run_dataset.dataset_id)
 
-    def test_add_rerun_find_input(self):
+    @patch('container.models.transaction.on_commit')
+    def test_add_rerun_find_input(self, mock_on_commit):
         app = self.test_run.app
         input_argument = app.arguments.get(type=ContainerArgument.INPUT)
         output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
@@ -1160,7 +1163,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['name'], "my rerun")
+        self.assertEquals("(rerun)", resp['name'])
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
@@ -1171,6 +1174,61 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         run = ContainerRun.objects.get(id=resp_run['id'])
         run_dataset = run.datasets.get()
         self.assertEqual(output1b.id, run_dataset.dataset_id)
+
+        self.assertEqual(1, len(mock_on_commit.call_args_list))
+
+    @patch('container.models.transaction.on_commit')
+    def test_add_rerun_with_dependencies(self, mock_on_commit):
+        app = self.test_run.app
+        input_argument = app.arguments.get(type=ContainerArgument.INPUT)
+        output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
+
+        content_file = ContentFile('x,y\n1,2')
+        output1 = Dataset.objects.create(user=self.test_run.user, name='output1')
+        output1.dataset_file.save('example.csv', content_file)
+        self.test_run.datasets.create(argument=output_argument, dataset=output1)
+
+        # run2 consumes an output from self.test_run
+        run2 = ContainerRun.objects.create(user=self.test_run.user,
+                                           name='example run',
+                                           app=self.test_run.app,
+                                           state=ContainerRun.FAILED)
+        run2.datasets.create(argument=input_argument, dataset=output1)
+
+        # Purge the input to run 2.
+        output1.dataset_file.delete()
+
+        # Now we request a rerun of run 2.
+        run2_path = reverse("containerrun-detail", kwargs={'pk': run2.id})
+        request1 = self.factory.get(self.list_path)
+        force_authenticate(request1, user=self.kive_user)
+        start_count = len(self.list_view(request1).data)
+
+        request2 = self.factory.post(
+            self.list_path,
+            dict(name='ignored name',
+                 original_run=run2_path),
+            format="json")
+
+        force_authenticate(request2, user=self.kive_user)
+        resp = self.list_view(request2).render().data
+
+        self.assertIn('id', resp)
+        self.assertEquals("example run (rerun)", resp['name'])
+
+        request3 = self.factory.get(self.list_path)
+        force_authenticate(request3, user=self.kive_user)
+        resp = self.list_view(request3).data
+
+        self.assertEquals(len(resp), start_count + 2)
+        resp_run = resp[1]
+        run = ContainerRun.objects.get(id=resp_run['id'])
+        self.assertEqual(0, run.datasets.count())
+        resp_run_nested = resp[0]
+        run_nested = ContainerRun.objects.get(id=resp_run_nested['id'])
+        self.assertEqual(self.test_run, run_nested.original_run)
+
+        self.assertEqual(1, len(mock_on_commit.call_args_list))
 
     @patch('container.models.check_output')
     def test_slurm_ended(self, mock_check_output):
@@ -1425,6 +1483,32 @@ class ContainerRunTests(TestCase):
         (check_output_args, check_output_kwargs), = mock_check_output.call_args_list
         self.assertEqual('sbatch', check_output_args[0][0])
         self.assertNotIn('KIVE_LOG', check_output_kwargs['env'])
+
+    @patch('container.models.check_output')
+    def test(self, mock_check_output):
+        mock_check_output.side_effect = ['42\n', '43\n']
+        expected_source_slurm_job_id = 42
+        expected_main_slurm_job_id = 43
+
+        main_run = ContainerRun.objects.filter(state=ContainerRun.NEW).first()
+        self.assertIsNotNone(main_run)
+        main_run.slurm_job_id = None
+        main_run.sandbox_path = ''
+        main_run.save()
+
+        source_run = ContainerRun.objects.create(user=main_run.user,
+                                                 app=main_run.app)
+
+        main_run.schedule(dependencies={source_run.id: {}})
+
+        main_run.refresh_from_db()
+        source_run.refresh_from_db()
+        self.assertEqual(expected_main_slurm_job_id, main_run.slurm_job_id)
+        self.assertEqual(expected_source_slurm_job_id, source_run.slurm_job_id)
+        self.assertEqual(2, len(mock_check_output.call_args_list))
+
+        main_run_sbatch_args = mock_check_output.call_args_list[1][0][0]
+        self.assertIn('--dependency=afterok:42', main_run_sbatch_args)
 
     @patch('container.models.check_call')
     def test_cancel_new_run(self, mock_check_call):
@@ -2055,6 +2139,81 @@ sum,product,bigger
         self.assertEqual(expected_stderr[:10], stderr.read(10))
         upload_length = len(ContainerLog.UPLOAD_DIR)
         self.assertEqual(ContainerLog.UPLOAD_DIR, stderr.long_text.name[:upload_length])
+
+    def test_find_rerun_input(self):
+        run1 = ContainerRun.objects.get(name='fixture run')
+        app = run1.app
+        input_argument = app.arguments.get(type=ContainerArgument.INPUT)
+        output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
+
+        content_file = ContentFile('x,y\n1,2')
+        output1 = Dataset.objects.create(user=run1.user, name='output1')
+        output1.dataset_file.save('example.csv', content_file)
+        run1.datasets.create(argument=output_argument, dataset=output1)
+
+        # run2 consumes an output from run1
+        run2 = ContainerRun.objects.create(user=run1.user,
+                                           app=run1.app,
+                                           state=ContainerRun.FAILED)
+        run2.datasets.create(argument=input_argument, dataset=output1)
+
+        # Purge the input to run 2.
+        output1.dataset_file.delete()
+
+        # run3 is a rerun of run1 to reproduce the input for run 2.
+        run3 = ContainerRun.objects.create(user=run1.user,
+                                           name='source rerun',
+                                           app=run1.app,
+                                           original_run=run1,
+                                           state=ContainerRun.COMPLETE)
+        output1b = Dataset.objects.create(user=run1.user, name='output1b')
+        output1b.dataset_file.save('example_b.csv', content_file)
+        output1b.set_MD5(output1b.dataset_file.path)
+        output1b.save()
+        run3.datasets.create(argument=output_argument, dataset=output1b)
+
+        # run4 is a rerun of run 2, and the one we are going to execute.
+        run4 = ContainerRun.objects.create(user=run2.user,
+                                           app=run2.app,
+                                           original_run=run2)
+
+        call_command('runcontainer', str(run4.id))
+
+        run4.refresh_from_db()
+        run_dataset = run4.datasets.get(argument__type=ContainerArgument.INPUT)
+        self.assertEqual(output1b.id, run_dataset.dataset_id)
+
+    def test_rerun_input_missing(self):
+        run1 = ContainerRun.objects.get(name='fixture run')
+        app = run1.app
+        input_argument = app.arguments.get(type=ContainerArgument.INPUT)
+        output_argument = app.arguments.get(type=ContainerArgument.OUTPUT)
+
+        content_file = ContentFile('x,y\n1,2')
+        output1 = Dataset.objects.create(user=run1.user, name='output1')
+        output1.dataset_file.save('example.csv', content_file)
+        run1.datasets.create(argument=output_argument, dataset=output1)
+
+        # run2 consumes an output from run1
+        run2 = ContainerRun.objects.create(user=run1.user,
+                                           app=run1.app,
+                                           state=ContainerRun.FAILED)
+        run2.datasets.create(argument=input_argument, dataset=output1)
+
+        # Purge the input to run 2.
+        output1.dataset_file.delete()
+
+        # run4 is a rerun of run 2, and the one we are going to execute.
+        run4 = ContainerRun.objects.create(user=run2.user,
+                                           app=run2.app,
+                                           original_run=run2)
+
+        with self.assertRaisesRegexp(RuntimeError,
+                                     'Inputs missing from reruns'):
+            call_command('runcontainer', str(run4.id))
+
+        run4.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, run4.state)
 
 
 @skipIfDBFeature('is_mocked')

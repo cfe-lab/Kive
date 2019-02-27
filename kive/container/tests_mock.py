@@ -18,7 +18,6 @@ from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
     ContainerArgument, ContainerRun, ContainerDataset
-from container.forms import ContainerForm
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -681,6 +680,21 @@ class ContainerRunMockTests(TestCase):
         command = run.build_slurm_command(slurm_queues)
 
         self.assertListEqual(expected_command, command)
+
+    def test_rerun_names(self):
+        expectations = [('example', 'example (rerun)'),
+                        ('', '(rerun)'),
+                        ('example   ', 'example (rerun)'),
+                        ('example (rerun)', 'example (rerun)'),
+                        ('example (rerun) ', 'example (rerun)'),
+                        ('example (rerun) weird', 'example (rerun) weird (rerun)')]
+        run = ContainerRun()
+        for name, expected_rerun_name in expectations:
+            run.name = name
+
+            rerun_name = run.get_rerun_name()
+
+            self.assertEqual(expected_rerun_name, rerun_name)
 
     def test_removal(self):
         run = ContainerRun(id=42, state=ContainerRun.COMPLETE)

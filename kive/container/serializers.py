@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import serializers
 from rest_framework.fields import URLField
 
@@ -320,21 +321,33 @@ class ContainerRunSerializer(AccessControlSerializer,
 
         original_run = validated_data.get('original_run')
         if original_run is not None:
-            validated_data['app'] = original_run.app
-        run = super(ContainerRunSerializer, self).create(validated_data)
-        run.validate_restrict_access(run.get_access_limits())
-        dataset_serializer = ContainerDatasetSerializer()
-        for dataset in datasets:
-            dataset['run'] = run
-            dataset_serializer.create(dataset)
-        if original_run is not None:
-            for container_dataset in original_run.datasets.filter(
-                    argument__type='I'):
-                container_dataset.id = None  # Make a copy.
-                container_dataset.dataset = container_dataset.find_rerun_dataset()
-                container_dataset.run = run
-                container_dataset.save()
+            run, dependencies = self.create_rerun(original_run,
+                                                  validated_data['user'])
+            transaction.on_commit(lambda: run.schedule(dependencies))
+        else:
+            run = super(ContainerRunSerializer, self).create(validated_data)
+            run.validate_restrict_access(run.get_access_limits())
+            dataset_serializer = ContainerDatasetSerializer()
+            for dataset in datasets:
+                dataset['run'] = run
+                dataset_serializer.create(dataset)
         return run
+
+    def create_rerun(self, original_run, user):
+        rerun = ContainerRun.objects.create(user=user,
+                                            app=original_run.app,
+                                            batch=original_run.batch,
+                                            name=original_run.get_rerun_name(),
+                                            description=original_run.description,
+                                            priority=original_run.priority,
+                                            original_run=original_run)
+
+        reruns_needed = rerun.create_inputs_from_original_run()
+        dependencies = {}  # {source_rerun_id: source_dependencies}
+        for source_run in reruns_needed:
+            source_rerun, source_dependencies = self.create_rerun(source_run, user)
+            dependencies[source_rerun.id] = source_dependencies
+        return rerun, dependencies
 
 
 class ContainerLogSerializer(serializers.ModelSerializer):

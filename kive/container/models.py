@@ -924,6 +924,20 @@ class ContainerRun(Stopwatch, AccessControl):
     def get_absolute_url(self):
         return reverse('container_run_detail', kwargs=dict(pk=self.pk))
 
+    def get_rerun_name(self):
+        """ Create a name to use when rerunning this run.
+
+        Appends a (rerun) suffix, if needed.
+        """
+        rerun_suffix = '(rerun)'
+        name = self.name.rstrip()
+        if name.endswith(rerun_suffix):
+            return name
+        if name:
+            name += ' '
+        name += rerun_suffix
+        return name
+
     def get_access_limits(self, access_limits=None):
         if access_limits is None:
             access_limits = []
@@ -943,7 +957,10 @@ class ContainerRun(Stopwatch, AccessControl):
                                        force_update,
                                        using,
                                        update_fields)
-        if schedule and self.state == self.NEW and not self.sandbox_path:
+        if (schedule and
+                self.state == self.NEW and
+                not self.sandbox_path and
+                not self.original_run):
             transaction.on_commit(self.schedule)
 
     @property
@@ -965,14 +982,21 @@ class ContainerRun(Stopwatch, AccessControl):
         os.mkdir(os.path.join(full_sandbox_path, 'logs'))
         self.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
 
-    def schedule(self):
+    def schedule(self, dependencies=None):
+        dependency_job_ids = []
+        if dependencies:
+            for source_run_id, source_dependencies in dependencies.items():
+                source_run = ContainerRun.objects.get(id=source_run_id)
+                source_run.schedule(source_dependencies)
+                dependency_job_ids.append(source_run.slurm_job_id)
         self.create_sandbox()
         self.save()
 
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         child_env.pop('KIVE_LOG', None)
-        output = check_output(self.build_slurm_command(settings.SLURM_QUEUES),
+        output = check_output(self.build_slurm_command(settings.SLURM_QUEUES,
+                                                       dependency_job_ids),
                               env=child_env)
 
         self.slurm_job_id = int(output)
@@ -980,7 +1004,7 @@ class ContainerRun(Stopwatch, AccessControl):
         # run, so only update one field.
         self.save(update_fields=['slurm_job_id'])
 
-    def build_slurm_command(self, slurm_queues=None):
+    def build_slurm_command(self, slurm_queues=None, dependency_job_ids=None):
         if not self.sandbox_path:
             raise RuntimeError(
                 'Container run needs a sandbox before calling Slurm.')
@@ -1001,10 +1025,36 @@ class ContainerRun(Stopwatch, AccessControl):
         if slurm_queues is not None:
             kive_name, slurm_name = slurm_queues[self.priority]
             command.extend(['-p', slurm_name])
+        if dependency_job_ids:
+            command.append('--dependency=afterok:' + ':'.join(
+                str(job_id)
+                for job_id in dependency_job_ids))
         manage_path = os.path.abspath(os.path.join(__file__,
                                                    '../../manage.py'))
         command.extend([manage_path, 'runcontainer', str(self.pk)])
         return command
+
+    def create_inputs_from_original_run(self):
+        """ Create input datasets by copying original run.
+
+        Checks for reruns of the source runs.
+        :return: a set of source runs that need to be rerun to recreate the
+        inputs. Calling this again after those reruns will finish creating the
+        inputs.
+        """
+        reruns_needed = set()
+        if self.original_run:
+            for container_dataset in self.original_run.datasets.filter(
+                    argument__type='I'):
+                rerun_dataset, source_run = container_dataset.find_rerun_dataset()
+                if rerun_dataset is None:
+                    reruns_needed.add(source_run)
+                    continue
+                container_dataset.id = None  # Make a copy.
+                container_dataset.dataset = rerun_dataset
+                container_dataset.run = self
+                container_dataset.save()
+        return reruns_needed
 
     def get_sandbox_prefix(self):
         return 'user{}_run{}_'.format(self.user.username, self.pk)
@@ -1152,20 +1202,22 @@ class ContainerDataset(models.Model):
     def find_rerun_dataset(self):
         """ Find the dataset, or the matching dataset from a rerun.
 
-        :return: the dataset, if found, otherwise None.
+        :return: (dataset, source_run) If all of the matching datasets have
+            been purged, then dataset is None and source_run is a run that
+            produced the dataset as an output. Otherwise, source_run is None.
         """
         if self.dataset.has_data():
-            return self.dataset
+            return self.dataset, None
 
         output_container_dataset = self.dataset.containers.get(
             argument__type=ContainerArgument.OUTPUT)
         output_argument = output_container_dataset.argument
         for rerun in output_container_dataset.run.reruns.all():
             rerun_container_dataset = rerun.datasets.get(argument=output_argument)
-            dataset = rerun_container_dataset.find_rerun_dataset()
+            dataset, source_run = rerun_container_dataset.find_rerun_dataset()
             if dataset is not None:
-                return dataset
-        return None
+                return dataset, None
+        return None, output_container_dataset.run
 
 
 class ContainerLog(models.Model):
