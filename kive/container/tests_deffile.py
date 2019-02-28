@@ -33,16 +33,18 @@ class DefFileTest(TestCase):
         app_lst = deffile.parse_string(_DEFFILE_01)
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 2, "two expected"
-        for app in app_lst:
-            assert isinstance(app, deffile.AppInfo), "appinfo expected"
-            inp, outp = app.get_io_args()
+        for app_dct in app_lst:
+            assert isinstance(app_dct, dict), "dict expected"
+            assert set(app_dct.keys()) == deffile.AppInfo.KEY_WORD_SET, 'faulty dict keys'
+            inp, outp = app_dct[deffile.AppInfo.KW_IO_ARGS]
             assert inp is not None, "inp key expected"
             assert outp is not None, "outp key expected"
             if lverb:
-                print("{}: {} -> {}".format(app.name, inp, outp))
-                print("   run: {}".format(app.get_runstring()))
-                print("  help: {}".format(app.get_helpstring()))
-                for k, val in app.get_label_dict().items():
+                appname = app_dct[deffile.AppInfo.KW_APP_NAME]
+                print("{}: {} -> {}".format(appname, inp, outp))
+                print("   run: {}".format(app_dct[deffile.AppInfo.KW_RUN_STRING]))
+                print("  help: {}".format(app_dct[deffile.AppInfo.KW_HELP_STRING]))
+                for k, val in app_dct[deffile.AppInfo.KW_LABEL_DICT].items():
                     print("   label: {}: {}".format(k, val))
             # --
         # assert False, "force fail"
@@ -152,22 +154,17 @@ gggg
         app_lst = deffile.parse_string(faulty)
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 1, "one expected"
-        app = app_lst[0]
-        assert isinstance(app, deffile.AppInfo), "appinfo expected"
-        # print("mainapp: {}".format(app))
-        iotup = app.get_io_args()
+        app_dct = app_lst[0]
+        assert isinstance(app_dct, dict), "dict expected"
+        assert set(app_dct.keys()) == deffile.AppInfo.KEY_WORD_SET, 'faulty dict keys'
+        # print("mainapp: {}".format(app_dct))
+        iotup = app_dct[deffile.AppInfo.KW_IO_ARGS]
         assert iotup == (None, None), "none expected"
-        assert app.get_num_threads() is None, "none expected"
-        assert app.get_memory() is None, "none expected"
-        dct = app.get_label_dict()
-        assert isinstance(dct, dict), "dict expected"
-        assert sorted(dct.keys()) == ['BLA', 'GOO'], "wrong dict keys"
-
-    def test_repr01(self):
-        app_lst = deffile.parse_string(_DEFFILE_01)
-        s = ""
-        for app in app_lst:
-            s += "{}: {}".format(app.name, app)
+        assert app_dct[deffile.AppInfo.KW_NUM_THREADS] is None, "none expected"
+        assert app_dct[deffile.AppInfo.KW_MEMORY] is None, "none expected"
+        # dct = app.get_label_dict()
+        # assert isinstance(dct, dict), "dict expected"
+        # assert sorted(dct.keys()) == ['BLA', 'GOO'], "wrong dict keys"
 
     def test_get_io(self):
         """Getting argument from an un-initialised app should return None"""
@@ -204,11 +201,13 @@ gggg
         app_lst = deffile.parse_string(ok_01)
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 1, "one expected"
-        app = app_lst[0]
-        n_thread = app.get_num_threads()
+        app_dct = app_lst[0]
+        assert isinstance(app_dct, dict), 'dict expected'
+        assert set(app_dct.keys()) == deffile.AppInfo.KEY_WORD_SET, 'faulty dict keys'
+        n_thread = app_dct[deffile.AppInfo.KW_NUM_THREADS]
         assert isinstance(n_thread, int), "int expected"
         assert n_thread == 100, "100 expected"
-        n_mem = app.get_memory()
+        n_mem = app_dct[deffile.AppInfo.KW_MEMORY]
         assert isinstance(n_mem, int), "int expected"
         assert n_mem == 1000, "1000 expected"
 

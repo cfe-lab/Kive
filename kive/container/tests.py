@@ -108,6 +108,18 @@ class ContainerTests(TestCase):
             tarinfo.size = len(content)
             f.addfile(tarinfo, BytesIO(content.encode('utf8')))
 
+    def create_sing_content(self, container):
+        image_path = os.path.abspath(os.path.join(__file__,
+                                                  '..',
+                                                  '..',
+                                                  '..',
+                                                  'samplecode',
+                                                  'singularity',
+                                                  'python2-alpine-trimmed.simg'))
+        with open(image_path, 'rb') as fi:
+            container.file = File(fi)
+        container.file_type = Container.SIMG
+
     def test_default_content(self):
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
@@ -148,6 +160,16 @@ class ContainerTests(TestCase):
         content = container.get_content()
         content.pop('id')
         self.assertEqual(expected_content, content)
+
+    def test__sing_content_is_serialisable(self):
+        """The content returned for a singularity container must be serialisable."""
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.create_sing_content(container)
+        content = container.get_content()
+        json.dumps(content)
+        # assert False, "force fail"
 
     def test_loaded_tar_content(self):
         user = User.objects.first()

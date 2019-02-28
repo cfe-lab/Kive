@@ -499,14 +499,15 @@ class Container(AccessControl):
             if app_lst is not None:
                 default_config = self.DEFAULT_APP_CONFIG
                 self.apps.all().delete()
-                for appinfo in app_lst:
-                    num_threads = appinfo.get_num_threads() or default_config['threads']
-                    memory = appinfo.get_memory() or default_config['memory']
-                    inpargs, outargs = appinfo.get_io_args()
+                for app_dct in app_lst:
+                    num_threads = app_dct[deffile.AppInfo.KW_NUM_THREADS] or default_config['threads']
+                    memory = app_dct[deffile.AppInfo.KW_MEMORY] or default_config['memory']
+                    inpargs, outargs = app_dct[deffile.AppInfo.KW_IO_ARGS]
                     inpargs = inpargs or "input_txt"
                     outargs = outargs or "output_txt"
-                    dbname = appinfo.name if appinfo.name != 'main' else ""
-                    help_str = appinfo.get_helpstring() or ""
+                    appname = app_dct[deffile.AppInfo.KW_APP_NAME]
+                    dbname = appname if appname != 'main' else ""
+                    help_str = app_dct[deffile.AppInfo.KW_HELP_STRING] or ""
                     # attach the help string of the default app to the container's description
                     if dbname == "" and help_str != "":
                         self.description = help_str if self.description == "" else self.description + "\n" + help_str

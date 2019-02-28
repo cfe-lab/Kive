@@ -26,6 +26,18 @@ def chunk_string(instr):
 class AppInfo:
     """Collect all information needed for a container app. This information is extracted
     from a singularity def file."""
+
+    KW_NUM_THREADS = 'numthreads'
+    KW_MEMORY = 'memory'
+    KW_IO_ARGS = 'io_args'
+    KW_APP_NAME = 'appname'
+    KW_HELP_STRING = 'helpstring'
+    KW_RUN_STRING = 'runstring'
+    KW_LABEL_DICT = 'labeldict'
+
+    KEY_WORD_SET = frozenset([KW_NUM_THREADS, KW_MEMORY, KW_IO_ARGS, KW_APP_NAME, KW_HELP_STRING,
+                              KW_RUN_STRING, KW_LABEL_DICT])
+
     def __init__(self, name):
         self.name = name
         self.helpstr = None
@@ -76,6 +88,16 @@ class AppInfo:
     def __repr__(self):
         inp, outp = self.get_io_args()
         return "appinfo name: {}, inputs: {}, -> outputs: {}".format(self.name, inp, outp)
+
+    def as_dict(self):
+        """Return this Appinfo as a dict that can be serialisable."""
+        return {AppInfo.KW_NUM_THREADS: self.get_num_threads(),
+                AppInfo.KW_MEMORY: self.get_memory(),
+                AppInfo.KW_IO_ARGS: self.get_io_args(),
+                AppInfo.KW_APP_NAME: self.name,
+                AppInfo.KW_HELP_STRING: self.get_helpstring(),
+                AppInfo.KW_RUN_STRING: self.get_runstring(),
+                AppInfo.KW_LABEL_DICT: self.get_label_dict()}
 
     def get_io_args(self):
         """Return a tuple (input_arg_string, output_arg_str).
@@ -154,4 +176,4 @@ def parse_string(instr):
     for app in appdct.values():
         if app.is_faulty():
             raise RuntimeError("faulty app {}".format(app.name))
-    return list(appdct.values())
+    return [a.as_dict() for a in appdct.values()]
