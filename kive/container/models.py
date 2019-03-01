@@ -235,6 +235,7 @@ class Container(AccessControl):
     # Related models get set later.
     methods = None
     apps = None
+    children = None
 
     @property
     def display_name(self):
@@ -567,6 +568,9 @@ class Container(AccessControl):
 
         for app in self.apps.all():
             app.build_removal_plan(removal_plan)
+
+        for child in self.children.all():
+            child.build_removal_plan(removal_plan)
 
         return removal_plan
 

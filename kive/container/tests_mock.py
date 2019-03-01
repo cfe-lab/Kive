@@ -86,6 +86,15 @@ class ContainerMockTests(TestCase):
 
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
+    def test_removal_with_child(self):
+        container = Container(id=42)
+        child_container = container.children.create(id=43)
+        expected_plan = {'Containers': {container, child_container}}
+
+        plan = container.build_removal_plan()
+
+        self.assertEqual(expected_plan, strip_removal_plan(plan))
+
 
 class ContainerCleanMockTests(TestCase):
     def setUp(self):
