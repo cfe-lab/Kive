@@ -203,6 +203,7 @@ class Command(BaseCommand):
                                     ('stderr.txt', ContainerLog.STDERR)):
             run.load_log(os.path.join(logs_path, file_name), log_type)
 
+        run.set_md5()
         run.state = (ContainerRun.COMPLETE
                      if run.return_code == 0
                      else ContainerRun.FAILED)
@@ -295,7 +296,6 @@ class Command(BaseCommand):
             execution_args = [
                 "singularity",
                 "exec",
-                '--cleanenv',
                 "--contain",
                 "-B",
                 extracted_archive_dir + ':' + internal_binary_dir,
@@ -310,6 +310,8 @@ class Command(BaseCommand):
             ]
             all_args = [str(arg)
                         for arg in execution_args + input_paths + output_paths]
+            child_environment = {'LANG': 'en_CA.UTF-8',
+                                 'PATH': os.environ['PATH']}
             command_path = os.path.join(log_path, 'step_{}_command.txt'.format(idx))
             with open(command_path, 'w') as f:
                 f.write(' '.join(all_args))
@@ -319,7 +321,8 @@ class Command(BaseCommand):
                     open(step_stderr_path, 'w') as step_stderr:
                 step_return_code = call(all_args,
                                         stdout=step_stdout,
-                                        stderr=step_stderr)
+                                        stderr=step_stderr,
+                                        env=child_environment)
             for step_path, main_file in ((step_stdout_path, standard_out),
                                          (step_stderr_path, standard_err)):
                 log_size = os.stat(step_path).st_size

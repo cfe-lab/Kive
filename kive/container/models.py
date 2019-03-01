@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 import errno
+import hashlib
 import json
 import logging
 import os
@@ -916,6 +917,13 @@ class ContainerRun(Stopwatch, AccessControl):
         null=True,
         blank=True,
         related_name="reruns")
+    md5 = models.CharField(
+        max_length=64,
+        validators=[RegexValidator(
+            regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
+            message="MD5 checksum is not either 32 hex characters or blank")],
+        blank=True,
+        help_text="Summary of MD5's for inputs, outputs, and containers.")
 
     class Meta(object):
         ordering = ('-submit_time',)
@@ -942,6 +950,12 @@ class ContainerRun(Stopwatch, AccessControl):
             name += ' '
         name += rerun_suffix
         return name
+
+    @property
+    def has_changed(self):
+        if self.state != self.COMPLETE or self.original_run is None:
+            return
+        return self.md5 != self.original_run.md5
 
     def get_access_limits(self, access_limits=None):
         if access_limits is None:
@@ -1189,6 +1203,27 @@ class ContainerRun(Stopwatch, AccessControl):
                 run.state = cls.FAILED
                 run.end_time = Now()
                 run.save()
+
+    def set_md5(self):
+        """ Set this run's md5.  Note that this does not save the run. """
+        encoding = 'utf8'
+        md5gen = hashlib.md5()
+        container = self.app.container
+        container_md5 = container.md5.encode(encoding)
+        md5gen.update(container_md5)
+        parent_container = container.parent
+        if parent_container is not None:
+            parent_md5 = parent_container.md5.encode(encoding)
+            md5gen.update(parent_md5)
+
+        # Use explict sort order, so changes to default don't invalidate MD5's.
+        for container_dataset in self.datasets.order_by('argument__type',
+                                                        'argument__position',
+                                                        'argument__name'):
+            dataset = container_dataset.dataset
+            dataset_md5 = dataset.MD5_checksum.encode(encoding)
+            md5gen.update(dataset_md5)
+        self.md5 = md5gen.hexdigest()
 
 
 class ContainerDataset(models.Model):

@@ -27,6 +27,10 @@
                 }, clickRerun)
                 .addClass('button')
                 .appendTo($td);
+            if (run.has_changed !== null) {
+                $("<span>").text(run.has_changed ? " CHANGED" : " unchanged")
+                    .appendTo($td);
+            }
 
             if (run.stopped_by !== null) {
                 $td.append(" (Stopped by user ", $('<span>').text(run.stopped_by), ")");

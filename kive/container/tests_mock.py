@@ -745,6 +745,37 @@ class ContainerRunMockTests(TestCase):
                                      r'ContainerRun id 42 is still active.'):
             run.build_removal_plan()
 
+    def test_change_on_rerun(self):
+        run1 = ContainerRun(md5='11111111111111111111111111111111')
+        run2 = ContainerRun(md5='22222222222222222222222222222222',
+                            original_run=run1,
+                            state=ContainerRun.COMPLETE)
+
+        self.assertEqual(True, run2.has_changed)
+
+    def test_change_not_on_rerun(self):
+        run1 = ContainerRun(md5='11111111111111111111111111111111')
+        run2 = ContainerRun(md5='11111111111111111111111111111111',
+                            original_run=run1,
+                            state=ContainerRun.COMPLETE)
+
+        self.assertEqual(False, run2.has_changed)
+
+    def test_change_on_fail(self):
+        """ Only report changes on successfully completed runs. """
+        run1 = ContainerRun(md5='11111111111111111111111111111111')
+        run2 = ContainerRun(md5='11111111111111111111111111111111',
+                            original_run=run1,
+                            state=ContainerRun.FAILED)
+
+        self.assertIsNone(run2.has_changed)
+
+    def test_change_on_new_run(self):
+        run1 = ContainerRun(md5='11111111111111111111111111111111',
+                            state=ContainerRun.COMPLETE)
+
+        self.assertIsNone(run1.has_changed)
+
 
 @mocked_relations(ContainerRun, ContainerApp, ContainerArgument)
 class RunContainerMockTests(TestCase):

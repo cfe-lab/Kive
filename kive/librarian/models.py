@@ -629,16 +629,20 @@ class Dataset(metadata.models.AccessControl):
         structure.save()
         return structure
 
-    def set_MD5(self, file_path, file_handle=None):
+    def set_MD5(self, file_path=None, file_handle=None):
         """Set the MD5 hash from a file.
 
         Closes the file after the MD5 is computed.
-        :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
-        :param file file_handle: file handle of file to calculate MD5.  File must be seeked to the beginning.
-                If file_handle empty, then uses file_path.
+        :param str file_path:  Path to file to calculate MD5 for.
+            Defaults to dataset_file.path, and not used if file_handle supplied.
+        :param file file_handle: file handle of file to calculate MD5.  File
+            must be seeked to the beginning.
+            If file_handle empty, then uses file_path.
         """
         opened_file_ourselves = False
         if file_handle is None:
+            if file_path is None:
+                file_path = self.dataset_file.path
             file_handle = io.open(file_path, "rb")
             opened_file_ourselves = True
 

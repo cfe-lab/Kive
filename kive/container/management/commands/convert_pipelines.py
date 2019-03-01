@@ -11,6 +11,7 @@ from django.core.files.base import File
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import transaction
+from six.moves import input
 
 from archive.models import Run
 from constants import runstates
@@ -24,10 +25,6 @@ CONVERTED_STATES = {
     runstates.FAILED_PK: ContainerRun.FAILED,
     runstates.QUARANTINED_PK: ContainerRun.CANCELLED
 }
-
-if hasattr(__builtins__, 'raw_input'):
-    # noinspection PyShadowingBuiltins
-    input = raw_input
 
 
 def get_converting_pipeline_marker(container_id):
@@ -170,11 +167,12 @@ class Command(BaseCommand):
                         container_run.datasets.create(argument=argument,
                                                       dataset=dataset)
                     self.convert_logs(run, container_run)
+                    container_run.set_md5()
+                    container_run.save()
                     if run.description:
                         run.description += '\n'
                     run.description += get_converted_run_marker(container_run.id)
                     run.save()
-                pass
         print('Converted all {} runs to container id {}.'.format(
             pipeline_run_count,
             container.id))
@@ -295,7 +293,7 @@ class Command(BaseCommand):
                 container.copy_permissions(pipeline)
                 container.full_clean()
                 container.refresh_from_db()
-                container.write_content(dict(pipeline=pipeline_config))
+                container.write_archive_content(dict(pipeline=pipeline_config))
                 container.created = pipeline.revision_DateTime
                 container.save()
 
@@ -366,7 +364,8 @@ class Command(BaseCommand):
                                           get_converting_pipeline_marker)
             if container_id is not None:
                 print(pipeline)
-                if input('In progress, continue? [Y]/N').upper() != 'Y':
+                # noinspection PyCompatibility
+                if input('In progress, continue? [Y]/N').upper() not in ('Y', ''):
                     return
                 return pipeline
 
@@ -389,12 +388,14 @@ class Command(BaseCommand):
                                                        pipeline_family.name,
                                                        converted_pipelines,
                                                        total_pipelines))
+        # noinspection PyCompatibility
         choice = int(input('Pick a pipeline family: '))
         pipeline_family = pipeline_families[choice - 1]
         unconverted_pipelines = family_map[pipeline_family.id]
         for pipeline in unconverted_pipelines:
             print('{}: {}'.format(pipeline.revision_number,
                                   pipeline.revision_name))
+        # noinspection PyCompatibility
         choice = int(input('Pick a pipeline revision: '))
         pipeline = pipeline_family.members.get(revision_number=choice)
         print(pipeline.revision_name)

@@ -292,6 +292,7 @@ class ContainerRunSerializer(AccessControlSerializer,
                   'batch_name',
                   'batch_absolute_url',
                   'original_run',
+                  'has_changed',
                   'app',
                   'app_name',
                   'state',
@@ -341,6 +342,7 @@ class ContainerRunSerializer(AccessControlSerializer,
                                             description=original_run.description,
                                             priority=original_run.priority,
                                             original_run=original_run)
+        rerun.copy_permissions(original_run)
 
         reruns_needed = rerun.create_inputs_from_original_run()
         dependencies = {}  # {source_rerun_id: source_dependencies}
