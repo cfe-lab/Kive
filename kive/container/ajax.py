@@ -31,6 +31,8 @@ from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
 from metadata.models import AccessControl
 from portal.views import admin_check
 
+NO_SINGULARITY_PUT = 'Cannot put a singularity container.'
+
 
 def parse_date_filter(text):
     return timezone.make_aware(datetime.strptime(text, '%d %b %Y %H:%M'),
@@ -145,15 +147,20 @@ class ContainerRenderer(JSONRenderer):
     """ Render the Raw data form for content_put to hold current content. """
     def render(self, data, accepted_media_type=None, renderer_context=None):
         if renderer_context['view'].action == 'content_put':
-            data = dict(renderer_context['response'].data)
+            container_id = renderer_context['kwargs']['pk']
+            container = Container.objects.get(id=container_id)
+            if container.is_singularity():
+                data = dict(message=NO_SINGULARITY_PUT)
+            else:
+                data = dict(renderer_context['response'].data)
 
-            # Remove ignored fields.
-            data.pop('files', None)
-            data.pop('id', None)
+                # Remove ignored fields.
+                data.pop('files', None)
+                data.pop('id', None)
 
-            # Add new fields that trigger a copy.
-            data['new_tag'] = None
-            data['new_description'] = None
+                # Add new fields that trigger a copy.
+                data['new_tag'] = None
+                data['new_description'] = None
         rendered = super(ContainerRenderer, self).render(data, accepted_media_type, renderer_context)
         return rendered
 
@@ -261,7 +268,7 @@ class ContainerViewSet(CleanCreateModelMixin,
         new_tag = content.get('new_tag')
         new_description = content.get('new_description')
         if container.is_singularity():
-            response_data = dict(message='Cannot put a singularity container.')
+            response_data = dict(message=NO_SINGULARITY_PUT)
         elif 'pipeline' not in content:
             response_data = dict(pipeline=['This field is required.'])
         elif new_tag and Container.objects.filter(tag=new_tag).exists():
@@ -277,7 +284,8 @@ class ContainerViewSet(CleanCreateModelMixin,
                 if new_description:
                     container.description = new_description
                 with use_field_file(container.file):
-                    container.file.save(container.file.name, File(container.file))
+                    container.file.save(os.path.basename(container.file.name),
+                                        File(container.file))
             try:
                 container.write_archive_content(content)
                 container.save()

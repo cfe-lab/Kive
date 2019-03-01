@@ -4,8 +4,10 @@ import errno
 import logging
 import os
 import shutil
+import sys
 from subprocess import call
 import json
+from traceback import format_exception_only
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -36,6 +38,7 @@ class Command(BaseCommand):
 
     def handle(self, run_id, **kwargs):
         run = self.record_start(run_id)
+        # noinspection PyBroadException
         try:
             self.fill_sandbox(run)
             run.save()
@@ -49,7 +52,9 @@ class Command(BaseCommand):
             run.state = ContainerRun.FAILED
             run.end_time = timezone.now()
             run.save()
-            raise
+            self.save_exception(run)
+            logger.error('Running container failed.', exc_info=True)
+            exit(1)
 
     def record_start(self, run_id):
         old_state = ContainerRun.NEW
@@ -202,6 +207,14 @@ class Command(BaseCommand):
                      if run.return_code == 0
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
+
+    def save_exception(self, run):
+        log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')
+        with open(log_path, 'w') as f:
+            f.write('========\nInternal Kive Error\n========\n')
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            f.write(''.join(format_exception_only(exc_type, exc_value)))
+        run.load_log(log_path, ContainerLog.STDERR)
 
     def run_pipeline(self,
                      instructions,

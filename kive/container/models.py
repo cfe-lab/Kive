@@ -1115,7 +1115,12 @@ class ContainerRun(Stopwatch, AccessControl):
             else:
                 short_text = ''
                 long_text = File(f)
-            log = self.logs.create(type=log_type, short_text=short_text)
+            # We use update_or_create(), because it's possible that a log could
+            # be successfully created, then an error occurs, and we need to
+            # update it.
+            log, _ = self.logs.update_or_create(
+                type=log_type,
+                defaults=dict(short_text=short_text))
             if long_text is not None:
                 upload_name = 'run_{}_{}'.format(
                     self.pk,

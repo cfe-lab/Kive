@@ -190,6 +190,7 @@ class Command(BaseCommand):
                                      run.id,
                                      run.sandbox_path,
                                      exc_info=True)
+                        run.sandbox_path = ''
                     run.save()
                 elif entry_type == 'l':
                     log = ContainerLog.objects.get(id=entry_id)

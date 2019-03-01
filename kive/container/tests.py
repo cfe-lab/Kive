@@ -771,6 +771,8 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual('v2', new_container.tag)
         self.assertEqual('v1 description', new_container.description)
         self.assertNotEqual(self.test_container.file.path, new_container.file.path)
+        if not new_container.file.name.startswith('Containers/test'):
+            self.fail('Unexpected container path: ' + new_container.file.name)
 
     def test_write_content_copy_with_description(self):
         self.test_container.file_type = Container.ZIP
@@ -1736,6 +1738,21 @@ class RunContainerTests(TestCase):
         stderr.write(self.call_stderr)
         return self.call_return_code
 
+    def assert_run_fails(self, run, *expected_stderr):
+        """ Check that a run fails, and look for messages in stderr. """
+        with self.assertRaises(
+                SystemExit):
+            call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        self.assertEqual(ContainerRun.FAILED, run.state)
+        self.assertIsNotNone(run.end_time)
+        stderr = run.logs.get(type=ContainerLog.STDERR)
+        stderr_text = stderr.read()
+        for expected_message in expected_stderr:
+            self.assertIn(expected_message, stderr_text)
+
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
         everyone = Group.objects.get(name='Everyone')
@@ -1787,9 +1804,22 @@ class RunContainerTests(TestCase):
         )
         input_dataset = input_containerdataset.dataset
         input_dataset.dataset_file.save("tampered", ContentFile(b"foo"), save=True)
+        expected_error = """\
+========
+Internal Kive Error
+========
+ValueError: Dataset with pk=1 has an inconsistent checksum \
+(original 06f7204f2679744fd76e6b111dc506ba; \
+current acbd18db4cc2f85cedef654fccc4a4d8)
+"""
 
-        with self.assertRaises(ValueError):
-            call_command('runcontainer', str(run.id))
+        with capture_log_stream(logging.ERROR, 'container') as mocked_stderr:
+            self.assert_run_fails(run, expected_error)
+            error_log = mocked_stderr.getvalue()
+
+        self.assertIn('Running container failed.', error_log)
+        self.assertIn('Traceback', error_log)
+        self.assertIn('inconsistent checksum', error_log)
 
     def test_run_bad_md5(self):
         run = ContainerRun.objects.get(name='fixture run')
@@ -1800,8 +1830,9 @@ class RunContainerTests(TestCase):
         # Tamper with the file.
         run.app.container.file.save("tampered", ContentFile(b"foo"), save=True)
 
-        with self.assertRaises(ValueError):
-            call_command('runcontainer', str(run.id))
+        self.assert_run_fails(
+            run,
+            'ValueError: Container fixture family:vFixture file MD5 has changed')
 
     @staticmethod
     def _test_run_archive_preamble():
@@ -1910,15 +1941,17 @@ greeting
         """Running an archive container with a bad MD5 should raise ValueError."""
         run, container, old_container = self._test_run_archive_preamble()
         container.file.save("tampered", ContentFile(b"foo"), save=True)
-        with self.assertRaises(ValueError):
-            call_command('runcontainer', str(run.id))
+        self.assert_run_fails(
+            run,
+            'ValueError: Container fixture family:tar_test file MD5 has changed')
 
     def test_run_archive_parent_bad_md5(self):
         """Running an archive container whose parent has a bad MD5 should raise ValueError."""
         run, container, old_container = self._test_run_archive_preamble()
         old_container.file.save("tampered", ContentFile(b"foo"), save=True)
-        with self.assertRaises(ValueError):
-            call_command('runcontainer', str(run.id))
+        self.assert_run_fails(
+            run,
+            'ValueError: Container fixture family:vFixture file MD5 has changed')
 
     def test_step_stdout(self):
         greetings_path = os.path.abspath(os.path.join(__file__,
@@ -2372,15 +2405,9 @@ what up
         dataset.save()
         self.assertIsNone(dataset.get_open_file_handle())
 
-        with self.assertRaisesRegexp(
-                IOError,
-                r"No such file or directory: .*missing_file\.csv"):
-            call_command('runcontainer', str(run.id))
-
-        run.refresh_from_db()
-
-        self.assertEqual(ContainerRun.FAILED, run.state)
-        self.assertIsNotNone(run.end_time)
+        self.assert_run_fails(run,
+                              'No such file',
+                              'singularity/host_input/missing_file.csv')
 
     @patch('container.management.commands.runcontainer.call')
     def test_short_stdout(self, mocked_call):
@@ -2531,12 +2558,7 @@ what up
                                            app=run2.app,
                                            original_run=run2)
 
-        with self.assertRaisesRegexp(RuntimeError,
-                                     'Inputs missing from reruns'):
-            call_command('runcontainer', str(run4.id))
-
-        run4.refresh_from_db()
-        self.assertEqual(ContainerRun.FAILED, run4.state)
+        self.assert_run_fails(run4, 'RuntimeError: Inputs missing from reruns')
 
 
 @skipIfDBFeature('is_mocked')
