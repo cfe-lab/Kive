@@ -34,9 +34,9 @@ class AppInfo:
     KW_HELP_STRING = 'helpstring'
     KW_RUN_STRING = 'runstring'
     KW_LABEL_DICT = 'labeldict'
-
+    KW_ERROR_MESSAGES = 'error_messages'
     KEY_WORD_SET = frozenset([KW_NUM_THREADS, KW_MEMORY, KW_IO_ARGS, KW_APP_NAME, KW_HELP_STRING,
-                              KW_RUN_STRING, KW_LABEL_DICT])
+                              KW_RUN_STRING, KW_LABEL_DICT, KW_ERROR_MESSAGES])
 
     def __init__(self, name):
         self.name = name
@@ -44,6 +44,7 @@ class AppInfo:
         self.runstr = None
         self._labdct = None
         self.err = False
+        self._err_msg = []
 
     def set_help(self, helpstr):
         """Set the help information of this app."""
@@ -51,25 +52,28 @@ class AppInfo:
             self.helpstr = helpstr
         else:
             self.err = True
+            self._err_msg.append('help string set twice')
 
     def set_label(self, labelstr):
         """Set the label information of this app."""
         if self._labdct is not None:
             self.err = True
+            self._err_msg.append('label string set twice')
             return
         # convert this into a dict of labels...
         labdct = {}
-        for l in labelstr:
-            cols = l.split()
+        for line in labelstr:
+            cols = line.split()
             if len(cols) <= 1:
                 self.err = True
+                self._err_msg.append('empty label definition')
                 return
             k = cols.pop(0)
-            v = " ".join(cols)
             if k in labdct:
                 self.err = True
+                self._err_msg.append('label {} defined twice'.format(k))
                 return
-            labdct[k] = v
+            labdct[k] = " ".join(cols)
         self._labdct = labdct
 
     def set_run(self, runstr):
@@ -78,26 +82,39 @@ class AppInfo:
             self.runstr = runstr
         else:
             self.err = True
+            self._err_msg.append('run string set twice')
 
-    def is_faulty(self):
-        """Return true if some inconsistency occurred in the app definition."""
-        return self.err or self.helpstr is None or\
-            self._labdct is None or\
-            self.runstr is None
+    def _check_faulty(self):
+        """Check sanity of the AppInfo. This will set self.err
+        and append to self._err_msg"""
+        if self.helpstr is None:
+            self.err = True
+            self._err_msg.append('help string is not set')
+        if self._labdct is None:
+            self.err = True
+            self._err_msg.append('labels string not set')
+        if self.runstr is None:
+            self.err = True
+            self._err_msg.append('run string not set')
+        # some additional checks, which will set self.err if there is a problem
+        self.get_num_threads()
+        self.get_memory()
 
     def __repr__(self):
         inp, outp = self.get_io_args()
         return "appinfo name: {}, inputs: {}, -> outputs: {}".format(self.name, inp, outp)
 
     def as_dict(self):
-        """Return this Appinfo as a dict that can be serialisable."""
+        """Return this AppInfo as a dict that can be serialised."""
+        self._check_faulty()
         return {AppInfo.KW_NUM_THREADS: self.get_num_threads(),
                 AppInfo.KW_MEMORY: self.get_memory(),
                 AppInfo.KW_IO_ARGS: self.get_io_args(),
                 AppInfo.KW_APP_NAME: self.name,
                 AppInfo.KW_HELP_STRING: self.get_helpstring(),
                 AppInfo.KW_RUN_STRING: self.get_runstring(),
-                AppInfo.KW_LABEL_DICT: self.get_label_dict()}
+                AppInfo.KW_LABEL_DICT: self.get_label_dict(),
+                AppInfo.KW_ERROR_MESSAGES: self._err_msg if self._err_msg else None}
 
     def get_io_args(self):
         """Return a tuple (input_arg_string, output_arg_str).
@@ -109,19 +126,34 @@ class AppInfo:
         return (self._labdct.get("KIVE_INPUTS", None),
                 self._labdct.get("KIVE_OUTPUTS", None))
 
-    def get_num_threads(self):
-        """Return the value (int) of KIVE_THREADS or None if this label is not defined."""
+    def _get_int_label(self, labname):
+        """Return an integer value of a labelname.
+        None is returned if no label is defined.
+        If the conversion to int fails, then self.err becomes True and None is returned.
+        """
         if self.err or self._labdct is None:
             return None
-        strval = self._labdct.get("KIVE_THREADS", None)
-        return int(strval) if strval is not None else None
+        strval = self._labdct.get(labname, None)
+        if strval is not None:
+            try:
+                retval = int(strval)
+            except ValueError:
+                retval = None
+                self.err = True
+                self._err_msg.append('value for {} ({}) is not an integer'.format(labname,
+                                                                                  strval))
+            return retval
+        return None
+
+    def get_num_threads(self):
+        """Return the value (int) of KIVE_THREADS.
+        Return None if this label is not defined, or if the conversion to int fails."""
+        return self._get_int_label("KIVE_THREADS")
 
     def get_memory(self):
-        """Return the value (int) of KIVE_MEMORY or None if this label is not defined."""
-        if self.err or self._labdct is None:
-            return None
-        strval = self._labdct.get("KIVE_MEMORY", None)
-        return int(strval) if strval is not None else None
+        """Return the value (int) of KIVE_MEMORY.
+        Return None if this label is not defined, or if the conversion to int fails."""
+        return self._get_int_label("KIVE_MEMORY")
 
     def get_label_dict(self):
         """Return all labels defined to this app in the form of a
@@ -159,8 +191,6 @@ def parse_string(instr):
     The main, default application of the container has the name 'main'.
     If no separate apps are defined, this will be the only appinfo instance in the returned list.
     If no appinfo instances can be determined from the deffile, an empty list is returned.
-    Raises:
-       RuntimeError: if an error occurred parsing the input string.
     """
     appdct = {}
     for chunk in chunk_string(instr):
@@ -173,7 +203,4 @@ def parse_string(instr):
             else:
                 my_app = appdct[appname] = AppInfo(appname)
             _SETTER_FUNK_DCT[got_kw](my_app, chunk[1:])
-    for app in appdct.values():
-        if app.is_faulty():
-            raise RuntimeError("faulty app {}".format(app.name))
     return [a.as_dict() for a in appdct.values()]

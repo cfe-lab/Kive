@@ -128,10 +128,28 @@ the help line
 %runscript
   bash do something
 """
+        faulty08 = """
+%applabels mainly
+   FUNNY val1
+   VALENTINE hello bla1 bla2
+   KIVE_THREADS 100 # a comment
+%apphelp mainly
+   the simple
+   help line
+%apprun mainly
+   bash echo 'hello world'
+"""
+
         for faulty in [faulty01, faulty02, faulty03,
-                       faulty04, faulty05, faulty06, faulty07]:
-            with self.assertRaises(RuntimeError):
-                deffile.parse_string(faulty)
+                       faulty04, faulty05, faulty06, faulty07, faulty08]:
+            # with self.assertRaises(RuntimeError):
+            applst = deffile.parse_string(faulty)
+            assert len(applst) > 0, "len(list) >0 expected"
+            for app_dct in applst:
+                err_lst = app_dct[deffile.AppInfo.KW_ERROR_MESSAGES]
+                # print("BLAA {}".format(err_lst))
+                assert err_lst, "nonempty err_lst expected"
+        # assert False, "force fail"
 
     def test_ignore01(self):
         """Keywords of no interest to us should be be silently ignored.

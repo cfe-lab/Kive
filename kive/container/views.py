@@ -7,6 +7,8 @@ import os
 import errno
 from django.conf import settings
 from django.contrib.auth.decorators import login_required, user_passes_test
+import django.contrib.messages as messages
+from django.contrib.messages.views import SuccessMessageMixin
 from django.db import transaction
 from django.http import Http404
 from django.template.defaultfilters import filesizeformat
@@ -75,9 +77,11 @@ class ContainerFamilyCreate(CreateView):
 
 
 @method_decorator(dev_decorators, name='dispatch')
-class ContainerCreate(CreateView, AdminViewMixin):
+class ContainerCreate(SuccessMessageMixin, CreateView, AdminViewMixin):
     model = Container
     form_class = ContainerForm
+
+    success_message = 'hello world'
 
     def form_valid(self, form):
         form.instance.user = self.request.user
@@ -88,7 +92,12 @@ class ContainerCreate(CreateView, AdminViewMixin):
             self.object.grant_from_json(form.cleaned_data["permissions"])
             self.object.validate_restrict_access([self.object.family])
             self.object.create_app_from_content()
+        # messages.add_message(response, messages.INFO, 
+        messages.error(self.request, 'Hello world')
         return response
+
+    def get_success_message(self, cleaned_data):
+        return self.success_message
 
     def get_success_url(self):
         return reverse('container_family_update',

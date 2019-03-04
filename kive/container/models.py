@@ -425,15 +425,16 @@ class Container(AccessControl):
         if def_file_str is None:
             appinfo_lst = []
         else:
-            try:
-                appinfo_lst = deffile.parse_string(def_file_str)
-            except RuntimeError:
+            appinfo_lst = deffile.parse_string(def_file_str)
+            has_error = any(app_dct[deffile.AppInfo.KW_ERROR_MESSAGES] for app_dct in appinfo_lst)
+            if has_error:
                 logger.warning('Invalid container file:', exc_info=True)
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
                                       code='invalid_singularity_deffile')
         return dict(applist=appinfo_lst)
 
     def get_archive_content(self, add_default):
+        """Determine the pipeline content from an archive container."""
         with self.open_content() as archive:
             last_entry = archive.infolist()[-1]
             if re.match(r'kive/pipeline\d+\.json', last_entry.name):
@@ -499,9 +500,11 @@ class Container(AccessControl):
         if self.is_singularity():
             app_lst = content.get('applist', None)
             if app_lst is not None:
+                non_faulty_app_lst = [app_dct for app_dct in app_lst
+                                      if app_dct[deffile.AppInfo.KW_ERROR_MESSAGES] is None]
                 default_config = self.DEFAULT_APP_CONFIG
                 self.apps.all().delete()
-                for app_dct in app_lst:
+                for app_dct in non_faulty_app_lst:
                     num_threads = app_dct[deffile.AppInfo.KW_NUM_THREADS] or default_config['threads']
                     memory = app_dct[deffile.AppInfo.KW_MEMORY] or default_config['memory']
                     inpargs, outargs = app_dct[deffile.AppInfo.KW_IO_ARGS]
