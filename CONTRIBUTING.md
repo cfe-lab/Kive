@@ -41,9 +41,11 @@ See the vagrant scripts for examples of how to start a production server.
 Once you have set up your production server, this is how to deploy a new release:
 
 1. Make sure the code works in your development environment. Run all the
-    Javascript tests by opening `kive/SpecRunner.html`, and run all the Django
-    unit tests.
+    Javascript tests and all the Django unit tests.
     
+    cd /path/to/git/Kive
+    npm run test:travis
+    cd kive
     ./manage.py test --settings kive.settings_test_pg
 
 2. Check if the kiveapi package needs to update its version number by looking

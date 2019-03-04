@@ -175,6 +175,10 @@ the key features that Kive cares about:
 * `%help` - describes the default app. This gets copied to the container
     description.
 * `%apphelp` - describes another app. This gets copied to the app description.
+* `%environment` and `%appenv` - set environment variables. If you install
+    something outside of the default path, you'll need to set `PATH`. If you
+    need to encode or decode Unicode text in Python, you'll need to set `LANG`
+    to something like `en_CA.UTF-8`.
 
 In other words, if there is a main, 'default' app without a name, then the entries
 and labels from `%runscript`, `%labels` and `%help` are used for that app. You can have
@@ -197,7 +201,8 @@ commands like this:
     mkdir input
     mkdir output
     cp input_data.csv input
-    singularity run my_app.simg --contain -B input:/mnt/input,output:/mnt/output \
+    singularity run my_app.simg --contain --cleanenv \
+        -B input:/mnt/input,output:/mnt/output \
         /mnt/input/input_data.csv /mnt/output/output_data.csv
     cat output/output_data.csv
 
