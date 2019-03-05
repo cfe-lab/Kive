@@ -23,6 +23,14 @@
 <div id="auth_info"><p>{{ user }}</p> <a href="/logout_then_login/">Log out</a></div>
 {% endif %}
 
+{% if messages %}
+<ul class="messages">
+    {% for message in messages %}
+    <li{% if message.tags %} class="{{ message.tags }}"{% endif %}>{{ message }}</li>
+    {% endfor %}
+</ul>
+{% endif %}
+
 {% block content %}
 {% endblock %}
 </div>

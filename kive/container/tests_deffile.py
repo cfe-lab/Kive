@@ -6,66 +6,124 @@ from django.test import TestCase
 
 import container.deffile as deffile
 
-_DEFFILE_01 = """# Generate the Singularity container to run MiCall on Kive.\nBootstrap: docker\nFrom: python:2.7.15-alpine3.6\n
-%help\n    Minimal example that can run simple Python scripts under Kive.\n
-    The main app generates \"Hello, World!\" messages for a list of names.\n
-%labels\n    MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
-    KIVE_INPUTS names_csv\n    KIVE_OUTPUTS greetings_csv\n
-%files\n    *.py /usr/local/share\n\n%post
-    # Create a /mnt directory to mount input and output folders.\n    # mkdir /mnt/input
-    # mkdir /mnt/output\n    # mkdir /mnt/bin\n\n    # Trim a bunch of extra features to reduce image size by about 25%.
-    cd /usr/local/lib/python2.7\n    rm -r site-packages/* ensurepip hotshot distutils curses
-    cd lib-dynload\n    rm pyexpat.so unicodedata.so _ctypes.so _tkinter.so parser.so cPickle.so \\
-        _sqlite3.so _ssl.so _socket.so _curses*.so _elementtree.so \\
-        zlib.so bz2.so _json.so cmath.so array.so _multibytecodec.so audioop.so \\
-        _hotshot.so ossaudiodev.so _ctypes_test.so linuxaudiodev.so\n\n%runscript
-    /usr/local/bin/python /usr/local/share/greetings.py \"$@\"\n\n%apphelp sums_and_products
-    Read pairs of numbers, then report their sums and products.\n
-%applabels sums_and_products\n    KIVE_INPUTS input_csv\n    KIVE_OUTPUTS output_csv\n
-%apprun sums_and_products\n    /usr/local/bin/python /usr/local/share/sums_and_products.py \"$@\"\n"""
+_DEFFILE_01 = r"""# Generate the Singularity container to run MiCall on Kive.
+Bootstrap: docker
+From: python:2.7.15-alpine3.6
+
+%help
+    Minimal example that can run simple Python scripts under Kive.
+
+    The main app generates "Hello, World!" messages for a list of names.
+
+%labels
+    MAINTAINER BC CfE in HIV/AIDS https://github.com/cfe-lab/Kive
+    KIVE_INPUTS names_csv
+    KIVE_OUTPUTS greetings_csv
+
+%files
+    *.py /usr/local/share
+
+%post
+    # Create a /mnt directory to mount input and output folders.
+    # mkdir /mnt/input
+    # mkdir /mnt/output
+    # mkdir /mnt/bin
+    
+    # Trim a bunch of extra features to reduce image size by about 25%.
+    cd /usr/local/lib/python2.7
+    rm -r site-packages/* ensurepip hotshot distutils curses
+    cd lib-dynload
+    rm pyexpat.so unicodedata.so _ctypes.so _tkinter.so parser.so cPickle.so \
+        _sqlite3.so _ssl.so _socket.so _curses*.so _elementtree.so \
+        zlib.so bz2.so _json.so cmath.so array.so _multibytecodec.so audioop.so \
+        _hotshot.so ossaudiodev.so _ctypes_test.so linuxaudiodev.so
+
+%runscript
+    /usr/local/bin/python /usr/local/share/greetings.py "$@"
+
+%apphelp sums_and_products
+    Read pairs of numbers, then report their sums and products.
+%applabels sums_and_products
+    KIVE_INPUTS input_csv
+    KIVE_OUTPUTS output_csv
+
+%apprun sums_and_products
+    /usr/local/bin/python /usr/local/share/sums_and_products.py "$@"
+"""
 
 
 class DefFileTest(TestCase):
 
     def test_parse01(self):
         """Retrieve app information from a legal singularity def file."""
-        lverb = False
+        expected_apps = [dict(appname='',
+                              io_args=('names_csv', 'greetings_csv'),
+                              memory=None,
+                              numthreads=None,
+                              error_messages=None),
+                         dict(appname='sums_and_products',
+                              io_args=('input_csv', 'output_csv'),
+                              memory=None,
+                              numthreads=None,
+                              error_messages=None)]
+
         app_lst = deffile.parse_string(_DEFFILE_01)
-        assert isinstance(app_lst, list), "list expected"
-        assert len(app_lst) == 2, "two expected"
-        for app_dct in app_lst:
-            assert isinstance(app_dct, dict), "dict expected"
-            assert set(app_dct.keys()) == deffile.AppInfo.KEY_WORD_SET, 'faulty dict keys'
-            inp, outp = app_dct[deffile.AppInfo.KW_IO_ARGS]
-            assert inp is not None, "inp key expected"
-            assert outp is not None, "outp key expected"
-            if lverb:
-                appname = app_dct[deffile.AppInfo.KW_APP_NAME]
-                print("{}: {} -> {}".format(appname, inp, outp))
-                print("   run: {}".format(app_dct[deffile.AppInfo.KW_RUN_STRING]))
-                print("  help: {}".format(app_dct[deffile.AppInfo.KW_HELP_STRING]))
-                for k, val in app_dct[deffile.AppInfo.KW_LABEL_DICT].items():
-                    print("   label: {}: {}".format(k, val))
-            # --
-        # assert False, "force fail"
+
+        for app in app_lst:
+            del app['helpstring']
+            del app['runstring']
+            del app['labeldict']
+        self.assertEqual(expected_apps, app_lst)
+
+    def test_parse_whitespace_line(self):
+        def_file = _DEFFILE_01.replace('\n%files', '    \n%files')
+        app_list = deffile.parse_string(def_file)
+
+        main_app = app_list[0]
+
+        self.assertEqual('', main_app['appname'])
+        self.assertIsNone(main_app['error_messages'])
 
     def test_faulty01(self):
-        """Parsing a variery of faulty singularity def files should raise a RuntimeError"""
-        faulty01 = """
+        """Parsing a variety of faulty singularity def files should raise a RuntimeError"""
+        scenarios = [("""
 %help
 the help line
 %labels
    GOO hello goo
    BLA hello bla
-"""
-        faulty02 = """
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+""", {'': ['run string not set']}),
+                     ("""
 %help
    the simple
    help line
 %runscript
    bash echo 'hello world'
-"""
-        faulty03 = """
+""", {'': ['labels string not set']}),
+                     ("""
+%help
+   the simple
+   help line
+%runscript
+   bash echo 'hello world'
+%labels
+   GOO hello goo
+   BLA hello bla
+   KIVE_INPUTS in1_csv
+""", {'': ['missing label KIVE_OUTPUTS']}),
+                     ("""
+%help
+   the simple
+   help line
+%runscript
+   bash echo 'hello world'
+%labels
+   GOO hello goo
+   BLA hello bla
+""", {'': ['missing label KIVE_INPUTS', 'missing label KIVE_OUTPUTS']}),
+                     ("""
 %apphelp bla
    the simple
    help line
@@ -74,8 +132,18 @@ the help line
 %applabels bla
    GOO hello goo
    BLA hello bla
-"""
-        faulty04 = """
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+""", {
+                         '': ['labels string not set', 'run string not set'],
+                         'bla': ['run string not set'],
+                         'blu': ['labels string not set']}),
+                     ("""
+%labels
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+%runscript
+   bash echo 'hello world'
 %apphelp bla
    the simple
    help line
@@ -84,8 +152,13 @@ the help line
 %applabels bla
    GOO
    BLA hello bla
-"""
-        faulty05 = """
+""", {'bla': ['empty label definition', 'labels string not set']}),
+                     ("""
+%labels
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+%runscript
+   bash echo 'hello world'
 %apphelp bla
    the simple
    help line
@@ -94,8 +167,13 @@ the help line
 %applabels bla
    GOO  val1
    GOO val2
-"""
-        faulty06 = """
+""", {'bla': ['label GOO defined twice', 'labels string not set']}),
+                     ("""
+%labels
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+%runscript
+   bash echo 'hello world'
 %applabels bla
    FUNNY val1
    VALENTINE hello bla1 bla2
@@ -107,49 +185,33 @@ the help line
 %applabels bla
    GOO val1
    BLA hello bla
-"""
-        faulty07 = """
+""", {'bla': ['label string set twice']}),
+                     ("""
+%labels
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
+%runscript
+   bash echo 'hello world'
 %applabels main
    FUNNY val1
    VALENTINE hello bla1 bla2
+   KIVE_THREADS 100 # a comment
 %apphelp main
    the simple
    help line
 %apprun main
    bash echo 'hello world'
-%labels
-   GOO val1
-   BLA hello bla
-%help
- a simple help line
+""", {'main': ['value for KIVE_THREADS (100 # a comment) is not an integer']})]
 
-
-
-%runscript
-  bash do something
-"""
-        faulty08 = """
-%applabels mainly
-   FUNNY val1
-   VALENTINE hello bla1 bla2
-   KIVE_THREADS 100 # a comment
-%apphelp mainly
-   the simple
-   help line
-%apprun mainly
-   bash echo 'hello world'
-"""
-
-        for faulty in [faulty01, faulty02, faulty03,
-                       faulty04, faulty05, faulty06, faulty07, faulty08]:
-            # with self.assertRaises(RuntimeError):
-            applst = deffile.parse_string(faulty)
-            assert len(applst) > 0, "len(list) >0 expected"
-            for app_dct in applst:
-                err_lst = app_dct[deffile.AppInfo.KW_ERROR_MESSAGES]
-                # print("BLAA {}".format(err_lst))
-                assert err_lst, "nonempty err_lst expected"
-        # assert False, "force fail"
+        for faulty_text, expected_errors in scenarios:
+            app_list = deffile.parse_string(faulty_text)
+            self.assertTrue(app_list)
+            error_lists = {
+                app_info[deffile.AppInfo.KW_APP_NAME]:
+                    app_info[deffile.AppInfo.KW_ERROR_MESSAGES]
+                for app_info in app_list
+                if app_info[deffile.AppInfo.KW_ERROR_MESSAGES]}
+            self.assertEqual(expected_errors, error_lists)
 
     def test_ignore01(self):
         """Keywords of no interest to us should be be silently ignored.
@@ -194,7 +256,7 @@ gggg
         lab_dct = app.get_label_dict()
         assert lab_dct is None, "none expected"
         h_str = app.get_helpstring()
-        assert h_str is None, "none expected"
+        self.assertEqual('', h_str)
         r_str = app.get_runstring()
         assert r_str is None, "none expected"
         app.err = True
@@ -208,6 +270,8 @@ gggg
    BLA hello bla
    KIVE_THREADS 100
    KIVE_MEMORY 1000
+   KIVE_INPUTS in1_csv
+   KIVE_OUTPUTS out1_csv
 %help
    the simple
    help line
@@ -220,11 +284,10 @@ gggg
         assert isinstance(app_lst, list), "list expected"
         assert len(app_lst) == 1, "one expected"
         app_dct = app_lst[0]
-        assert isinstance(app_dct, dict), 'dict expected'
         assert set(app_dct.keys()) == deffile.AppInfo.KEY_WORD_SET, 'faulty dict keys'
+        self.assertIsNone(app_dct[deffile.AppInfo.KW_ERROR_MESSAGES])
         n_thread = app_dct[deffile.AppInfo.KW_NUM_THREADS]
-        assert isinstance(n_thread, int), "int expected"
-        assert n_thread == 100, "100 expected"
+        self.assertEqual(100, n_thread)
         n_mem = app_dct[deffile.AppInfo.KW_MEMORY]
         assert isinstance(n_mem, int), "int expected"
         assert n_mem == 1000, "1000 expected"

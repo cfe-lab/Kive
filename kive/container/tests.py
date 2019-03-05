@@ -576,11 +576,32 @@ class ContainerTests(TestCase):
     }
 }
 """
+        expected_content = dict(
+            applist=[dict(appname='',
+                          error_messages=['labels string not set',
+                                          'run string not set'],
+                          helpstring='',
+                          io_args=(None, None),
+                          labeldict=None,
+                          memory=None,
+                          numthreads=None,
+                          runstring=None),
+                     dict(appname='bla',
+                          error_messages=['labels string not set',
+                                          'run string not set'],
+                          helpstring='',
+                          io_args=(None, None),
+                          labeldict=None,
+                          memory=None,
+                          numthreads=None,
+                          runstring=None)])
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
-        with self.assertRaises(ValidationError):
-            container.get_singularity_content()
+
+        content = container.get_singularity_content()
+
+        self.assertEqual(expected_content, content)
 
 
 @skipIfDBFeature('is_mocked')

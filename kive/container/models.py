@@ -426,11 +426,6 @@ class Container(AccessControl):
             appinfo_lst = []
         else:
             appinfo_lst = deffile.parse_string(def_file_str)
-            has_error = any(app_dct[deffile.AppInfo.KW_ERROR_MESSAGES] for app_dct in appinfo_lst)
-            if has_error:
-                logger.warning('Invalid container file:', exc_info=True)
-                raise ValidationError(self.DEFAULT_ERROR_MESSAGES['invalid_singularity_deffile'],
-                                      code='invalid_singularity_deffile')
         return dict(applist=appinfo_lst)
 
     def get_archive_content(self, add_default):
@@ -494,37 +489,45 @@ class Container(AccessControl):
         if applist is []: all apps are deleted.
         """
         content = content or self.get_content()
+        error_messages = []
         if content is None:
             logger.warning("failed to obtain content from container")
             return
         if self.is_singularity():
             app_lst = content.get('applist', None)
-            if app_lst is not None:
-                non_faulty_app_lst = [app_dct for app_dct in app_lst
-                                      if app_dct[deffile.AppInfo.KW_ERROR_MESSAGES] is None]
+            if not app_lst:
+                error_messages.append(
+                    'No definition file found in singularity file.')
+            else:
                 default_config = self.DEFAULT_APP_CONFIG
                 self.apps.all().delete()
-                for app_dct in non_faulty_app_lst:
+                for app_dct in app_lst:
+                    appname = app_dct[deffile.AppInfo.KW_APP_NAME]
+                    app_errors = app_dct[deffile.AppInfo.KW_ERROR_MESSAGES]
+                    if app_errors:
+                        summary = 'The {} app was not created: {}'.format(
+                            repr(appname) if appname else 'default',
+                            ', '.join(app_errors))
+                        error_messages.append(summary)
+                        continue
                     num_threads = app_dct[deffile.AppInfo.KW_NUM_THREADS] or default_config['threads']
                     memory = app_dct[deffile.AppInfo.KW_MEMORY] or default_config['memory']
                     inpargs, outargs = app_dct[deffile.AppInfo.KW_IO_ARGS]
                     inpargs = inpargs or "input_txt"
                     outargs = outargs or "output_txt"
-                    appname = app_dct[deffile.AppInfo.KW_APP_NAME]
-                    dbname = appname if appname != 'main' else ""
                     help_str = app_dct[deffile.AppInfo.KW_HELP_STRING] or ""
                     # attach the help string of the default app to the container's description
-                    if dbname == "" and help_str != "":
+                    if appname == "" and help_str != "":
                         self.description = help_str if self.description == "" else self.description + "\n" + help_str
                         self.save()
-                    newdb_app = self.apps.create(name=dbname,
+                    newdb_app = self.apps.create(name=appname,
                                                  description=help_str,
                                                  threads=num_threads,
                                                  memory=memory)
                     newdb_app.write_inputs(inpargs)
                     newdb_app.write_outputs(outargs)
         else:
-            # arch container
+            # archive container
             pipeline = content['pipeline']
             if self.pipeline_valid(pipeline):
                 default_config = pipeline.get('default_config',
@@ -540,6 +543,7 @@ class Container(AccessControl):
                                         for entry in pipeline['outputs'])
                 app.write_inputs(input_names)
                 app.write_outputs(output_names)
+        return error_messages
 
     @staticmethod
     def pipeline_valid(pipeline):

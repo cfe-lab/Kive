@@ -63,7 +63,9 @@ class AppInfo:
         # convert this into a dict of labels...
         labdct = {}
         for line in labelstr:
-            cols = line.split()
+            cols = line.strip().split()
+            if not cols:
+                continue
             if len(cols) <= 1:
                 self.err = True
                 self._err_msg.append('empty label definition')
@@ -87,9 +89,6 @@ class AppInfo:
     def _check_faulty(self):
         """Check sanity of the AppInfo. This will set self.err
         and append to self._err_msg"""
-        if self.helpstr is None:
-            self.err = True
-            self._err_msg.append('help string is not set')
         if self._labdct is None:
             self.err = True
             self._err_msg.append('labels string not set')
@@ -99,6 +98,7 @@ class AppInfo:
         # some additional checks, which will set self.err if there is a problem
         self.get_num_threads()
         self.get_memory()
+        self.get_io_args()
 
     def __repr__(self):
         inp, outp = self.get_io_args()
@@ -122,9 +122,16 @@ class AppInfo:
         E.g. if we have inputs but no defined outputs, we will return ('input_args', None) .
         """
         if self.err or self._labdct is None:
-            return (None, None)
-        return (self._labdct.get("KIVE_INPUTS", None),
-                self._labdct.get("KIVE_OUTPUTS", None))
+            return None, None
+        inputs = self._labdct.get("KIVE_INPUTS", None)
+        outputs = self._labdct.get("KIVE_OUTPUTS", None)
+        if not inputs:
+            self.err = True
+            self._err_msg.append('missing label KIVE_INPUTS')
+        if not outputs:
+            self.err = True
+            self._err_msg.append('missing label KIVE_OUTPUTS')
+        return inputs, outputs
 
     def _get_int_label(self, labname):
         """Return an integer value of a labelname.
@@ -167,7 +174,7 @@ class AppInfo:
     def get_helpstring(self):
         """Return the help string (which can be on multiple lines) as a single string"""
         if self.err or self.helpstr is None:
-            return None
+            return ''
         return "\n".join(self.helpstr)
 
     def get_runstring(self):
@@ -193,14 +200,15 @@ def parse_string(instr):
     If no appinfo instances can be determined from the deffile, an empty list is returned.
     """
     appdct = {}
+    default_app_name = ''
     for chunk in chunk_string(instr):
         hed_info = chunk[0].split()
         got_kw = hed_info[0]
-        appname = hed_info[1] if len(hed_info) > 1 else 'main'
+        appname = hed_info[1] if len(hed_info) > 1 else default_app_name
         if got_kw in _MY_KW_SET:
-            if appname in appdct:
-                my_app = appdct[appname]
-            else:
+            my_app = appdct.get(appname)
+            if my_app is None:
                 my_app = appdct[appname] = AppInfo(appname)
             _SETTER_FUNK_DCT[got_kw](my_app, chunk[1:])
-    return [a.as_dict() for a in appdct.values()]
+    appdct.setdefault(default_app_name, AppInfo(default_app_name))
+    return [a.as_dict() for name, a in sorted(appdct.items())]

@@ -148,7 +148,6 @@ class Command(BaseCommand):
                         user=run.user,
                         start_time=run.start_time,
                         end_time=run.end_time,
-                        submit_time=run.time_queued,
                         priority=run.priority,
                         return_code=return_code,
                         stopped_by=run.stopped_by)
@@ -168,6 +167,7 @@ class Command(BaseCommand):
                                                       dataset=dataset)
                     self.convert_logs(run, container_run)
                     container_run.set_md5()
+                    container_run.submit_time = run.time_queued
                     container_run.save()
                     if run.description:
                         run.description += '\n'
