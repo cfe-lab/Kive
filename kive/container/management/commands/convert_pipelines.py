@@ -312,7 +312,8 @@ class Command(BaseCommand):
         return container
 
     def build_pipeline_config(self, pipeline):
-        max_memory = max_threads = 1
+        max_memory = 200
+        max_threads = 1
         pipeline_config = dict(inputs=[],
                                steps=[],
                                outputs=[])
