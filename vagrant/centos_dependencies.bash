@@ -126,8 +126,8 @@ chmod g-r,o-r /etc/sysconfig/httpd
 sed -e 's/Listen 80$/Listen 8080/' \
     -e 's/User apache$/User kive/' \
     -e 's/Group apache$/Group kive/' \
-    -e 's#ErrorLog "logs/error_log"#ErrorLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/error_log.%Y-%m-%d-%H_%M_%S 15M"#' \
-    -e 's#CustomLog "logs/access_log" combined#CustomLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/access_log.%Y-%m-%d-%H_%M_%S 15M" combined#' \
+    -e 's#ErrorLog "logs/error_log"#ErrorLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/error_log.%Y-%m-%d-%H%M%S 15M"#' \
+    -e 's#CustomLog "logs/access_log" combined#CustomLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/access_log.%Y-%m-%d-%H%M%S 15M" combined#' \
     -i /etc/httpd/conf/httpd.conf
 systemctl enable httpd
 systemctl start httpd

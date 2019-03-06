@@ -620,7 +620,7 @@ Apache logging requires some extra configuration to let the log files roll over
 safely. Kive errors will get written to standard error, which is handled by
 Apache's [`ErrorLog` configuration] in `/etc/httpd/conf/httpd.conf`. That can
 be configured to use [piped logs], and piped through the
-[`rotate logs` program]. You should probably also configure the access log to
+[`rotatelogs` program]. You should probably also configure the access log to
 roll over. It uses the `CustomLog` entry.
 
 See the Vagrant scripts for some examples of how to configure Kive.

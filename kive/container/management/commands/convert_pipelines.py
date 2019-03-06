@@ -135,8 +135,9 @@ class Command(BaseCommand):
                     container_batch = self.find_or_create_batch(batch)
                     # noinspection PyProtectedMember
                     state = CONVERTED_STATES[run._runstate_id]
-                    return_codes = [step.execrecord.generator.methodoutput.return_code
-                                    for step in run.runsteps.all()]
+                    return_codes = [
+                        step.execrecord.generator.methodoutput.return_code
+                        for step in run.runsteps.filter(execrecord__isnull=False)]
                     bad_return_codes = filter(None, return_codes)
                     return_code = bad_return_codes and bad_return_codes[-1] or 0
                     container_run = ContainerRun.objects.create(
@@ -159,6 +160,8 @@ class Command(BaseCommand):
                         container_run.datasets.create(argument=argument,
                                                       dataset=run_input.dataset)
                     for run_output in run.runoutputcables.all():
+                        if run_output.execrecord is None:
+                            continue
                         output_index = run_output.pipelineoutputcable.output_idx
                         dataset = run_output.execrecord.execrecordouts.get().dataset
                         argument = app.arguments.get(position=output_index,
@@ -183,6 +186,8 @@ class Command(BaseCommand):
             stdout_path = os.path.join(work_path, 'stdout.txt')
             stderr_path = os.path.join(work_path, 'stderr.txt')
             for step in run.runsteps_in_order:
+                if step.execrecord is None:
+                    continue
                 method_output = step.execrecord.generator.methodoutput
                 for log, log_path in ((method_output.output_log,
                                        stdout_path),
@@ -227,6 +232,8 @@ class Command(BaseCommand):
                     pipeline_run_count))
 
     def find_or_create_batch(self, run_batch):
+        if run_batch is None:
+            return None
         container_batch_id = find_target_id(run_batch.description,
                                             get_converted_batch_marker)
         if container_batch_id is not None:

@@ -41,7 +41,8 @@ See the vagrant scripts for examples of how to start a production server.
 Once you have set up your production server, this is how to deploy a new release:
 
 1. Make sure the code works in your development environment. Run all the
-    Javascript tests and all the Django unit tests.
+    Javascript tests and all the Django unit tests, or check that they ran
+    successfully in the latest TravisCI build.
     
     cd /path/to/git/Kive
     npm run test:travis
@@ -75,7 +76,13 @@ Once you have set up your production server, this is how to deploy a new release
         ssh user@server
         ps aux|grep runfleet
         sudo kill -int <pid for runfleet>
-        
+
+5. Stop the web server and scheduled jobs.
+
+        sudo systemctl stop httpd
+        sudo systemctl stop kive_purge.timer
+        sudo systemctl stop kive_purge_synch.timer
+
 5. (Optional, but skip at your own peril!) Make a complete backup of the Kive installation.
     We use a tool called barman to backup PostgreSQL.
         
@@ -119,6 +126,13 @@ Once you have set up your production server, this is how to deploy a new release
 7. Check if you need to set any new environment variables by running
     `diff kive/settings_default.py kive/settings.py`. Then copy
     `settings_default.py` over `settings.py`.
+
+7. Upgrade dependencies if `requirements.txt` has changed. This assumes that
+    you have activated a virtual environment.
+
+         ssh user@server
+         cd /usr/local/share/Kive
+         sudo /opt/venv_kive/bin/pip install -r requirements.txt
     
 8. Migrate the database as described in the Creating Database Tables section
     of INSTALL.md, and deploy the static files:
@@ -141,13 +155,11 @@ Once you have set up your production server, this is how to deploy a new release
         cd /usr/local/share/Kive/kive
         ./manage.py runfleet </dev/null &
         
-10. Restart apache:
+10. Start the web server and scheduled jobs.
 
-        sudo /usr/sbin/apachectl restart
-
-    On CentOS 7, use `systemctl`:
-
-        sudo systemctl restart httpd
+        sudo systemctl start httpd
+        sudo systemctl start kive_purge.timer
+        sudo systemctl start kive_purge_synch.timer
 
 11. Update the Kive API library if needed.
 
