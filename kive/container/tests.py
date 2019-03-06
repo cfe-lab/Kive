@@ -1097,11 +1097,11 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
             type=ContainerArgument.INPUT)
         input_dataset = self.test_run.datasets.get(
             argument=input_argument).dataset
-        app_url = rest_reverse('containerapp-detail',
+        app_url = rest_reverse(str('containerapp-detail'),
                                kwargs=dict(pk=self.test_run.app_id))
-        arg_url = rest_reverse('containerargument-detail',
+        arg_url = rest_reverse(str('containerargument-detail'),
                                kwargs=dict(pk=input_argument.id))
-        dataset_url = rest_reverse('dataset-detail',
+        dataset_url = rest_reverse(str('dataset-detail'),
                                    kwargs=dict(pk=input_dataset.pk))
         request2 = self.factory.post(
             self.list_path,
@@ -1137,7 +1137,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
             type=ContainerArgument.INPUT)
         input_dataset = self.test_run.datasets.get(
             argument=input_argument).dataset
-        app_url = rest_reverse('containerapp-detail',
+        app_url = rest_reverse(str('containerapp-detail'),
                                kwargs=dict(pk=self.test_run.app_id))
         request2 = self.factory.post(
             self.list_path,
@@ -1480,11 +1480,66 @@ class ContainerRunTests(TestCase):
                                  name='greetings_123.csv',
                                  size='missing',
                                  type='Output',
-                                 url='/dataset_view/2')]
+                                 url='/dataset_view/{}'.format(dataset.id))]
         client = Client()
         client.force_login(run.user)
         response = client.get(reverse('container_run_detail',
                                       kwargs=dict(pk=run.pk)))
+
+        self.assertEqual('Complete', response.context['state_name'])
+        self.assertListEqual(expected_entries, response.context['data_entries'])
+
+    def test_rerun_failed_run(self):
+        run = ContainerRun.objects.get(id=1)
+        run.state = ContainerRun.FAILED
+        run.end_time = make_aware(datetime(2000, 1, 1), utc)
+        run.set_md5()
+        run.save()
+
+        rerun = ContainerRun.objects.create(
+            user=run.user,
+            app=run.app,
+            batch=run.batch,
+            name=run.get_rerun_name(),
+            description=run.description,
+            priority=run.priority,
+            end_time=make_aware(datetime(2000, 1, 2), utc),
+            original_run=run)
+
+        rerun.create_inputs_from_original_run()
+
+        dataset = Dataset.objects.create(
+            user=rerun.user,
+            name='greetings_123.csv',
+            date_created=make_aware(datetime(2000, 1, 1), utc))
+        argument = rerun.app.arguments.get(name='greetings_csv')
+        rerun.datasets.create(argument=argument, dataset=dataset)
+        log = rerun.logs.create(short_text='Job completed.', type=ContainerLog.STDERR)
+        rerun.set_md5()
+        rerun.state = ContainerRun.COMPLETE
+        rerun.save()
+        expected_entries = [dict(created=make_aware(datetime(2000, 1, 1), utc),
+                                 is_changed='no',
+                                 name='names.csv',
+                                 size='30\xa0bytes',
+                                 type='Input',
+                                 url='/dataset_view/1'),
+                            dict(created=make_aware(datetime(2000, 1, 2), utc),
+                                 name='stderr',
+                                 size='14\xa0bytes',
+                                 type='Log',
+                                 url='/container_logs/{}/'.format(log.id)),
+                            dict(created=make_aware(datetime(2000, 1, 1), utc),
+                                 is_changed='YES',
+                                 name='greetings_123.csv',
+                                 size='missing',
+                                 type='Output',
+                                 url='/dataset_view/{}'.format(dataset.id))]
+        client = Client()
+        client.force_login(rerun.user)
+
+        response = client.get(reverse('container_run_detail',
+                                      kwargs=dict(pk=rerun.pk)))
 
         self.assertEqual('Complete', response.context['state_name'])
         self.assertListEqual(expected_entries, response.context['data_entries'])
@@ -1532,7 +1587,7 @@ class ContainerRunTests(TestCase):
         self.assertNotIn('KIVE_LOG', check_output_kwargs['env'])
 
     @patch('container.models.check_output')
-    def test(self, mock_check_output):
+    def test_launch_with_dependencies(self, mock_check_output):
         mock_check_output.side_effect = ['42\n', '43\n']
         expected_source_slurm_job_id = 42
         expected_main_slurm_job_id = 43
@@ -1685,11 +1740,11 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request1, user=self.kive_user)
         start_count = len(self.list_view(request1).data)
 
-        app_url = rest_reverse('containerapp-detail',
+        app_url = rest_reverse(str('containerapp-detail'),
                                kwargs=dict(pk=self.test_app.pk))
-        arg_url = rest_reverse('containerargument-detail',
+        arg_url = rest_reverse(str('containerargument-detail'),
                                kwargs=dict(pk=self.test_arg.pk))
-        dataset_url = rest_reverse('dataset-detail',
+        dataset_url = rest_reverse(str('dataset-detail'),
                                    kwargs=dict(pk=self.dataset.pk))
         request2 = self.factory.post(
             self.list_path,

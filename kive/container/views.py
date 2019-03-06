@@ -21,7 +21,7 @@ import rest_framework.reverse
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument, ContainerLog, Batch
+    ContainerRun, ContainerArgument, ContainerLog, Batch, ContainerDataset
 from portal.views import developer_check, AdminViewMixin
 
 dev_decorators = [login_required, user_passes_test(developer_check)]
@@ -249,14 +249,16 @@ class ContainerInputList(TemplateView, AdminViewMixin):
             raise Http404("ID {} is not accessible".format(app_id))
         context = super(ContainerInputList, self).get_context_data(**kwargs)
         context['app'] = app
-        context['app_url'] = rest_framework.reverse.reverse('containerapp-detail',
-                                                            kwargs=dict(pk=app.pk),
-                                                            request=self.request)
+        context['app_url'] = rest_framework.reverse.reverse(
+            str('containerapp-detail'),
+            kwargs=dict(pk=app.pk),
+            request=self.request)
         context['batch_form'] = BatchForm()
         context['inputs'] = [
-            dict(name=arg.name, url=rest_framework.reverse.reverse('containerargument-detail',
-                                                                   kwargs=dict(pk=arg.pk),
-                                                                   request=self.request))
+            dict(name=arg.name, url=rest_framework.reverse.reverse(
+                str('containerargument-detail'),
+                kwargs=dict(pk=arg.pk),
+                request=self.request))
             for arg in app.arguments.filter(
                 type=ContainerArgument.INPUT).order_by('position')]
         context['priolist'] = [t[0] for t in settings.SLURM_QUEUES]
@@ -301,10 +303,15 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
                               size=run_dataset.dataset.get_formatted_filesize(),
                               created=run_dataset.dataset.date_created)
             if self.object.original_run:
-                original_container_dataset = self.object.original_run.datasets.get(
-                    argument=run_dataset.argument)
-                original_dataset = original_container_dataset.dataset
-                original_md5 = original_dataset.MD5_checksum
+                # noinspection PyUnresolvedReferences
+                try:
+                    original_container_dataset = self.object.original_run.datasets.get(
+                        argument=run_dataset.argument)
+                except ContainerDataset.DoesNotExist:
+                    original_md5 = None
+                else:
+                    original_dataset = original_container_dataset.dataset
+                    original_md5 = original_dataset.MD5_checksum
                 is_changed = original_md5 == run_dataset.dataset.MD5_checksum
                 data_entry['is_changed'] = 'no' if is_changed else 'YES'
             data_entries.append(data_entry)
