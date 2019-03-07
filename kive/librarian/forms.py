@@ -355,7 +355,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
         """
         # First try to unzip the archive
         try:
-            archive = ZipFile(self.cleaned_data["dataset_file"])
+            archive = ZipFile(self.cleaned_data["dataset_file"], allowZip64=True)
 
             def get_filestream(filename):
                 f = archive.open(filename)

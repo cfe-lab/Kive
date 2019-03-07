@@ -300,7 +300,7 @@ class Container(AccessControl):
             if self.file_type == Container.ZIP:
                 try:
                     with use_field_file(self.file):
-                        with ZipFile(self.file):
+                        with ZipFile(self.file, allowZip64=True):
                             pass
                 except BadZipfile:
                     raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
@@ -604,7 +604,7 @@ class ZipHandler(object):
 
     def __init__(self, fileobj=None, mode='r', archive=None):
         if archive is None:
-            archive = ZipFile(fileobj, mode)
+            archive = ZipFile(fileobj, mode, allowZip64=True)
         self.archive = archive
 
     def close(self):

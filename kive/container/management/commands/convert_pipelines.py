@@ -257,7 +257,7 @@ class Command(BaseCommand):
         with NamedTemporaryFile(prefix=base_name, suffix='.zip') as f:
             parent_containers = set()
             copied_paths = set()
-            with ZipFile(f, 'w', ZIP_DEFLATED) as z:
+            with ZipFile(f, 'w', ZIP_DEFLATED, allowZip64=True) as z:
                 for step in pipeline.steps.all():
                     method = step.transformation.definite
                     if method.container is None and method.docker_image is not None:
