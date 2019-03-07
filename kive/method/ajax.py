@@ -5,13 +5,13 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import APIException
 
+from file_access_utils import build_download_response
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet, CleanCreateModelMixin, \
     StandardPagination, SearchableModelMixin
 from method.models import CodeResourceRevision, Method, MethodFamily, CodeResource, DockerImage
 from method.serializers import MethodSerializer, MethodFamilySerializer, \
     CodeResourceSerializer, CodeResourceRevisionSerializer, DockerImageSerializer
 from metadata.models import AccessControl
-from archive.views import build_download_response
 from portal.views import admin_check
 
 

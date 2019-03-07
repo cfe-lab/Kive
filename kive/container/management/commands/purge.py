@@ -277,9 +277,14 @@ class Command(BaseCommand):
                     raise
                 file_size = 0
                 row_date = row.extra__date
+                if isinstance(f, FieldFile):
+                    file_name = f.name
+                else:
+                    file_name = f
+                setattr(row, file_field, '')
                 logger.warn('Missing %s file %r from %s.',
                             model_name,
-                            str(f.name),
+                            str(file_name),
                             naturaltime(row_date))
                 if min_missing_date is None or row_date < min_missing_date:
                     min_missing_date = row_date
@@ -310,7 +315,7 @@ class Command(BaseCommand):
         full_path = os.path.join(settings.MEDIA_ROOT, folder_path)
         size_accumulator = 0
         sandbox_files = (os.path.join(root, file_name)
-                         for root, _, files in os.walk(full_path)
+                         for root, _, files in os.walk(full_path, onerror=raise_error)
                          for file_name in files)
         for file_path in sandbox_files:
             size_accumulator += os.path.getsize(file_path)
@@ -389,3 +394,7 @@ class Command(BaseCommand):
             files_removed += 1
             bytes_removed += file_size
         return files_removed, bytes_removed
+
+
+def raise_error(ex):
+    raise ex

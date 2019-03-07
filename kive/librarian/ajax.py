@@ -6,13 +6,13 @@ from django.db.models import Q
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 
-from rest_framework import permissions, status
+from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from librarian.views import build_download_response
+from file_access_utils import build_download_response
 from librarian.serializers import DatasetSerializer, ExternalFileDirectorySerializer,\
     ExternalFileDirectoryListFilesSerializer
 
@@ -179,8 +179,4 @@ class DatasetViewSet(RemovableModelViewSet,
         """
         dataset = self.get_object()
 
-        data_handle = dataset.get_open_file_handle()
-        if data_handle is None:
-            return Response(None, status=status.HTTP_404_NOT_FOUND)
-        with data_handle as dh:
-            return build_download_response(dh)
+        return build_download_response(dataset.dataset_file)

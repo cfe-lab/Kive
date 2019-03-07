@@ -2,10 +2,7 @@
 librarian views
 """
 
-from six.moves.urllib.parse import unquote
 import logging
-import mimetypes
-import os
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
@@ -14,28 +11,17 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
-from wsgiref.util import FileWrapper
 from django.conf import settings
 from django.utils.encoding import DjangoUnicodeDecodeError
 
+from file_access_utils import build_download_response
 from librarian.forms import DatasetDetailsForm, BulkAddDatasetForm, BulkDatasetUpdateForm,\
     ArchiveAddDatasetForm
-from archive.models import RunInput
 from librarian.models import Dataset
 from portal.views import admin_check
-# from metadata.models import CompoundDatatype
 import librarian.models
 
 LOGGER = logging.getLogger(__name__)
-
-
-def build_download_response(source_file):
-    file_chunker = FileWrapper(source_file)  # Stream file in chunks to avoid overloading memory.
-    mimetype = mimetypes.guess_type(source_file.name)[0]
-    response = HttpResponse(file_chunker, content_type=mimetype)
-    response['Content-Length'] = source_file.size
-    response['Content-Disposition'] = 'attachment; filename="{}"'.format(os.path.basename(source_file.name))
-    return response
 
 
 def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
@@ -65,12 +51,7 @@ def dataset_download(request, dataset_id):
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
-    data_handle = dataset.get_open_file_handle('r')
-    if data_handle is None:
-        raise Http404("ID {} cannot be accessed (file access)".format(dataset_id))
-    else:
-        with data_handle:
-            return build_download_response(data_handle)
+    return build_download_response(dataset.dataset_file)
 
 
 @login_required

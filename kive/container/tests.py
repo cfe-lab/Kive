@@ -2949,6 +2949,22 @@ class PurgeTests(TestCase):
         self.assertTrue(os.path.exists(run2_path))
         self.assertEqual(200, run1.sandbox_size)
 
+    def test_purge_missing_folder(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+        run1_path = run1.full_sandbox_path
+        shutil.rmtree(run1_path)
+        expected_log_message = 'Missing 1 containerrun file from 20 minutes ago.\n'
+
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertEqual(expected_log_message, log_messages)
+        self.assertEqual('', run1.sandbox_path)
+
     def test_purge_start(self):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
@@ -3148,6 +3164,7 @@ Purged 1 dataset containing 200 bytes from a minute ago.
     def test_missing_dataset_file(self):
         run = self.create_sandbox(size=100, age=timedelta(minutes=1))
         run.delete_sandbox()
+        run.save()
         dataset = Dataset.objects.create(
             user=run.user,
             dataset_file='Datasets/2019_02/does_not_exist.txt',
@@ -3164,11 +3181,14 @@ Missing 1 dataset file from a minute ago.
             purge.Command().handle()
             log_messages = mocked_stderr.getvalue()
 
+        dataset.refresh_from_db()
         self.assertLogStreamEqual(expected_messages, log_messages)
+        self.assertEqual('', dataset.dataset_file)
 
     def test_multiple_dataset_files_missing(self):
         run1 = self.create_sandbox(size=100, age=timedelta(minutes=1))
         run1.delete_sandbox()
+        run1.save()
         dataset = Dataset.objects.create(
             user=run1.user,
             dataset_file='Datasets/2019_02/does_not_exist.txt',
@@ -3178,6 +3198,7 @@ Missing 1 dataset file from a minute ago.
                              dataset=dataset)
         run2 = self.create_sandbox(size=100, age=timedelta(minutes=1))
         run2.delete_sandbox()
+        run2.save()
         dataset = Dataset.objects.create(
             user=run2.user,
             dataset_file='Datasets/2019_02/also_gone.txt',
@@ -3195,7 +3216,7 @@ Missing 2 dataset files from 5 minutes ago to a minute ago.
 
         self.assertLogStreamEqual(expected_messages, log_messages)
 
-    def test(self):
+    def test_purge_missing_log(self):
         run = self.create_sandbox(size=100, age=timedelta(minutes=1))
         self.create_outputs(run, output_size=200, age=timedelta(minutes=1))
         stdout_log = run.logs.get(type=ContainerLog.STDOUT)

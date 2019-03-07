@@ -8,8 +8,9 @@ from django.core.urlresolvers import reverse
 from django.http import Http404
 
 from archive.models import MethodOutput
+from file_access_utils import build_download_response
 from librarian.models import Dataset
-from librarian.views import build_download_response, _build_raw_viewer
+from librarian.views import _build_raw_viewer
 
 LOGGER = logging.getLogger(__name__)
 

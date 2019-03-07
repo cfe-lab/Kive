@@ -7,6 +7,7 @@ import errno
 import grp
 import hashlib
 import logging
+import mimetypes
 import os
 import random
 import shutil
@@ -14,12 +15,11 @@ import stat
 import time
 import io
 from contextlib import contextmanager
-from operator import itemgetter
 
 from django.conf import settings
+from django.http import FileResponse
 from django.utils import timezone
 import django.utils.six as dsix
-from django.db import transaction
 
 
 from constants import dirnames
@@ -150,6 +150,19 @@ def set_up_directory(directory_to_use, tolerate=False):
                         path == os.path.join(directory_to_use, dirnames.LOG_DIR)):
                     continue
             raise ValueError("Directory \"{}\" nonempty; contains file {}".format(directory_to_use, path))
+
+
+def build_download_response(field_file):
+    # Intentionally leave this open for streaming response.
+    # FileResponse will close it when streaming finishes.
+    field_file.open('rb')
+
+    mimetype = mimetypes.guess_type(field_file.name)[0]
+    response = FileResponse(field_file, content_type=mimetype)
+    response['Content-Length'] = field_file.size
+    response['Content-Disposition'] = 'attachment; filename="{}"'.format(
+        os.path.basename(field_file.name))
+    return response
 
 
 def compute_md5(file_to_checksum, chunk_size=1024*64):

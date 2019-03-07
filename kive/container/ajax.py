@@ -1,4 +1,3 @@
-import mimetypes
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta
@@ -24,7 +23,7 @@ from container.serializers import ContainerFamilySerializer, \
     ContainerSerializer, ContainerAppSerializer, \
     ContainerFamilyChoiceSerializer, ContainerRunSerializer, BatchSerializer, \
     ContainerArgumentSerializer, ContainerDatasetSerializer, ContainerLogSerializer
-from file_access_utils import use_field_file
+from file_access_utils import use_field_file, build_download_response
 from kive.ajax import CleanCreateModelMixin, RemovableModelViewSet, \
     SearchableModelMixin, IsDeveloperOrGrantedReadOnly, StandardPagination, \
     IsGrantedReadCreate, GrantedModelMixin, IsGrantedReadOnly
@@ -229,19 +228,7 @@ class ContainerViewSet(CleanCreateModelMixin,
     @action(detail=True)
     def download(self, request, pk=None):
         container = self.get_object()
-        container.file.open()
-        try:
-            # Stream file in chunks to avoid overloading memory.
-            file_chunker = FileWrapper(container.file)
-
-            mimetype = mimetypes.guess_type(container.file.name)[0]
-            response = HttpResponse(file_chunker, content_type=mimetype)
-            response['Content-Length'] = container.file.size
-            response['Content-Disposition'] = 'attachment; filename="{}"'.format(
-                os.path.basename(container.file.name))
-        finally:
-            container.file.close()
-        return response
+        return build_download_response(container.file)
 
     # noinspection PyUnusedLocal
     @action(detail=True, suffix='Apps')
@@ -428,17 +415,21 @@ class ContainerRunPermission(permissions.BasePermission):
     administrators or their owner.
     """
     def has_permission(self, request, view):
+        # noinspection PyUnresolvedReferences
         return (request.method in permissions.SAFE_METHODS or
                 request.method == "POST" or
                 request.method == "PATCH" or
                 admin_check(request.user))
 
     def has_object_permission(self, request, view, obj):
+        # noinspection PyUnresolvedReferences
         if admin_check(request.user):
             return True
+        # noinspection PyUnresolvedReferences
         if not obj.can_be_accessed(request.user):
             return False
         if request.method == "PATCH":
+            # noinspection PyUnresolvedReferences
             return obj.user == request.user
         return request.method in permissions.SAFE_METHODS
 
