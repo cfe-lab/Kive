@@ -342,7 +342,8 @@ class DatasetViewMockTests(ViewMockTestCase):
                                            kwargs=dict(dataset_id='99')))
 
         self.assertEqual(200, response.status_code)
-        self.assertEqual(self.file_content, response.content)
+        content_chunks = list(response.streaming_content)
+        self.assertEqual([self.file_content], content_chunks)
         # under python3 serialize_headers returns bytes, not strings
         header_bytes = response.serialize_headers()
         header_str = header_bytes.decode()
