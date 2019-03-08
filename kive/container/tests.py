@@ -2965,6 +2965,24 @@ class PurgeTests(TestCase):
         self.assertEqual(expected_log_message, log_messages)
         self.assertEqual('', run1.sandbox_path)
 
+    def test_purge_broken_link(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
+        run1_path = run1.full_sandbox_path
+        link_path = os.path.join(run1_path, 'broken_link.txt')
+        source_path = os.path.join(run1_path, 'does_not_exist.txt')
+        os.symlink(source_path, link_path)
+        expected_log_message = ''
+
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(start=500, stop=500)
+            log_messages = mocked_stderr.getvalue()
+
+        run1.refresh_from_db()
+        run2.refresh_from_db()
+        self.assertEqual(expected_log_message, log_messages)
+        self.assertEqual('', run1.sandbox_path)
+
     def test_purge_start(self):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)

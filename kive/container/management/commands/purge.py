@@ -277,10 +277,7 @@ class Command(BaseCommand):
                     raise
                 file_size = 0
                 row_date = row.extra__date
-                if isinstance(f, FieldFile):
-                    file_name = f.name
-                else:
-                    file_name = f
+                file_name = os.path.relpath(ex.filename, settings.MEDIA_ROOT)
                 setattr(row, file_field, '')
                 logger.warn('Missing %s file %r from %s.',
                             model_name,
@@ -318,7 +315,8 @@ class Command(BaseCommand):
                          for root, _, files in os.walk(full_path, onerror=raise_error)
                          for file_name in files)
         for file_path in sandbox_files:
-            size_accumulator += os.path.getsize(file_path)
+            if not os.path.islink(file_path):
+                size_accumulator += os.path.getsize(file_path)
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
     def summarize_storage(self,
