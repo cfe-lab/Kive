@@ -308,16 +308,47 @@ class Command(BaseCommand):
             **{file_field: None}).aggregate(  # Not used.
             models.Sum(size_field))[size_field + "__sum"] or 0
 
-    def scan_folder_size(self, folder_path):
+    def scan_folder_size(self, folder_path, newest_allowed=None):
+        """ Scan the total size of all the files in and below a folder.
+
+        :param str folder_path: the folder to scan, relative to MEDIA_ROOT.
+        :param datetime newest_allowed: if there are any files newer than this,
+            return None.
+        :return: the total size if all of the files are old enough or
+            newest_allowed is None, otherwise return None.
+        """
         full_path = os.path.join(settings.MEDIA_ROOT, folder_path)
         size_accumulator = 0
         sandbox_files = (os.path.join(root, file_name)
                          for root, _, files in os.walk(full_path, onerror=raise_error)
                          for file_name in files)
         for file_path in sandbox_files:
-            if not os.path.islink(file_path):
-                size_accumulator += os.path.getsize(file_path)
+            file_size = self.get_file_size(file_path, newest_allowed)
+            if file_size is None:
+                return  # File was too new.
+            size_accumulator += file_size
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
+
+    def get_file_size(self, file_path, newest_allowed=None):
+        """ Get the size of a file, if it's not too new.
+
+        :param str file_path: the absolute path of the file to check
+        :param datetime newest_allowed: if the file is newer than this,
+            return None.
+        :return: the file size if it's old enough or newest_allowed is None,
+            otherwise return None.
+        """
+        if os.path.islink(file_path):
+            file_stat = os.lstat(file_path)
+        else:
+            file_stat = os.stat(file_path)
+        if newest_allowed is not None:
+            modification_time = datetime.fromtimestamp(
+                file_stat.st_mtime,
+                timezone.get_current_timezone())
+            if modification_time > newest_allowed:
+                return
+        return file_stat.st_size
 
     def summarize_storage(self,
                           container_total,
@@ -369,21 +400,15 @@ class Command(BaseCommand):
         bytes_removed = files_removed = 0
         for file_name in sorted(unknown_file_names):
             file_path = os.path.join(settings.MEDIA_ROOT, file_name)
-            file_stat = os.stat(file_path)
-            modification_time = datetime.fromtimestamp(
-                file_stat.st_mtime,
-                timezone.get_current_timezone())
-            if modification_time > remove_older_than:
-                continue
             if os.path.isdir(file_path):
-                file_size = 0
-                for child_path, _, content_names in os.walk(file_path):
-                    for content_name in content_names:
-                        content_path = os.path.join(child_path, content_name)
-                        file_size += os.stat(content_path).st_size
+                file_size = self.scan_folder_size(file_path, remove_older_than)
+                if file_size is None:
+                    continue  # Found some new files in there.
                 shutil.rmtree(file_path)
             else:
-                file_size = file_stat.st_size
+                file_size = self.get_file_size(file_path, remove_older_than)
+                if file_size is None:
+                    continue  # File was too new.
                 os.remove(file_path)
             logger.warning(
                 'Purged unregistered file %r containing %s.',

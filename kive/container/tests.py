@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from io import BytesIO
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
+from time import time
 from zipfile import ZipFile
 from filecmp import cmp
 
@@ -2983,6 +2984,23 @@ class PurgeTests(TestCase):
         self.assertEqual(expected_log_message, log_messages)
         self.assertEqual('', run1.sandbox_path)
 
+    def test_synch_broken_link(self):
+        run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
+        run1_path = run1.full_sandbox_path
+        link_path = os.path.join(run1_path, 'broken_link.txt')
+        source_path = '../does_not_exist.txt'  # Symbolic link contains 21 bytes.
+        os.symlink(source_path, link_path)
+        run1.sandbox_path = ''  # Abandon the sandbox to get cleaned up by synch.
+        run1.save()
+        expected_log_message = 'Purged 1 unregistered container run file ' \
+                               'containing 221 bytes.\n'
+
+        with self.capture_log_stream(logging.ERROR) as mocked_stderr:
+            purge.Command().handle(synch=True)
+            log_messages = mocked_stderr.getvalue()
+
+        self.assertEqual(expected_log_message, log_messages)
+
     def test_purge_start(self):
         run1 = self.create_sandbox(age=timedelta(minutes=20), size=200)
         run2 = self.create_sandbox(age=timedelta(minutes=10), size=400)
@@ -3030,20 +3048,44 @@ class PurgeTests(TestCase):
 
         self.assertFalse(os.path.exists(left_overs_path))
 
-    def test_unregistered_too_new(self):
-        folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'left_overs')
-        os.mkdir(folder_path)
-        with open(os.path.join(folder_path, 'contents.txt'), 'wb') as f:
-            f.write(b'.' * 100)
+    def test_unregistered_by_age(self):
+        too_new_time = time() - 20
+        old_enough_time = time() - 40
 
-        file_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'extras.txt')
-        with open(file_path, 'wb') as f:
+        new_folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'new_left_overs')
+        os.mkdir(new_folder_path)
+        child1_path = os.path.join(new_folder_path, 'contents1.txt')
+        with open(child1_path, 'wb') as f:
             f.write(b'.' * 100)
+        os.utime(child1_path, (old_enough_time, old_enough_time))
+        child2_path = os.path.join(new_folder_path, 'contents2.txt')
+        with open(child2_path, 'wb') as f:
+            f.write(b'.' * 100)
+        os.utime(child2_path, (too_new_time, too_new_time))
+
+        old_folder_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'old_left_overs')
+        os.mkdir(old_folder_path)
+        child3_path = os.path.join(old_folder_path, 'contents3.txt')
+        with open(child3_path, 'wb') as f:
+            f.write(b'.' * 100)
+        os.utime(child3_path, (old_enough_time, old_enough_time))
+
+        new_file_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'new_extras.txt')
+        with open(new_file_path, 'wb') as f:
+            f.write(b'.' * 100)
+        os.utime(new_file_path, (too_new_time, too_new_time))
+
+        old_file_path = os.path.join(ContainerRun.SANDBOX_ROOT, 'old_extras.txt')
+        with open(old_file_path, 'wb') as f:
+            f.write(b'.' * 100)
+        os.utime(old_file_path, (old_enough_time, old_enough_time))
 
         purge.Command().handle(wait=timedelta(seconds=30), synch=True)
 
-        self.assertTrue(os.path.exists(folder_path))
-        self.assertTrue(os.path.exists(file_path))
+        self.assertTrue(os.path.exists(new_folder_path))
+        self.assertTrue(os.path.exists(new_file_path))
+        self.assertFalse(os.path.exists(old_folder_path))
+        self.assertFalse(os.path.exists(old_file_path))
 
     @contextmanager
     def capture_log_stream(self, log_level):
