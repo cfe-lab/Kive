@@ -6,20 +6,21 @@ set -e
 cd /root
 
 echo ========== Installing PostgreSQL ==========
-yum install -q -y postgresql-server postgresql-contrib
-postgresql-setup initdb
+sudo rpm -Uvh https://yum.postgresql.org/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm
+yum install -q -y postgresql10-server postgresql10-contrib
+/usr/pgsql-10/bin/postgresql-10-setup initdb
 
 # Order matters for access rules.
 sudo sed -i '0,/^local/s/^local/local all kive      peer map=vagrantkive\n&/' \
-    /var/lib/pgsql/data/pg_hba.conf
+    /var/lib/pgsql/10/data/pg_hba.conf
 
 echo "
 # MAPNAME       SYSTEM-USERNAME         PG-USERNAME
 vagrantkive     vagrant                 kive
 vagrantkive     kive                    kive
-" >> /var/lib/pgsql/data/pg_ident.conf
-systemctl enable postgresql
-systemctl start postgresql
+" >> /var/lib/pgsql/10/data/pg_ident.conf
+systemctl enable postgresql-10
+systemctl start postgresql-10
 
 echo ========== Installing Singularity ==========
 yum groupinstall -q -y 'Development Tools'
