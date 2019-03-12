@@ -267,12 +267,19 @@ class Command(BaseCommand):
             os.makedirs(external_step_input_dir)
             os.makedirs(external_step_output_dir)
 
+            external_step_bin_dir = os.path.join(run.full_sandbox_path, "step{}".format(idx), "bin")
+            dependency_filter = DependencyFilter(extracted_archive_dir, step)
+            shutil.copytree(extracted_archive_dir,
+                            external_step_bin_dir,
+                            symlinks=True,
+                            ignore=dependency_filter.ignore)
+
             # Each step is a dictionary with fields:
             # - driver (the executable)
             # - inputs (a list of (step_num, dataset_name) pairs)
             # - outputs (a list of dataset_names)
             executable = os.path.join(internal_binary_dir, step["driver"])
-            driver_external_path = os.path.join(extracted_archive_dir,
+            driver_external_path = os.path.join(external_step_bin_dir,
                                                 step["driver"])
             os.chmod(driver_external_path, 0o777)
             input_paths = []
@@ -298,7 +305,7 @@ class Command(BaseCommand):
                 "exec",
                 "--contain",
                 "-B",
-                extracted_archive_dir + ':' + internal_binary_dir,
+                external_step_bin_dir + ':' + internal_binary_dir,
                 "-B",
                 external_step_input_dir + ':' + internal_inputs_dir,
                 "-B",
@@ -346,3 +353,34 @@ class Command(BaseCommand):
                 os.link(file_map[source_step][source_dataset_name], final_output_path)
 
         return final_return_code
+
+
+class DependencyFilter(object):
+    def __init__(self, archive_directory, step):
+        self.archive_directory = archive_directory
+        # The dependencies list is only used when converting old pipelines.
+        # New archive containers copy all bin files for every step, so the
+        # developer needs to fix any incompatibilities between steps.
+        dependency_list = step.get('dependencies')
+        if dependency_list is None:
+            self.to_copy = None
+        else:
+            self.to_copy = {os.path.normpath(dependency)
+                            for dependency in dependency_list}
+            self.to_copy.add(os.path.normpath(step['driver']))
+
+    def ignore(self, directory, entries):
+        to_ignore = set()
+        if self.to_copy is None:
+            # Copy everything, ignore nothing.
+            return to_ignore
+        rel_directory = os.path.relpath(directory, self.archive_directory)
+        for entry in entries:
+            abs_entry = os.path.join(directory, entry)
+            if os.path.isdir(abs_entry):
+                continue
+            rel_entry = os.path.join(rel_directory, entry)
+            rel_entry = os.path.normpath(rel_entry)
+            if rel_entry not in self.to_copy:
+                to_ignore.add(entry)
+        return to_ignore

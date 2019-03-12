@@ -333,8 +333,13 @@ class Command(BaseCommand):
                            source_step=cable.source_step)
                       for cable in step.cables_in.order_by('dest__dataset_idx')]
             output_names = [o.dataset_name for o in method.outputs.all()]
+            dependencies = []
+            for dependency in method.dependencies.all():
+                dependencies.append(os.path.join(dependency.path,
+                                                 dependency.get_filename()))
             step_config = dict(inputs=inputs,
                                driver=install_path,
+                               dependencies=dependencies,
                                outputs=output_names,
                                x=step.x,
                                y=step.y)

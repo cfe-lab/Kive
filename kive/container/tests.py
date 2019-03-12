@@ -1841,6 +1841,9 @@ class RunContainerTests(TestCase):
         for expected_message in expected_stderr:
             self.assertIn(expected_message, stderr_text)
 
+    def assert_files_match(self, file_path1, file_path2, shallow=True):
+        self.assertTrue(cmp(file_path1, file_path2, shallow))
+
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
         everyone = Group.objects.get(name='Everyone')
@@ -2005,11 +2008,16 @@ greeting
         input_names_csv = os.path.join(input_dir, "names_csv")
         self.assertTrue(os.path.isfile(input_names_csv))
 
+        step1_bin_dir = os.path.join(run.full_sandbox_path, "step1", "bin")
+        self.assertTrue(os.path.isdir(step1_bin_dir))
+        step1_script = os.path.join(step1_bin_dir, "greetings.py")
+        self.assertTrue(os.path.isfile(step1_script))
+
         step1_input_dir = os.path.join(run.full_sandbox_path, "step1", "input")
         self.assertTrue(os.path.isdir(step1_input_dir))
         step1_input_names_csv = os.path.join(step1_input_dir, "names_csv")
         self.assertTrue(os.path.isfile(step1_input_names_csv))
-        self.assertTrue(cmp(input_names_csv, step1_input_names_csv))
+        self.assert_files_match(input_names_csv, step1_input_names_csv)
 
         step1_output_dir = os.path.join(run.full_sandbox_path, "step1", "output")
         self.assertTrue(os.path.isdir(step1_output_dir))
@@ -2023,7 +2031,7 @@ greeting
         upload_dir = os.path.join(run.full_sandbox_path, "upload")
         final_greetings_csv = os.path.join(upload_dir, "greetings_{}.csv".format(run.pk))
         self.assertTrue(os.path.isfile(final_greetings_csv))
-        self.assertTrue(cmp(step1_output_greetings_csv, final_greetings_csv))
+        self.assert_files_match(step1_output_greetings_csv, final_greetings_csv)
 
     def test_run_archive_bad_md5(self):
         """Running an archive container with a bad MD5 should raise ValueError."""
@@ -2115,7 +2123,8 @@ x,y
                         inputs=[dict(dataset_name="pairs_csv",
                                      source_step=0,
                                      source_dataset_name="pairs_csv")],
-                        outputs=["sums_csv"]),
+                        outputs=["sums_csv"],
+                        dependencies=["scanner.py"]),
                    dict(driver="sum_summary.py",
                         inputs=[dict(dataset_name="sums_csv",
                                      source_step=1,
@@ -2126,7 +2135,7 @@ x,y
                           source_dataset_name="summary_csv")]))
         tar_data = BytesIO()
         with TarFile(fileobj=tar_data, mode='w') as t:
-            for script_name in ('sums_and_products.py', 'sum_summary.py'):
+            for script_name in ('sums_and_products.py', 'sum_summary.py', 'scanner.py'):
                 with open(os.path.join(self.source_path, script_name), 'rb') as f:
                     script_text = f.read()
                     script_text = b'#!/usr/bin/env python\n' + script_text
@@ -2182,6 +2191,31 @@ sum,product,bigger
         summary = output_dataset.dataset_file.read()
         self.assertEqual(expected_summary, summary)
 
+    def test_run_multistep_archive_bin_directories(self):
+        run = self._test_run_multistep_archive_helper()
+
+        call_command('runcontainer', str(run.id))
+
+        run.refresh_from_db()
+
+        # Step 1 defines dependencies, so unrelated script should not be there.
+        step1_bin_dir = os.path.join(run.full_sandbox_path, "step1", "bin")
+        self.assertTrue(os.path.isdir(step1_bin_dir))
+        step1_script = os.path.join(step1_bin_dir, "sums_and_products.py")
+        self.assertTrue(os.path.isfile(step1_script))
+        step1_helper = os.path.join(step1_bin_dir, "scanner.py")
+        self.assertTrue(os.path.isfile(step1_helper))
+        step1_unrelated = os.path.join(step1_bin_dir, "sum_summary.py")
+        self.assertFalse(os.path.isfile(step1_unrelated))
+
+        # Step 2 does not define dependencies, so all scripts should be there.
+        step2_bin_dir = os.path.join(run.full_sandbox_path, "step2", "bin")
+        self.assertTrue(os.path.isdir(step2_bin_dir))
+        step2_script = os.path.join(step2_bin_dir, "sum_summary.py")
+        self.assertTrue(os.path.isfile(step2_script))
+        step2_unrelated = os.path.join(step2_bin_dir, "sums_and_products.py")
+        self.assertTrue(os.path.isfile(step2_unrelated))
+
     def test_run_multistep_archive_input_output_directories(self):
         run = self._test_run_multistep_archive_helper()
         call_command('runcontainer', str(run.id))
@@ -2196,7 +2230,7 @@ sum,product,bigger
         self.assertTrue(os.path.isdir(step1_input_dir))
         step1_input_pairs_csv = os.path.join(step1_input_dir, "pairs_csv")
         self.assertTrue(os.path.isfile(step1_input_pairs_csv))
-        self.assertTrue(cmp(input_pairs_csv, step1_input_pairs_csv))
+        self.assert_files_match(input_pairs_csv, step1_input_pairs_csv)
 
         step1_output_dir = os.path.join(run.full_sandbox_path, "step1", "output")
         self.assertTrue(os.path.isdir(step1_output_dir))
@@ -2207,7 +2241,7 @@ sum,product,bigger
         self.assertTrue(os.path.isdir(step2_input_dir))
         step2_input_sums_csv = os.path.join(step2_input_dir, "sums_csv")
         self.assertTrue(os.path.isfile(step2_input_sums_csv))
-        self.assertTrue(cmp(step1_output_sums_csv, step2_input_sums_csv))
+        self.assert_files_match(step1_output_sums_csv, step2_input_sums_csv)
 
         step2_output_dir = os.path.join(run.full_sandbox_path, "step2", "output")
         self.assertTrue(os.path.isdir(step2_output_dir))
@@ -2221,7 +2255,7 @@ sum,product,bigger
         upload_dir = os.path.join(run.full_sandbox_path, "upload")
         final_summary_csv = os.path.join(upload_dir, "summary_{}.csv".format(run.pk))
         self.assertTrue(os.path.isfile(final_summary_csv))
-        self.assertTrue(cmp(step2_output_summary_csv, final_summary_csv))
+        self.assert_files_match(step2_output_summary_csv, final_summary_csv)
 
     def test_multiple_inputs_and_outputs_directories(self):
         names_text = """\
@@ -2361,8 +2395,9 @@ what up
         step2_input_regularized_salutations_csv = os.path.join(step2_input_dir, "regularized_salutations_csv")
         self.assertTrue(os.path.isfile(step2_input_names_csv))
         self.assertTrue(os.path.isfile(step2_input_regularized_salutations_csv))
-        self.assertTrue(cmp(input_names_csv, step2_input_names_csv))
-        self.assertTrue(cmp(step2_input_regularized_salutations_csv, step1_output_regularized_salutations_csv))
+        self.assert_files_match(input_names_csv, step2_input_names_csv)
+        self.assert_files_match(step2_input_regularized_salutations_csv,
+                                step1_output_regularized_salutations_csv)
 
         step2_output_dir = os.path.join(run.full_sandbox_path, "step2", "output")
         self.assertTrue(os.path.isdir(step2_output_dir))
@@ -2379,8 +2414,8 @@ what up
         step3_input_opposite_csv = os.path.join(step3_input_dir, "opposite_csv")
         self.assertTrue(os.path.isfile(step3_input_names_csv))
         self.assertTrue(os.path.isfile(step3_input_opposite_csv))
-        self.assertTrue(cmp(input_names_csv, step3_input_names_csv))
-        self.assertTrue(cmp(step3_input_opposite_csv, step1_output_opposite_csv))
+        self.assert_files_match(input_names_csv, step3_input_names_csv)
+        self.assert_files_match(step3_input_opposite_csv, step1_output_opposite_csv)
 
         step3_output_dir = os.path.join(run.full_sandbox_path, "step3", "output")
         self.assertTrue(os.path.isdir(step3_output_dir))
@@ -2398,14 +2433,16 @@ what up
         upload_dir = os.path.join(run.full_sandbox_path, "upload")
         final_formatted_salutations_csv = os.path.join(upload_dir, "salutation_and_name_{}.csv".format(run.pk))
         self.assertTrue(os.path.isfile(final_formatted_salutations_csv))
-        self.assertTrue(cmp(step2_output_formatted_salutations_csv, final_formatted_salutations_csv))
+        self.assert_files_match(step2_output_formatted_salutations_csv,
+                                final_formatted_salutations_csv)
 
         final_opposite_formatted_salutations = os.path.join(
             upload_dir,
             "opposite_salutation_and_name_{}.csv".format(run.pk)
         )
         self.assertTrue(os.path.isfile(final_opposite_formatted_salutations))
-        self.assertTrue(cmp(step3_output_opposite_formatted_salutations_csv, final_opposite_formatted_salutations))
+        self.assert_files_match(step3_output_opposite_formatted_salutations_csv,
+                                final_opposite_formatted_salutations)
 
     def test_mount_directories(self):
         """Test that the correct directories are mounted in the right places."""
