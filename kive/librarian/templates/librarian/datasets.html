@@ -30,7 +30,7 @@
             storedPage;
 
         if (pairs === null) {
-            table.filterSet.add('uploaded');
+            table.filterSet.add('uploaded', undefined, true);
             var yearsOffset = 0,
                 monthsOffset = -1;
             table.filterSet.addDate(
