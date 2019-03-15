@@ -339,11 +339,15 @@ var permissions = (function() {
     }
 
     function handleTableFail(request) {// called with bind(), apply(), or call()
+        var detail_msg = "Failed to reload table";
+        if (this.refine) {
+            detail_msg = "Refining search....";
+        }
         var response = request.responseJSON,
             detail = (
                 response ?
                     response.detail :
-                    "Failed to reload table");
+                    detail_msg);
         if (this.$tbody !== undefined) {
             this.$tbody.empty();
         }
@@ -352,11 +356,13 @@ var permissions = (function() {
     
     my.PermissionsTable.prototype.reloadTable = function(callback) {
         var permissions_table = this;
+        permissions_table.refine = false;
+
         if (permissions_table.ajax_request !== undefined) {
-            // already a reload in progress
-            return;
-            // permissions_table.ajax_request.abort();
-            // permissions_table.ajax_request = undefined;
+            // There's already a reload in progress; mark this as a "refinement".
+            permissions_table.refine = true;
+            permissions_table.ajax_request.abort();
+            permissions_table.ajax_request = undefined;
         }
         var query_params = permissions_table.getQueryParams();
         query_params.page_size = permissions_table.page_size;
