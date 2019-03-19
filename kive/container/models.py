@@ -151,6 +151,20 @@ class ExistingRunsError(Exception):
         super(ExistingRunsError, self).__init__(message)
 
 
+def get_drivers(archive):
+    """
+    Return a list of files that can be a driver.
+
+    :param archive: an archive as returned by open_content.
+    """
+    drivers = []
+    for info in archive.infolist():
+        file_contents = archive.read(info)
+        if file_contents.startswith("#!"):
+            drivers.append(info)
+    return drivers
+
+
 class Container(AccessControl):
     UPLOAD_DIR = "Containers"
 
@@ -189,7 +203,8 @@ class Container(AccessControl):
         'singularity_cannot_have_parent': "Singularity containers cannot have parents",
         'archive_must_have_parent': "Archive containers must have a valid Singularity container parent",
         'parent_container_not_singularity': "Parent container must be a Singularity container",
-        'bad_extension': "File must have one of the following: {}".format(accepted_extension_str)
+        'bad_extension': "File must have one of the following: {}".format(accepted_extension_str),
+        'archive_has_no_drivers': "Archive containers must contain at least one driver file"
     }
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
@@ -297,24 +312,16 @@ class Container(AccessControl):
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["parent_container_not_singularity"],
                                       code="parent_container_not_singularity")
 
-            if self.file_type == Container.ZIP:
-                try:
-                    with use_field_file(self.file):
-                        with ZipFile(self.file, allowZip64=True):
-                            pass
-                except BadZipfile:
-                    raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
-                                          code="invalid_archive")
+            try:
+                with self.open_content() as a:
+                    drivers = get_drivers(a)
+                    if len(drivers) == 0:
+                        raise ValidationError(self.DEFAULT_ERROR_MESSAGES["archive_has_no_drivers"],
+                                              code="archive_has_no_drivers")
 
-            else:
-                assert self.file_type == Container.TAR
-                try:
-                    with use_field_file(self.file):
-                        with tarfile.open(fileobj=self.file, mode="r"):
-                            pass
-                except tarfile.ReadError:
-                    raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
-                                          code="invalid_archive")
+            except BadZipfile, tarfile.ReadError:
+                raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
+                                      code="invalid_archive")
 
     def set_md5(self):
         """
