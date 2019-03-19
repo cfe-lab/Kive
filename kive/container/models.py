@@ -160,7 +160,7 @@ def get_drivers(archive):
     drivers = []
     for info in archive.infolist():
         file_contents = archive.read(info)
-        if file_contents.startswith("#!"):
+        if file_contents.startswith(b"#!"):
             drivers.append(info)
     return drivers
 
