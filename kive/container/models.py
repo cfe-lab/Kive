@@ -319,7 +319,7 @@ class Container(AccessControl):
                         raise ValidationError(self.DEFAULT_ERROR_MESSAGES["archive_has_no_drivers"],
                                               code="archive_has_no_drivers")
 
-            except BadZipfile, tarfile.ReadError:
+            except (BadZipfile, tarfile.ReadError):
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
                                       code="invalid_archive")
 

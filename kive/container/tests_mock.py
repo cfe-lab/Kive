@@ -112,24 +112,60 @@ class ContainerCleanMockTests(TestCase):
         with io.open(fd, mode="w") as f:
             f.write(u"foobar")
 
-        hello_world_script = """\
+        hello_world_script = u"""\
 #! /bin/bash
 echo Hello World
 """
         _, self.zip_archive = tempfile.mkstemp()
         _, self.tar_archive = tempfile.mkstemp()
-        with tempfile.NamedTemporaryFile(mode="w") as f:
-            f.write(hello_world_script)
-            with zipfile.ZipFile(self.zip_archive, mode="w") as z:
-                z.write(f.name, arcname="hello_world.sh")
 
-            with tarfile.open(self.tar_archive, mode="w") as t:
-                t.add(f.name, arcname="hello_world.sh")
+        hello_world_fd, hello_world_filename = tempfile.mkstemp()
+        with io.open(hello_world_fd, mode="w") as f:
+            f.write(hello_world_script)
+
+        with zipfile.ZipFile(self.zip_archive, mode="w") as z:
+            z.write(hello_world_filename, arcname="hello_world.sh")
+
+        with tarfile.open(self.tar_archive, mode="w") as t:
+            t.add(hello_world_filename, arcname="hello_world.sh")
+
+        os.remove(hello_world_filename)
+
+        _, self.empty_zip_archive = tempfile.mkstemp()
+        _, self.empty_tar_archive = tempfile.mkstemp()
+        with zipfile.ZipFile(self.empty_zip_archive, mode="w") as z:
+            pass
+
+        with tarfile.open(self.empty_tar_archive, mode="w") as t:
+            pass
+
+        not_a_script = u"""\
+This is not a driver.
+"""
+        _, self.no_driver_zip = tempfile.mkstemp()
+        _, self.no_driver_tar = tempfile.mkstemp()
+
+        not_a_script_fd, not_a_script_filename = tempfile.mkstemp()
+        with io.open(not_a_script_fd, mode="w") as f:
+            f.write(not_a_script)
+
+        with zipfile.ZipFile(self.no_driver_zip, mode="w") as z:
+            z.write(not_a_script_filename, arcname="hello_world.sh")
+
+        with tarfile.open(self.no_driver_tar, mode="w") as t:
+            t.add(not_a_script_filename, arcname="hello_world.sh")
+
+        _, self.empty_file = tempfile.mkstemp()
 
     def tearDown(self):
         os.remove(self.useless_file)
         os.remove(self.zip_archive)
         os.remove(self.tar_archive)
+        os.remove(self.empty_zip_archive)
+        os.remove(self.empty_tar_archive)
+        os.remove(self.no_driver_zip)
+        os.remove(self.no_driver_tar)
+        os.remove(self.empty_file)
 
     def test_validate_singularity_container_pass(self):
         """
@@ -255,6 +291,86 @@ echo Hello World
             container.file = File(alpine_file)
             container.clean()
         mock_val.assert_not_called()
+
+    def no_driver_archive_test_helper(self, archive_type, empty=True):
+        """
+        Helper for testing archive containers with no driver.
+        :return:
+        """
+        parent = Container(id=41, file_type=Container.SIMG)
+        container = Container(id=42, file_type=archive_type, parent=parent)
+        archive_file = self.empty_zip_archive
+        if empty and archive_type == Container.TAR:
+            archive_file = self.empty_tar_archive
+        elif not empty:
+            if archive_type == Container.ZIP:
+                archive_file = self.no_driver_zip
+            else:
+                archive_file = self.no_driver_tar
+        with open(archive_file, "rb") as f:
+            container.file = File(f)
+            with self.assertRaisesMessage(
+                    ValidationError,
+                    Container.DEFAULT_ERROR_MESSAGES["archive_has_no_drivers"]
+            ):
+                container.clean()
+
+    def test_empty_valid_zip_archive(self):
+        """
+        A zip archive must have a driver in it.
+        :return:
+        """
+        self.no_driver_archive_test_helper(Container.ZIP)
+
+    def test_empty_valid_tar_archive(self):
+        """
+        A tar archive must have a driver in it.
+        :return:
+        """
+        self.no_driver_archive_test_helper(Container.TAR)
+
+    def test_no_driver_zip_archive(self):
+        """
+        A non-empty zip archive must have a driver in it.
+        :return:
+        """
+        self.no_driver_archive_test_helper(Container.ZIP, empty=False)
+
+    def test_no_driver_tar_archive(self):
+        """
+        A non-empty tar archive must have a driver in it.
+        :return:
+        """
+        self.no_driver_archive_test_helper(Container.TAR, empty=False)
+
+    def empty_archive_test_helper(self, archive_type):
+        """
+        Helper for testing archive containers that are just empty files (as opposed to empty archives).
+        :return:
+        """
+        parent = Container(id=41, file_type=Container.SIMG)
+        container = Container(id=42, file_type=archive_type, parent=parent)
+        with open(self.empty_file, "rb") as f:
+            container.file = File(f)
+            with self.assertRaisesMessage(
+                    ValidationError,
+                    Container.DEFAULT_ERROR_MESSAGES["invalid_archive"]
+            ):
+                container.clean()
+
+    def test_empty_zip_archive(self):
+        """
+        The zip archive cannot be a totally empty file.
+        :return:
+        """
+        self.empty_archive_test_helper(Container.ZIP)
+
+    def test_empty_tar_archive(self):
+        """
+        The tar archive cannot be a totally empty file.
+        :return:
+        """
+        self.empty_archive_test_helper(Container.TAR)
 
 
 @mocked_relations(Container,
