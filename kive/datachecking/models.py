@@ -391,6 +391,8 @@ class MD5Conflict(models.Model):
     conflicting_dataset = models.OneToOneField("librarian.Dataset", related_name="usurps",
                                                null=True, on_delete=models.SET_NULL)
 
+    objects = None  # Filled in later by Django.
+
 
 class BlankCell(models.Model):
     """

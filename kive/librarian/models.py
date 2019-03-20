@@ -42,7 +42,8 @@ import archive.exceptions
 import archive.models
 import librarian.signals
 from constants import maxlengths, runcomponentstates
-from datachecking.models import BadData
+from container.models import ContainerDataset
+from datachecking.models import BadData, MD5Conflict
 import six
 
 import file_access_utils
@@ -1342,15 +1343,16 @@ class Dataset(metadata.models.AccessControl):
         :return: a QuerySet
         """
         # Exclude Datasets that are currently in use
-        active_datasets = cls.objects.filter(containers__run__end_time=None)
-        container_outputs = Dataset.objects.filter(containers__argument__type='O')
-        uploads = Dataset.objects.filter(
-            file_source=None, usurps__isnull=True).exclude(
-            pk__in=container_outputs)
+        active_dataset_ids = ContainerDataset.objects.filter(
+            run__end_time=None).values_list('dataset_id').order_by()
+        container_output_ids = ContainerDataset.objects.filter(
+            argument__type='O').values_list('dataset_id').order_by()
+        md5_conflict_ids = MD5Conflict.objects.values_list('conflicting_dataset_id')
+        output_ids = container_output_ids.union(md5_conflict_ids, all=True)
 
-        unneeded = cls.objects.exclude(
-            pk__in=active_datasets).exclude(  # Don't purge while it's in use.
-            pk__in=uploads).exclude(  # Never purge uploads.
+        unneeded = cls.objects.filter(
+            pk__in=output_ids).exclude(  # Only purge outputs.
+            pk__in=active_dataset_ids).exclude(  # Don't purge while it's in use.
             dataset_file=None).exclude(  # External file.
             dataset_file='').exclude(  # Already purged.
             dataset_size=None)  # New dataset.

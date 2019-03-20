@@ -150,21 +150,21 @@ class Command(BaseCommand):
             age=sandbox_aging * (Now() - F('end_time'))).values_list(
             'entry_type',
             'id',
-            'age')
+            'age').order_by()
 
         log_ages = ContainerLog.find_unneeded().annotate(
             entry_type=Value('l', models.CharField()),
             age=log_aging * (Now() - F('run__end_time'))).values_list(
             'entry_type',
             'id',
-            'age')
+            'age').order_by()
 
         dataset_ages = Dataset.find_unneeded().annotate(
             entry_type=Value('d', models.CharField()),
             age=dataset_aging * (Now() - F('date_created'))).values_list(
             'entry_type',
             'id',
-            'age')
+            'age').order_by()
 
         purge_counts = Counter()
         max_purge_dates = {}
