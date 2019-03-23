@@ -466,14 +466,28 @@ export class MethodDialog extends NodePreviewDialog {
         this.$input_names = $('#id_input_names');
         this.$output_names = $('#id_output_names');
         this.$error = $('#id_method_error');
+        /*
         let option_elements = container.files.map(file_name =>
             $("<option>", {
                 value: file_name,
                 title: file_name
             }).text(file_name));
+        */
+
+        let option_elements = container.files.map(function(filename_driver_pair) {
+            if (!filename_driver_pair[1]) {
+                return null;
+            } else {
+                let file_name = filename_driver_pair[0];
+                return $("<option>", {
+                    value: file_name,
+                    title: file_name
+                }).text(file_name);
+            }
+        });
+
         this.$select_method.empty()
             .append(option_elements).show();
-
 
         this.$select_method.change(
             () => this.triggerPreviewRefresh()

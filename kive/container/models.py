@@ -19,6 +19,7 @@ import io
 from io import BytesIO
 from zipfile import ZipFile, BadZipfile
 from collections import OrderedDict, namedtuple
+from operator import itemgetter
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -163,6 +164,16 @@ def get_drivers(archive):
         if file_contents.startswith(b"#!"):
             drivers.append(info)
     return drivers
+
+
+def is_driver(archive, info):
+    """
+    True if the file in the archive that is specified by info is an admissible driver.
+    :param archive:
+    :param info:
+    :return:
+    """
+    return archive.read(info).startswith(b"#!")
 
 
 class Container(AccessControl):
@@ -449,9 +460,13 @@ class Container(AccessControl):
                                 outputs=[])
             else:
                 return None
-            content = dict(files=sorted(entry.name
-                                        for entry in archive.infolist()
-                                        if not entry.name.startswith('kive/')),
+            file_and_driver_status = [
+                (entry.name, is_driver(archive, entry))
+                for entry in archive.infolist()
+                if not entry.name.startswith('kive/')
+            ]
+            file_and_driver_status = sorted(file_and_driver_status, key=itemgetter(0))
+            content = dict(files=file_and_driver_status,
                            pipeline=pipeline,
                            id=self.pk)
             return content
