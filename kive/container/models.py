@@ -160,8 +160,7 @@ def get_drivers(archive):
     """
     drivers = []
     for info in archive.infolist():
-        file_contents = archive.read(info)
-        if file_contents.startswith(b"#!"):
+        if is_driver(archive, info):
             drivers.append(info)
     return drivers
 
@@ -215,7 +214,8 @@ class Container(AccessControl):
         'archive_must_have_parent': "Archive containers must have a valid Singularity container parent",
         'parent_container_not_singularity': "Parent container must be a Singularity container",
         'bad_extension': "File must have one of the following: {}".format(accepted_extension_str),
-        'archive_has_no_drivers': "Archive containers must contain at least one driver file"
+        'archive_has_no_drivers': "Archive containers must contain at least one driver file",
+        'inadmissible_driver': 'Step drivers must start with "#!"'
     }
 
     family = models.ForeignKey(ContainerFamily, related_name="containers")
@@ -329,6 +329,25 @@ class Container(AccessControl):
                     if len(drivers) == 0:
                         raise ValidationError(self.DEFAULT_ERROR_MESSAGES["archive_has_no_drivers"],
                                               code="archive_has_no_drivers")
+
+                # Check that all of the step drivers are admissible drivers.
+                archive_content = self.get_archive_content(False)
+                pipeline = archive_content["pipeline"]
+
+                with self.open_content() as archive:
+                    all_members = archive.infolist()
+                    members = [member
+                               for member in all_members
+                               if not member.name.startswith('kive/pipeline')]
+                    members_by_name = {}
+                    for member in members:
+                        members_by_name[member.name] = member
+
+                    for step_dict in pipeline["steps"]:
+                        driver = step_dict["driver"]
+                        if driver not in members_by_name:
+                            raise ValidationError(self.DEFAULT_ERROR_MESSAGES["inadmissible_driver"],
+                                                  code="inadmissible_driver")
 
             except (BadZipfile, tarfile.ReadError):
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
