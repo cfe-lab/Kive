@@ -237,23 +237,6 @@ Dave,40
             column=count_column,
             row_num=expected_bad_row)
 
-    def test_uploaded(self):
-        dataset = Dataset()
-
-        self.assertTrue(dataset.uploaded)
-
-    def test_file_source_means_not_uploaded(self):
-        dataset = Dataset()
-        dataset.file_source = RunComponent()
-
-        self.assertFalse(dataset.uploaded)
-
-    def test_usurps_means_not_uploaded(self):
-        dataset = Dataset(name='failed_integrity_check.txt')
-        dataset.usurps = Dataset(name='original.txt')
-
-        self.assertFalse(dataset.uploaded)
-
     def test_removal_plan(self):
         dataset = Dataset(id=42)
         expected_plan = {'Datasets': {dataset}}

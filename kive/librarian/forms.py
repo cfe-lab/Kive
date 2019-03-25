@@ -282,6 +282,7 @@ class BulkAddDatasetForm (BaseMultiDatasetAddForm):
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
                 dataset = Dataset.create_dataset(
+                    is_uploaded=True,
                     file_path=None,
                     user=user,
                     cdt=compound_datatype_obj,
@@ -443,6 +444,7 @@ class ArchiveAddDatasetForm(metadata.forms.AccessControlForm):
                     auto_description = "Bulk Uploaded File " + uploaded_file.name
 
                 dataset = Dataset.create_dataset(
+                    is_uploaded=True,
                     file_path=None,
                     user=user,
                     cdt=compound_datatype_obj,

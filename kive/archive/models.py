@@ -1019,6 +1019,8 @@ class RunInput(models.Model):
     dataset = models.ForeignKey(Dataset, related_name="runinputs")
     index = models.PositiveIntegerField()
 
+    objects = None  # Filled in later by Django.
+
     class Meta(object):
         ordering = ['index']
 

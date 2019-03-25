@@ -200,6 +200,9 @@ class Dataset(metadata.models.AccessControl):
     is_external_missing = models.BooleanField(
         default=False,
         help_text='True if the external file was missing when last checked.')
+    is_uploaded = models.BooleanField(
+        default=False,
+        help_text='True if the file was uploaded, not an output.')
 
     class Meta:
         ordering = ["-date_created", "name"]
@@ -804,10 +807,22 @@ class Dataset(metadata.models.AccessControl):
 
     @classmethod
     # FIXME what does it do for num_rows when file_path is unset?
-    def create_dataset(cls, file_path, user=None, users_allowed=None, groups_allowed=None,
-                       cdt=None, keep_file=True,
-                       name=None, description=None, file_source=None, check=True, file_handle=None,
-                       instance=None, externalfiledirectory=None, precomputed_md5=None):
+    def create_dataset(cls,
+                       file_path,
+                       user=None,
+                       users_allowed=None,
+                       groups_allowed=None,
+                       cdt=None,
+                       keep_file=True,
+                       name=None,
+                       description=None,
+                       file_source=None,
+                       check=True,
+                       file_handle=None,
+                       instance=None,
+                       externalfiledirectory=None,
+                       precomputed_md5=None,
+                       is_uploaded=False):
         """
         Helper function to make defining SDs and Datasets faster.
 
@@ -865,6 +880,7 @@ class Dataset(metadata.models.AccessControl):
             new_dataset.externalfiledirectory = externalfiledirectory
             new_dataset.external_path = external_path
             new_dataset.last_time_checked = timezone.now()
+            new_dataset.is_uploaded = is_uploaded
 
             if precomputed_md5 is not None:
                 new_dataset.MD5_checksum = precomputed_md5
@@ -1263,7 +1279,8 @@ class Dataset(metadata.models.AccessControl):
 
     @property
     def uploaded(self):
-        return self.file_source is None and not hasattr(self, 'usurps')
+        """ Kept for backward compatibility in serializer. """
+        return self.is_uploaded
 
     @transaction.atomic
     def build_removal_plan(self, removal_accumulator=None):
@@ -1343,15 +1360,16 @@ class Dataset(metadata.models.AccessControl):
         :return: a QuerySet
         """
         # Exclude Datasets that are currently in use
-        active_dataset_ids = ContainerDataset.objects.filter(
+        active_container_dataset_ids = ContainerDataset.objects.filter(
             run__end_time=None).values_list('dataset_id').order_by()
-        container_output_ids = ContainerDataset.objects.filter(
-            argument__type='O').values_list('dataset_id').order_by()
-        md5_conflict_ids = MD5Conflict.objects.values_list('conflicting_dataset_id')
-        output_ids = container_output_ids.union(md5_conflict_ids, all=True)
+        active_run_dataset_ids = archive.models.RunInput.objects.filter(
+            run__end_time=None).values_list('dataset_id').order_by()
+        active_dataset_ids = active_container_dataset_ids.union(
+            active_run_dataset_ids,
+            all=True)
 
         unneeded = cls.objects.filter(
-            pk__in=output_ids).exclude(  # Only purge outputs.
+            is_uploaded=False).exclude(  # Only purge outputs.
             pk__in=active_dataset_ids).exclude(  # Don't purge while it's in use.
             dataset_file=None).exclude(  # External file.
             dataset_file='').exclude(  # Already purged.

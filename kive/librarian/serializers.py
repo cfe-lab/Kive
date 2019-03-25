@@ -44,8 +44,8 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
     compounddatatype = serializers.PrimaryKeyRelatedField(
         source="structure.compounddatatype",
         queryset=CompoundDatatype.objects.all(),
-        required=False
-    )
+        required=False,
+        allow_null=True)
 
     filename = serializers.SerializerMethodField()
     filesize = serializers.IntegerField(source='get_filesize', read_only=True)
@@ -112,9 +112,9 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             return filesizeformat(obj.get_filesize())
 
     def validate(self, data):
-        df_exists = "dataset_file" in data
-        ep_exists = "external_path" in data
-        efd_exists = "externalfiledirectory" in data
+        df_exists = bool(data.get("dataset_file"))
+        ep_exists = bool(data.get("external_path"))
+        efd_exists = bool(data.get("externalfiledirectory"))
 
         if df_exists:
             errors = []
@@ -154,6 +154,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         keep_file = validated_data.get("save_in_db", keep_file)
 
         dataset = Dataset.create_dataset(
+            is_uploaded=True,  # Assume serializer is only used for uploads.
             file_path=file_path,
             user=self.context["request"].user,
             users_allowed=validated_data["users_allowed"],
@@ -161,7 +162,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             cdt=cdt,
             keep_file=keep_file,
             name=validated_data["name"],
-            description=validated_data["description"],
+            description=validated_data.get("description"),
             file_source=None,
             check=True,
             file_handle=validated_data.get("dataset_file", None),  # should be freshly opened so cursor is at start

@@ -3357,7 +3357,10 @@ No purge needed for 100 bytes: 100 bytes of container runs.
         with open(output_path, 'wb') as f:
             f.write(b'.' * 1000)
         user = User.objects.get(username='kive')
-        Dataset.create_dataset(output_path, name='extra.txt', user=user)
+        Dataset.create_dataset(output_path,
+                               name='extra.txt',
+                               user=user,
+                               is_uploaded=True)
 
         expected_messages = u"""\
 Starting purge.

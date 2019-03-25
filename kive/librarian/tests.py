@@ -12,10 +12,14 @@ import logging
 import json
 import shutil
 import stat
+from io import BytesIO
+from zipfile import ZipFile
+
 import django.utils.six as dsix
 
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, skipIfDBFeature, Client
 from django.core.urlresolvers import reverse, resolve
 from django.core.files import File
@@ -455,6 +459,57 @@ Bob,tw3nty
                          response.context['dataset_form'].errors)
         dataset.refresh_from_db()
         self.assertFalse(dataset.shared_with_everyone)
+
+    def test_bulk_upload(self):
+        file1 = SimpleUploadedFile("file1.txt", b"Content of file 1.")
+        file2 = SimpleUploadedFile("file2.txt", b"Content of file 2.")
+        client = Client()
+        client.force_login(self.myUser)
+
+        response = client.post(reverse('datasets_add_bulk'),
+                               dict(dataset_files=[file1, file2],
+                                    compound_datatype='__raw__',
+                                    permissions_1='Everyone'))
+
+        self.assertEqual(200, response.status_code)  # Form error, not redirect
+        old_form = response.context.get('bulkAddDatasetForm')
+        if old_form is not None:
+            self.assertEqual([], old_form.errors)
+            self.fail('Should not have old form.')
+
+        self.assertEqual(2, response.context['num_files_added'])
+        dataset2, dataset1 = Dataset.objects.all()[:2]
+        self.assertRegexpMatches(dataset1.name, r'file1\.txt.*')
+        self.assertRegexpMatches(dataset2.name, r'file2\.txt.*')
+        self.assertTrue(dataset1.is_uploaded)
+
+    def test_archive_upload(self):
+        bytes_file = BytesIO()
+        with ZipFile(bytes_file, "w") as f:
+            f.writestr("foo.txt", b"The first file.")
+            f.writestr("bar.txt", b"The second file.")
+        uploading_file = SimpleUploadedFile("file1.zip", bytes_file.getvalue())
+
+        client = Client()
+        client.force_login(self.myUser)
+
+        response = client.post(reverse('datasets_add_archive'),
+                               dict(dataset_file=uploading_file,
+                                    compound_datatype='__raw__',
+                                    permissions_1='Everyone'))
+
+        self.assertEqual(200, response.status_code)  # Form error, not redirect
+        old_form = response.context.get('archiveAddDatasetForm')
+        if old_form is not None:
+            self.assertEqual({}, old_form.errors)
+            self.assertEqual([], old_form.non_field_errors())
+            self.fail('Should not have old form.')
+
+        self.assertEqual(2, response.context['num_files_added'])
+        dataset2, dataset1 = Dataset.objects.all()[:2]
+        self.assertRegexpMatches(dataset1.name, r'foo\.txt.*')
+        self.assertRegexpMatches(dataset2.name, r'bar\.txt.*')
+        self.assertTrue(dataset1.is_uploaded)
 
 
 class DatasetStructureTests(LibrarianTestCase):
@@ -1215,11 +1270,13 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
                          name='apples',
                          description='chosen',
                          date_created=apples_date,
+                         is_uploaded=True,
                          user=self.kive_kive_user)
         cherries_date = timezone.make_aware(datetime(2017, 1, 2), tz)
         cherries = Dataset(pk=43,
                            name='cherries',
                            date_created=cherries_date,
+                           is_uploaded=True,
                            MD5_checksum='1234',
                            user=self.kive_kive_user)
         bananas_date = timezone.make_aware(datetime(2017, 1, 3), tz)
@@ -1415,13 +1472,11 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
             d.dataset_file.delete()
 
     def test_dataset_add(self):
-        """
-        Test adding a Dataset via the API.
-
-        Each dataset must have unique content.
-        """
         num_cols = 12
         num_files = 2
+        expected_summaries = [('My cool file 1', True),  # name, uploaded
+                              ('My cool file 0', True),
+                              ('Test dataset', False)]
 
         with tempfile.TemporaryFile() as f:
             data = ','.join(map(str, range(num_cols)))
@@ -1451,49 +1506,26 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request).data
 
         self.assertEquals(len(resp), num_files + self.n_preexisting_datasets)
-        self.assertEquals(resp[-1]['description'],
-                          "Test data for a test that tests test data")
+        summaries = [(entry['name'], entry['uploaded'])
+                     for entry in resp]
+        self.assertEquals(expected_summaries, summaries)
 
-    def test_dataset_add_duplicate(self):
-        """
-        Test adding a duplicate Dataset via the API.
+    def test_dataset_add_with_blank_externals(self):
+        """ Browser API leaves external dir and path blank. """
+        f = SimpleUploadedFile("example.txt", b"File contents")
+        request = self.factory.post(
+            self.list_path,
+            dict(name="Some file",
+                 external_path='',
+                 externalfiledirectory='',
+                 dataset_file=f))
 
-        Each dataset must have unique content.
-        """
-        num_cols = 12
+        force_authenticate(request, user=self.kive_user)
+        resp = self.list_view(request).render().data
 
-        with tempfile.TemporaryFile() as f:
-            data = ','.join(map(str, range(num_cols)))
-            f.write(data.encode())
-            f.seek(0)
-
-            # First, we add this file and it works.
-            request = self.factory.post(
-                self.list_path,
-                {
-                    'name': "Original",
-                    'description': 'Totes unique',
-                    # No CompoundDatatype -- this is raw.
-                    'dataset_file': f
-                }
-            )
-            force_authenticate(request, user=self.kive_user)
-            self.list_view(request).render()
-
-            # Now we add the same file again.
-            request = self.factory.post(
-                self.list_path,
-                {
-                    'name': "CarbonCopy",
-                    'description': "Maybe not so unique",
-                    'dataset_file': f
-                }
-            )
-            force_authenticate(request, user=self.kive_user)
-            resp = self.list_view(request).render().data
-
-        self.assertEqual({'dataset_file': [u'The submitted file is empty.']},
-                         resp)
+        self.assertIsNone(resp.get('errors'))
+        self.assertIsNone(resp.get('non_field_errors'))
+        self.assertEquals(resp['name'], "Some file")
 
     def test_dataset_removal_plan(self):
         request = self.factory.get(self.removal_path)
