@@ -4,6 +4,7 @@ import tempfile
 import io
 import zipfile
 import tarfile
+import json
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
@@ -17,7 +18,7 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerRun, ContainerDataset
+    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -108,64 +109,65 @@ class ContainerCleanMockTests(TestCase):
             'singularity',
             'python2-alpine-trimmed.simg'))
 
+        # Some files to put into archives.
+        self.useless = u"foobar"
         fd, self.useless_file = tempfile.mkstemp()
         with io.open(fd, mode="w") as f:
-            f.write(u"foobar")
+            f.write(self.useless)
 
-        hello_world_script = u"""\
+        self.hello_world_script = u"""\
 #! /bin/bash
 echo Hello World
 """
+        hello_world_fd, self.hello_world_filename = tempfile.mkstemp()
+        with io.open(hello_world_fd, mode="w") as f:
+            f.write(self.hello_world_script)
+
+        self.not_a_script = u"""\
+This is not a driver.
+"""
+        not_a_script_fd, self.not_a_script_filename = tempfile.mkstemp()
+        with io.open(not_a_script_fd, mode="w") as f:
+            f.write(self.not_a_script)
+
+        _, self.empty_file = tempfile.mkstemp()
+
+        # Proper archives that contain a single driver.
         _, self.zip_archive = tempfile.mkstemp()
         _, self.tar_archive = tempfile.mkstemp()
-
-        hello_world_fd, hello_world_filename = tempfile.mkstemp()
-        with io.open(hello_world_fd, mode="w") as f:
-            f.write(hello_world_script)
-
         with zipfile.ZipFile(self.zip_archive, mode="w") as z:
-            z.write(hello_world_filename, arcname="hello_world.sh")
-
+            z.write(self.hello_world_filename, arcname="hello_world.sh")
         with tarfile.open(self.tar_archive, mode="w") as t:
-            t.add(hello_world_filename, arcname="hello_world.sh")
+            t.add(self.hello_world_filename, arcname="hello_world.sh")
 
-        os.remove(hello_world_filename)
-
+        # Improper archives that do not contain anything.
         _, self.empty_zip_archive = tempfile.mkstemp()
         _, self.empty_tar_archive = tempfile.mkstemp()
         with zipfile.ZipFile(self.empty_zip_archive, mode="w") as z:
             pass
-
         with tarfile.open(self.empty_tar_archive, mode="w") as t:
             pass
 
-        not_a_script = u"""\
-This is not a driver.
-"""
+        # Improper archives that contain no drivers.
         _, self.no_driver_zip = tempfile.mkstemp()
         _, self.no_driver_tar = tempfile.mkstemp()
-
-        not_a_script_fd, not_a_script_filename = tempfile.mkstemp()
-        with io.open(not_a_script_fd, mode="w") as f:
-            f.write(not_a_script)
-
         with zipfile.ZipFile(self.no_driver_zip, mode="w") as z:
-            z.write(not_a_script_filename, arcname="hello_world.sh")
-
+            z.write(self.not_a_script_filename, arcname="hello_world.sh")
         with tarfile.open(self.no_driver_tar, mode="w") as t:
-            t.add(not_a_script_filename, arcname="hello_world.sh")
-
-        _, self.empty_file = tempfile.mkstemp()
+            t.add(self.not_a_script_filename, arcname="hello_world.sh")
 
     def tearDown(self):
+        os.remove(self.hello_world_filename)
         os.remove(self.useless_file)
+        os.remove(self.not_a_script_filename)
+        os.remove(self.empty_file)
+
         os.remove(self.zip_archive)
         os.remove(self.tar_archive)
         os.remove(self.empty_zip_archive)
         os.remove(self.empty_tar_archive)
         os.remove(self.no_driver_zip)
         os.remove(self.no_driver_tar)
-        os.remove(self.empty_file)
 
     def test_validate_singularity_container_pass(self):
         """
@@ -371,6 +373,105 @@ This is not a driver.
         :return:
         """
         self.empty_archive_test_helper(Container.TAR)
+
+    def admissible_driver_test_helper(self, archive_type, driver_type):
+        """
+        Helper for testing archive containers' drivers' admissibility.
+        :return:
+        """
+        pipeline_dict = {
+            "steps": [
+                {
+                    "driver": "foobarbaz"
+                }
+            ]
+        }
+
+        # Archives that contain a mix of files, including one driver.
+        fd, archive = tempfile.mkstemp()
+        try:
+            with open(archive, mode="w") as f:
+                if archive_type == Container.ZIP:
+                    archive_handler = ZipHandler(f, mode="w")
+                else:
+                    archive_handler = TarHandler(f, mode="w")
+
+                archive_handler.write(u"hello_world.sh", self.hello_world_script)
+                archive_handler.write(u"useless.lib", self.useless)
+                archive_handler.write(u"not_a_script", self.not_a_script)
+
+                if driver_type == "good":
+                    pipeline_dict["steps"][0]["driver"] = "hello_world.sh"
+                elif driver_type == "bad":
+                    pipeline_dict["steps"][0]["driver"] = "not_a_script"
+                archive_handler.write("kive/pipeline0.json", json.dumps(pipeline_dict))
+                archive_handler.close()
+
+            parent = Container(id=41, file_type=Container.SIMG)
+            container = Container(id=42, file_type=archive_type, parent=parent)
+            with open(archive, "rb") as f:
+                container.file = File(f)
+
+                if driver_type == "good":
+                    container.clean()
+
+                elif driver_type == "bad":
+                    with self.assertRaisesMessage(
+                            ValidationError,
+                            Container.DEFAULT_ERROR_MESSAGES["inadmissible_driver"]
+                    ):
+                        container.clean()
+
+                elif driver_type == "nonexistent":
+                    with self.assertRaisesMessage(
+                            ValidationError,
+                            Container.DEFAULT_ERROR_MESSAGES["driver_not_in_archive"]
+                    ):
+                        container.clean()
+        finally:
+            os.remove(archive)
+
+    def test_admissible_driver_tar(self):
+        """
+        Tar archive with an admissible driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.TAR, "good")
+
+    def test_inadmissible_driver_tar(self):
+        """
+        Tar archive with an inadmissible driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.TAR, "bad")
+
+    def test_nonexistent_driver_tar(self):
+        """
+        Tar archive with a nonexistent driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.TAR, "nonexistent")
+
+    def test_admissible_driver_zip(self):
+        """
+        Zip archive with an admissible driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.ZIP, "good")
+
+    def test_inadmissible_driver_zip(self):
+        """
+        Zip archive with an inadmissible driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.ZIP, "bad")
+
+    def test_nonexistent_driver_zip(self):
+        """
+        Zip archive with a nonexistent driver.
+        :return:
+        """
+        self.admissible_driver_test_helper(Container.ZIP, "nonexistent")
 
 
 @mocked_relations(Container,

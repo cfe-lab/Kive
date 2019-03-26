@@ -215,6 +215,7 @@ class Container(AccessControl):
         'parent_container_not_singularity': "Parent container must be a Singularity container",
         'bad_extension': "File must have one of the following: {}".format(accepted_extension_str),
         'archive_has_no_drivers': "Archive containers must contain at least one driver file",
+        'driver_not_in_archive': 'Step drivers must all be in the archive',
         'inadmissible_driver': 'Step drivers must start with "#!"'
     }
 
@@ -332,7 +333,8 @@ class Container(AccessControl):
 
                 # Check that all of the step drivers are admissible drivers.
                 archive_content = self.get_archive_content(False)
-                pipeline = archive_content["pipeline"]
+                if archive_content is None:
+                    return
 
                 with self.open_content() as archive:
                     all_members = archive.infolist()
@@ -343,9 +345,13 @@ class Container(AccessControl):
                     for member in members:
                         members_by_name[member.name] = member
 
+                    pipeline = archive_content["pipeline"]
                     for step_dict in pipeline["steps"]:
                         driver = step_dict["driver"]
                         if driver not in members_by_name:
+                            raise ValidationError(self.DEFAULT_ERROR_MESSAGES["driver_not_in_archive"],
+                                                  code="driver_not_in_archive")
+                        if not is_driver(archive, members_by_name[driver]):
                             raise ValidationError(self.DEFAULT_ERROR_MESSAGES["inadmissible_driver"],
                                                   code="inadmissible_driver")
 
