@@ -390,7 +390,7 @@ This is not a driver.
         # Archives that contain a mix of files, including one driver.
         fd, archive = tempfile.mkstemp()
         try:
-            with open(archive, mode="w") as f:
+            with open(archive, mode="wb") as f:
                 if archive_type == Container.ZIP:
                     archive_handler = ZipHandler(f, mode="w")
                 else:

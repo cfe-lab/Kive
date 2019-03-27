@@ -56,10 +56,17 @@ def create_tar_content(container=None, content=None):
         foo_info = TarInfo('foo.txt')
         foo_info.size = len(foo.getvalue())
         f.addfile(foo_info, foo)
+
         bar = BytesIO(b"The second file.")
         bar_info = TarInfo('bar.txt')
         bar_info.size = len(bar.getvalue())
         f.addfile(bar_info, bar)
+
+        driver = BytesIO(b"#! /usr/bin/env python\nprint('Hello World')\n")
+        driver_info = TarInfo('driver.py')
+        driver_info.size = len(driver.getvalue())
+        f.addfile(driver_info, driver)
+
         if content is not None:
             pipeline = BytesIO(json.dumps(content['pipeline']).encode('utf8'))
             pipeline_info = TarInfo('kive/pipeline1.json')
@@ -73,11 +80,11 @@ def create_tar_content(container=None, content=None):
 
 def create_valid_tar_content(container=None):
     return create_tar_content(container, content=dict(
-        files=["bar.txt", "foo.txt"],
+        files=[("bar.txt", False), ("foo.txt", False), ("driver.py", True)],
         pipeline=dict(default_config=dict(memory=200,
                                           threads=2),
                       inputs=[dict(dataset_name='in1')],
-                      steps=[dict(driver='foo.txt',
+                      steps=[dict(driver='driver.py',
                                   inputs=[dict(dataset_name="in1",
                                                source_step=0,
                                                source_dataset_name="in1")],
@@ -94,6 +101,7 @@ class ContainerTests(TestCase):
         with ZipFile(bytes_file, "w") as f:
             f.writestr("foo.txt", b"The first file.")
             f.writestr("bar.txt", b"The second file.")
+            f.writestr("driver.py", b"#! /usr/bin/env python\nprint('Hello World')\n")
         container.file = ContentFile(bytes_file.getvalue(), "container.zip")
         container.file_type = Container.ZIP
 
@@ -128,7 +136,7 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
         container.save()
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=5000,
                                                                   threads=1),
                                               inputs=[],
@@ -152,7 +160,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -186,7 +194,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -211,7 +219,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -237,7 +245,7 @@ class ContainerTests(TestCase):
     "steps": [],
     "outputs": []}
 """)
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -254,7 +262,7 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_zip_content(container)
         container.save()
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -273,7 +281,7 @@ class ContainerTests(TestCase):
         container = Container.objects.create(family=family, user=user)
         self.create_tar_content(container)
         container.save()
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -295,7 +303,7 @@ class ContainerTests(TestCase):
         self.create_zip_content(container)
         container.save()
         self.add_zip_content(container, "kive/pipeline1.json", '"old content"')
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=200,
                                                                   threads=2),
                                               inputs=[],
@@ -319,7 +327,7 @@ class ContainerTests(TestCase):
         self.create_tar_content(container)
         container.save()
         expected_content = dict(
-            files=["bar.txt", "foo.txt"],
+            files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
             pipeline=dict(default_config=dict(memory=200,
                                               threads=2),
                           inputs=[dict(dataset_name='in1')],
@@ -612,6 +620,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         with ZipFile(bytes_file, "w") as f:
             f.writestr("foo.txt", b"The first file.")
             f.writestr("bar.txt", b"The second file.")
+            f.writestr("driver.py", b"#! /usr/bin/env python\nprint('Hello World')\n")
         return bytes_file
 
     def setUp(self):
@@ -702,7 +711,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         self.test_container.file.save(
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=5000,
                                                                   threads=1),
                                               inputs=[],
@@ -722,7 +731,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             'test.zip',
             ContentFile(self.create_zip_content().getvalue()))
         old_md5 = self.test_container.md5
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=400,
                                                                   threads=3),
                                               inputs=[],
@@ -774,7 +783,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
                                          steps=[],
                                          outputs=[]),
                            new_tag='v2')
-        expected_content = dict(files=["bar.txt", "foo.txt"],
+        expected_content = dict(files=[("bar.txt", False), ("driver.py", True), ("foo.txt", False)],
                                 pipeline=dict(default_config=dict(memory=400,
                                                                   threads=3),
                                               inputs=[],
@@ -3572,15 +3581,21 @@ class ContainerFormMockTests(TestCase):
             "permissions": self.everyone_permissions
         }
 
-        hello_world_script = """\
-        #! /bin/bash
-        echo Hello World
-        """
+        hello_world_script = u"""\
+#! /bin/bash
+echo Hello World
+"""
+        pipeline_dict = {
+            "steps": [
+                {
+                    "driver": "hello_world.sh"
+                }
+            ]
+        }
         _, self.zip_archive = mkstemp()
-        with NamedTemporaryFile(mode="w") as f:
-            f.write(hello_world_script)
-            with ZipFile(self.zip_archive, mode="w") as z:
-                z.write(f.name, arcname="hello_world.sh")
+        with ZipFile(self.zip_archive, mode="w") as z:
+            z.writestr("hello_world.sh", hello_world_script)
+            z.writestr("kive/pipeline1.json", json.dumps(pipeline_dict))
         self.zip_size = os.path.getsize(self.zip_archive)
 
     def test_uploaded_invalid(self):
