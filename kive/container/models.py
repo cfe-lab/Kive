@@ -346,6 +346,8 @@ class Container(AccessControl):
                         members_by_name[member.name] = member
 
                     pipeline = archive_content["pipeline"]
+                    if pipeline is None:
+                        return
                     for step_dict in pipeline["steps"]:
                         driver = step_dict["driver"]
                         if driver not in members_by_name:
@@ -484,7 +486,8 @@ class Container(AccessControl):
                                 steps=[],
                                 outputs=[])
             else:
-                return None
+                pipeline = None
+
             file_and_driver_status = [
                 (entry.name, is_driver(archive, entry))
                 for entry in archive.infolist()
@@ -523,6 +526,8 @@ class Container(AccessControl):
         if content is None:
             return self.EMPTY
         pipeline = content['pipeline']
+        if pipeline is None:
+            return self.EMPTY
         if self.pipeline_valid(pipeline):
             return self.VALID
         return self.INCOMPLETE

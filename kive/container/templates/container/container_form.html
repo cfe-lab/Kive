@@ -73,6 +73,18 @@
                     {{ file_size }}
                 </td>
             </tr>
+            {% if archive_contents is not None %}
+            <tr>
+                <th>Contents:</th>
+                <td colspan="2">
+                    <ul>
+                    {% for file, admissible_driver in archive_contents %}
+                        <li>{{ file }}{% if admissible_driver %}*{% endif %}</li>
+                    {% endfor %}
+                    </ul>
+                </td>
+            </tr>
+            {% endif %}
         {% endif %}
 
         {{ form.as_table }}

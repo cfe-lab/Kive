@@ -504,19 +504,55 @@ class ContainerTests(TestCase):
 
         self.assertEqual(expected_pipeline_state, pipeline_state)
 
+    def test_pipeline_state_nothing_defined(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        create_tar_content(
+            container,
+            dict(
+                pipeline=dict(
+                    inputs=[],
+                    steps=[],
+                    outputs=[]
+                )
+            )
+        )
+        container.save()
+        expected_pipeline_state = Container.INCOMPLETE
+        pipeline_state = container.get_pipeline_state()
+        self.assertEqual(expected_pipeline_state, pipeline_state)
+
+    def test_pipeline_state_invalid_pipeline(self):
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+        container = family.containers.create(user=user)
+        create_tar_content(container, dict(pipeline="This is not a pipeline!"))
+        container.save()
+        expected_pipeline_state = Container.INCOMPLETE
+        pipeline_state = container.get_pipeline_state()
+        self.assertEqual(expected_pipeline_state, pipeline_state)
+
     def test_pipeline_state_incomplete(self):
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = family.containers.create(user=user)
-        create_tar_content(container, dict(pipeline='This is not a pipeline!'))
+        create_tar_content(
+            container,
+            dict(
+                pipeline=dict(
+                    inputs=[{"dataset_name": 'in1'}],
+                    steps=[],
+                    outputs=[]
+                )
+            )
+        )
         container.save()
         expected_pipeline_state = Container.INCOMPLETE
-
         pipeline_state = container.get_pipeline_state()
-
         self.assertEqual(expected_pipeline_state, pipeline_state)
 
-    def test_pipeline_state_empty(self):
+    def test_pipeline_state_no_json(self):
         user = User.objects.first()
         family = ContainerFamily.objects.create(user=user)
         container = family.containers.create(user=user)
