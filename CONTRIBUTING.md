@@ -170,11 +170,18 @@ Once you have set up your production server, this is how to deploy a new release
         pip3 show kiveapi  # compare with the version installed in Python 3
         sudo python3 setup.py install  # if needed
 
-12. Remove the pre-release flag from the release.
+12. When the release is stable, remove the pre-release flag from the release.
+    Check that it's included on the [Zenodo] page. If you included more than
+    one tag in the same release, the new tags have not triggered Zenodo
+    versions. Edit the release on GitHub, copy the description text, download
+    the `static_root` archive, update the release, then click the Delete button.
+    Then create a new release with the same description and `static_root`, and
+    that will trigger a Zenodo version.
 13. Close the milestone for this release, create one for the next release, and
     decide which issues you will include in that milestone.
 
 [release]: https://help.github.com/categories/85/articles
+[Zenodo]: https://zenodo.org/badge/latestdoi/14132839
 
 ## Restoring the system after something's gone wrong ##
 

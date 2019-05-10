@@ -3,11 +3,15 @@ Kive
 
 [![Build Status]][travis]
 [![Code Coverage]][codecov]
+[![DOI]][zenodo]
+
 
 [Build Status]: https://travis-ci.org/cfe-lab/Kive.svg?branch=master
 [travis]: https://travis-ci.org/cfe-lab/Kive
 [Code Coverage]: https://codecov.io/github/cfe-lab/Kive/coverage.svg?branch=master
 [codecov]: https://codecov.io/github/cfe-lab/Kive?branch=master
+[DOI]: https://zenodo.org/badge/14132839.svg
+[zenodo]: https://zenodo.org/badge/latestdoi/14132839
 
 *Kive* is an accessible computing framework for the version control of
 bioinformatic pipelines, along with their input and output datasets.
