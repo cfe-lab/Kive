@@ -94,8 +94,6 @@ API.
 What are we working on?
 -----------------------
 
-You can see active tasks on [our project board][waffle], or look at the [current milestone's burndown][burndown].
+You can see the active tasks in our [milestones].
 
-[waffle]: https://waffle.io/cfe-lab/kive
-[burndown]: https://waffle.io/cfe-lab/kive/metrics/burndown
-
+[milestones]: https://github.com/cfe-lab/Kive/milestones

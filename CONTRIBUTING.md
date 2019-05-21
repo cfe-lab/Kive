@@ -18,9 +18,10 @@ packages to run the tests.
 
     pip install -r requirements-dev.txt
 
-If you want to see what's currently being worked on, check out the [waffle board][waffle].
+If you want to see what's currently being worked on, check out the active tasks
+in our [milestones].
 
-[waffle]: https://waffle.io/cfe-lab/kive
+[milestones]: https://github.com/cfe-lab/Kive/milestones
 
 ## Performance Testing ##
 It can be useful to track where time is spent when running a pipeline or a set
