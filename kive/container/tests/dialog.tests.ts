@@ -92,9 +92,9 @@ describe("Container MethodDialog fixture", function() {
 
     let initial_container: Container = {
         "files": [
-            "prelim_map.py",
-            "remap.py",
-            "helper.py"
+            ["prelim_map.py", true],
+            ["remap.py", true],
+            ["helper.py", false]
         ],
         "pipeline": {
             "kive_version": "0.14",

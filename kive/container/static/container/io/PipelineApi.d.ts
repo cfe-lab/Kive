@@ -8,7 +8,7 @@ export interface PipelineData {
     outputs?: DataSource[];
 }
 export interface Container {
-    files: string[];
+    files: [string, boolean][];
     pipeline: PipelineData;
     id?: number;
     new_tag?: string;
