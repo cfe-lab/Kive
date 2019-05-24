@@ -45,10 +45,10 @@ Once you have set up your production server, this is how to deploy a new release
     Javascript tests and all the Django unit tests, or check that they ran
     successfully in the latest TravisCI build.
     
-    cd /path/to/git/Kive
-    npm run test:travis
-    cd kive
-    ./manage.py test --settings kive.settings_test_pg
+        cd /path/to/git/Kive
+        npm run test:travis
+        cd kive
+        ./manage.py test --settings kive.settings_test_pg
 
 2. Check if the kiveapi package needs to update its version number by looking
    for new commits in the `/api` folder.
