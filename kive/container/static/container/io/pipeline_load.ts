@@ -12,7 +12,7 @@ export class Pipeline {
 
     container: Container = null;
     pipeline: PipelineData = null;
-    files: string[] = [];
+    files: [string, boolean][] = [];
 
     // Pipeline constructor
     constructor(private canvasState: CanvasState) {}
