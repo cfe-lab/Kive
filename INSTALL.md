@@ -26,7 +26,7 @@ Installing Python
 -----------------
 
 Source code or binaries for Python can be obtained from the official website,
-[python.org](www.python.org).  Most *nix distributions (including OS X) come
+[python.org](https://www.python.org).  Most *nix distributions (including OS X) come
 with some version of Python. CentOS 6.7 requires you to install Python 2.7 as
 a software collection.
 
@@ -307,7 +307,7 @@ to start the daemon. Do not proceed until munge is running successfully.
 
 The slurm configuration file, living in `/etc/slurm-llnl/slurm.conf`, needs to be created next.
 An initial file can be created using the 
-online [slurm configuration tool](slurm.schedmd.com/configurator.html).
+online [slurm configuration tool](https://slurm.schedmd.com/configurator.html).
 Make sure that accounting is switched on:
 
     # LOGGING AND ACCOUNTING

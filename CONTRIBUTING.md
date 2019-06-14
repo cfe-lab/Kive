@@ -63,6 +63,7 @@ Once you have set up your production server, this is how to deploy a new release
         ./manage.py collectstatic -c
         cd ..
         tar -czvf static_root.tar.gz static_root
+        rm -rf static_root
 
 3. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
     matches the version on the milestone. If you have to redo

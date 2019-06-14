@@ -44,17 +44,17 @@ export function buildPipelineSubmit(
         clearErrors($error);
         try {
             let form_data = serializePipeline(canvasState);
-            let container_pk = parseInt($container_pk.val(), 10),
-                memory = parseInt($memory.val(), 10),
-                threads = parseInt($threads.val(), 10);
+            let container_pk = parseInt($container_pk.val() as string, 10),
+                memory = parseInt($memory.val() as string, 10),
+                threads = parseInt($threads.val() as string, 10);
 
             form_data.pipeline.default_config = <PipelineConfig> {
                 memory: memory,
                 threads: threads
             };
             if ($new_tag !== undefined) {
-                form_data.new_tag = $new_tag.val();
-                form_data.new_description = $new_description.val();
+                form_data.new_tag = $new_tag.val() as string;
+                form_data.new_description = $new_description.val() as string;
             }
 
             submitPipelineAjax(container_pk, form_data, $error);

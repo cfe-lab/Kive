@@ -95,20 +95,23 @@ let $submit_as_ctrl = $('#id_submit_as_button');
 /* anonymous */       new Dialog( $('#id_defaults_ctrl'), $ctrl_nav.find("li[data-rel='#id_defaults_ctrl']") );
 /* anonymous */       new ViewDialog( $view_menu,           $ctrl_nav.find("li[data-rel='#id_view_ctrl']")   );
 let add_menu      =       new Dialog( $add_menu,            $ctrl_nav.find("li[data-rel='#id_add_ctrl']")    );
-let input_dialog  =  new InputDialog( $('#id_input_ctrl'),  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
+let inputCtrl = $('#id_input_ctrl');
+let input_dialog  =  new InputDialog( inputCtrl,  $add_menu.find("li[data-rel='#id_input_ctrl']")  );
+let methodCtrl = $('#id_method_ctrl');
 let method_dialog = new MethodDialog(
-    $('#id_method_ctrl'),
+    methodCtrl,
     $add_menu.find("li[data-rel='#id_method_ctrl']"),
     loader.container);
-let output_dialog = new OutputDialog( $('#id_output_ctrl'), $add_menu.find("li[data-rel='#id_output_ctrl']") );
+let outputCtrl = $('#id_output_ctrl');
+let output_dialog = new OutputDialog( outputCtrl, $add_menu.find("li[data-rel='#id_output_ctrl']") );
 let save_as_dialog = new Dialog( $save_as_ctrl, $submit_as_ctrl );
 
 $add_menu.click('li', function() { add_menu.hide(); });
 
 // Handle jQuery-UI Dialog spawned for output cable
-$('form', '#id_output_ctrl') .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
-$('form', '#id_input_ctrl')  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
-$('form', '#id_method_ctrl') .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
+$('form', outputCtrl) .submit( function(e) { e.preventDefault(); output_dialog.submit(canvasState); } );
+$('form', inputCtrl)  .submit( function(e) { e.preventDefault();  input_dialog.submit(canvasState); } );
+$('form', methodCtrl) .submit( function(e) { e.preventDefault(); method_dialog.submit(canvasState); } );
 
 canvas.addEventListener("CanvasStateNewOutput", function(e: CustomEvent) {
     let d = e.detail;
