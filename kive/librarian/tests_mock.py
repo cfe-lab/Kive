@@ -1,4 +1,3 @@
-from datetime import datetime
 from io import BytesIO
 import os
 import six
@@ -13,14 +12,14 @@ from django_mock_queries.mocks import mocked_relations
 import mock
 from mock import PropertyMock, Mock, patch
 
-from constants import datatypes, runcomponentstates, users
+from constants import datatypes, users
 from container.models import ContainerRun, ContainerArgument, ContainerDataset
 from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file, strip_removal_plan
 from kive.tests import ViewMockTestCase
-from librarian.models import Dataset, ExecRecord, ExecRecordOut
+from librarian.models import Dataset
 from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype, kive_user, KiveUser
-from archive.models import RunStep, ExecLog, Run, RunInput
+from archive.models import Run, RunInput
 
 
 @mocked_relations(Dataset,
@@ -194,42 +193,6 @@ Dave,40
 
         self.assertEqual(expected_rows, rows)
 
-    def test_check_file_contents(self):
-        file_path = os.devnull
-        BadData.objects = Mock(name='BadData.objects')
-        mock_structure = Mock(name='Dataset.structure')
-        Dataset.structure = mock_structure
-        expected_bad_data = BadData.objects.create.return_value  # @UndefinedVariable
-        Dataset.content_checks = Mock(name='Dataset.content_checks')
-        expected_check = Dataset.content_checks.create.return_value  # @UndefinedVariable
-        expected_bad_row = 42
-        expected_bad_column = 2
-        count_column = CompoundDatatypeMember()
-        compound_datatype = mock_structure.compounddatatype
-        compound_datatype.members.get.return_value = count_column
-        compound_datatype.summarize_csv.return_value = {
-            u'num_rows': expected_bad_row * 2,
-            u'header': ['name', 'count'],
-            u'failing_cells': {(expected_bad_row,
-                                expected_bad_column): [u'Was not integer']}
-        }
-        dataset = Dataset()
-
-        check = dataset.check_file_contents(file_path_to_check=file_path,
-                                            summary_path=None,
-                                            min_row=None,
-                                            max_row=None,
-                                            execlog=None,
-                                            checking_user=None,
-                                            notify_all=False)
-
-        self.assertIs(expected_check, check)
-        compound_datatype.members.get.assert_called_once_with(
-            column_idx=expected_bad_column)
-        expected_bad_data.cell_errors.create.assert_called_once_with(
-            column=count_column,
-            row_num=expected_bad_row)
-
     def test_removal_plan(self):
         dataset = Dataset(id=42)
         expected_plan = {'Datasets': {dataset}}
@@ -343,33 +306,12 @@ class DatasetViewMockTests(ViewMockTestCase):
 
     def test_dataset_view_output(self):
         """ Link back to the run that generated the output dataset. """
-        user = User()
         response = self.client.get(reverse('dataset_view',
                                            kwargs=dict(dataset_id='99')))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(self.file_content, response.context['sample_content'])
         self.assertEqual('/datasets', response.context['return'])
-
-    def test_dataset_view_run(self):
-        response = self.client.get(reverse('dataset_view',
-                                           kwargs=dict(dataset_id='99')),
-                                   data=dict(run_id=42,
-                                             view_run=None))
-
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(self.file_content, response.context['sample_content'])
-        self.assertEqual('/view_run/42', response.context['return'])
-
-    def test_dataset_view_results(self):
-        response = self.client.get(reverse('dataset_view',
-                                           kwargs=dict(dataset_id='99')),
-                                   data=dict(run_id=42,
-                                             view_results=None))
-
-        self.assertEqual(200, response.status_code)
-        self.assertEqual(self.file_content, response.context['sample_content'])
-        self.assertEqual('/view_results/42/', response.context['return'])
 
     def test_dataset_view_other(self):
         response = self.client.get(reverse('dataset_view',

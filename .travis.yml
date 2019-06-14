@@ -35,7 +35,7 @@ script:
   - cd kive
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then ./manage.py test --setting kive.settings_mocked ; fi
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run manage.py test --setting kive.settings_test_pg ; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg container librarian fleet transformation stopwatch method.tests kive.tests_file_access_utils kive.tests datachecking archive portal rest_framework ; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg container librarian stopwatch kive.tests_file_access_utils kive.tests portal rest_framework ; fi
   - cd ../api
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run --source=kiveapi -m pytest ; fi
   - set +e

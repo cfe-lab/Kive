@@ -59,15 +59,7 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser, or update its name/description.
     """
-    return_to_run = request.GET.get('run_id', None)
-    is_view_results = "view_results" in request.GET
-    is_view_run = "view_run" in request.GET
     return_url = reverse("datasets")
-    if return_to_run is not None:
-        if is_view_run:
-            return_url = reverse('view_run', kwargs={'run_id': return_to_run})
-        elif is_view_results:
-            return_url = reverse('view_results', kwargs={'run_id': return_to_run})
 
     try:
         if admin_check(request.user):

@@ -875,49 +875,6 @@ class Dataset(metadata.models.AccessControl):
             if file_handle is not None:
                 file_handle.seek(0)
 
-            if cdt is not None and check:
-                run_dir = tempfile.mkdtemp(
-                    prefix="SD{}_".format(new_dataset.pk),
-                    dir=file_access_utils.create_sandbox_base_path()
-                )
-                file_access_utils.configure_sandbox_permissions(run_dir)
-
-                # Note that this may raise a VerificationMethodError if a CustomConstraint
-                # verification method fails.  We allow the error to propagate
-                # up.
-                content_check = new_dataset.check_file_contents(
-                    file_path_to_check=file_name,
-                    file_handle=file_handle,
-                    summary_path=run_dir,
-                    min_row=None,
-                    max_row=None,
-                    execlog=None,
-                    checking_user=user
-                )
-
-                shutil.rmtree(run_dir)
-                if content_check.is_fail():
-                    if content_check.baddata.bad_header:
-                        raise ValueError('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                         .format(file_name, cdt))
-                    elif content_check.baddata.cell_errors.exists():
-                        error = content_check.baddata.cell_errors.first()
-                        cdtm = error.column
-                        if error.has_blank_error():
-                            raise ValueError(
-                                'Entry ({},{}) of file "{}" is blank.'.format(
-                                    error.row_num, cdtm.column_idx, file_name)
-                            )
-                        else:
-                            raise ValueError(
-                                'The entry at row {}, column {} of file "{}" did not pass the constraints of '
-                                'Datatype "{}"'.format(error.row_num, cdtm.column_idx, file_name, cdtm.datatype)
-                            )
-                    else:
-                        # Shouldn't reach here.
-                        raise ValueError('The file "{}" was malformed'.format(file_name))
-                LOGGER.debug("Read {} rows from file {}".format(new_dataset.structure.num_rows, file_name))
-
             if keep_file:
                 new_dataset.register_file(file_path=file_name, file_handle=file_handle)
 
@@ -926,123 +883,6 @@ class Dataset(metadata.models.AccessControl):
                 new_dataset.structure.save()
             new_dataset.save()
         return new_dataset
-
-    # FIXME: use a transaction!
-    # TODO: clean this up, end_time is set in too many places
-    def check_file_contents(self, file_path_to_check, summary_path, min_row, max_row, execlog,
-                            checking_user, file_handle=None, notify_all=True):
-        """
-        Performs content check on a file, generates a CCL, and sets this
-        SD's num_rows.
-
-        Closes the file afterwards if the file source is a string file path.
-        Does not close the file afterwards if file source is a file handle.
-
-        OUTPUTS
-        If SD is raw, creates a clean CCL.
-        If not raw, checks the file and returns CCL with/without a
-        corresponding BadData.
-
-        PRE
-        Should never be called twice on the same dataset, as
-        this would overwrite num_rows to a potentially new value?
-
-        :param str file_path_to_check:  Path to file to check. file_path_to_check not used if file_handle supplied.
-        :param file file_handle: file handle of file to check.  This should be opened in the form that the CSV
-                module requires for the version of Python being used, and seeked to the beginning.
-                If file_handle empty, then uses file_path_to_check.
-        :param summary_path:
-        :param min_row:
-        :param max_row:
-        :param execlog:
-        :rtype ContentCheckLog :
-        """
-        self.logger.debug("Creating clean ContentCheckLog for file {} and linking to ExecLog"
-                          .format(file_path_to_check))
-        ccl = self.content_checks.create(execlog=execlog, user=checking_user)
-        ccl.start(save=True)
-
-        if self.is_raw():
-            ccl.stop(save=True, clean=False)
-            ccl.clean()
-            return ccl
-
-        my_CDT = self.get_cdt()
-        file_path_to_report = (file_handle.name
-                               if file_handle
-                               else file_path_to_check)
-
-        opened_file_ourselves = False
-        if file_handle is None:
-            file_handle = file_access_utils.open_for_csv(file_path_to_check)
-            opened_file_ourselves = True
-
-        try:
-            csv_summary = my_CDT.summarize_csv(file_handle)
-        finally:
-            if opened_file_ourselves:
-                file_handle.close()
-
-        if "bad_num_cols" in csv_summary or "bad_col_indices" in csv_summary:
-            self.logger.warning("malformed header in %r.", file_path_to_report)
-            ccl.add_bad_header()
-            ccl.stop(save=True, clean=True)
-            return ccl
-
-        if csv_summary["num_rows"] == 0:
-            self.logger.debug("file had no rows in %r.", file_path_to_report)
-
-        csv_baddata = False
-        self.structure.num_rows = csv_summary["num_rows"]
-        self.structure.save()
-        if max_row is not None and csv_summary["num_rows"] > max_row:
-            self.logger.warning("too many rows in %r.", file_path_to_report)
-            # FIXME: Do we only create these BD objects if they don't already exist?
-            ccl.add_bad_num_rows()
-            csv_baddata = True
-
-        if min_row is not None and csv_summary["num_rows"] < min_row:
-            self.logger.warning("too few rows in %r.", file_path_to_report)
-            # FIXME: Do we only create these BD objects if they don't already exist?
-            ccl.add_bad_num_rows()
-            csv_baddata = True
-
-        if "failing_cells" in csv_summary:
-            self.logger.warning("cells failed datatype check in %r.", file_path_to_report)
-
-            if not csv_baddata:
-                bad_data = BadData.objects.create(contentchecklog=ccl)
-                csv_baddata = True
-
-            for row, col in csv_summary["failing_cells"]:
-                fails = csv_summary["failing_cells"][(row, col)]
-                for failed_constr in fails:
-                    new_cell_error = bad_data.cell_errors.create(
-                        row_num=row,
-                        column=my_CDT.members.get(column_idx=col))
-
-                    if failed_constr == metadata.models.CompoundDatatypeMember.BLANK_ENTRY:
-                        blank_cell = datachecking.models.BlankCell(cellerror=new_cell_error)
-                        blank_cell.save()
-                    # If failure is a string (Ex: "Was not integer"), leave constraint_failed as null.
-                    elif not isinstance(failed_constr, six.string_types):
-                        new_cell_error.constraint_failed = failed_constr
-
-                    new_cell_error.clean()
-                    new_cell_error.save()
-
-        if csv_baddata:
-            self.logger.debug(
-                "Content check failed - file {} does not conform to Dataset {}".
-                format(file_path_to_check, self))
-            if notify_all:
-                self.quarantine_runcomponents_using_as_output()
-        else:
-            self.logger.debug(
-                "Content check passed - file {} conforms to Dataset {}".
-                format(file_path_to_check, self))
-        ccl.stop(save=True, clean=True)
-        return ccl
 
     def check_integrity(self, new_file_path, checking_user, execlog=None, runcomponent=None,
                         newly_computed_MD5=None, notify_all=True):
@@ -1459,8 +1299,6 @@ class ExecRecord(models.Model):
     """
     Record of a previous execution of a Pipeline component.
     """
-    generator = models.OneToOneField("archive.ExecLog", related_name="execrecord")
-
     # FIXME exactly one of these must be non-null
 
     def __init__(self, *args, **kwargs):

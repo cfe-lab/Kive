@@ -16,11 +16,7 @@ import datachecking.models
 class Command(BaseCommand):
     help = 'Resets the database and loads sample data.'
     TARGETS = (
-        method.models.CodeResourceRevision.UPLOAD_DIR,
         librarian.models.Dataset.UPLOAD_DIR,
-        archive.models.MethodOutput.UPLOAD_DIR,
-        datachecking.models.VerificationLog.UPLOAD_DIR,
-        settings.SANDBOX_PATH,
         container.models.Container.UPLOAD_DIR,
         container.models.ContainerLog.UPLOAD_DIR,
         container.models.ContainerRun.SANDBOX_ROOT)

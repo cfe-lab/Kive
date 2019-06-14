@@ -8,7 +8,6 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import APIException
 from rest_framework.response import Response
 
-from archive.serializers import RunSerializer
 from kive.ajax import IsDeveloperOrGrantedReadOnly, RemovableModelViewSet,\
     CleanCreateModelMixin, convert_validation, StandardPagination,\
     SearchableModelMixin
@@ -213,15 +212,4 @@ class PipelineViewSet(CleanCreateModelMixin,
     # noinspection PyUnusedLocal
     @action(detail=True, suffix="Instances")
     def instances(self, request, pk=None):
-        queryset = self.get_object().pipeline_instances.all()
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            # Not paging.
-            serializer = RunSerializer(page,
-                                       many=True,
-                                       context=self.get_serializer_context())
-            return self.get_paginated_response(serializer.data)
-        serializer = RunSerializer(queryset,
-                                   many=True,
-                                   context=self.get_serializer_context())
-        return Response(serializer.data)
+        pass

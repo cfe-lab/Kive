@@ -10,10 +10,7 @@ from django.views.decorators.http import require_GET
 from django.contrib.auth.models import User, Group
 from django.conf import settings
 
-from rest_framework.renderers import JSONRenderer
-
 from archive.models import Run, RunBatch
-from archive.serializers import RunOutputsSerializer
 from pipeline.models import Pipeline
 from portal.views import admin_check, developer_check
 from sandbox.forms import RunDetailsForm, RunBatchDetailsForm, StartRunBatchForm
@@ -152,7 +149,7 @@ def view_results(request, run_id):
 
     context = {
         "run": run,
-        "outputs": JSONRenderer().render(RunOutputsSerializer(run, context={'request': request}).data),
+        "outputs": "[]",
         "run_form": run_form,
         "is_complete": run_complete,
         "is_owner": run.user == request.user,

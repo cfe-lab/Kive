@@ -7,7 +7,6 @@ import os
 import random
 import re
 import tempfile
-import time
 import logging
 import json
 import shutil
@@ -32,45 +31,21 @@ from mock import patch
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
-from archive.models import ExecLog, MethodOutput, Run
 from constants import datatypes, groups
 from container.models import ContainerFamily
 from datachecking.models import MD5Conflict
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
-from librarian.models import Dataset, ExecRecord, ExternalFileDirectory, DatasetStructure
+from librarian.models import Dataset, ExternalFileDirectory, DatasetStructure
 from librarian.serializers import DatasetSerializer
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
-from method.models import CodeResource, CodeResourceRevision, Method, \
-    MethodFamily
-from pipeline.models import Pipeline, PipelineFamily
 
 import file_access_utils
 import kive.testing_utils as tools
-from kive.tests import BaseTestCases, DuckContext, install_fixture_files, remove_fixture_files, capture_log_stream
+from kive.tests import BaseTestCases, DuckContext, capture_log_stream
 
 FROM_FILE_END = 2
 
 samplecode_path = os.path.abspath(os.path.join(__file__, '../../../samplecode'))
-
-
-def er_from_record(record):
-    """
-    Helper function to create an ExecRecord from an Run, RunStep, or
-    RunOutputCable (record), by creating a throwaway ExecLog.
-    """
-    exec_log = ExecLog(record=record, invoking_record=record)
-    exec_log.start_time = timezone.now()
-    time.sleep(1)
-    exec_log.end_time = timezone.now()
-    exec_log.save()
-    if record.__class__.__name__ == "RunStep":
-        output = MethodOutput(execlog=exec_log, return_code=0)
-        output.save()
-        exec_log.methodoutput = output
-        exec_log.save()
-    exec_record = ExecRecord(generator=exec_log)
-    exec_record.save()
-    return exec_record
 
 
 @skipIfDBFeature('is_mocked')
@@ -198,83 +173,6 @@ class DatasetTests(LibrarianTestCase):
                              actual_md5,
                              expected_md5
                          ))
-
-    def test_forgot_header(self):
-        """
-        Dataset creation with a CDT fails when the header is left off
-        the data file.
-        """
-        # Write the data with no header.
-        data_file = tempfile.NamedTemporaryFile()
-        data_file.write(self.data.encode())
-
-        # Try to create a dataset.
-        self.assertRaisesRegexp(ValueError,
-                                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                                          .format(data_file.name, self.cdt_record)),
-                                lambda: Dataset.create_dataset(file_path=data_file.name,
-                                                               user=self.myUser, cdt=self.cdt_record,
-                                                               name="lab data", description="patient sequences"))
-        data_file.close()
-
-    def test_empty_file(self):
-        """
-        Dataset creation fails if the file passed is empty.
-        """
-        data_file = tempfile.NamedTemporaryFile()
-        file_path = data_file.name
-
-        self.assertRaisesRegexp(
-            ValueError,
-            re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                      .format(file_path, self.cdt_record)),
-            lambda: Dataset.create_dataset(
-                file_path=data_file.name,
-                user=self.myUser,
-                cdt=self.cdt_record,
-                name="missing data",
-                description="oops!"
-            )
-        )
-        data_file.close()
-
-    def test_too_many_columns(self):
-        """
-        Dataset creation fails if the data file has too many
-        columns.
-        """
-        with tempfile.NamedTemporaryFile() as data_file:
-            data_file.write("""\
-header,sequence,extra
-foo,bar,baz
-            """.encode())
-            data_file.flush()
-            file_path = data_file.name
-
-            self.assertRaisesRegexp(
-                ValueError,
-                re.escape('The header of file "{}" does not match the CompoundDatatype "{}"'
-                          .format(file_path, self.cdt_record)),
-                lambda: Dataset.create_dataset(file_path=file_path, user=self.myUser,
-                                               cdt=self.cdt_record, name="bad data",
-                                               description="too many columns")
-            )
-
-    def test_right_columns(self):
-        """
-        Dataset creation fails if the data file has too many
-        columns.
-        """
-        with tempfile.NamedTemporaryFile() as data_file:
-            data_file.write("""\
-header,sequence
-foo,bar
-""".encode())
-            data_file.flush()
-            file_path = data_file.name
-
-            Dataset.create_dataset(file_path=file_path, user=self.myUser, cdt=self.cdt_record,
-                                   description="right columns", name="good data")
 
     def test_dataset_creation(self):
         """
