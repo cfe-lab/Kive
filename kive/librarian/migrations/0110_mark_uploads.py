@@ -9,6 +9,8 @@ from django.db import migrations
 def mark_uploads(apps, schema_editor):
     # noinspection PyPep8Naming
     Dataset = apps.get_model('librarian', 'Dataset')
+    if Dataset.objects.count() == 0:
+        return
     # noinspection PyPep8Naming
     ContainerDataset = apps.get_model('container', 'ContainerDataset')
     # noinspection PyPep8Naming

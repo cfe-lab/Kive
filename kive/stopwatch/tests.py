@@ -8,19 +8,17 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 
 import kive.testing_utils as tools
-from pipeline.models import PipelineFamily
+from container.models import ContainerRun
 
 
 @skipIfDBFeature('is_mocked')
 class StopwatchTests(TestCase):
-    fixtures = ["em_sandbox_test_environment"]
+    fixtures = ["container_run"]
 
     # The fixture creates self.pE_run, which is a
     # Stopwatch.  We'll use this as our Stopwatch.
     def setUp(self):
-        self.pf = PipelineFamily.objects.get(name="Pipeline_family")
-        self.pE = self.pf.members.get(revision_name="pE_name")
-        self.pE_run = self.pE.pipeline_instances.first()
+        self.pE_run = ContainerRun.objects.first()
 
     def tearDown(self):
         tools.clean_up_all_files()

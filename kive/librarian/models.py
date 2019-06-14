@@ -139,14 +139,6 @@ class Dataset(metadata.models.AccessControl):
                                         help_text="Date of Dataset creation.",
                                         db_index=True)
 
-    # Four cases from which Datasets can originate:
-    #
-    # Case 1: uploaded
-    # Case 2: from the transformation of a RunStep
-    # Case 3: from the execution of a POC (i.e. from a ROC)
-    # Case 4: from the execution of a PSIC (i.e. from a RunSIC)
-    file_source = models.ForeignKey("archive.RunComponent", related_name="outputs", null=True, blank=True)
-
     # Datasets are stored in the "Datasets" folder
     dataset_file = models.FileField(upload_to=get_upload_path,
                                     help_text="Physical path where datasets are stored",
@@ -451,10 +443,6 @@ class Dataset(metadata.models.AccessControl):
         if self.has_structure():
             self.structure.clean()
 
-        if self.file_source is not None:
-            # Whatever run created this Dataset must have had access to the parent Dataset.
-            self.file_source.definite.top_level_run.validate_restrict_access([self])
-
         if not (self.externalfiledirectory and self.external_path or
                 not self.externalfiledirectory and not self.external_path):
             raise ValidationError(
@@ -495,10 +483,6 @@ class Dataset(metadata.models.AccessControl):
     def get_access_limits(self, access_limits=None):
         if access_limits is None:
             access_limits = []
-
-        # Is this an output from an old run?
-        if self.file_source is not None:
-            access_limits.append(self.file_source.parent_run)
 
         # Is this an output from a container run?
         for container_dataset in self.containers.filter(argument__type='O'):

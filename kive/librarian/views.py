@@ -90,10 +90,7 @@ def dataset_view(request, dataset_id):
     # if it was generated, it's anyone who had access to the generating run.
     addable_users, addable_groups = dataset.other_users_groups()
 
-    if dataset.file_source is None:
-        generating_run = None
-    else:
-        generating_run = dataset.file_source.top_level_run
+    generating_run = None
     container_dataset = dataset.containers.filter(argument__type='O').first()  # Output from which runs?
     if container_dataset is None:
         container_run = None
