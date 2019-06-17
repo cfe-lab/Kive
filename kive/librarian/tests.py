@@ -31,13 +31,13 @@ from mock import patch
 from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
-from constants import datatypes, groups
+from constants import groups
 from container.models import ContainerFamily
 from datachecking.models import MD5Conflict
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
 from librarian.models import Dataset, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
-from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
+from metadata.models import CompoundDatatype, kive_user, everyone_group
 
 import file_access_utils
 import kive.testing_utils as tools

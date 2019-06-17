@@ -1,10 +1,6 @@
 # Ignore .pyc files
 *.pyc
 .pytest_cache
-# Don't get the settings.py or hostfile files that have been customized
-kive/kive/hostfile
-# active settings
-kive/kive/settings.py
 # Ignore the temporary stuff created during testing
 kive/testreport.xml
 kive/timing.dat
@@ -54,7 +50,6 @@ kive/pipeline/tests.js
 kive/pipeline/tests/*.js
 kive/portal/portal.tests.js
 kive/portal/static/portal/noxss_jq.js
-kive/sandbox/sandbox.tests.js
 kive/sandbox/static/sandbox/choose_pipeline.js
 kive/sandbox/static/sandbox/view_run.js
 kive/sandbox/static/sandbox/PipelineRunTable.js

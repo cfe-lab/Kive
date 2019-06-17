@@ -41,56 +41,8 @@ deletion_order = [
 ]
 
 
-# A helper for remove_helper and redact_helper, in archive.models.
-def any_runs_in_progress(plan_of_attack):
-
-    for sd in plan_of_attack["Datasets"]:
-        for rtp_input in sd.runinputs.all():
-            curr_run = rtp_input.run
-            if not curr_run.is_complete() and not curr_run.is_pending():
-                return True
-
-    for er in plan_of_attack["ExecRecords"]:
-        for affected_rc in er.used_by_components.all():
-            curr_run = affected_rc.top_level_run
-            if not curr_run.is_complete() and not curr_run.is_pending():
-                return True
-
-    if "Pipelines" in plan_of_attack:  # Redaction plans don't have this key
-        for pipeline in plan_of_attack["Pipelines"]:
-            for run in pipeline.pipeline_instances.all():
-                if not run.is_complete() and not run.is_pending():
-                    return True
-
-    return False
-
-
 @transaction.atomic
 def remove_helper(removal_plan):
-    # If we're affecting anything that's currently running, stop immediately.
-
-    if any_runs_in_progress(removal_plan):
-        raise RunNotFinished("Cannot remove: an affected run is still in progress")
-
-    # Redact any sandboxes tied to Runs that we're removing.
-    for run in removal_plan["Runs"]:
-        try:
-            if not run.purged:
-                run.collect_garbage()
-        except ObjectDoesNotExist:
-            # There's no associated RunToProcess, and therefore no sandbox path.
-            pass
-        except (SandboxActiveException, OSError) as e:
-            LOGGER.warning(e)
-
-    for execrecord in removal_plan["ExecRecords"]:
-        execlog = execrecord.generator
-        methodoutput = getattr(execlog, 'methodoutput', None)
-        if methodoutput is not None:
-            for f in (methodoutput.output_log, methodoutput.error_log):
-                if f is not None:
-                    f.delete()
-
     for class_name in deletion_order:
         if class_name in removal_plan:
             for obj_to_delete in removal_plan[class_name]:

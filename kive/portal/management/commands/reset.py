@@ -42,7 +42,6 @@ class Command(BaseCommand):
         # flush truncates all tables, so we need to re-load this stuff.
         call_command("loaddata", "initial_groups")
         call_command("loaddata", "initial_user")
-        call_command("loaddata", "initial_data")
 
         # Create the Sandboxes directory specially because it has to have
         # special permissions added to it.

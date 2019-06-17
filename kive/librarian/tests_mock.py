@@ -1,5 +1,4 @@
 from io import BytesIO
-import os
 import six
 from zipfile import ZipFile
 
@@ -10,7 +9,7 @@ from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django_mock_queries.mocks import mocked_relations
 import mock
-from mock import PropertyMock, Mock, patch
+from mock import PropertyMock, patch
 
 from constants import datatypes, users
 from container.models import ContainerRun, ContainerArgument, ContainerDataset
@@ -19,7 +18,6 @@ from kive.tests import dummy_file, strip_removal_plan
 from kive.tests import ViewMockTestCase
 from librarian.models import Dataset
 from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype, kive_user, KiveUser
-from archive.models import Run, RunInput
 
 
 @mocked_relations(Dataset,
@@ -168,6 +166,16 @@ Dave,40
 
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
+    def test_remove_input_runs_still_active(self):
+        dataset = Dataset(id=42)
+        run = ContainerRun(id=43, state=ContainerRun.RUNNING)
+        argument = ContainerArgument(type=ContainerArgument.INPUT)
+        dataset.containers.create(run=run, argument=argument)
+
+        with self.assertRaisesRegexp(ValueError,
+                                     r'ContainerRun id 43 is still active\.'):
+            dataset.build_removal_plan()
+
     def test_removal_skips_output_runs(self):
         dataset = Dataset(id=42)
         run = ContainerRun(id=43)
@@ -197,7 +205,7 @@ Dave,40
 class DatasetViewMockTests(ViewMockTestCase):
     def setUp(self):
         super(DatasetViewMockTests, self).setUp()
-        patcher = mocked_relations(KiveUser, Dataset, Group, CompoundDatatype, Run)
+        patcher = mocked_relations(KiveUser, Dataset, Group, CompoundDatatype)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -332,7 +340,6 @@ class DatasetViewMockTests(ViewMockTestCase):
                          register_file.call_args_list[1][1]['file_handle'].name)
         self.assertEqual(2, compute_md5.call_count)
 
-    @mocked_relations(RunInput)
     def test_dataset_lookup_not_found(self):
         md5_checksum = '123456789012345678901234567890ab'
         response = self.client.get(reverse(
@@ -344,7 +351,6 @@ class DatasetViewMockTests(ViewMockTestCase):
         self.assertEqual(200, response.status_code)
         self.assertEqual(0, response.context['num_datasets'])
 
-    @mocked_relations(RunInput)
     def test_dataset_lookup(self):
         md5_checksum = '123456789012345678901234567890ab'
         self.dataset.MD5_checksum = md5_checksum

@@ -938,21 +938,6 @@ class Dataset(metadata.models.AccessControl):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
 
-    @staticmethod
-    def _active_datasets():
-        """A generator to produce the datasets of all running and pending runs."""
-        pending_runs = archive.models.Run.objects.filter(start_time=None)
-        running_runs = archive.models.Run.objects.filter(end_time=None)
-        active_runs = pending_runs | running_runs
-        for run in active_runs:
-            for component in run.get_all_atomic_runcomponents():
-                execrecord = component.execrecord
-                if execrecord is not None:
-                    for eri in execrecord.execrecordins.all():
-                        yield eri.dataset
-                    for ero in execrecord.execrecordouts.all():
-                        yield ero.dataset
-
     @classmethod
     def find_unneeded(cls):
         """ Finds datasets that could be purged.
@@ -961,13 +946,8 @@ class Dataset(metadata.models.AccessControl):
         :return: a QuerySet
         """
         # Exclude Datasets that are currently in use
-        active_container_dataset_ids = ContainerDataset.objects.filter(
+        active_dataset_ids = ContainerDataset.objects.filter(
             run__end_time=None).values_list('dataset_id').order_by()
-        active_run_dataset_ids = archive.models.RunInput.objects.filter(
-            run__end_time=None).values_list('dataset_id').order_by()
-        active_dataset_ids = active_container_dataset_ids.union(
-            active_run_dataset_ids,
-            all=True)
 
         unneeded = cls.objects.filter(
             is_uploaded=False).exclude(  # Only purge outputs.
