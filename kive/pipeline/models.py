@@ -959,35 +959,6 @@ class PipelineCable(models.Model):
         execrecord      ExecRecord which may be reused, or None if no
                         ExecRecord exists
         """
-        # Look at ERIs with matching input dataset.
-        candidate_ERIs = librarian.models.ExecRecordIn.objects.filter(
-            dataset=input_dataset).prefetch_related(
-                'execrecord__execrecordins__dataset',
-                'execrecord__execrecordouts__dataset',
-                'execrecord__generator__methodoutput')
-
-        candidates = []
-        for candidate_ERI in candidate_ERIs:
-            candidate_execrecord = candidate_ERI.execrecord
-            if candidate_execrecord.is_redacted():
-                continue
-
-            candidate_component = candidate_execrecord.general_transf()
-
-            if not candidate_component.is_cable():
-                continue
-
-            # Check that this ER is accessible by runcable.
-            extra_users, extra_groups = runcable.top_level_run.extra_users_groups(
-                [candidate_execrecord.generating_run])
-            if len(extra_users) > 0 or len(extra_groups) > 0:
-                continue
-
-            if self.definite.is_compatible(candidate_component):
-                self.logger.debug("Compatible ER found")
-                candidates.append(candidate_execrecord)
-
-        return candidates
 
 
 @python_2_unicode_compatible

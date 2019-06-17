@@ -8,18 +8,13 @@ from __future__ import unicode_literals
 
 import itertools
 import logging
-from operator import attrgetter, itemgetter
-import os
-import time
-from datetime import datetime, timedelta
+from operator import attrgetter
 import shutil
 import six
 
 from django.db import models, transaction
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.core.urlresolvers import reverse
+from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.conf import settings
 from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.contrib.auth.models import User, Group
@@ -27,12 +22,10 @@ from django.contrib.auth.models import User, Group
 import archive.exceptions
 from constants import maxlengths, groups, runstates, runcomponentstates
 from datachecking.models import ContentCheckLog, IntegrityCheckLog
-from librarian.models import Dataset, ExecRecord
-import librarian.filewalker as filewalker
+from librarian.models import Dataset
 import metadata.models
 import stopwatch.models
 from pipeline.models import Pipeline
-from method.models import Method
 
 
 def empty_redaction_plan():
@@ -898,7 +891,6 @@ class RunComponent(stopwatch.models.Stopwatch):
     This class encapsulates much of the common function
     of the three "atomic" Run* classes.
     """
-    execrecord = models.ForeignKey("librarian.ExecRecord", null=True, blank=True, related_name="used_by_components")
     reused = models.NullBooleanField(help_text="Denotes whether this reuses an ExecRecord", default=None)
 
     # State field to avoid the use of is_complete() and is_successful(), which can be slow.

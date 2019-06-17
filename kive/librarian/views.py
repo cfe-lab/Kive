@@ -66,13 +66,7 @@ def dataset_view(request, dataset_id):
             accessible_datasets = Dataset.objects
         else:
             accessible_datasets = Dataset.filter_by_user(request.user)
-        dataset = accessible_datasets.prefetch_related(
-            'structure',
-            'structure__compounddatatype',
-            'structure__compounddatatype__members',
-            'structure__compounddatatype__members__datatype',
-            'structure__compounddatatype__members__datatype__basic_constraints'
-        ).get(pk=dataset_id)
+        dataset = accessible_datasets.get(pk=dataset_id)
 
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))

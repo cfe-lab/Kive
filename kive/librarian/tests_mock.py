@@ -116,51 +116,6 @@ Tom,15
 
         self.assertEqual(expected_rows, rows)
 
-    def test_rows_with_error_after_limit(self):
-        data_file = dummy_file("""\
-name,count
-Bob,20
-Dave,40
-Tom,15
-Jim,th1rty
-""")
-        bad_row, bad_column = 4, 2
-        count_column_id = 42
-        name_column_id = 99
-        expected_rows = [[('Bob', []), ('20', [])],
-                         [('Dave', []), ('40', [])]]
-        expected_extra_errors = [
-            (bad_row, [('Jim', []), ('th1rty', [u'Was not integer'])])]
-
-        mock_structure = Mock(name='Dataset.structure')
-        Dataset.structure = mock_structure
-        int_datatype = Datatype(id=datatypes.INT_PK)
-        count_column = CompoundDatatypeMember(id=count_column_id,
-                                              column_idx=bad_column,
-                                              datatype=int_datatype)
-        str_datatype = Datatype(id=datatypes.STR_PK)
-        name_column = CompoundDatatypeMember(id=name_column_id,
-                                             datatype=str_datatype)
-        compound_datatype = mock_structure.compounddatatype
-        compound_datatype.members.all.return_value = [count_column, name_column]
-        extra_cell_errors = [{'column_id': count_column_id,
-                              'row_num__min': bad_row}]
-        dataset = Dataset()
-        dataset.get_open_file_handle = lambda md: data_file
-        expected_check = dataset.content_checks.create()
-        ContentCheckLog.baddata = PropertyMock()
-        expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = []
-        expected_check.baddata.cell_errors.values.return_value.\
-            annotate.return_value.order_by.return_value = extra_cell_errors
-
-        extra_errors = []
-        rows = list(dataset.rows(data_check=True,
-                                 limit=2,
-                                 extra_errors=extra_errors))
-
-        self.assertEqual(expected_rows, rows)
-        self.assertEqual(expected_extra_errors, extra_errors)
-
     def test_rows_with_no_data_check(self):
         data_file = dummy_file("""\
 name,count

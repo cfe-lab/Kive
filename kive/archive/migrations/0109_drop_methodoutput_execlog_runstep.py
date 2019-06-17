@@ -8,7 +8,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('datachecking', '0107_auto_20190614_1645'),
+        ('datachecking', '0107_remove_execlog_refs'),
         ('librarian', '0113_remove_execrecord_generator'),
         ('archive', '0108_drop_cables'),
     ]

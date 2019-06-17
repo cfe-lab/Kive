@@ -129,11 +129,6 @@ class DatasetViewSet(RemovableModelViewSet,
             return queryset.filter(user__username__icontains=value)
         if key == 'uploaded':
             return queryset.filter(is_uploaded=True)
-        if key == 'cdt':
-            if value == '':
-                return queryset.filter(structure__isnull=True)
-            else:
-                return queryset.filter(structure__compounddatatype_id=int(value))
         if key == 'md5':
             return queryset.filter(MD5_checksum=value)
         if key in ('createdafter', 'createdbefore'):

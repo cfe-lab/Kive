@@ -2735,7 +2735,7 @@ Line 3
         content_file = ContentFile('x,y\n1,2')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file)
-        output1.set_MD5()
+        output1.set_md5()
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 
@@ -2749,7 +2749,7 @@ Line 3
         output2 = Dataset.objects.create(user=run2.user, name='output2')
         content_file2 = ContentFile('greeting\n')
         output2.dataset_file.save('out.csv', content_file2)
-        output2.set_MD5()
+        output2.set_md5()
         output2.save()
         run2.datasets.create(argument=output_argument, dataset=output2)
         run2.set_md5()
@@ -2765,7 +2765,7 @@ Line 3
                                            state=ContainerRun.COMPLETE)
         output1b = Dataset.objects.create(user=run1.user, name='output1b')
         output1b.dataset_file.save('example_b.csv', content_file)
-        output1b.set_MD5()
+        output1b.set_md5()
         output1b.save()
         run3.datasets.create(argument=output_argument, dataset=output1b)
 
@@ -2791,7 +2791,7 @@ Line 3
         content_file1b = ContentFile('x,y\n10,20')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file1)
-        output1.set_MD5()
+        output1.set_md5()
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 
@@ -2805,7 +2805,7 @@ Line 3
         output2 = Dataset.objects.create(user=run2.user, name='output2')
         content_file2 = ContentFile('greeting\n')
         output2.dataset_file.save('out.csv', content_file2)
-        output2.set_MD5()
+        output2.set_md5()
         output2.save()
         run2.datasets.create(argument=output_argument, dataset=output2)
         run2.set_md5()
@@ -2821,7 +2821,7 @@ Line 3
                                            state=ContainerRun.COMPLETE)
         output1b = Dataset.objects.create(user=run1.user, name='output1b')
         output1b.dataset_file.save('example_b.csv', content_file1b)
-        output1b.set_MD5()
+        output1b.set_md5()
         output1b.save()
         run3.datasets.create(argument=output_argument, dataset=output1b)
 
@@ -2846,7 +2846,7 @@ Line 3
         content_file = ContentFile('x,y\n1,2')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file)
-        output1.set_MD5(output1.dataset_file.path)
+        output1.set_md5(output1.dataset_file.path)
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 

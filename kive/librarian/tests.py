@@ -35,7 +35,7 @@ from constants import datatypes, groups
 from container.models import ContainerFamily
 from datachecking.models import MD5Conflict
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
-from librarian.models import Dataset, ExternalFileDirectory, DatasetStructure
+from librarian.models import Dataset, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
 from metadata.models import Datatype, CompoundDatatype, kive_user, everyone_group
 
@@ -93,23 +93,6 @@ class DatasetTests(LibrarianTestCase):
             self.data += "patient{},{}\n".format(i, seq)
         self.header = "header,sequence"
 
-        self.datatype_str = Datatype.objects.get(pk=datatypes.STR_PK)
-        self.datatype_dna = Datatype(name="DNA", description="sequences of ATCG",
-                                     user=self.myUser)
-        # self.datatype_dna.clean()
-        self.datatype_dna.save()
-        self.datatype_dna.restricts.add(self.datatype_str)
-        self.datatype_dna.complete_clean()
-        self.cdt_record = CompoundDatatype(user=self.myUser)
-        self.cdt_record.save()
-        self.cdt_record.members.create(datatype=self.datatype_str,
-                                       column_name="header",
-                                       column_idx=1)
-        self.cdt_record.members.create(datatype=self.datatype_dna,
-                                       column_name="sequence",
-                                       column_idx=2)
-        self.cdt_record.clean()
-
         self.data_file = tempfile.NamedTemporaryFile(delete=False)
         data_str = self.header + "\n" + self.data
         self.data_file.write(data_str.encode())
@@ -121,7 +104,6 @@ class DatasetTests(LibrarianTestCase):
         self.dataset = Dataset.create_dataset(
             file_path=self.file_path,
             user=self.myUser,
-            cdt=self.cdt_record,
             keep_file=True,
             name=self.dsname,
             description=self.dsdesc
@@ -180,7 +162,7 @@ class DatasetTests(LibrarianTestCase):
         """
         self.assertEqual(self.dataset.clean(), None)
         self.assertEqual(self.dataset.has_data(), True)
-        self.assertEqual(self.dataset.is_raw(), False)
+        self.assertTrue(self.dataset.is_raw())
 
         self.assertEqual(self.dataset.user, self.myUser)
         self.assertEqual(self.dataset.name, self.dsname)
@@ -460,8 +442,6 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         Dataset.objects.add(apples,
                             cherries,
                             bananas)
-        apples.structure = DatasetStructure(compounddatatype_id=5)
-        bananas.structure = DatasetStructure(compounddatatype_id=6)
 
     def test_list(self):
         """
@@ -532,30 +512,6 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         response = self.list_view(request, pk=None)
 
         self.assertEquals(len(response.data), 2)
-
-    def test_filter_raw(self):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(
-            self.list_path + "?filters[0][key]=cdt")
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request, pk=None)
-
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'cherries')
-
-    def test_filter_cdt(self):
-        """
-        Test the API list view.
-        """
-        request = self.factory.get(
-            self.list_path + "?filters[0][key]=cdt&filters[0][val]=5")
-        force_authenticate(request, user=self.kive_user)
-        response = self.list_view(request, pk=None)
-
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'apples')
 
     def test_filter_md5(self):
         """

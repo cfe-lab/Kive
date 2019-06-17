@@ -8,22 +8,18 @@ from __future__ import unicode_literals
 
 from collections import defaultdict
 import csv
-from datetime import date, timedelta
 import hashlib
-import itertools
 import logging
 import os
 import os.path
 import re
-import shutil
-import tempfile
 import time
 import io
 
 from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.db import models, transaction
-from django.core.exceptions import ValidationError, ObjectDoesNotExist
-from django.core.validators import MinValueValidator, RegexValidator
+from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.core.files import File
 from django.db.models.functions import Now
 from django.utils.encoding import python_2_unicode_compatible
@@ -34,16 +30,13 @@ from django.db.models import Min
 from django.db.models.signals import post_delete
 from django.core.urlresolvers import reverse
 
-import pipeline.models
-import transformation.models
-import datachecking.models
 import metadata.models
 import archive.exceptions
 import archive.models
 import librarian.signals
-from constants import maxlengths, runcomponentstates
+from constants import maxlengths
 from container.models import ContainerDataset
-from datachecking.models import BadData, MD5Conflict
+from datachecking.models import BadData
 import six
 
 import file_access_utils
@@ -62,6 +55,7 @@ def get_upload_path(instance, filename):
     :param filename: Dataset.dataset_file.name
     :return:  The upload directory for Dataset files.
     """
+    # noinspection PyTypeChecker
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
@@ -104,14 +98,6 @@ class ExternalFileDirectory(models.Model):
         """
         self.path = os.path.normpath(self.path)
         super(ExternalFileDirectory, self).save(*args, **kwargs)
-
-
-class SafeContext:
-    def __enter__(self):
-        pass
-
-    def __exit__(self, *args):
-        pass
 
 
 @python_2_unicode_compatible
@@ -408,6 +394,7 @@ class Dataset(metadata.models.AccessControl):
             elif u_score < l_score and u_score != float('inf'):
                 [expt.insert(i, "") for _ in range(u_score)]
             elif l_score <= u_score and l_score != float('inf'):
+                # noinspection PyTypeChecker
                 [obs.insert(i, "") for _ in range(l_score)]
                 insert += [i] * l_score  # keep track of where to insert columns in the resulting view
             i += 1
@@ -440,9 +427,6 @@ class Dataset(metadata.models.AccessControl):
 
         Note that the MD5 checksum is already checked via a validator.
         """
-        if self.has_structure():
-            self.structure.clean()
-
         if not (self.externalfiledirectory and self.external_path or
                 not self.externalfiledirectory and not self.external_path):
             raise ValidationError(
@@ -461,6 +445,7 @@ class Dataset(metadata.models.AccessControl):
                 }
             )
 
+    # noinspection PyUnusedLocal
     def validate_uniqueness_on_upload(self, *args, **kwargs):
         """
         Validates that the name and MD5 of the Dataset are unique.
@@ -579,21 +564,12 @@ class Dataset(metadata.models.AccessControl):
         return False
 
     def has_structure(self):
-        """True if associated DatasetStructure exists; False otherwise."""
-        try:
-            self.structure
-        except ObjectDoesNotExist:
-            return False
-        return self.structure.pk is not None
+        """ Compound datatypes were removed, so all datasets are now raw. """
+        return False
 
     def is_raw(self):
-        """True if this Dataset is raw, i.e. not a CSV file."""
-        # return not hasattr(self, "structure")
-        try:
-            self.structure
-        except ObjectDoesNotExist:
-            return True
-        return self.structure is None
+        """ Compound datatypes were removed, so all datasets are now raw. """
+        return True
 
     def num_rows(self):
         """Returns number of rows in the associated Dataset.
@@ -603,21 +579,10 @@ class Dataset(metadata.models.AccessControl):
         return None if self.is_raw() else self.structure.num_rows
 
     def get_cdt(self):
-        """
-        Retrieve the CDT of this Dataset (none if it is raw).
-        """
-        return None if self.is_raw() else self.structure.compounddatatype
+        """ Compound datatypes were removed, so all datasets are now raw. """
+        return None
 
-    def create_structure(self, compounddatatype, num_rows=-1):
-        """Add a DatasetStructure to this Dataset."""
-        if not self.is_raw():
-            raise ValueError('CompoundDatatype "{}" already has a structure.')
-        structure = DatasetStructure(dataset=self, compounddatatype=compounddatatype, num_rows=num_rows)
-        structure.clean()
-        structure.save()
-        return structure
-
-    def set_MD5(self, file_path=None, file_handle=None):
+    def set_md5(self, file_path=None, file_handle=None):
         """Set the MD5 hash from a file.
 
         Closes the file after the MD5 is computed.
@@ -640,7 +605,7 @@ class Dataset(metadata.models.AccessControl):
             if opened_file_ourselves:
                 file_handle.close()
 
-    def set_MD5_and_count_rows(self, file_path, file_handle=None):
+    def set_md5_and_count_rows(self, file_path, file_handle=None):
         """Set the MD5 hash and number of rows from a file.
 
         Closes the file afterwards.
@@ -752,8 +717,7 @@ class Dataset(metadata.models.AccessControl):
         instance            None or a Dataset to fill in (e.g. if we get a dummy one from DatasetForm)
 
         OUTPUTS
-        empty_SD            Dataset with a blank MD5 and an
-                            appropriate DatasetStructure
+        empty_dataset            Dataset with a blank MD5
         """
         users_allowed = users_allowed or []
         groups_allowed = groups_allowed or []
@@ -769,28 +733,30 @@ class Dataset(metadata.models.AccessControl):
             assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
         with transaction.atomic():
-            empty_SD = instance or cls()
-            empty_SD.user = user
-            empty_SD.MD5_checksum = ""
-            empty_SD.dataset_file = None
-            empty_SD.file_source = file_source
-            empty_SD.last_time_checked = None
-            # Save so we can add structure and permissions.
-            empty_SD.save()
+
+            empty_dataset = instance or cls()
+            empty_dataset.user = user
+            empty_dataset.MD5_checksum = ""
+            empty_dataset.dataset_file = None
+            empty_dataset.file_source = file_source
+            empty_dataset.last_time_checked = None
+            # Save so we can add permissions.
+            empty_dataset.save()
 
             if cdt:
-                empty_SD.create_structure(cdt)
+                raise NotImplementedError(
+                    'Compound data types are no longer supported.')
 
             for user in users_allowed:
-                empty_SD.users_allowed.add(user)
+                empty_dataset.users_allowed.add(user)
             for group in groups_allowed:
-                empty_SD.groups_allowed.add(group)
-            empty_SD.clean()
+                empty_dataset.groups_allowed.add(group)
+            empty_dataset.clean()
 
-        return empty_SD
+        return empty_dataset
 
+    # noinspection PyUnusedLocal
     @classmethod
-    # FIXME what does it do for num_rows when file_path is unset?
     def create_dataset(cls,
                        file_path,
                        user=None,
@@ -869,9 +835,9 @@ class Dataset(metadata.models.AccessControl):
             if precomputed_md5 is not None:
                 new_dataset.MD5_checksum = precomputed_md5
             elif new_dataset.is_raw():
-                new_dataset.set_MD5(file_name, file_handle)
+                new_dataset.set_md5(file_name, file_handle)
             else:
-                new_dataset.set_MD5_and_count_rows(file_name, file_handle)
+                new_dataset.set_md5_and_count_rows(file_name, file_handle)
             if file_handle is not None:
                 file_handle.seek(0)
 
@@ -883,159 +849,6 @@ class Dataset(metadata.models.AccessControl):
                 new_dataset.structure.save()
             new_dataset.save()
         return new_dataset
-
-    def check_integrity(self, new_file_path, checking_user, execlog=None, runcomponent=None,
-                        newly_computed_MD5=None, notify_all=True):
-        """
-        Checks integrity of SD against the md5 provided (newly_computed_MD5),
-        or in it's absence, the MD5 computed from new_file_path.
-
-        If this is the output of a RunComponent, it will quarantine or
-        attempt to decontaminate all RunComponents using the same ExecRecord
-        depending on the result of the check by default.
-
-        OUTPUT
-        Returns the ICL.
-        """
-        # RL February 6: I'm choosing this to be the time of the "start" of the
-        # check, but it does raise the question: what exactly is the start and
-        # end time of an integrity check?  Is the check just the comparison
-        # of the MD5s or is it the time that you finish computing the MD5 or
-        # is it the time that you start computing the MD5?
-        icl = self.integrity_checks.create(execlog=execlog, runcomponent=runcomponent, user=checking_user)
-        icl.start(save=True)
-
-        if newly_computed_MD5 is None:
-            with open(new_file_path, "rb") as f:
-                newly_computed_MD5 = file_access_utils.compute_md5(f)
-
-        if newly_computed_MD5 != self.MD5_checksum:
-            self.logger.warn(
-                "md5s do not agree for dataset id %d (old: %s; new: %s)",
-                self.id,
-                self.MD5_checksum,
-                newly_computed_MD5)
-
-            # June 4, 2014: this evil_twin should be a raw SD -- we don't really care what it contains,
-            # just that it conflicted with the existing one.
-            evil_twin = Dataset.create_dataset(
-                file_path=new_file_path,
-                user=checking_user,
-                cdt=None,
-                description="MD5 conflictor of {}".format(self),
-                name="{}eviltwin".format(self)
-            )
-
-            note_of_usurping = datachecking.models.MD5Conflict(integritychecklog=icl, conflicting_dataset=evil_twin)
-            note_of_usurping.save()
-
-        icl.stop(save=True, clean=True)
-
-        # for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
-
-        if notify_all:
-            if newly_computed_MD5 != self.MD5_checksum:
-                any_successful_ers = ExecRecord.objects.filter(
-                    execrecordouts__dataset=self,
-                    used_by_components___runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK
-                ).exists()
-                if any_successful_ers:
-                    self.quarantine_runcomponents_using_as_output()
-            else:
-                any_quarantined_ers = ExecRecord.objects.filter(
-                    execrecordouts__dataset=self,
-                    used_by_components___runcomponentstate_id=runcomponentstates.QUARANTINED_PK
-                ).exists()
-                if any_quarantined_ers:
-                    self.attempt_to_decontaminate_runcomponents_using_as_output()
-
-        return icl
-
-    @transaction.atomic
-    def quarantine_runcomponents_using_as_output(self):
-        """
-        Quarantine all RunComponents that use an ExecRecord that outputs this Dataset.
-        """
-        for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
-            er.quarantine_runcomponents()
-
-    @transaction.atomic
-    def attempt_to_decontaminate_runcomponents_using_as_output(self):
-        """
-        Decontaminate all RunComponents that use an ExecRecord that outputs this Dataset.
-        """
-        for er in ExecRecord.objects.filter(execrecordouts__dataset=self):
-            er.attempt_decontamination(self)
-
-    def initially_OK(self):
-        """
-        Check that the Dataset was, at some point, okay.
-
-        Such Datasets may be used as Run inputs, even if they've had some
-        failed checks in the interim.
-        """
-        # If this is not raw, check that there is at least one content check completed and
-        # successful.
-        if not self.is_raw() and not self.content_checks.filter(
-                baddata__isnull=True, end_time__isnull=False).exists():
-            return False
-
-        return True
-
-    def usable_in_run(self):
-        """
-        Check that the Dataset is eligible to be used in a Run.
-
-        Such a Dataset must not have failed its first content check, if there is one.
-        It may have failed subsequent checks, but either
-        a) it was initially good so warrants reexamination in case corruption has been fixed
-        b) it never got checked initially so it should be tried again and checked now
-        """
-        if self.is_redacted():
-            # Don't use redacted data.
-            return False
-        if self.is_raw():
-            # If it's raw, go ahead.
-            return True
-        elif self.initially_OK():
-            # If it was initially OK, go ahead.
-            return True
-        elif not self.content_checks.filter(baddata__isnull=False, end_time__isnull=False).exists():
-            # At least there is no failed content check yet (maybe the execution
-            # crashed during a content check), so go ahead and try again.
-            return True
-        return False
-
-    def is_OK(self):
-        """
-        Check that this Dataset is fit for consumption.
-
-        We check this by making sure that the Dataset has passed a content
-        check (unless it's raw), and that if any more recent content or
-        integrity checks have failed, the Dataset has subsequently been
-        re-validated with a successful integrity check, i.e. there is an
-        integrity check more recent than any failed data check.
-
-        Redacted Datasets are not considered OK.
-        """
-        if self.is_redacted():
-            return False
-
-        # Was this Dataset initially OK?
-        if not self.initially_OK():
-            return False
-
-        # If there are any failures, check that the most recent integrity check is good.
-        if self.any_failed_checks():
-            last_icl = self.integrity_checks.order_by("-end_time").first()
-            if last_icl is None or last_icl.is_fail():
-                return False
-
-            last_bad_ccl = self.content_checks.filter(baddata__isnull=False).order_by("-end_time").first()
-            if last_bad_ccl is not None and last_icl.start_time <= last_bad_ccl.end_time:
-                return False
-
-        return True
 
     def any_failed_checks(self):
         """ Checks if any integrity or content checks failed. """
@@ -1063,13 +876,6 @@ class Dataset(metadata.models.AccessControl):
         # Make a special note if this Dataset is associated with an external file.
         if self.external_path:
             redaction_plan["ExternalFiles"].add(self)
-
-        # Mark anything that was produced from this Dataset for redaction.
-        for used_as_input in self.execrecordins.all().select_related("execrecord"):
-            if used_as_input.execrecord not in redaction_plan["ExecRecords"]:
-                metadata.models.update_removal_plan(
-                    redaction_plan, used_as_input.execrecord.build_redaction_plan(redaction_plan)
-                )
 
         return redaction_plan
 
@@ -1125,41 +931,12 @@ class Dataset(metadata.models.AccessControl):
         if self.external_path:
             removal_plan["ExternalFiles"].add(self)
 
-        for er_xput in itertools.chain(self.execrecordins.all(), self.execrecordouts.all()):
-            curr_ER = er_xput.execrecord
-            if curr_ER not in removal_plan["ExecRecords"]:
-                metadata.models.update_removal_plan(removal_plan, curr_ER.build_removal_plan(removal_plan))
-
         return removal_plan
 
     @transaction.atomic
     def remove(self):
         removal_plan = self.build_removal_plan()
         metadata.models.remove_helper(removal_plan)
-
-    @classmethod
-    def idle_create_next_month_upload_dir(cls):
-        """Create next month's dataset directory if it doesn't exist.
-        NOTE: We do not need to take into account different month lengths, because
-        we run this routine frequently.
-        """
-        numcheck = CHECK_ITERS = 10000
-        while True:
-            (yield None)
-            numcheck += 1
-            if numcheck > CHECK_ITERS:
-                numcheck = 0
-                date_str = (date.today() + timedelta(days=30)).strftime('%Y_%m')
-                next_dirname = os.path.join(settings.MEDIA_ROOT, cls.UPLOAD_DIR, date_str)
-                cls.logger.debug("idle_next_month_upload_dir: checking for '%s'", next_dirname)
-                try:
-                    with SafeContext():
-                        if os.path.exists(next_dirname):
-                            cls.logger.debug("idle_next_month_upload_dir: directory exists.")
-                        else:
-                            os.makedirs(next_dirname)
-                except OSError:
-                    cls.logger.warn("Could not make directory '%s'", next_dirname)
 
     @staticmethod
     def _active_datasets():
@@ -1270,750 +1047,6 @@ class Dataset(metadata.models.AccessControl):
         for ic in self.integrity_checks.all():
             if ic.is_fail():
                 ic.usurper.conflicting_dataset.increase_permissions_from_json(permissions_json)
-
-
-class DatasetStructure(models.Model):
-    """
-    Data with a Shipyard-compliant structure: a CSV file with a header.
-    Encodes the CDT, and the transformation output generating this data.
-
-    PRECONDITION
-    Any Dataset that represents a CSV file has to have confirmed using
-    summarize_csv() that the CSV file is coherent.
-    """
-    # Note: previously we were tracking the exact TransformationOutput
-    # this came from (both for its Run and its RunStep) but this is
-    # now done more cleanly using ExecRecord.
-    dataset = models.OneToOneField(Dataset, related_name="structure")
-    compounddatatype = models.ForeignKey("metadata.CompoundDatatype", related_name="conforming_datasets")
-
-    # A value of -1 means the file is missing or num rows has never been counted
-    num_rows = models.IntegerField("number of rows", validators=[MinValueValidator(-1)], default=-1)
-
-    def clean(self):
-        self.dataset.validate_restrict_access([self.compounddatatype])
-
-
-@python_2_unicode_compatible
-class ExecRecord(models.Model):
-    """
-    Record of a previous execution of a Pipeline component.
-    """
-    # FIXME exactly one of these must be non-null
-
-    def __init__(self, *args, **kwargs):
-        super(ExecRecord, self).__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    def __str__(self):
-        """Unicode representation of this ExecRecord."""
-        inputs_list = [str(eri) for eri in self.execrecordins.all()]
-        outputs_list = [str(ero) for ero in self.execrecordouts.all()]
-
-        if self.general_transf().is_method():
-            return "{}({}) = ({})".format(
-                    self.general_transf(),
-                    ", ".join(inputs_list),
-                    ", ".join(outputs_list))
-        else:
-            # Return a representation for a cable.
-            return ("{}".format(", ".join(inputs_list)) +
-                    " ={" + "{}".format(str(self.general_transf())) + "}=> " +
-                    "{}".format(", ".join(outputs_list)))
-
-    @property
-    def execrecordins_in_order(self):
-        return sorted(self.execrecordins.all(), key=lambda e: e.generic_input.definite.dataset_idx)
-
-    @property
-    def execrecordouts_in_order(self):
-        return sorted(self.execrecordouts.all(), key=lambda e: e.generic_output.definite.dataset_idx)
-
-    @classmethod
-    @transaction.atomic
-    def create(cls, generator, component, input_SDs, output_SDs):
-        """Create a complete ExecRecord, including inputs and outputs.
-
-        INPUTS
-        generator       ExecLog generating this ExecRecord
-        component       Pipeline component the ExecRecord is for (a
-                        PipelineStep, PipelineOutputCable, or
-                        PipelineStepInputCable)
-        input_SDs       list of Datasets input to the component
-                        during execution, in order of their index
-        output_SDs      list of Datasets output by the component
-                        during execution, in order of their index
-        """
-        execrecord = cls(generator=generator)
-        # execrecord.clean()
-        execrecord.save()
-        for i, component_input in enumerate(component.inputs):
-            execrecord.execrecordins.create(generic_input=component_input, dataset=input_SDs[i])
-        for i, component_output in enumerate(component.outputs):
-            execrecord.execrecordouts.create(generic_output=component_output, dataset=output_SDs[i])
-        execrecord.complete_clean()
-        return execrecord
-
-    def get_execrecordout(self, xput):
-        """Get the ExecRecordOut for a TransformationXput.
-
-        INPUTS
-        xput        TransformationXput to get ExecRecordOut for
-        """
-        try:
-            return self.execrecordouts.get(generic_output=xput)
-        except ExecRecordOut.DoesNotExist:
-            return None
-
-    def clean(self):
-        """
-        Checks coherence of the ExecRecord.
-
-        Calls clean on all of the in/outputs.  (Multiple quenching is
-        checked via a uniqueness condition and does not need to be
-        coded here.)
-
-        If this ER represents a trivial cable, then the single ERI and
-        ERO should have the same Dataset.
-        """
-        eris = self.execrecordins.all()
-        eros = self.execrecordouts.all()
-
-        for eri in eris:
-            eri.clean()
-        for ero in eros:
-            ero.clean()
-
-        # Check that the permissions on the generating Run do not exceed those of the inputs.
-        # (That the output permissions are the same as the generating Run will be checked
-        # by the output Datasets themselves.)
-        input_SDs = [x.dataset for x in self.execrecordouts.all()]
-        self.generating_run.validate_restrict_access(input_SDs)
-
-        if not self.general_transf().is_method():
-            # If the cable is quenched:
-            if eris.exists() and eros.exists():
-
-                # If the cable is trivial, then the ERI and ERO should
-                # have the same Dataset (if they both exist).
-                if self.general_transf().is_trivial():
-                    if eris[0].dataset != eros[0].dataset:
-                        raise ValidationError(('ExecRecord "{}" represents a trivial cable but its input and output '
-                                               'do not match').format(self))
-
-                # From this point on we can't proceed if the ExecRecord is redacted.
-                if self.is_redacted():
-                    return
-
-                # If the cable is not trivial and both sides have
-                # data, then the column *Datatypes* on the destination
-                # side are the same as the corresponding column on the
-                # source side.  For example, if a CDT like (DNA col1,
-                # int col2) is fed through a cable that maps col1 to
-                # produce (string foo), then the actual Datatype of
-                # the column in the corresponding Dataset would be
-                # DNA.
-
-                # Note that because the ERI and ERO are both clean,
-                # and because we checked general_transf is not
-                # trivial, we know that both have well-defined
-                # DatasetStructures.
-                elif not self.general_transf().is_trivial():
-                    cable_wires = self.general_transf().custom_wires.all()
-
-                    source_CDT = eris[0].dataset.structure.compounddatatype
-                    dest_CDT = eros[0].dataset.structure.compounddatatype
-
-                    for wire in cable_wires:
-                        source_idx = wire.source_pin.column_idx
-                        dest_idx = wire.dest_pin.column_idx
-
-                        dest_dt = dest_CDT.members.get(column_idx=dest_idx).datatype
-                        source_dt = source_CDT.members.get(column_idx=source_idx).datatype
-
-                        if source_dt != dest_dt:
-                            raise ValidationError(
-                                ('ExecRecord "{}" represents a cable, but the Datatype '
-                                 'of its destination column, "{}", does not match the Datatype '
-                                 'of its source column, "{}"').format(self, dest_dt, source_dt)
-                            )
-
-    def complete_clean(self):
-        """
-        Checks completeness of the ExecRecord.
-
-        Calls clean, and then checks that all in/outputs of the
-        Method/POC/PSIC are quenched.
-        """
-        self.clean()
-
-        # Because we know that each ERI is clean (and therefore each
-        # one maps to a valid input of our Method/POC/PSIC), and
-        # because there is no multiple quenching (due to a uniqueness
-        # constraint), all we have to do is check the number of ERIs
-        # to make sure everything is quenched.
-        if type(self.general_transf()) in (
-                pipeline.models.PipelineOutputCable,
-                pipeline.models.PipelineStepInputCable
-                ):
-            # In this case we check that there is an input and an output.
-            if not self.execrecordins.all().exists():
-                raise ValidationError(
-                    "Input to ExecRecord \"{}\" is not quenched".format(self))
-            if not self.execrecordouts.all().exists():
-                raise ValidationError(
-                    "Output of ExecRecord \"{}\" is not quenched".format(self))
-
-        else:
-            if self.execrecordins.count() != self.general_transf().inputs.count():
-                raise ValidationError(
-                    "Input(s) to ExecRecord \"{}\" are not quenched".format(self))
-
-            # Similar for EROs.
-            if self.execrecordouts.count() != self.general_transf().outputs.count():
-                raise ValidationError(
-                    "Output(s) of ExecRecord \"{}\" are not quenched".format(self))
-
-    def general_transf(self):
-        """Returns the Method/POC/PSIC represented by this ExecRecord."""
-        if self.generator.record.is_cable():
-            return self.generator.record.component
-        else:
-            # This is a Method.
-            return self.generator.record.component.transformation.definite
-
-    @property
-    def generating_run(self):
-        return self.generator.record.top_level_run
-
-    def provides_outputs(self, outputs):
-        """
-        Checks whether this ER has existent data for these outputs.
-        outputs: an iterable of TOs we want the ER to have real data for.
-
-        PRE
-        1) outputs must be TransformationOutputs of the Transformation associated
-        with the RunStep/RunSIC/RunOutputCable associated with this ExecRecord
-        (they cannot be arbitrary TransformationOutputs).
-        """
-        # Load each TO in outputs
-        for curr_output in outputs:
-            corresp_ero = self.execrecordouts.get(generic_output=curr_output)
-
-            if not corresp_ero.has_data():
-                self.logger.debug(
-                    "corresponding ERO doesn't have data - ER doesn't have existent data for all TOs requested")
-                return False
-
-        self.logger.debug("all outputs needed have corresponding EROs with data")
-        return True
-
-    def outputs_OK(self):
-        """Checks whether all of the EROs of this ER are OK."""
-        return all([ero.is_OK() for ero in self.execrecordouts.all()])
-
-    def outputs_not_usable_in_run(self):
-        """
-        Checks whether any of the EROs of this ER have ever failed any checks.
-        """
-        return any([not ero.dataset.usable_in_run() for ero in self.execrecordouts.all()])
-
-    def has_ever_failed(self):
-        """Has any execution of this ExecRecord ever failed?"""
-        # Go through all RunSteps using this ExecRecord.
-        run_components = self.used_by_components.exclude(
-            reused=True).filter(runstep__isnull=False)
-        for component_using_this in run_components:
-            if not component_using_this.runstep.is_successful():
-                return True
-        return False
-
-    def is_redacted(self):
-        ins = self.execrecordins.all()
-        outs = self.execrecordouts.all()
-        if not hasattr(self, '_prefetched_objects_cache'):
-            # Not already prefetched, use select_related.
-            ins = ins.select_related('dataset')
-            outs = outs.select_related('dataset')
-
-        for eri in ins:
-            if eri.dataset.is_redacted():
-                return True
-        for ero in outs:
-            if ero.dataset.is_redacted():
-                return True
-
-        return self.generator.is_redacted()
-
-    @transaction.atomic
-    def build_redaction_plan(self, redaction_accumulator=None):
-        redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
-        assert self not in redaction_plan["ExecRecords"]
-        if self.is_redacted():
-            return redaction_plan
-        redaction_plan["ExecRecords"].add(self)
-
-        metadata.models.update_removal_plan(redaction_plan, self.generator.build_redaction_plan())
-
-        for ero in self.execrecordouts.exclude(dataset___redacted=True).select_related("dataset"):
-            # If any of these are already redacted, this call will simply do nothing.
-            if ero.dataset not in redaction_plan["Datasets"]:
-                metadata.models.update_removal_plan(
-                    redaction_plan, ero.dataset.build_redaction_plan(redaction_plan)
-                )
-
-        return redaction_plan
-
-    @transaction.atomic
-    def redact_this(self):
-        # Redact components that used this ExecRecord, and purge any sandboxes that still exist.
-        runs_to_purge = set()
-        for rc in self.used_by_components.all():
-            rc.redact()
-            if rc.top_level_run not in runs_to_purge:
-                runs_to_purge.add(rc.top_level_run)
-
-        for run in runs_to_purge:
-            try:
-                if not run.purged:
-                    run.collect_garbage()
-            except ObjectDoesNotExist:
-                # No RunToProcess exists.
-                pass
-            except archive.exceptions.SandboxActiveException as e:
-                # The Run never started or hasn't finished.
-                self.logger.warning(e)
-            except OSError as e:
-                # The sandbox could not be removed.
-                self.logger.warning(e)
-
-    @transaction.atomic
-    def redact(self):
-        """
-        "Hollow out" this ExecRecord.
-
-        This may be triggered by an input Dataset or by the ExecLog.
-        """
-        redaction_plan = self.build_redaction_plan()
-        archive.models.redact_helper(redaction_plan)
-
-    @transaction.atomic
-    def build_removal_plan(self, removal_accumulator=None):
-        """
-        Creates a manifest of objects that will be removed if this ExecRecord is removed.
-        """
-        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
-        assert self not in removal_plan["ExecRecords"]
-        removal_plan["ExecRecords"].add(self)
-
-        if not (self.generator.record.is_cable() and self.general_transf().is_trivial()):
-            for ero in self.execrecordouts.exclude(
-                    dataset__in=removal_plan["Datasets"]).select_related("dataset"):
-                if ero.dataset not in removal_plan["Datasets"]:
-                    metadata.models.update_removal_plan(
-                        removal_plan, ero.dataset.build_removal_plan(removal_plan)
-                    )
-
-        for rc in self.used_by_components.all():
-            if rc.top_level_run not in removal_plan["Runs"]:
-                metadata.models.update_removal_plan(removal_plan, rc.top_level_run.build_removal_plan(removal_plan))
-
-        return removal_plan
-
-    @transaction.atomic
-    def remove(self):
-        removal_plan = self.build_removal_plan()
-        metadata.models.remove_helper(removal_plan)
-
-    @transaction.atomic
-    def quarantine_runcomponents(self):
-        """
-        Quarantine RunComponents that used this ExecRecord.
-        """
-        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.SUCCESSFUL_PK):
-            rc.quarantine(save=True, recurse_upward=True)
-
-    @transaction.atomic
-    def decontaminate_runcomponents(self):
-        """
-        Decontaminate RunComponents that used this ExecRecord.
-        """
-        for rc in self.used_by_components.filter(_runcomponentstate_id=runcomponentstates.QUARANTINED_PK):
-            rc.decontaminate(save=True, recurse_upward=True)
-
-    @transaction.atomic
-    def attempt_decontamination(self, decontaminated_dataset):
-        """
-        Attempt to decontaminate all RunComponents that used this ExecRecord.
-
-        It goes ahead and does so if the specified Dataset was the last
-        contaminated one, and if the last complete RunComponent to use it did
-        not have a failing ExecLog.
-        """
-        for ero in self.execrecordouts.exclude(dataset=decontaminated_dataset):
-            if not ero.is_OK():
-                return
-
-        last_rc = self.used_by_components.filter(
-            log__isnull=False,
-            _runcomponentstate_id__in=runcomponentstates.COMPLETE_STATE_PKS
-        ).order_by("-end_time").first()
-        if not last_rc.log.is_successful():
-            return
-
-        # Having reached here, we now know that the ExecRecord can be decontaminated.
-        self.decontaminate_runcomponents()
-
-
-@python_2_unicode_compatible
-class ExecRecordIn(models.Model):
-    """
-    Denotes an input fed to the Method/POC/PSIC in the parent ExecRecord.
-
-    The input may map to deleted data, e.g. if it was a deleted output
-    of a previous step in a pipeline.
-    """
-    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord", related_name="execrecordins")
-    dataset = models.ForeignKey(Dataset, help_text="Dataset fed to this input",
-                                related_name="execrecordins")
-
-    # For a Method/Pipeline, this denotes the input that this ERI refers to;
-    # for a cable, this denotes the thing that "feeds" it.
-    generic_input = models.ForeignKey(transformation.models.TransformationXput)
-
-    class Meta:
-        unique_together = ("execrecord", "generic_input")
-
-    def __init__(self, *args, **kwargs):
-        super(ExecRecordIn, self).__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    def __str__(self):
-        """
-        Unicode representation.
-
-        If this ERI represents the source of a POC/PSIC, then it looks like
-        [dataset]
-        If it represents a TI, then it looks like
-        [dataset]=>[transformation (raw) input name]
-
-        Examples:
-        S552
-        S552=>foo_bar
-
-        PRE: the parent ER must exist and be clean.
-        """
-        if (type(self.execrecord.general_transf()) in
-                (pipeline.models.PipelineOutputCable,
-                 pipeline.models.PipelineStepInputCable)):
-            return str(self.dataset)
-        else:
-            dest_name = self.generic_input.definite.dataset_name
-            return "{}=>{}".format(self.dataset, dest_name)
-
-    def clean(self):
-        """
-        Checks coherence of this ExecRecordIn.
-
-        Checks that generic_input is appropriate for the parent
-        ExecRecord's Method/POC/PSIC.
-        - If execrecord is for a POC, then generic_input should be the TO that
-          feeds it (i.e. the PipelineStep TO that is cabled to a Pipeline output).
-        - If execrecord is for a PSIC, then generic_input should be the TO or TI
-          that feeds it (TO if it's from a previous step; TI if it's from a Pipeline
-          input).
-        - If execrecord is for a Method, then generic_input is the TI
-          that this ERI represents.
-
-        Also, if dataset refers to existent data, check that it
-        is compatible with the input represented.
-        """
-        # Check that the input is accessible by the generating run.
-        self.execrecord.generating_run.validate_restrict_access([self.dataset])
-
-        parent_transf = self.execrecord.general_transf()
-
-        # If ER links to POC, ERI must link to TO which the outcable runs from.
-        if type(parent_transf) == pipeline.models.PipelineOutputCable:
-            if self.generic_input.definite != parent_transf.source.definite:
-                raise ValidationError(
-                    'ExecRecordIn "{}" does not denote the TO that feeds the parent ExecRecord POC'.
-                    format(self))
-        # Similarly for a PSIC.
-        elif type(parent_transf) == pipeline.models.PipelineStepInputCable:
-            if self.generic_input.definite != parent_transf.source.definite:
-                raise ValidationError(
-                    'ExecRecordIn "{}" does not denote the TO/TI that feeds the parent ExecRecord PSIC'.
-                    format(self))
-
-        else:
-            # The ER represents a Method (not a cable).  Therefore the
-            # ERI must refer to a TI of the parent ER's Method.
-            if type(self.generic_input) == transformation.models.TransformationOutput:
-                raise ValidationError(
-                    'ExecRecordIn "{}" must refer to a TI of the Method of the parent ExecRecord'.
-                    format(self))
-
-            transf_inputs = parent_transf.inputs
-            if not transf_inputs.filter(pk=self.generic_input.pk).exists():
-                raise ValidationError(
-                    'Input "{}" does not belong to Method of ExecRecord "{}"'.
-                    format(self.generic_input, self.execrecord))
-
-        # If the SD is redacted, we return -- the rest is not applicable.
-        if self.dataset.is_redacted():
-            return
-
-        # The ERI's Dataset raw/unraw state must match the
-        # raw/unraw state of the generic_input that feeds it (if ER is a cable)
-        # or that it is fed into (if ER is a Method).
-        # self.dataset = librarian.models.Dataset.objects.get(pk=self.dataset.pk)
-        # self.generic_input = transformation.models.TransformationXput.objects.get(pk=self.generic_input.pk)
-        if self.generic_input.is_raw() != self.dataset.is_raw():
-            sd_raw_str = "raw" if self.dataset.is_raw() else "non-raw"
-            gi_raw_str = "raw" if self.generic_input.is_raw() else "non-raw"
-            raise ValidationError(
-                'Dataset "{}" ({}) cannot feed source "{}" ({})'.
-                format(self.dataset, sd_raw_str, self.generic_input, gi_raw_str))
-
-        if not self.dataset.is_raw():
-            transf_xput_used = self.generic_input
-            cdt_needed = self.generic_input.get_cdt()
-            input_SD = self.dataset
-
-            # CDT of input_SD must be a restriction of cdt_needed,
-            # i.e. we can feed it into cdt_needed.
-            if not input_SD.structure.compounddatatype.is_restriction(
-                    cdt_needed):
-                raise ValidationError(
-                    'CDT of Dataset "{}" is not a restriction of the required CDT'.
-                    format(input_SD))
-
-            # Check row constraints.
-            if (transf_xput_used.get_min_row() is not None and
-                    input_SD.num_rows() < transf_xput_used.get_min_row()):
-                error_str = ""
-                if type(self.generic_input) == transformation.models.TransformationOutput:
-                    error_str = 'Dataset "{}" has too few rows to have come from TransformationOutput "{}"'
-                else:
-                    error_str = 'Dataset "{}" has too few rows for TransformationInput "{}"'
-                raise ValidationError(error_str.format(input_SD, transf_xput_used))
-
-            if (transf_xput_used.get_max_row() is not None and
-                    input_SD.num_rows() > transf_xput_used.get_max_row()):
-                error_str = ""
-                if type(self.generic_input) == transformation.models.TransformationOutput:
-                    error_str = 'Dataset "{}" has too many rows to have come from TransformationOutput "{}"'
-                else:
-                    error_str = 'Dataset "{}" has too many rows for TransformationInput "{}"'
-                raise ValidationError(error_str.format(input_SD, transf_xput_used))
-
-    def is_OK(self):
-        """Checks if the associated Dataset is OK."""
-        return self.dataset.is_OK()
-
-
-@python_2_unicode_compatible
-class ExecRecordOut(models.Model):
-    """
-    Denotes an output from the Method/PSIC/POC in the parent ExecRecord.
-
-    The output may map to deleted data, i.e. if it was deleted after
-    being generated.
-    """
-    execrecord = models.ForeignKey(ExecRecord, help_text="Parent ExecRecord",
-                                   related_name="execrecordouts")
-
-    dataset = models.ForeignKey(
-        Dataset,
-        help_text="Dataset coming from this output",
-        related_name="execrecordouts"
-    )
-
-    # For a Method/Pipeline this represents the TO that produces this output.
-    # For a cable, this represents the TO (for a POC) or TI (for a PSIC) that
-    # this cable feeds into.
-    generic_output = models.ForeignKey(transformation.models.TransformationXput,
-                                       related_name="execrecordouts_referencing")
-
-    class Meta:
-        unique_together = ("execrecord", "generic_output")
-
-    def __init__(self, *args, **kwargs):
-        super(ExecRecordOut, self).__init__(*args, **kwargs)
-        self.logger = logging.getLogger(self.__class__.__name__)
-
-    def __str__(self):
-        """
-        Unicode representation of this ExecRecordOut.
-
-        If this ERO represented the output of a PipelineOutputCable, then this looks like
-        [dataset]
-        If it represents the input that a PSIC feeds into, then it looks like
-        [dataset]
-        Otherwise, it represents a TransformationOutput, and this looks like
-        [TO name]=>[dataset]
-        e.g.
-        S458
-        output_one=>S458
-        """
-        if (type(self.execrecord.general_transf()) in
-                (pipeline.models.PipelineOutputCable,
-                 pipeline.models.PipelineStepInputCable)):
-            return str(self.dataset)
-        else:
-            return "{}=>{}".format(self.generic_output.definite.dataset_name, self.dataset)
-
-    def clean(self):
-        """
-        - If the ExecRecord represents a PipelineOutputCable, check
-          that the output is the one defined by the PipelineOutputCable.
-        - If the ExecRecord represents a PipelineStepInputCable, check
-          that the output is the TransformationInput that the cable feeds.
-        - If the ExecRecord is not for a cable, check that the output
-          belongs to the ExecRecord's Method.
-        - The Dataset is compatible with generic_output. (??)
-        """
-        # Runs must not increase permissions on an input.
-        self.execrecord.generating_run.validate_restrict_access(
-            [self.dataset])
-
-        # If the parent ER is linked with POC, the corresponding ERO TO must be coherent
-        if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
-            parent_er_outcable = self.execrecord.general_transf()
-
-            # ERO TO must belong to the same pipeline as the ER POC
-            if self.generic_output.definite.transformation.definite != parent_er_outcable.pipeline:
-                raise ValidationError(
-                    "ExecRecordOut \"{}\" does not belong to the same pipeline as its parent ExecRecord POC".
-                    format(self))
-
-            # And the POC defined output name must match the pipeline TO name
-            if parent_er_outcable.output_name != self.generic_output.definite.dataset_name:
-                raise ValidationError(
-                    "ExecRecordOut \"{}\" does not represent the same output as its parent ExecRecord POC".
-                    format(self))
-
-        # Second case: parent ER represents a PSIC.
-        elif isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
-            # This ERO must point to a TI.
-            if not self.generic_output.is_input:
-                raise ValidationError(
-                    "Parent of ExecRecordOut \"{}\" represents a PSIC; ERO must be a TransformationInput".
-                    format(self))
-
-        # Else the parent ER is linked with a method
-        else:
-            query_for_outs = self.execrecord.general_transf().outputs
-
-            # The ERO output TO must be a member of the ER's method/pipeline
-            if not query_for_outs.filter(pk=self.generic_output.pk).exists():
-                raise ValidationError(
-                    "Output \"{}\" does not belong to Method/Pipeline of ExecRecord \"{}\"".
-                    format(self.generic_output, self.execrecord))
-
-        if self.dataset.is_redacted():
-            # A redacted SD is fine -- the rest of the checks are inapplicable.
-            return
-
-        # Check that the SD is compatible with generic_output.
-
-        self.logger.debug("ERO SD '{}' is raw? {}".format(
-            self.dataset,
-            self.dataset.is_raw()))
-        self.logger.debug("ERO generic_output '{}' {} is raw? {}".format(
-            self.generic_output,
-            type(self.generic_output),
-            self.generic_output.is_raw()))
-
-        # If SD is raw, the ERO output TO must also be raw
-        # Refresh dataset and generic_output to make sure we get the right information.
-        self.dataset = librarian.models.Dataset.objects.get(pk=self.dataset.pk)
-        self.generic_output = transformation.models.TransformationXput.objects.get(pk=self.generic_output.pk)
-        if self.dataset.is_raw() != self.generic_output.is_raw():
-            sd_raw_str = "raw" if self.dataset.is_raw() else "non-raw"
-            go_raw_str = "raw" if self.generic_output.is_raw() else "non-raw"
-            if type(self.generic_output) == pipeline.models.PipelineStepInputCable:
-                raise ValidationError(
-                    'Dataset "{}" ({}) cannot feed input "{}" ({})'.
-                    format(self.dataset, sd_raw_str, self.generic_output, go_raw_str))
-            else:
-                raise ValidationError(
-                    'Dataset "{}" ({}) cannot have come from output "{}" ({})'.
-                    format(self.dataset, sd_raw_str, self.generic_output, go_raw_str))
-
-        # SD must satisfy the CDT / row constraints of the producing TO (Methods/Pipelines/POCs)
-        # or of the TI fed (PSIC case)
-        if not self.dataset.is_raw():
-            input_SD = self.dataset
-
-            # If this execrecord refers to a Method, the SD CDT
-            # must *exactly* be generic_output's CDT since it was
-            # generated by this Method.
-
-            if self.execrecord.general_transf().is_method():
-                if input_SD.structure.compounddatatype != self.generic_output.get_cdt():
-                    raise ValidationError(
-                        ('CDT of Dataset "{}" is not the CDT of the '
-                         'TransformationOutput "{}" of the generating Method').
-                        format(input_SD, self.generic_output))
-
-            # For POCs, ERO SD's CDT must be >>identical<< to generic_output's CDT, because it was generated either
-            # by this POC or by a compatible one.
-            # FIXME: self.generic_output.get_cdt().is_restriction(self.dataset.structure.compounddatatype)
-
-            elif isinstance(self.execrecord.general_transf(), pipeline.models.PipelineOutputCable):
-                if not self.dataset.structure.compounddatatype.is_identical(self.generic_output.get_cdt()):
-                    raise ValidationError(
-                        "CDT of Dataset \"{}\" is not identical to the "
-                        "CDT of the TransformationOutput \"{}\" of the "
-                        "generating Pipeline".format(input_SD,
-                                                     self.generic_output))
-
-            # If it refers to a PSIC, then SD CDT must be a
-            # restriction of generic_output's CDT.
-            else:
-                if not input_SD.structure.compounddatatype.is_restriction(self.generic_output.get_cdt()):
-                    raise ValidationError(
-                        'CDT of Dataset "{}" is not a restriction of '
-                        'the CDT of the fed TransformationInput "{}"'.format(
-                            input_SD,
-                            self.generic_output))
-
-            # If the input SD has a number of rows, then check that it is coherent.  (If it is -1,
-            # then we can't check this.)
-            if input_SD.num_rows() != -1:
-                if (self.generic_output.get_min_row() is not None and
-                        input_SD.num_rows() < self.generic_output.get_min_row()):
-                    if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
-                        raise ValidationError(
-                            "Dataset \"{}\" feeds TransformationInput \"{}\" but has too few rows".
-                            format(input_SD, self.generic_output))
-                    else:
-                        raise ValidationError(
-                            "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too few rows".
-                            format(input_SD, self.generic_output))
-
-                if (self.generic_output.get_max_row() is not None and
-                        input_SD.num_rows() > self.generic_output.get_max_row()):
-                    if isinstance(self.execrecord.general_transf(), pipeline.models.PipelineStepInputCable):
-                        raise ValidationError(
-                            "Dataset \"{}\" feeds TransformationInput \"{}\" but has too many rows".
-                            format(input_SD, self.generic_output))
-                    else:
-                        raise ValidationError(
-                            "Dataset \"{}\" was produced by TransformationOutput \"{}\" but has too many rows".
-                            format(input_SD, self.generic_output))
-
-        self.logger.debug("ERO is clean")
-
-    def has_data(self):
-        """True if associated Dataset has data; False otherwise."""
-        return self.dataset.has_data()
-
-    def is_OK(self):
-        """Checks if the associated Dataset is OK."""
-        return self.dataset.is_OK()
 
 
 # Register signals.
