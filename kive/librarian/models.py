@@ -31,7 +31,6 @@ from django.db.models.signals import post_delete
 from django.core.urlresolvers import reverse
 
 import metadata.models
-import archive.exceptions
 import archive.models
 import librarian.signals
 from constants import maxlengths

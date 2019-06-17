@@ -14,38 +14,6 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterUniqueTogether(
-            name='runoutputcable',
-            unique_together=set([]),
-        ),
-        migrations.RemoveField(
-            model_name='runoutputcable',
-            name='pipelineoutputcable',
-        ),
-        migrations.RemoveField(
-            model_name='runoutputcable',
-            name='run',
-        ),
-        migrations.RemoveField(
-            model_name='runoutputcable',
-            name='runcomponent_ptr',
-        ),
-        migrations.AlterUniqueTogether(
-            name='runsic',
-            unique_together=set([]),
-        ),
-        migrations.RemoveField(
-            model_name='runsic',
-            name='PSIC',
-        ),
-        migrations.RemoveField(
-            model_name='runsic',
-            name='dest_runstep',
-        ),
-        migrations.RemoveField(
-            model_name='runsic',
-            name='runcomponent_ptr',
-        ),
         migrations.DeleteModel(
             name='RunOutputCable',
         ),
