@@ -1353,14 +1353,18 @@ class ExternalFileTests(TestCase):
         )
         # Delete this file.
         os.remove(external_path)
-        self.assertFalse(external_file_ds_no_internal.has_data())
+        expected_error = r"No such file or directory: .*ext_test_has_data\.txt"
+        with self.assertRaisesRegexp(IOError, expected_error):
+            external_file_ds_no_internal.has_data()
 
         # Now test when the file exists but is unreadable.
         with open(os.path.join(self.working_dir, ext_path), "wb") as f:
             f.write(ext_contents.encode())
         self.assertTrue(external_file_ds_no_internal.has_data())
         os.chmod(external_path, stat.S_IWUSR | stat.S_IXUSR)
-        self.assertFalse(external_file_ds_no_internal.has_data())
+        expected_error = r"Permission denied: .*ext_test_has_data\.txt"
+        with self.assertRaisesRegexp(IOError, expected_error):
+            external_file_ds_no_internal.has_data()
 
     def test_clean_efd_external_path_both_set(self):
         """

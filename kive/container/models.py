@@ -623,9 +623,6 @@ class Container(AccessControl):
         assert self not in removal_plan["Containers"]
         removal_plan["Containers"].add(self)
 
-        for method in self.methods.all():
-            method.build_removal_plan(removal_plan)
-
         for app in self.apps.all():
             app.build_removal_plan(removal_plan)
 

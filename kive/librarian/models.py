@@ -556,11 +556,12 @@ class Dataset(metadata.models.AccessControl):
         return True
 
     def has_data(self):
-        data_handle = self.get_open_file_handle("rb")
-        if data_handle is not None:
+        try:
+            data_handle = self.get_open_file_handle("rb", raise_errors=True)
             data_handle.close()
             return True
-        return False
+        except ValueError:
+            return False
 
     def has_structure(self):
         """ Compound datatypes were removed, so all datasets are now raw. """

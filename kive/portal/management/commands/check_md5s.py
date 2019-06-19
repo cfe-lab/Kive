@@ -1,13 +1,18 @@
 from threading import Thread, Event
 
+import errno
 from django.core.management.base import BaseCommand
 
 from librarian.models import Dataset
-from method.models import CodeResourceRevision
 
 
 class Command(BaseCommand):
-    help = 'Checks MD5 checksums for all code resources.'
+    help = 'Checks MD5 checksums for all datasets.'
+
+    def __init__(self, *args, **kwargs):
+        super(Command, self).__init__(*args, **kwargs)
+        self.dataset_count = self.dataset_failures = self.dataset_skips = 0
+        self.dataset_purged = self.dataset_missing = self.dataset_passed = 0
 
     def add_arguments(self, parser):
         parser.add_argument('--max_size',
@@ -22,28 +27,28 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         max_size = options['max_size']
-        self.code_count = self.code_failures = self.code_skips = 0
-        self.dataset_count = self.dataset_failures = self.dataset_skips = 0
-        self.dataset_purged = 0
         finish_event = Event()
         report_thread = Thread(target=self.report,
                                args=(options['report_interval'], finish_event))
         report_thread.daemon = True
         report_thread.start()
-        for r in CodeResourceRevision.objects.iterator():
-            self.code_count += 1
-            if max_size is not None and r.content_file.size > max_size:
-                self.code_skips += 1
-            elif not r.check_md5():
-                self.code_failures += 1
         for ds in Dataset.objects.iterator():
             self.dataset_count += 1
-            if not ds.has_data():
+            try:
+                has_data = ds.has_data()
+            except IOError as ex:
+                if ex.errno != errno.ENOENT:
+                    raise
+                self.dataset_missing += 1
+                continue
+            if not has_data:
                 self.dataset_purged += 1
             elif max_size is not None and ds.get_filesize() > max_size:
                 self.dataset_skips += 1
             elif not ds.check_md5():
                 self.dataset_failures += 1
+            else:
+                self.dataset_passed += 1
         finish_event.set()
         report_thread.join()
 
@@ -57,15 +62,12 @@ class Command(BaseCommand):
         is_finished = False
         while not is_finished:
             is_finished = finish_event.wait(interval)
-            if self.code_count:
-                print('Of {} code resources, {} failures and {} skipped.'.format(
-                    self.code_count,
-                    self.code_failures,
-                    self.code_skips))
             if self.dataset_count:
-                print('Of {} datasets, {} purged, {} failures, and {} skipped.'.format(
-                    self.dataset_count,
-                    self.dataset_purged,
-                    self.dataset_failures,
-                    self.dataset_skips))
-        print('See log for details.')
+                print('Of {} datasets, {} purged, {} missing, {} skipped, '
+                      '{} passed, and {} failed.'.format(
+                        self.dataset_count,
+                        self.dataset_purged,
+                        self.dataset_missing,
+                        self.dataset_skips,
+                        self.dataset_passed,
+                        self.dataset_failures))

@@ -1,5 +1,0 @@
-# Most files in this dir are typescript - ignore generated js and map files
-*.js
-*.js.map
-!PipelineFamiliesTable.js
-!PipelineTable.js

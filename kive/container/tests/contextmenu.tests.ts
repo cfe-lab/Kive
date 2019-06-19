@@ -12,7 +12,7 @@ describe("Drydock context menu", function() {
     let event;
     let test_action_iterator = 0;
 
-    jasmine.getStyleFixtures().fixturesPath = '/static/pipeline';
+    jasmine.getStyleFixtures().fixturesPath = '/static/container';
     jasmine.getStyleFixtures().preload('./drydock.css');
 
     beforeAll(function() {
