@@ -131,7 +131,7 @@ class KiveAPI(Session):
         if context is None:
             context = []
         messages = []
-        for field, errors in fields.items():
+        for field, errors in sorted(fields.items()):
             context.append(field)
             if isinstance(errors, list):
                 for error in errors:

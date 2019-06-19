@@ -36,6 +36,7 @@ script:
   - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg ; fi
   - cd ../api
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run --source=kiveapi -m pytest ; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then pytest ; fi
   - set +e
 after_success:
     - pip install codecov
