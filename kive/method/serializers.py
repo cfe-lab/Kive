@@ -2,7 +2,7 @@ from django.db import transaction
 
 from rest_framework import serializers
 
-from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision, DockerImage
+from method.models import Method, MethodDependency, MethodFamily, CodeResource, CodeResourceRevision
 from transformation.models import XputStructure
 from transformation.serializers import TransformationInputSerializer, TransformationOutputSerializer
 from kive.serializers import AccessControlSerializer
@@ -195,10 +195,6 @@ class MethodSerializer(AccessControlSerializer,
 
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='method-removal-plan')
-    docker_image = serializers.HyperlinkedRelatedField(
-        view_name='dockerimage-detail',
-        lookup_field='pk',
-        queryset=DockerImage.objects.all())
 
     # This is as in CodeResourceRevisionSerializer.
     revision_number = serializers.IntegerField(
@@ -226,7 +222,6 @@ class MethodSerializer(AccessControlSerializer,
             "family_id",
             "family",
             "driver",
-            "docker_image",
             "reusable",
             "threads",
             "memory",
@@ -250,9 +245,6 @@ class MethodSerializer(AccessControlSerializer,
     
             driver_field = self.fields["driver"]
             driver_field.queryset = CodeResourceRevision.filter_by_user(curr_user)
-
-            docker_field = self.fields["docker_image"]
-            docker_field.queryset = DockerImage.filter_by_user(curr_user)
 
     # Due to nesting of inputs and outputs, we need to customize the create method.
     def create(self, validated_data):
@@ -294,24 +286,3 @@ class MethodSerializer(AccessControlSerializer,
             method.dependencies.create(**dep_data)
 
         return method
-
-
-class DockerImageSerializer(AccessControlSerializer,
-                            serializers.ModelSerializer):
-    removal_plan = serializers.HyperlinkedIdentityField(
-        view_name='dockerimage-removal-plan')
-
-    class Meta:
-        model = DockerImage
-        fields = (
-            "name",
-            "tag",
-            "git",
-            "description",
-            "url",
-            "absolute_url",
-            "full_name",
-            "user",
-            "users_allowed",
-            "groups_allowed",
-            "removal_plan")

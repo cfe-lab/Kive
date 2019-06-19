@@ -10,9 +10,7 @@ from __future__ import unicode_literals
 import os
 import stat
 import hashlib
-from inspect import getsourcefile
 import logging
-from subprocess import check_output, STDOUT
 
 from django.db import models, transaction
 from django.db.models import Max
@@ -28,7 +26,6 @@ import file_access_utils
 from constants import maxlengths
 import method.signals
 from container.models import Container
-from fleet import docker_build
 from metadata.models import empty_removal_plan, remove_helper, update_removal_plan
 
 
@@ -340,75 +337,6 @@ class CodeResourceRevision(metadata.models.AccessControl):
 
 
 @python_2_unicode_compatible
-class DockerImage(metadata.models.AccessControl):
-    DEFAULT_IMAGE = 'kive-default:default'
-
-    name = models.CharField('Name',
-                            help_text='Docker image name',
-                            max_length=200)  # Approximate limit in Docker.
-    tag = models.CharField('Tag',
-                           help_text='Docker image tag and Git tag',
-                           max_length=128)  # Limit in Docker.
-    git = models.CharField('Git URL',
-                           help_text='URL of Git repository',
-                           max_length=2000)
-    description = models.CharField('Description',
-                                   help_text='What is this image used for?',
-                                   blank=True,
-                                   max_length=2000)
-    hash = models.CharField('Hash',
-                            help_text='Hash of contents in docker',
-                            max_length=71)
-    created = models.DateTimeField(
-        auto_now_add=True,
-        help_text="When this docker image was added to Kive.")
-
-    class Meta:
-        ordering = ('name', '-tag')
-
-    def __str__(self):
-        return self.full_name
-
-    @property
-    def absolute_url(self):
-        return reverse("docker_image_view", kwargs={"image_id": self.pk})
-
-    @property
-    def full_name(self):
-        return self.name + ':' + self.tag
-
-    def build(self):
-        """ Build a docker image, and record the hash. Does not save. """
-        result = check_output(['sudo',
-                               getsourcefile(docker_build),
-                               '--id',
-                               self.name,
-                               self.git,
-                               self.tag],
-                              stderr=STDOUT)
-        self.hash = result.splitlines()[-1]
-        if not self.hash.startswith('sha256:'):
-            raise RuntimeError('Expected sha256 hash on last line:\n' + result)
-
-    @transaction.atomic
-    def remove(self):
-        removal_plan = self.build_removal_plan()
-        remove_helper(removal_plan)
-
-    @transaction.atomic
-    def build_removal_plan(self, removal_accumulator=None):
-        removal_plan = removal_accumulator or empty_removal_plan()
-        assert self not in removal_plan["DockerImages"]
-
-        removal_plan["DockerImages"].add(self)
-
-        for method_affected in self.methods.all():
-            if method_affected not in removal_plan["Methods"]:
-                update_removal_plan(removal_plan, method_affected.build_removal_plan(removal_plan))
-        return removal_plan
-
-
-@python_2_unicode_compatible
 class Method(transformation.models.Transformation):
     """
     Methods are atomic transformations.
@@ -439,12 +367,6 @@ class Method(transformation.models.Transformation):
         blank=True
     )
 
-    docker_image = models.ForeignKey(
-        DockerImage,
-        related_name="methods",
-        help_text="The method will run inside this docker image (deprecated).",
-        null=True,
-        blank=True)
     container = models.ForeignKey(
         Container,
         related_name='methods',
