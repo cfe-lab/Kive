@@ -2,7 +2,6 @@
 This module defines a wrapper for Kive's Dataset
 object, and some support methods.
 """
-from .datatype import CompoundDatatype
 from . import KiveMalformedDataException
 
 
@@ -16,7 +15,7 @@ class Dataset(object):
             self.dataset_id = obj['id']
             self.filename = obj['filename']
             self.name = obj['name'] if 'name' in obj else obj['output_name']
-            self.cdt = CompoundDatatype(obj.get('compounddatatype'))
+            self.cdt = None
             self.groups_allowed = obj.get('groups_allowed')
             self.users_allowed = obj.get('users_allowed')
             self.externalfiledirectory = obj.get('externalfiledirectory')
