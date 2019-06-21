@@ -1911,6 +1911,9 @@ class RunContainerTests(TestCase):
                                    expected_dataset_name)
         self.assertTrue(os.path.exists(upload_path),
                         upload_path + ' should exist.')
+        command_log_path = os.path.join(sandbox_path, 'logs', 'command.txt')
+        self.assertTrue(os.path.exists(command_log_path),
+                        command_log_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
         self.assertIsNotNone(run.submit_time)
@@ -2235,6 +2238,17 @@ sum,product,bigger
             argument__type=ContainerArgument.OUTPUT).dataset
         summary = output_dataset.dataset_file.read()
         self.assertEqual(expected_summary, summary)
+        sandbox_path = run.full_sandbox_path
+        command1_log_path = os.path.join(sandbox_path,
+                                         'logs',
+                                         'step_1_command.txt')
+        self.assertTrue(os.path.exists(command1_log_path),
+                        command1_log_path + ' should exist.')
+        command2_log_path = os.path.join(sandbox_path,
+                                         'logs',
+                                         'step_2_command.txt')
+        self.assertTrue(os.path.exists(command2_log_path),
+                        command2_log_path + ' should exist.')
 
     def test_run_multistep_archive_bin_directories(self):
         run = self._test_run_multistep_archive_helper()

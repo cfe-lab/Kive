@@ -121,6 +121,9 @@ class Command(BaseCommand):
             if run.app.container.is_singularity():
                 # This is a Singularity container.
                 command = self.build_command(run)
+                command_path = os.path.join(logs_path, 'command.txt')
+                with open(command_path, 'w') as f:
+                    f.write(' '.join(command) + '\n')
                 run.return_code = call(command, stdout=stdout, stderr=stderr)
             else:
                 # This is a child container to be run inside another Singularity container.
