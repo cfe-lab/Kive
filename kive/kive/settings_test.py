@@ -7,5 +7,3 @@ from settings_test_pg import *  # @UnusedWildImport
 DATABASES['default'] = {'ENGINE': 'django.db.backends.sqlite3',
                         'TEST': {'NAME': ':memory:'},
                         'NAME': 'kive.db'}
-
-RUN_SLURM_TESTS = False  # Slurm tests are incompatible with in-memory DB.

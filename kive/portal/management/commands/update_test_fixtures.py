@@ -14,7 +14,6 @@ from django.conf import settings
 
 from container.models import ContainerFamily, ContainerArgument, Container
 from file_access_utils import compute_md5
-import kive.testing_utils as tools
 from librarian.models import Dataset
 from portal.management.commands.reset import Command as ResetCommand
 
@@ -36,8 +35,6 @@ class FixtureBuilder(object):
         print(self.get_name())
         print("--------")
         call_command('reset')
-
-        settings.FLEET_POLLING_INTERVAL = 0.1  # Make short steps run faster.
 
         before_filename = 'test_fixture_before.json'
         self.dump_all_data(before_filename)

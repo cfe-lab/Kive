@@ -259,25 +259,10 @@ REST_FRAMEWORK = {
 
 FILE_UPLOAD_PERMISSIONS = 0o644
 
-# The polling interval that the manager of the fleet uses between queries to the database.
-FLEET_POLLING_INTERVAL = 30  # in seconds
-FLEET_PURGING_INTERVAL = 3600  # in seconds
-
-# The time interval the worker uses between polling for progress, in seconds.
-# Shorter sleep makes worker more responsive, generates more load when idle.
-SLEEP_SECONDS = 0.1
-
 TEST_RUNNER = 'django.test.runner.DiscoverRunner'
 
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "home"
-
-# Sandbox configuration
-
-# The path to the directory that sandboxes run in.  If this is not an absolute path,
-# sandboxes will run in ${MEDIA_ROOT}/${SANDBOX_PATH}.  Otherwise it will run in
-# exactly this path.
-SANDBOX_PATH = "Sandboxes"
 
 # Settings for the purge task. How much storage triggers a purge, and how much
 # will stop the purge.
@@ -292,53 +277,6 @@ PURGE_SANDBOX_AGING = os.environ.get('KIVE_PURGE_SANDBOX_AGING', '10.0')
 PURGE_WAIT = os.environ.get('KIVE_PURGE_WAIT', '0 days, 1:00:00')
 PURGE_BATCH_SIZE = int(os.environ.get('KIVE_PURGE_BATCH_SIZE', '100'))
 
-# Here you specify the time that sandboxes should be left after finishing
-# before being automatically purged. (They may still be manually purged
-# sooner than this.)  These quantities get added up.
-SANDBOX_PURGE_DAYS = 1
-SANDBOX_PURGE_HOURS = 0
-SANDBOX_PURGE_MINUTES = 0
-
-# Whether the fleet Manager should run idle tasks.
-DO_IDLE_TASKS = True
-
-# try to run an idle task every IDLE_TASK_FACTOR * FLEET_POLLING_INTERVAL
-IDLE_TASK_FACTOR = 50
-
-# Keep this many of the most recent Sandboxes for any PipelineFamily.
-SANDBOX_KEEP_RECENT = int(os.environ.get('KIVE_SANDBOX_KEEP_RECENT', '10'))
-
-# When to start purging old logfiles
-LOGFILE_MAX_STORAGE = 5 << 40  # TB
-# When to stop purging
-LOGFILE_TARGET_STORAGE = 2 << 40  # TB
-
-# only log files older than this period will be considered for purging
-LOGFILE_GRACE_PERIOD_HRS = 1.0
-
-# set the frequency with which the Log directory is rescanned for files to purge.
-LOGFILE_PURGE_SCAN_PERIOD_HRS = 12.0
-
-# Worker account configuration
-
-# The system user that actually runs the code.  This user:
-# - should be a standard unprivileged user
-# - should have access to the sandbox directory
-# - should be made the owner of all sandboxes
-# - should be accessible via SSH by the Kive user (i.e. apache on a production machine,
-#   your user account on a developer machine) without password.
-# - should have access to any tools used in any of your CodeResources on PATH
-# - should use bash as its default shell
-# Leave blank to run as the user that launches the fleet.
-KIVE_SANDBOX_WORKER_ACCOUNT = ""
-
-# The system group that contains both the user that launches the fleet and
-# the sandbox worker account.  This is ignored if KIVE_SANDBOX_WORKER_ACCOUNT is blank.
-KIVE_PROCESSING_GROUP = os.environ.get("KIVE_PROCESSING_GROUP", "")
-
-# Number of rows to display on the View Dataset page.
-DATASET_DISPLAY_MAX = 100
-
 # A list, ordered from lowest-priority to highest-priority, of Slurm queues to
 # be used by Kive.  Fill these in with the names of the queues as you have them
 # defined on your system.  The tuples contain the name Kive will use for the
@@ -350,72 +288,6 @@ SLURM_QUEUES = json.loads(os.environ.get("KIVE_SLURM_QUEUES", """\
     ["High priority", "HIGH_PRIO"]
 ]
 """))
-# Number of seconds between checking Slurm for job information.
-DEFAULT_SLURM_CHECK_INTERVAL = 5
 
-KIVE_HOME = os.path.abspath(os.path.join(__file__, '../..'))
-STEP_HELPER_COMMAND = "step_helper"
-CABLE_HELPER_COMMAND = "cable_helper"
-
-# Steps in Pipelines will run as Slurm tasks, using a script like this:
-"""
-#!/usr/bin/env bash
-
-[SANDBOX_XXX_PREAMBLE]
-
-[DRIVER] [INPUTS] [OUTPUTS]
-"""
-# If there's anything system-specific that you need in that spot, put it
-# into this variable:
-SANDBOX_SETUP_PREAMBLE = os.environ.get("KIVE_SANDBOX_SETUP_PREAMBLE", "")
-SANDBOX_DRIVER_PREAMBLE = os.environ.get("KIVE_SANDBOX_DRIVER_PREAMBLE", "")
-SANDBOX_BOOKKEEPING_PREAMBLE = os.environ.get("KIVE_SANDBOX_BOOKKEEPING_PREAMBLE", "")
-SANDBOX_CABLE_PREAMBLE = os.environ.get("KIVE_SANDBOX_CABLE_PREAMBLE", "")
-
-# The amount of memory to allocate to setup, bookkeeping, and cable tasks (in MB).
-SANDBOX_SETUP_MEMORY = os.environ.get("KIVE_SANDBOX_SETUP_MEMORY", 100)
-SANDBOX_BOOKKEEPING_MEMORY = os.environ.get("KIVE_SANDBOX_BOOKKEEPING_MEMORY", 100)
-SANDBOX_CABLE_MEMORY = os.environ.get("KIVE_SANDBOX_CABLE_MEMORY", 100)
-
-CONFIRM_COPY_RETRIES = 5
-CONFIRM_COPY_WAIT_MIN = 3
-CONFIRM_COPY_WAIT_MAX = 7
-
-CONFIRM_FILE_CREATED_RETRIES = 5
-CONFIRM_FILE_CREATED_WAIT_MIN = 8
-CONFIRM_FILE_CREATED_WAIT_MAX = 12
-
-# The settings file the fleet should use.  Leave as None if it should just use the normal one.
-FLEET_SETTINGS = None
-
-# The keyword used by the system's sinfo command to retrieve a queue's priority,
-# and the name of the corresponding column returned.
-SLURM_PRIO_KEYWORD = os.environ.get('KIVE_PRIO_KEYWORD', "prioritytier")
-SLURM_PRIO_COLNAME = os.environ.get('KIVE_PRIO_COLNAME', "PRIO_TIER")
-
-# Attempt to run the system tests that use Slurm.
-RUN_SLURM_TESTS = os.environ.get('KIVE_RUN_SLURM_TESTS', 'False').lower() != 'false'
-
-# The number of times to retry a slurm command such as sbatch or sacct,
-# and the interval in seconds to wait between retries.
-# NOTE: these timeouts are also used for DOCKER_COMMAND.
-SLURM_COMMAND_RETRY_NUM = 10
-SLURM_COMMAND_RETRY_SLEEP_SECS = 10
-
-# Fail any slurm job that reports a NODE_FAIL for longer than this time (in seconds).
-NODE_FAIL_TIME_OUT_SECS = 5*60
-
-# Attempt to run the system tests that use Docker.
-RUN_DOCKER_TESTS = os.environ.get('KIVE_RUN_DOCKER_TESTS', 'False').lower() != 'false'
-
-DOCK_DOCKER_COMMAND = "/usr/bin/docker"
-DOCK_BZIP2_COMMAND = "/bin/bzip2"
-
-# Attempt to run the system tests that use singularity
-# NOTE: It only makes sense to have this true iff RUN_DOCKER_TESTS is also true
-RUN_SINGULARITY_TESTS = (
-        RUN_DOCKER_TESTS and
-        os.environ.get('KIVE_RUN_SINGULARITY_TESTS', 'False').lower() != 'false')
-
-# Container file in CodeResources folder
+# Container file in Containers folder
 DEFAULT_CONTAINER = os.environ.get('KIVE_DEFAULT_CONTAINER', 'kive-default.simg')

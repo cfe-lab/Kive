@@ -5,12 +5,8 @@ from django.core.management.base import BaseCommand
 from django.core.management import call_command
 from django.conf import settings
 
-import file_access_utils
-import method.models
-import archive.models
 import librarian.models
 import container.models
-import datachecking.models
 
 
 class Command(BaseCommand):
@@ -42,12 +38,6 @@ class Command(BaseCommand):
         # flush truncates all tables, so we need to re-load this stuff.
         call_command("loaddata", "initial_groups")
         call_command("loaddata", "initial_user")
-
-        # Create the Sandboxes directory specially because it has to have
-        # special permissions added to it.
-        sandboxes_path = os.path.join(settings.MEDIA_ROOT, settings.SANDBOX_PATH)
-        os.mkdir(sandboxes_path)
-        file_access_utils.configure_sandbox_permissions(sandboxes_path)
 
         if fixture:
             call_command("loaddata", fixture)
