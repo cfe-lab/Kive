@@ -311,83 +311,6 @@ class Dataset(metadata.models.AccessControl):
             else:
                 yield row
 
-    def expected_header(self):
-        header = []
-        if not self.is_raw():
-            header = [c.column_name for c in self.compounddatatype.members.order_by("column_idx")]
-        return header
-
-    @property
-    def content_matches_header(self):
-        observed = self.header()
-
-        # Cache this so we only hit the db once here
-        if hasattr(self, "_expected_header_cache"):
-            expected = self._expected_header_cache
-        else:
-            expected = self._expected_header_cache = self.expected_header()
-
-        if len(observed) != len(expected):
-            return False
-        return not any([o != x for (o, x) in zip(observed, expected)])
-
-    def column_alignment(self):
-        """
-        This function looks at the expected and observed headers for
-        a Dataset, and tries to align them if they don't match.
-
-        :return: a tuple whose first element is a list of tuples
-        i.e (expected header name, observed header name), and
-        whose second element is a list of gaps indicating where
-        to insert blank fields in a row
-        """
-        expt = self.expected_header()
-        obs = self.header()
-        i, insert = 0, []
-
-        if self.is_raw() and not self.content_matches_header:
-            return None, None
-
-        # Do a greedy 'hard matching' over the columns
-        while i < max(len(expt), len(obs)) - 1:
-            ex, ob = zip(*(map(None, expt, obs)[i:]))
-            u_score = float('inf')
-            l_score = float('inf')
-
-            for j, val in enumerate(ob):
-                if val == ex[0]:
-                    u_score = j
-            for j, val in enumerate(ex):
-                if val == ob[0]:
-                    l_score = j
-            if l_score == u_score == float('inf'):
-                pass
-            elif u_score < l_score and u_score != float('inf'):
-                [expt.insert(i, "") for _ in range(u_score)]
-            elif l_score <= u_score and l_score != float('inf'):
-                # noinspection PyTypeChecker
-                [obs.insert(i, "") for _ in range(l_score)]
-                insert += [i] * l_score  # keep track of where to insert columns in the resulting view
-            i += 1
-
-        # it would be nice to do a similar soft matching to try to
-        # match columns that are close to being the same string
-
-        # Pad out the arrays
-        diff = abs(len(expt)-len(obs))
-        if len(expt) > len(obs):
-            obs += [""] * diff
-        else:
-            expt += [""] * diff
-
-        return zip(expt, obs), insert
-
-    @property
-    def compounddatatype(self):
-        if self.is_raw():
-            return None
-        return self.structure.compounddatatype
-
     def clean(self):
         """
         Checks coherence of this Dataset.
@@ -467,22 +390,6 @@ class Dataset(metadata.models.AccessControl):
             if data_handle is None:
                 return None
             return data_handle.size
-        finally:
-            if data_handle is not None:
-                data_handle.close()
-
-    def get_basename_and_formatted_size(self):
-        """
-        :return str: basename of the dataset file.
-        :return str: size of dataset_file in bytes.
-        If the file handle cannot be accessed, this routine returns (None, 'missing').
-        """
-        data_handle = None
-        try:
-            data_handle = self.get_open_file_handle("rb")
-            if data_handle is None:
-                return None, 'missing'
-            return os.path.basename(data_handle.name), filesizeformat(data_handle.size)
         finally:
             if data_handle is not None:
                 data_handle.close()
@@ -583,37 +490,6 @@ class Dataset(metadata.models.AccessControl):
             if opened_file_ourselves:
                 file_handle.close()
 
-    def set_md5_and_count_rows(self, file_path, file_handle=None):
-        """Set the MD5 hash and number of rows from a file.
-
-        Closes the file afterwards.
-        PRE
-        This Dataset must have a DatasetStructure
-        :param str file_path:  Path to file to calculate MD5 for. file_path not used if file_handle supplied.
-        :param file file_handle: file handle of file to calculate MD5.  File must be opened in text mode and
-         seeked to the beginning.  If this is None, then file_path is used.
-        """
-        assert not self.is_raw()
-
-        num_rows = -1  # skip header
-        md5gen = hashlib.md5()
-
-        opened_file_ourselves = False
-        if file_handle is None:
-            file_handle = io.open(file_path, "rt", newline="")
-            opened_file_ourselves = True
-
-        try:
-            for line in file_handle:
-                md5gen.update(line.encode())
-                num_rows += 1
-        finally:
-            if opened_file_ourselves:
-                file_handle.close()
-
-        self.structure.num_rows = num_rows
-        self.MD5_checksum = md5gen.hexdigest()
-
     @transaction.atomic
     def register_file(self, file_path, file_handle=None):
         """
@@ -655,34 +531,6 @@ class Dataset(metadata.models.AccessControl):
 
         self.clean()
         self.save()
-
-    def mark_missing(self, start_time, end_time, execlog, checking_user):
-        """Mark a Dataset as missing output.
-
-        INPUTS
-        start_time      time when we started checking for the file
-        end_time        time when check for file finished
-        execlog         ExecLog of execution which did not produce
-                        output
-        checking_user   user that discovered the missing output
-        """
-        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog, user=checking_user)
-        ccl.add_missing_output()
-        return ccl
-
-    def mark_file_not_stable(self, start_time, end_time, execlog, checking_user):
-        """Mark a Dataset as having had an unstable file size.
-
-        INPUTS
-        start_time      time when we started checking for the file
-        end_time        time when check for file finished
-        execlog         ExecLog of execution which did not produce
-                        output
-        checking_user   user that discovered the missing output
-        """
-        ccl = self.content_checks.create(start_time=start_time, end_time=end_time, execlog=execlog, user=checking_user)
-        ccl.add_file_not_stable()
-        return ccl
 
     @classmethod
     def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
@@ -812,10 +660,8 @@ class Dataset(metadata.models.AccessControl):
 
             if precomputed_md5 is not None:
                 new_dataset.MD5_checksum = precomputed_md5
-            elif new_dataset.is_raw():
-                new_dataset.set_md5(file_name, file_handle)
             else:
-                new_dataset.set_md5_and_count_rows(file_name, file_handle)
+                new_dataset.set_md5(file_name, file_handle)
             if file_handle is not None:
                 file_handle.seek(0)
 
@@ -823,22 +669,8 @@ class Dataset(metadata.models.AccessControl):
                 new_dataset.register_file(file_path=file_name, file_handle=file_handle)
 
             new_dataset.clean()
-            if not new_dataset.is_raw():
-                new_dataset.structure.save()
             new_dataset.save()
         return new_dataset
-
-    def any_failed_checks(self):
-        """ Checks if any integrity or content checks failed. """
-        if self.integrity_checks.filter(usurper__isnull=False).exists():
-            self.logger.debug("Dataset '{}' failed integrity check".format(self))
-            return True
-
-        if self.content_checks.filter(baddata__isnull=False).exists():
-            self.logger.debug("Dataset '{}' failed content check".format(self))
-            return True
-
-        return False
 
     @transaction.atomic
     def build_redaction_plan(self, redaction_accumulator=None):

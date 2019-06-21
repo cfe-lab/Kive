@@ -24,12 +24,6 @@ import librarian.models
 LOGGER = logging.getLogger(__name__)
 
 
-def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
-    t = loader.get_template("librarian/raw_view.html")
-    c = {"file": file, "name": name, 'download': download, 'return': return_to_url}
-    return HttpResponse(t.render(c, request))
-
-
 @login_required
 def datasets(request):
     """
@@ -137,7 +131,7 @@ def dataset_view(request, dataset_id):
             c["missing_data_message"] = "Data was not retained or has been purged."
         rendered_response = t.render(c, request)
 
-    elif dataset.is_raw():
+    else:
         t = loader.get_template("librarian/raw_dataset_view.html")
 
         # Test whether this is a binary file or not.
@@ -156,32 +150,6 @@ def dataset_view(request, dataset_id):
             c["is_binary"] = True
             del c["sample_content"]
             rendered_response = t.render(c, request)
-    else:
-        extra_errors = []
-        # If we have a mismatched output, we do an alignment
-        # over the columns.
-        if dataset.content_matches_header:
-            col_matching, processed_rows = None, dataset.rows(
-                True,
-                limit=settings.DATASET_DISPLAY_MAX,
-                extra_errors=extra_errors)
-        else:
-            col_matching, insert = dataset.column_alignment()
-            processed_rows = dataset.rows(data_check=True,
-                                          insert_at=insert,
-                                          limit=settings.DATASET_DISPLAY_MAX,
-                                          extra_errors=extra_errors)
-        t = loader.get_template("librarian/csv_dataset_view.html")
-        processed_rows = list(processed_rows)
-        c.update(
-            {
-                'column_matching': col_matching,
-                'processed_rows': processed_rows,
-                'extra_errors': extra_errors,
-                "are_rows_truncated": len(processed_rows) >= settings.DATASET_DISPLAY_MAX
-            }
-        )
-        rendered_response = t.render(c, request)
     return HttpResponse(rendered_response)
 
 

@@ -904,7 +904,6 @@ baz
             # Probe the Dataset to make sure everything looks fine.
             self.assertEquals(dataset.name, self.data_to_serialize["name"])
             self.assertEquals(dataset.description, self.data_to_serialize["description"])
-            self.assertIsNone(dataset.compounddatatype)
             self.assertEquals(dataset.user, self.kive_user)
             self.assertTrue(bool(dataset.dataset_file))
 
@@ -929,7 +928,6 @@ baz
             # Probe the Dataset to make sure everything looks fine.
             self.assertEquals(dataset.name, self.data_to_serialize["name"])
             self.assertEquals(dataset.description, self.data_to_serialize["description"])
-            self.assertIsNone(dataset.compounddatatype)
             self.assertEquals(dataset.user, self.kive_user)
             self.assertFalse(bool(dataset.dataset_file))
 
@@ -992,7 +990,6 @@ baz
         # Probe the Dataset to make sure everything looks fine.
         self.assertEquals(dataset.name, self.data_to_serialize["name"])
         self.assertEquals(dataset.description, self.data_to_serialize["description"])
-        self.assertIsNone(dataset.compounddatatype)
         self.assertEquals(dataset.user, self.kive_user)
         self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
         self.assertEquals(dataset.externalfiledirectory, self.efd)
@@ -1017,7 +1014,6 @@ baz
         # Probe the Dataset to make sure everything looks fine.
         self.assertEquals(dataset.name, self.data_to_serialize["name"])
         self.assertEquals(dataset.description, self.data_to_serialize["description"])
-        self.assertIsNone(dataset.compounddatatype)
         self.assertEquals(dataset.user, self.kive_user)
         self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
         self.assertEquals(dataset.externalfiledirectory, self.efd)
