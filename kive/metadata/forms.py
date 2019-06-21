@@ -9,26 +9,12 @@ from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from django.forms.utils import ErrorList
 
-from metadata.models import Datatype, BasicConstraint, CompoundDatatypeMember, CompoundDatatype
-
-
-def setup_form_users_allowed(form, users_allowed):
-    """
-    Helper that sets up the users_allowed field on a Form or ModelForm that has a users_allowed
-    ModelMultipleChoiceField (e.g. anything that inherits from AccessControl).
-    """
-    form.fields["users_allowed"].queryset = users_allowed if users_allowed else get_user_model().objects.all()
-
-
-def setup_form_groups_allowed(form, groups_allowed):
-    form.fields["groups_allowed"].queryset = groups_allowed if groups_allowed else Group.objects.all()
-
 
 class UsersAllowedWidget(forms.SelectMultiple):
     """
     A sub-widget of the PermissionsWidget.  This should not be created on its own.
     """
-    class Media:
+    class Media(object):
         css = {
             "all": ("metadata/accumulator.css",)
         }
@@ -39,7 +25,7 @@ class GroupsAllowedWidget(forms.SelectMultiple):
     """
     A sub-widget of the PermissionsWidget.  This should not be created on its own.
     """
-    class Media:
+    class Media(object):
         css = {
             "all": ("metadata/accumulator.css",)
         }
@@ -48,6 +34,7 @@ class GroupsAllowedWidget(forms.SelectMultiple):
 
 class PermissionsWidget(forms.MultiWidget):
     template_name = "metadata/permissions_widget.html"
+    widgets = None  # Filled in later.
 
     def __init__(self, user_choices=None, group_choices=None, attrs=None):
         self.user_choices = user_choices or []
@@ -106,11 +93,11 @@ class PermissionsWidget(forms.MultiWidget):
         return context
 
 
-def user_choices(user_queryset):
+def get_user_choices(user_queryset):
     return [(x.username, x.username) for x in user_queryset]
 
 
-def group_choices(group_queryset):
+def get_group_choices(group_queryset):
     return [(x.name, x.name) for x in group_queryset]
 
 
@@ -135,8 +122,8 @@ class PermissionsField(forms.MultiValueField):
         if isinstance(widget, type):
             widget = widget()
         # This will be set later, at run time.
-        widget.widgets[0].choices = user_choices([])
-        widget.widgets[1].choices = group_choices([])
+        widget.widgets[0].choices = get_user_choices([])
+        widget.widgets[1].choices = get_group_choices([])
 
         super(PermissionsField, self).__init__(
             widget=widget,
@@ -160,17 +147,17 @@ class PermissionsField(forms.MultiValueField):
         """
         Update the valid users and groups allowed, and update the widget.
         """
-        self.widget.user_choices = user_choices(users_allowed)
+        self.widget.user_choices = get_user_choices(users_allowed)
         self.fields[0].queryset = users_allowed
         self.widget.widgets[0].choices = self.widget.user_choices
 
-        self.widget.group_choices = group_choices(groups_allowed)
+        self.widget.group_choices = get_group_choices(groups_allowed)
         self.fields[1].queryset = groups_allowed
         self.widget.widgets[1].choices = self.widget.group_choices
 
     def set_old_users_groups(self, old_users, old_groups):
-        self.widget.old_users = user_choices(old_users)
-        self.widget.old_groups = group_choices(old_groups)
+        self.widget.old_users = get_user_choices(old_users)
+        self.widget.old_groups = get_group_choices(old_groups)
         if self.widget.old_users or self.widget.old_groups:
             placeholder = [('None', 'None')]
             if not self.widget.old_users:
@@ -261,116 +248,3 @@ class PermissionsForm(forms.ModelForm):
                 addable_groups)
         self.fields["permissions"].set_users_groups_allowed(addable_users,
                                                             addable_groups)
-
-
-class DatatypeForm (forms.ModelForm):
-
-    permissions = PermissionsField(
-        label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this Datatype?",
-        required=False
-    )
-
-    restricts = forms.ModelMultipleChoiceField(
-        queryset = Datatype.objects.all(),
-        required=True,
-        help_text='The new Datatype is a special case of one or more existing Datatypes; e.g., DNA restricts string.',
-        initial=Datatype.objects.filter(name='string'))
-
-    class Meta:
-        model = Datatype
-        fields = ('name', 'description', 'restricts', "permissions")
-
-    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
-        super(DatatypeForm, self).__init__(data, *args, **kwargs)
-
-        users_allowed = users_allowed or get_user_model().objects.all()
-        groups_allowed = groups_allowed or Group.objects.all()
-        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
-
-
-class DatatypeDetailsForm (forms.ModelForm):
-
-    permissions = PermissionsField(
-        label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this Datatype?",
-        required=False
-    )
-
-    class Meta:
-        model = Datatype
-        fields = ('name', 'description', "permissions")
-
-    def __init__(self, data=None, addable_users=None, addable_groups=None, *args, **kwargs):
-        super(DatatypeDetailsForm, self).__init__(data, *args, **kwargs)
-        self.fields["permissions"].set_users_groups_allowed(addable_users, addable_groups)
-
-
-class BasicConstraintForm (forms.ModelForm):
-    #ruletype = forms.ChoiceField(BasicConstraint.CONSTRAINT_TYPES)
-    class Meta:
-        model = BasicConstraint
-        exclude = ()
-        #exclude = ('datatype', )
-
-
-class IntegerConstraintForm (forms.Form):
-    minval = forms.FloatField(required=False, help_text='Minimum numerical value')
-    maxval = forms.FloatField(required=False, help_text='Maximum numerical value')
-
-
-class StringConstraintForm (forms.Form):
-    minlen = forms.IntegerField(required=False, help_text='Minimum string length (must be non-negative integer)')
-    maxlen = forms.IntegerField(required=False, help_text='Maximum string length (must be non-negative integer)')
-    regexp = forms.CharField(
-        required=False,
-        help_text=('A regular expression that can be recognized by the Python re module (Perl-like syntax). '
-                   'To define multiple regexes, enclose each in double-quotes (") and separate with commas (,).'))
-
-
-class CompoundDatatypeMemberForm(forms.ModelForm):
-    datatype = forms.ModelChoiceField(
-        queryset = Datatype.objects.all(), required=True, help_text="This column's expected datatype")
-
-    blankable = forms.BooleanField(
-        required=False,
-        help_text="If a file has this CompoundDatatype, can its entries in this column be blank?"
-    )
-
-    class Meta:
-        model = CompoundDatatypeMember
-        exclude = ('compounddatatype', 'column_idx')
-
-    def __init__(self, data=None, user=None, *args, **kwargs):
-        super(CompoundDatatypeMemberForm, self).__init__(data, *args, **kwargs)
-
-        if user is not None:
-            self.fields["datatype"].queryset = Datatype.filter_by_user(user)
-
-
-class CompoundDatatypeForm(forms.ModelForm):
-    name = forms.CharField(
-        widget=forms.TextInput(
-            attrs={"size": 125}
-        ),
-        required=False,
-        help_text="Name of this CompoundDatatype.  If left blank, the name will default to "
-                  "a tuple representation of its columns."
-    )
-
-    permissions = PermissionsField(
-        label="Users and groups allowed",
-        help_text="Which users and groups are allowed access to this CompoundDatatype?",
-        required=False
-    )
-
-    class Meta:
-        model = CompoundDatatype
-        exclude = ("user", "users_allowed", "groups_allowed")
-
-    def __init__(self, data=None, users_allowed=None, groups_allowed=None, *args, **kwargs):
-        super(CompoundDatatypeForm, self).__init__(data, *args, **kwargs)
-        users_allowed = users_allowed if users_allowed is not None else get_user_model().objects.all()
-        groups_allowed = groups_allowed if groups_allowed is not None else Group.objects.all()
-        self.fields["permissions"].set_users_groups_allowed(users_allowed, groups_allowed)
-

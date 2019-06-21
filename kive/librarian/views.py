@@ -207,9 +207,7 @@ def datasets_add_archive(request):
         try:
             archive_add_dataset_form = ArchiveAddDatasetForm(
                 data=request.POST,
-                files=request.FILES,
-                user=request.user,
-            )
+                files=request.FILES)
             # Try to retrieve new datasets. If this fails, we return to our current page
             is_ok = archive_add_dataset_form.is_valid()
             if is_ok:
@@ -293,7 +291,7 @@ def datasets_add_archive(request):
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_archive.html')
-        c['archiveAddDatasetForm'] = ArchiveAddDatasetForm(user=request.user)
+        c['archiveAddDatasetForm'] = ArchiveAddDatasetForm()
 
     return HttpResponse(t.render(c, request))
 
@@ -310,8 +308,7 @@ def datasets_add_bulk(request):
         try:
             # Add new datasets.
             bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST,
-                                                       files=request.FILES,
-                                                       user=request.user)
+                                                       files=request.FILES)
             isok = bulk_add_dataset_form.is_valid()
             if isok:
                 CDT_obj, add_results = bulk_add_dataset_form.create_datasets(request.user)
@@ -383,7 +380,7 @@ def datasets_add_bulk(request):
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_bulk.html')
-        c.update({'bulkAddDatasetForm': BulkAddDatasetForm(user=request.user)})
+        c.update({'bulkAddDatasetForm': BulkAddDatasetForm()})
 
     return HttpResponse(t.render(c, request))
 
@@ -434,7 +431,7 @@ def datasets_bulk(request):
         # You must access the /datasets_bulk.html page by adding datasets in bulk form /datasets_add_bulk.html
         # A GET to /datasets_bulk.html will only redirect to you the /dataset_add_bulk.html page
         t = loader.get_template('librarian/datasets_add_bulk.html')
-        bulk_dataset_form = BulkAddDatasetForm(user=request.user)
+        bulk_dataset_form = BulkAddDatasetForm()
         c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
     return HttpResponse(t.render(c, request))

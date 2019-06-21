@@ -35,7 +35,7 @@ class Command(BaseCommand):
         for ds in Dataset.objects.iterator():
             self.dataset_count += 1
             try:
-                has_data = ds.has_data()
+                has_data = ds.has_data(raise_errors=True)
             except IOError as ex:
                 if ex.errno != errno.ENOENT:
                     raise

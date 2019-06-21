@@ -9,6 +9,9 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('transformation', '0103_no_default_user'),
+        ('portal', '0002_remove_stagedfile_20170815_1726'),
+        ('method', '0111_drop_all'),
+        ('pipeline', '0103_drop_all'),
     ]
 
     operations = [

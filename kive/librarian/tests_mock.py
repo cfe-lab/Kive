@@ -9,20 +9,17 @@ from django.core.urlresolvers import reverse
 from django.test import TestCase
 from django_mock_queries.mocks import mocked_relations
 import mock
-from mock import PropertyMock, patch
+from mock import patch
 
-from constants import datatypes, users
+from constants import users
 from container.models import ContainerRun, ContainerArgument, ContainerDataset
-from datachecking.models import BadData, CellError, ContentCheckLog
 from kive.tests import dummy_file, strip_removal_plan
 from kive.tests import ViewMockTestCase
 from librarian.models import Dataset
-from metadata.models import Datatype, CompoundDatatypeMember, CompoundDatatype, kive_user, KiveUser
+from metadata.models import kive_user, KiveUser
 
 
 @mocked_relations(Dataset,
-                  ContentCheckLog,
-                  BadData,
                   ContainerRun,
                   ContainerArgument,
                   ContainerDataset)
@@ -38,8 +35,6 @@ Dave,40
 
         dataset = Dataset()
         dataset.get_open_file_handle = lambda md: data_file
-        expected_check = dataset.content_checks.create()
-        type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
         rows = list(dataset.rows(data_check=True))
 
@@ -56,61 +51,8 @@ Dave,40
 
         dataset = Dataset()
         dataset.get_open_file_handle = lambda md: data_file
-        expected_check = dataset.content_checks.create()
-        type(expected_check).baddata = PropertyMock(side_effect=BadData.DoesNotExist)
 
         rows = list(dataset.rows(data_check=True, insert_at=[0, 1]))
-
-        self.assertEqual(expected_rows, rows)
-
-    def test_rows_with_errors(self):
-        data_file = dummy_file("""\
-name,count
-Bob,tw3nty
-Dave,40
-Tom,15
-""")
-        bad_row, bad_column = 1, 2
-        expected_rows = [[('Bob', []), ('tw3nty', [u'Was not integer'])],
-                         [('Dave', []), ('40', [])],
-                         [('Tom', []), ('15', [])]]
-
-        int_datatype = Datatype(id=datatypes.INT_PK)
-        count_column = CompoundDatatypeMember(column_idx=bad_column,
-                                              datatype=int_datatype)
-        cell_error = CellError(column=count_column, row_num=bad_row)
-        dataset = Dataset()
-        dataset.get_open_file_handle = lambda md: data_file
-        expected_check = dataset.content_checks.create()
-        ContentCheckLog.baddata = PropertyMock()
-        expected_check.baddata.cell_errors.order_by.return_value = [cell_error]
-
-        rows = list(dataset.rows(data_check=True))
-
-        self.assertEqual(expected_rows, rows)
-
-    def test_rows_with_limit(self):
-        data_file = dummy_file("""\
-name,count
-Bob,tw3nty
-Dave,40
-Tom,15
-""")
-        bad_row, bad_column = 1, 2
-        expected_rows = [[('Bob', []), ('tw3nty', [u'Was not integer'])],
-                         [('Dave', []), ('40', [])]]
-
-        int_datatype = Datatype(id=datatypes.INT_PK)
-        count_column = CompoundDatatypeMember(column_idx=bad_column,
-                                              datatype=int_datatype)
-        cell_error = CellError(column=count_column, row_num=bad_row)
-        dataset = Dataset()
-        dataset.get_open_file_handle = lambda md: data_file
-        expected_check = dataset.content_checks.create()
-        ContentCheckLog.baddata = PropertyMock()
-        expected_check.baddata.cell_errors.order_by.return_value.filter.return_value = [cell_error]
-
-        rows = list(dataset.rows(data_check=True, limit=2))
 
         self.assertEqual(expected_rows, rows)
 
@@ -205,7 +147,7 @@ Dave,40
 class DatasetViewMockTests(ViewMockTestCase):
     def setUp(self):
         super(DatasetViewMockTests, self).setUp()
-        patcher = mocked_relations(KiveUser, Dataset, Group, CompoundDatatype)
+        patcher = mocked_relations(KiveUser, Dataset, Group)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -294,8 +236,7 @@ class DatasetViewMockTests(ViewMockTestCase):
         response = self.client.post(reverse('datasets_add_archive'))
 
         self.assertEqual(200, response.status_code)
-        self.assertEqual({'compound_datatype': [u'This field is required.'],
-                          'dataset_file': [u'This field is required.']},
+        self.assertEqual({'dataset_file': [u'This field is required.']},
                          response.context['archiveAddDatasetForm'].errors)
 
     # noinspection PyUnresolvedReferences
@@ -309,8 +250,7 @@ class DatasetViewMockTests(ViewMockTestCase):
         upload_file = SimpleUploadedFile("added.zip", zip_buffer.getvalue())
         response = self.client.post(
             reverse('datasets_add_archive'),
-            data=dict(compound_datatype=CompoundDatatype.RAW_ID,
-                      dataset_file=upload_file))
+            data=dict(dataset_file=upload_file))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(1, response.context['num_files_added'])
@@ -328,8 +268,7 @@ class DatasetViewMockTests(ViewMockTestCase):
         upload_file2 = SimpleUploadedFile(filename2, b"Goodbye, Town!")
         response = self.client.post(
             reverse('datasets_add_bulk'),
-            data=dict(compound_datatype=CompoundDatatype.RAW_ID,
-                      dataset_files=[upload_file1, upload_file2]))
+            data=dict(dataset_files=[upload_file1, upload_file2]))
 
         self.assertEqual(200, response.status_code)
         self.assertEqual(2, response.context['num_files_added'])

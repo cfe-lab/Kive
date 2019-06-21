@@ -6,7 +6,6 @@ Dataset, etc.
 """
 from __future__ import unicode_literals
 
-from collections import defaultdict
 import csv
 import hashlib
 import logging
@@ -26,7 +25,6 @@ from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.conf import settings
 from django.template.defaultfilters import filesizeformat, pluralize
-from django.db.models import Min
 from django.db.models.signals import post_delete
 from django.core.urlresolvers import reverse
 
@@ -35,7 +33,6 @@ import archive.models
 import librarian.signals
 from constants import maxlengths
 from container.models import ContainerDataset
-from datachecking.models import BadData
 import six
 
 import file_access_utils
@@ -268,32 +265,7 @@ class Dataset(metadata.models.AccessControl):
         with data_handle:
             reader = csv.reader(data_handle)
             if data_check:
-                try:
-                    content_check = self.content_checks.first()
-                    if content_check is None:
-                        raise BadData.DoesNotExist('Dataset has no content checks')
-                    baddata = content_check.baddata
-                    cell_errors = baddata.cell_errors.order_by('row_num', 'column')
-                    if limit is not None:
-                        cell_errors = cell_errors.filter(row_num__lte=limit)
-                    row_errors = defaultdict(dict)  # {row_num: {col_num: column}}
-                    for error in cell_errors:
-                        row_error = row_errors[error.row_num]
-                        row_error[error.column.column_idx] = error.column
-                    if extra_errors is not None:
-                        first_errors = baddata.cell_errors.values(
-                            'column_id').annotate(Min('row_num')).order_by(
-                                'row_num__min')
-                        columns = None
-                        for error in first_errors:
-                            if columns is None:
-                                members = self.structure.compounddatatype.members.all()
-                                columns = {col.id: col for col in members}
-                            failed_column = columns[error['column_id']]
-                            row_error = row_errors[error['row_num__min']]
-                            row_error[failed_column.column_idx] = failed_column
-                except BadData.DoesNotExist:
-                    row_errors = {}
+                row_errors = {}
             for row_num, row in enumerate(reader):
                 if not data_check:
                     if limit is not None and row_num > limit:
@@ -555,12 +527,18 @@ class Dataset(metadata.models.AccessControl):
             return False
         return True
 
-    def has_data(self):
+    def has_data(self, raise_errors=False):
         try:
             data_handle = self.get_open_file_handle("rb", raise_errors=True)
             data_handle.close()
             return True
         except ValueError:
+            # No file recorded for this dataset.
+            return False
+        except IOError:
+            # Recorded file is not found or not readable.
+            if raise_errors:
+                raise
             return False
 
     def has_structure(self):
@@ -1023,10 +1001,6 @@ class Dataset(metadata.models.AccessControl):
         be by the permissions widget used in the UI.
         """
         self.grant_from_json(permissions_json)
-
-        for ic in self.integrity_checks.all():
-            if ic.is_fail():
-                ic.usurper.conflicting_dataset.increase_permissions_from_json(permissions_json)
 
 
 # Register signals.

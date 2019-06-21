@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('transformation', '0101_squashed'),
-        ('metadata', '0101_squashed'),
+        ('metadata', '0103_remove_custom_constraints_20170106_1628'),
     ]
 
     operations = [

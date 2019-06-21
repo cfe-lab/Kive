@@ -25,7 +25,6 @@ from django.core.files import File
 from django.core.files.base import ContentFile
 # from django.utils.timezone import get_default_timezone, get_current_timezone
 from django.utils import timezone
-from django_mock_queries.mocks import mocked_relations
 from mock import patch
 
 from rest_framework.test import force_authenticate, APIRequestFactory
@@ -33,11 +32,10 @@ from rest_framework import status
 
 from constants import groups
 from container.models import ContainerFamily
-from datachecking.models import MD5Conflict
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
 from librarian.models import Dataset, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
-from metadata.models import CompoundDatatype, kive_user, everyone_group
+from metadata.models import kive_user, everyone_group
 
 import file_access_utils
 import kive.testing_utils as tools
@@ -199,14 +197,6 @@ class DatasetTests(LibrarianTestCase):
         )
         usurping_ds.save()
 
-        ic = self.singlet_dataset.integrity_checks.create(user=self.myUser)
-        ic.start()
-
-        new_conflict = MD5Conflict(integritychecklog=ic, conflicting_dataset=usurping_ds)
-        new_conflict.save()
-
-        ic.stop()
-
         # Now, let's try to grant some permissions on self.singlet_dataset.
         new_perms_json = json.dumps(
             [
@@ -217,10 +207,10 @@ class DatasetTests(LibrarianTestCase):
         self.singlet_dataset.increase_permissions_from_json(new_perms_json)
 
         self.assertTrue(self.singlet_dataset.users_allowed.filter(pk=self.ringoUser.pk).exists())
-        self.assertTrue(usurping_ds.users_allowed.filter(pk=self.ringoUser.pk).exists())
+        self.assertFalse(usurping_ds.users_allowed.filter(pk=self.ringoUser.pk).exists())
 
         self.assertTrue(self.singlet_dataset.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
-        self.assertTrue(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
+        self.assertFalse(usurping_ds.groups_allowed.filter(pk=groups.DEVELOPERS_PK).exists())
 
     def test_update_name(self):
         dataset = self.singlet_dataset
@@ -401,9 +391,6 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         super(DatasetApiMockTests, self).setUp()
         # num_cols = 12
 
-        patcher = mocked_relations(CompoundDatatype)
-        patcher.start()
-        self.addCleanup(patcher.stop)
         self.list_path = reverse("dataset-list")
         self.list_view, _, _ = resolve(self.list_path)
 
@@ -661,7 +648,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         response = self.removal_view(request, pk=self.detail_pk)
 
         self.assertEquals(response.data['Datasets'], 1)
-        self.assertEquals(response.data['CompoundDatatypes'], 0)
+        self.assertEquals(response.data['Containers'], 0)
 
     def test_dataset_removal(self):
         start_count = Dataset.objects.all().count()
@@ -1353,18 +1340,27 @@ class ExternalFileTests(TestCase):
         )
         # Delete this file.
         os.remove(external_path)
+        assert not external_file_ds_no_internal.has_data()
         expected_error = r"No such file or directory: .*ext_test_has_data\.txt"
         with self.assertRaisesRegexp(IOError, expected_error):
-            external_file_ds_no_internal.has_data()
+            external_file_ds_no_internal.has_data(raise_errors=True)
 
         # Now test when the file exists but is unreadable.
         with open(os.path.join(self.working_dir, ext_path), "wb") as f:
             f.write(ext_contents.encode())
         self.assertTrue(external_file_ds_no_internal.has_data())
         os.chmod(external_path, stat.S_IWUSR | stat.S_IXUSR)
+        assert not external_file_ds_no_internal.has_data()
         expected_error = r"Permission denied: .*ext_test_has_data\.txt"
         with self.assertRaisesRegexp(IOError, expected_error):
-            external_file_ds_no_internal.has_data()
+            external_file_ds_no_internal.has_data(raise_errors=True)
+
+    def test_has_no_data(self):
+        """ Purged dataset should not raise exception from has_data. """
+        self.external_file_ds_no_internal.external_path = ''
+        self.external_file_ds_no_internal.externalfiledirectory = None
+        self.assertFalse(self.external_file_ds_no_internal.has_data())
+        self.assertFalse(self.external_file_ds_no_internal.has_data(raise_errors=True))
 
     def test_clean_efd_external_path_both_set(self):
         """
