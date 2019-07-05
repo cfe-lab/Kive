@@ -25,7 +25,7 @@
     "tslint": "^3.15.1"
   },
   "dependencies": {
-    "@types/jquery": "^2.0.33",
+    "@types/jquery": "^3.3.30",
     "@types/node": "^6.0.45",
     "awesome-typescript-loader": "^3.2.3",
     "script-loader": "^0.7.1",
