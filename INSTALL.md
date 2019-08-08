@@ -1,6 +1,8 @@
 Installation Instructions
 =========================
 
+Kive may be installed directly on the host machine, inside of a VM, or within a VM using Vagrant. For instructions on how to install using Vagrant, please see [these instructions for CentOS](/vagrant/README.md) (alternative options: [CentOS with Python3](/vagrant_centos_python3/README.md), [Ubuntu](/vagrant_ubuntu/README.md)).
+
 Prerequisites
 -------------
 
