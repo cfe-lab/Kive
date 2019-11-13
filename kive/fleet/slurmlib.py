@@ -1,4 +1,9 @@
-# A low level interface to slurm using the calls to sbatch, scancel and squeue via Popen
+# -*- coding: utf-8 -*-
+"""
+A low level interface to slurm using the calls to
+sbatch, scancel and squeue via Popen
+
+"""
 
 import os
 import stat
@@ -19,7 +24,6 @@ from datetime import datetime
 import django.utils.timezone as timezone
 from django.conf import settings
 
-# from sandbox.execute import Sandbox
 from fleet.exceptions import StopExecution
 
 
@@ -27,6 +31,7 @@ logger = logging.getLogger("fleet.slurmlib")
 
 MANAGE_PY = "manage.py"
 
+MANAGE_PY_FULLPATH = os.path.join(settings.KIVE_HOME, MANAGE_PY)
 
 DEFAULT_MEM = 6000
 
@@ -34,7 +39,7 @@ NUM_RETRY = settings.SLURM_COMMAND_RETRY_NUM
 SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
 
 
-def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
+def multi_check_output(cmd_lst, stderr=None, env=None, num_retry=NUM_RETRY):
     """ This routine should always return a (unicode) string.
     NOTE: Under python3, sp.check_output returns bytes by default, so we
     set universal_newlines=True to guarantee strings.
@@ -44,7 +49,10 @@ def multi_check_output(cmd_lst, stderr=None, num_retry=NUM_RETRY):
     while cmd_retry:
         cmd_retry = False
         try:
-            out_str = sp.check_output(cmd_lst, stderr=stderr, universal_newlines=True)
+            out_str = sp.check_output(cmd_lst,
+                                      stderr=stderr,
+                                      env=env,
+                                      universal_newlines=True)
         except OSError as e:
             # typically happens if the executable cannot execute at all (e.g. not installed)
             # ==> we just pass this error up with extra context
@@ -426,14 +434,14 @@ class SlurmScheduler(BaseSlurmScheduler):
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
             logger.warning(status_report, exc_info=True)
             raise
-        except sp.CalledProcessError as e:
+        except sp.CalledProcessError as err1:
             status_report = "sbatch returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
                 with open(stderr_path, "r") as f:
                     stderr_str = "stderr:\n{}".format(f.read())
-            except IOError as e:
+            except IOError:
                 stderr_str = "The stderr log for the sbatch call appears to have been lost!"
-            logger.error(status_report, e.returncode, cmd_lst, e.output, stderr_str,
+            logger.error(status_report, err1.returncode, cmd_lst, err1.output, stderr_str,
                          exc_info=True)
             raise
 
@@ -521,7 +529,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         if is_alive:
             # also check for the existence of MANAGE_PY at the correct location.
             # If this file is not present, the sbatch commands will crash terribly
-            manage_fp = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+            manage_fp = MANAGE_PY_FULLPATH
             if not os.access(manage_fp, os.X_OK):
                 status_report = "An executable '%s' was not found\nsettings.KIVE_HOME = %s"
                 logger.error(status_report, manage_fp, settings.KIVE_HOME)
@@ -548,15 +556,16 @@ class SlurmScheduler(BaseSlurmScheduler):
             status_report = "failed to execute '%s'" % " ".join(cmd_lst)
             logger.warning(status_report, exc_info=True)
             raise
-        except sp.CalledProcessError as e:
+        except sp.CalledProcessError as err1:
             # typically happens if the executable did run, but returned an error
             status_report = "%s returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
                 with open(stderr_path, "r") as f:
                     stderr_str = "stderr:\n{}".format(f.read())
-            except IOError as e:
+            except IOError:
                 stderr_str = "The stderr log appears to have been lost!"
-            logger.debug(status_report, cmd_lst[0], e.returncode, cmd_lst, e.output, stderr_str,
+            logger.debug(status_report, cmd_lst[0], err1.returncode, cmd_lst,
+                         err1.output, stderr_str,
                          exc_info=True)
             raise
 
@@ -859,18 +868,17 @@ class SlurmScheduler(BaseSlurmScheduler):
             status_report = "failed to execute '%s'" % " ".join(cmd_list)
             logger.warning(status_report, exc_info=True)
             raise
-        except sp.CalledProcessError as e:
+        except sp.CalledProcessError as err1:
             status_report = "scontrol returned an error code '%s'\n\nCommand list:\n%s\n\nOutput:\n%s\n\n%s"
             try:
                 with open(stderr_path, "r") as f:
                     stderr_str = "stderr:\n{}".format(f.read())
-            except IOError as e:
+            except IOError:
                 stderr_str = "The stderr log appears to have been lost!"
-            logger.debug(status_report, e.returncode, cmd_list, e.output, stderr_str)
-
+            logger.debug(status_report, err1.returncode, cmd_list, err1.output, stderr_str)
             # scontrol returns 1 if a job is already running or has completed.
             # Catch this case silently, but raise an exception in all other cases.
-            if e.returncode != 1:
+            if err1.returncode != 1:
                 raise
 
     @classmethod
@@ -885,7 +893,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         cable_execute_dict_path = cls._dump_temp_json(cable_dir,
                                                       "cable_info",
                                                       cable_info.dict_repr())
-        cable_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        cable_cmd = re.escape(MANAGE_PY_FULLPATH)
         cable_args_list = [settings.CABLE_HELPER_COMMAND] + cls.fleet_settings + [cable_execute_dict_path]
         cable_args = " ".join([re.escape(x) for x in cable_args_list])
         cable_exec_path = cls._create_wrapperfile(cable_dir, "cable",
@@ -917,7 +925,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         step_dir = step_info.step_run_dir
         step_execute_dict_path = cls._dump_temp_json(step_dir, "step_info", step_info.dict_repr())
 
-        step_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        step_cmd = re.escape(MANAGE_PY_FULLPATH)
         step_args_list = [settings.STEP_HELPER_COMMAND] + cls.fleet_settings + [step_execute_dict_path]
         step_args = " ".join([re.escape(x) for x in step_args_list])
         step_exec_path = cls._create_wrapperfile(step_dir, "setup",
@@ -954,7 +962,7 @@ class SlurmScheduler(BaseSlurmScheduler):
         if info_path is None:
             step_execute_dict_path = cls._dump_temp_json(step_dir, "step_info", step_info.dict_repr())
 
-        book_cmd = re.escape(os.path.join(settings.KIVE_HOME, MANAGE_PY))
+        book_cmd = re.escape(MANAGE_PY_FULLPATH)
         book_args_list = [settings.STEP_HELPER_COMMAND, "--bookkeeping"] + cls.fleet_settings + [step_execute_dict_path]
         book_args = " ".join([re.escape(x) for x in book_args_list])
         book_exec_path = cls._create_wrapperfile(step_dir, "book",
@@ -1430,7 +1438,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         driver_arglst = [settings.CABLE_HELPER_COMMAND, cable_execute_dict_path]
         job_name = "run{}_cable{}".format(runcable.parent_run.pk, runcable.pk)
         jdct = dict([('workingdir', settings.KIVE_HOME),
-                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_name', MANAGE_PY_FULLPATH),
                      ('driver_arglst', driver_arglst),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', cable_info.threads_required),
@@ -1480,7 +1488,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         driver_arglst = [settings.STEP_HELPER_COMMAND, step_execute_dict_path]
         job_name = "r{}s{}_setup".format(runstep.top_level_run.pk, runstep.get_coordinates())
         jdct = dict([('workingdir', settings.KIVE_HOME),
-                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_name', MANAGE_PY_FULLPATH),
                      ('driver_arglst', driver_arglst),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', 1),
@@ -1520,7 +1528,7 @@ class DummySlurmScheduler(BaseSlurmScheduler):
         job_name = "r{}s{}_bookkeeping".format(runstep.top_level_run.pk,
                                                runstep.get_coordinates())
         jdct = dict([('workingdir', settings.KIVE_HOME),
-                     ('driver_name', os.path.join(settings.KIVE_HOME, MANAGE_PY)),
+                     ('driver_name', MANAGE_PY_FULLPATH),
                      ('driver_arglst', driver_arglst),
                      ('prio_level', sandbox.run.priority),
                      ('num_cpus', 1),

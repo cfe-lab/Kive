@@ -13,7 +13,7 @@ from django_mock_queries.mocks import mocked_relations, PatcherChain
 from container.models import Container, ContainerFamily
 from kive.tests import ViewMockTestCase
 from metadata.models import CompoundDatatype, KiveUser, kive_user, empty_removal_plan
-from method.forms import MethodForm
+# from method.forms import MethodForm
 from method.models import Method, MethodFamily, CodeResourceRevision, \
     CodeResource, MethodDependency, DockerImage
 from transformation.models import TransformationInput, TransformationOutput,\

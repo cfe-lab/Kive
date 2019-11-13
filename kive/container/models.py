@@ -39,6 +39,8 @@ from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import container.deffile as deffile
+import fleet.slurmlib as slurmlib
+
 
 logger = logging.getLogger(__name__)
 
@@ -1073,9 +1075,9 @@ class ContainerRun(Stopwatch, AccessControl):
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         child_env.pop('KIVE_LOG', None)
-        output = check_output(self.build_slurm_command(settings.SLURM_QUEUES,
-                                                       dependency_job_ids),
-                              env=child_env)
+        output = slurmlib.multi_check_output(self.build_slurm_command(settings.SLURM_QUEUES,
+                                                                      dependency_job_ids),
+                                             env=child_env)
 
         self.slurm_job_id = int(output)
         # It's just possible the slurm job has already started modifying the
@@ -1083,6 +1085,7 @@ class ContainerRun(Stopwatch, AccessControl):
         self.save(update_fields=['slurm_job_id'])
 
     def build_slurm_command(self, slurm_queues=None, dependency_job_ids=None):
+        """Build a list of strings representing a slurm command"""
         if not self.sandbox_path:
             raise RuntimeError(
                 'Container run needs a sandbox before calling Slurm.')
@@ -1107,8 +1110,9 @@ class ContainerRun(Stopwatch, AccessControl):
             command.append('--dependency=afterok:' + ':'.join(
                 str(job_id)
                 for job_id in dependency_job_ids))
-        manage_path = os.path.abspath(os.path.join(__file__,
-                                                   '../../manage.py'))
+        # manage_path = os.path.abspath(os.path.join(__file__,
+        #                                            '../../manage.py'))
+        manage_path = os.path.abspath(slurmlib.MANAGE_PY_FULLPATH)
         command.extend([manage_path, 'runcontainer', str(self.pk)])
         return command
 
@@ -1246,11 +1250,11 @@ class ContainerRun(Stopwatch, AccessControl):
             # No jobs to check.
             return
         job_id_text = ','.join(job_runs)
-        output = check_output(['sacct',
-                               '-j', job_id_text,
-                               '-o', 'jobid,end',
-                               '--noheader',
-                               '--parsable2'])
+        output = slurmlib.multi_check_output(['sacct',
+                                              '-j', job_id_text,
+                                              '-o', 'jobid,end',
+                                              '--noheader',
+                                              '--parsable2'])
         max_end_time = datetime.now() - timedelta(minutes=1)
         max_end_time_text = max_end_time.strftime('%Y-%m-%dT%H:%M:%S')
         for line in output.splitlines():
