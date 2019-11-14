@@ -1,8 +1,8 @@
 -r requirements-test.txt
-requests==2.20.0
-matplotlib==2.2.3
-seaborn==0.8.1
-pandas==0.21.0
-coverage==4.2
-django-extensions==2.1.4
+requests==2.22.0
+matplotlib==2.2.4
+seaborn==0.9.0
+pandas==0.24.2
+coverage==4.5.4
+django-extensions==2.2.5
 pygraphviz==1.5
