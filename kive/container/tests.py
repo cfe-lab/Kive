@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import warnings
+import subprocess as sp
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -35,8 +36,10 @@ from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from container.management.commands import purge, runcontainer
+# import container.models as cm
 from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus, ExistingRunsError
+    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus,\
+    ExistingRunsError, multi_check_output
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
@@ -92,6 +95,44 @@ def create_valid_tar_content(container=None):
                       outputs=[dict(dataset_name="out1",
                                     source_step=1,
                                     source_dataset_name="out1")])))
+
+
+@patch('container.models.SLEEP_SECS', 0)
+class TestMultiCheckOutput(TestCase):
+    """Perform tests on multi_check_output ."""
+
+    @patch('container.models.check_output')
+    def test_oserror01(self, mock_check_output):
+        """An OSError exception that check_output raises should be propagated up."""
+        # mock_check_output.side_effect = FileNotFoundError
+        mock_check_output.side_effect = OSError(99, 'Forgetaboutit')
+        with self.assertRaises(OSError):
+            multi_check_output(['bla'])
+
+    @patch('container.models.check_output')
+    def test_callprocerror01(self, mock_check_output):
+        """A CalledProcessError exception that check_output raises
+        should be propagated up, but only after a number of retries,
+        """
+        mock_check_output.side_effect = sp.CalledProcessError(returncode=2,
+                                                              cmd=["baddy"])
+        num_retries = 3
+        with self.assertRaises(sp.CalledProcessError):
+            multi_check_output(['bla'], num_retry=num_retries)
+        self.assertEqual(mock_check_output.call_count, num_retries)
+
+    @patch('container.models.check_output')
+    def test_callprocerror02(self, mock_check_output):
+        """If a CalledProcessError exception is raised by check_output less
+        than num_retries times, then the call should succeed.
+        """
+        proc_err = sp.CalledProcessError(returncode=2, cmd=["baddy"])
+        num_retries = 3
+        res_str = 'hello baby'
+        mock_check_output.side_effect = [proc_err, proc_err, res_str]
+        res_got = multi_check_output(['bla'], num_retry=num_retries)
+        self.assertEqual(mock_check_output.call_count, num_retries)
+        self.assertEqual(res_got, res_str)
 
 
 @skipIfDBFeature('is_mocked')

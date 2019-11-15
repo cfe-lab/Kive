@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import sys
+import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from itertools import count
@@ -43,6 +44,52 @@ import container.deffile as deffile
 logger = logging.getLogger(__name__)
 
 SINGULARITY_COMMAND = 'singularity'
+
+# MANAGE_PY = "manage.py"
+# MANAGE_PY_FULLPATH = os.path.join(settings.KIVE_HOME, MANAGE_PY)
+MANAGE_PY_FULLPATH = os.path.abspath(os.path.join(__file__, '../../manage.py'))
+
+NUM_RETRY = settings.SLURM_COMMAND_RETRY_NUM
+SLEEP_SECS = settings.SLURM_COMMAND_RETRY_SLEEP_SECS
+
+
+def multi_check_output(cmd_lst, stderr=None, env=None, num_retry=NUM_RETRY):
+    """ Perform a check_output command multiples times.
+    We use this routine when calling slurm commands to counter time-outs under
+    heavy load. For calls to other commands, we use check_output directly.
+
+    This routine should always return a (unicode) string.
+    NOTE: Under python3, subprocess.check_output() returns bytes by default, so we
+    set universal_newlines=True to guarantee strings.
+    NOTE: this routine was taken from the now defunct slurmlib module.
+    """
+    itry, cmd_retry = 1, True
+    out_str = None
+    while cmd_retry:
+        cmd_retry = False
+        try:
+            out_str = check_output(cmd_lst,
+                                   stderr=stderr,
+                                   env=env,
+                                   universal_newlines=True)
+        except OSError as e:
+            # typically happens if the executable cannot execute at
+            # all (e.g. not installed)
+            # ==> we just pass this error up with extra context
+            e.strerror += ': ' + ' '.join(cmd_lst)
+            raise
+        except CalledProcessError as e:
+            # typically happens if the executable did run, but returned an error
+            # ==> assume the slurm command timed out, so we retry
+            cmd_retry = True
+            logger.warn("timeout #%d/%d on command %s (retcode %s)",
+                        itry, num_retry, cmd_lst[0], e.returncode)
+            if itry < num_retry:
+                itry += 1
+                time.sleep(SLEEP_SECS)
+            else:
+                raise
+    return out_str
 
 
 class ContainerFamily(AccessControl):
@@ -1070,9 +1117,9 @@ class ContainerRun(Stopwatch, AccessControl):
         child_env = dict(os.environ)
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         child_env.pop('KIVE_LOG', None)
-        output = check_output(self.build_slurm_command(settings.SLURM_QUEUES,
-                                                       dependency_job_ids),
-                              env=child_env)
+        output = multi_check_output(self.build_slurm_command(settings.SLURM_QUEUES,
+                                                             dependency_job_ids),
+                                    env=child_env)
 
         self.slurm_job_id = int(output)
         # It's just possible the slurm job has already started modifying the
@@ -1104,9 +1151,7 @@ class ContainerRun(Stopwatch, AccessControl):
             command.append('--dependency=afterok:' + ':'.join(
                 str(job_id)
                 for job_id in dependency_job_ids))
-        manage_path = os.path.abspath(os.path.join(__file__,
-                                                   '../../manage.py'))
-        command.extend([manage_path, 'runcontainer', str(self.pk)])
+        command.extend([MANAGE_PY_FULLPATH, 'runcontainer', str(self.pk)])
         return command
 
     def create_inputs_from_original_run(self):
@@ -1243,11 +1288,11 @@ class ContainerRun(Stopwatch, AccessControl):
             # No jobs to check.
             return
         job_id_text = ','.join(job_runs)
-        output = check_output(['sacct',
-                               '-j', job_id_text,
-                               '-o', 'jobid,end',
-                               '--noheader',
-                               '--parsable2'])
+        output = multi_check_output(['sacct',
+                                     '-j', job_id_text,
+                                     '-o', 'jobid,end',
+                                     '--noheader',
+                                     '--parsable2'])
         max_end_time = datetime.now() - timedelta(minutes=1)
         max_end_time_text = max_end_time.strftime('%Y-%m-%dT%H:%M:%S')
         for line in output.splitlines():

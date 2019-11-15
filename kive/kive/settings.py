@@ -289,5 +289,11 @@ SLURM_QUEUES = json.loads(os.environ.get("KIVE_SLURM_QUEUES", """\
 ]
 """))
 
+# The number of times to retry a slurm command such as sbatch or sacct,
+# and the interval in seconds to wait between retries.
+SLURM_COMMAND_RETRY_NUM = int(os.environ.get('SLURM_COMMAND_RETRY_NUM', '10'))
+SLURM_COMMAND_RETRY_SLEEP_SECS = int(os.environ.get('SLURM_COMMAND_RETRY_SLEEP_SECS', '10'))
+
+
 # Container file in Containers folder
 DEFAULT_CONTAINER = os.environ.get('KIVE_DEFAULT_CONTAINER', 'kive-default.simg')
