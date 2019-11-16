@@ -41,7 +41,9 @@ urlpatterns = [
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     # Uncomment the next line to enable the admin:
-    url(r'^admin/', include(admin.site.urls)),
+    # deprecated way : url(r'^admin/', include(admin.site.urls)),
+    # new way for Django 2.0 goinf forward
+    url(r'^admin/', admin.site.urls),
     url(r'^$', portal.views.home, name='home'),
     url(r'^login/$', django.contrib.auth.views.login,
         {"template_name": "portal/login.html",
