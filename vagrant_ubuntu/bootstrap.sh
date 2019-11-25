@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Make apt-get select the default options
+export DEBIAN_FRONTEND=noninteractive
+
 # Exit immediately if any untested command fails.
 set -e
 
