@@ -9,7 +9,7 @@ set -e
 apt-get update -qq --fix-missing
 
 echo ========== Installing PostgreSQL ==========
-apt-get install -qq postgresql postgresql-contrib postgresql-client
+apt-get install -qq postgresql postgresql-contrib postgresql-client libpq-dev
 
 echo  ========== Installing Singularity ==========
 apt-get install -qq python dh-autoreconf build-essential libarchive-dev squashfs-tools
