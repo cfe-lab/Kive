@@ -40,6 +40,8 @@ from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import container.deffile as deffile
+import fleet.slurmlib as slurmlib
+
 
 logger = logging.getLogger(__name__)
 
@@ -1127,6 +1129,7 @@ class ContainerRun(Stopwatch, AccessControl):
         self.save(update_fields=['slurm_job_id'])
 
     def build_slurm_command(self, slurm_queues=None, dependency_job_ids=None):
+        """Build a list of strings representing a slurm command"""
         if not self.sandbox_path:
             raise RuntimeError(
                 'Container run needs a sandbox before calling Slurm.')
