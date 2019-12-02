@@ -309,3 +309,13 @@ command is also run on install.
 
 \* *Recommended*: If `pngquant` is available on your system, Grunt will use
 it to compress the icons.
+
+## Code coverage
+* If you want to run code coverage, complete the following steps:
+  * Run the `repo/vagrant_ubuntu/configure_vagrant_user.sh` script to add the vagrant user, then run the following commands:
+```bash
+coverage run manage.py test --setting kive.settings_test_pg
+coverage html
+```
+
+* Check the `htmlcov` folder to view coverage
