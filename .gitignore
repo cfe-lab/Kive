@@ -59,3 +59,5 @@ kive/tests.js
 /vagrant_ubuntu/dumps
 /vagrant_ubuntu/db_data.sql
 /vagrant_ubuntu/docker
+
+kive/htmlcov
