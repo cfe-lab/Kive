@@ -733,6 +733,12 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             'singularity',
             'python2-alpine-trimmed.simg'))
         self.assertTrue(os.path.exists(self.image_path), self.image_path)
+    
+    def test_removal(self):
+        request = self.factory.delete(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_create_singularity(self):
         request1 = self.factory.get(self.list_path)
@@ -4062,3 +4068,42 @@ class PipelineCompletionStatusTests(TestCase):
         self.assertTrue(pcs.has_outputs)
         self.assertListEqual(pcs.inputs_not_connected, [])
         self.assertListEqual(pcs.dangling_outputs, [])
+
+@skipIfDBFeature('is_mocked')
+class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        super(ContainerFamilyApiTests, self).setUp()
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+
+        self.detail_pk = family.pk
+
+        self.list_path = reverse("container-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_path = reverse("containerfamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("containerfamily-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        self.family_path = reverse("containerfamily-detail",
+                                   kwargs={'pk': family.pk})
+
+        self.image_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        self.assertTrue(os.path.exists(self.image_path), self.image_path)
+
+    def test_removal(self):
+        request = self.factory.delete(self.family_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT) 
