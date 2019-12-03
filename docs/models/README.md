@@ -35,9 +35,6 @@ You will need django_extensions and pygraphviz installed, see the INSTALL.md fil
 #### pipeline ####
 ![pipeline classes](pipeline.png)
 
-#### portal ####
-![portal classes](portal.png)
-
 #### sandbox ####
 ![sandbox classes](sandbox.png)
 
