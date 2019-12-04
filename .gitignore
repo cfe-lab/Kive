@@ -61,3 +61,4 @@ kive/tests.js
 /vagrant_ubuntu/docker
 
 kive/htmlcov
+.vscode
