@@ -29,22 +29,21 @@ class Command(BaseCommand):
         rows = cur.fetchall()
 
         n_orphaned = len(rows)
-
-        if args.verbosity > 0:
+        if options['verbosity'] > 0:
             for row in rows:
-                path = os.path.join(args.root_path, row[4])
+                path = os.path.join(options['root_path'], row[4])
                 print(path)
         else:
             print(n_orphaned)
         
-        if args.delete:
+        if (options['delete_files'] or options['delete_records'] or options['delete_all']):
             for row in rows:
-                path = os.path.join(args.root_path, row[4])
-                if (args.delete_files or args.delete_all):
+                path = os.path.join(options['root_path'], row[4])
+                if (options['delete_files'] or options['delete_all']):
                     print('Deleting file {} ...'.format(path))
                     os.remove(path)
                     print('File deleted successfully')
-                if (args.delete_records or args.delete_all):
+                if (options['delete_records'] or options['delete_all']):
                     print('Removing database record ...')
                     delete_query = 'DELETE FROM librarian_dataset WHERE id = {}'.format(row[0])
                     print('Executing SQL query "{}"'.format(delete_query))
