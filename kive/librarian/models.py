@@ -631,7 +631,7 @@ class Dataset(metadata.models.AccessControl):
             file_name = file_path
         elif file_handle:
             LOGGER.debug("Creating Dataset from file {}".format(file_handle.name))
-            file_name = file_handle.name
+            file_name = str(file_handle.name)
         else:
             raise ValueError("Must supply either the file path or file handle")
 
