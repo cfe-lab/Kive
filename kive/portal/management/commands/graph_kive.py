@@ -15,7 +15,8 @@ class Command(BaseCommand):
 
         docs_path = os.path.join(os.path.pardir, 'docs', 'models')
         apps = [app for app in settings.INSTALLED_APPS
-                if not (app.startswith('django') or app == 'rest_framework')]
+                if not (app.startswith('django') or
+                        app in ('portal.apps.PortalConfig', 'rest_framework'))]
         apps.sort()
         for app in apps:
             print(app)
@@ -41,3 +42,4 @@ class Command(BaseCommand):
             for app in apps:
                 f.write('#### {} ####\n'.format(app))
                 f.write('![{} classes]({}.png)\n\n'.format(app, app))
+            f.truncate()

@@ -22,7 +22,6 @@ from container.models import Container, ContainerFamily, ContainerApp, \
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
-from method.models import Method
 
 EXPECTED_MANAGE_PATH = os.path.abspath(os.path.join(__file__,
                                                     '../../manage.py'))
@@ -49,7 +48,7 @@ class ContainerFamilyMockTests(TestCase):
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
-@mocked_relations(Container, ContainerFamily, ContainerApp, Method)
+@mocked_relations(Container, ContainerFamily, ContainerApp)
 class ContainerMockTests(TestCase):
     def test_str(self):
         family = ContainerFamily(name='Spline Reticulator')
@@ -72,16 +71,6 @@ class ContainerMockTests(TestCase):
         app = container.apps.create(id=43)
         expected_plan = {'Containers': {container},
                          'ContainerApps': {app}}
-
-        plan = container.build_removal_plan()
-
-        self.assertEqual(expected_plan, strip_removal_plan(plan))
-
-    def test_removal_with_method(self):
-        container = Container(id=42)
-        method = container.methods.create(transformation_ptr_id=43)
-        expected_plan = {'Containers': {container},
-                         'Methods': {method}}
 
         plan = container.build_removal_plan()
 
@@ -143,9 +132,9 @@ This is not a driver.
         # Improper archives that do not contain anything.
         _, self.empty_zip_archive = tempfile.mkstemp()
         _, self.empty_tar_archive = tempfile.mkstemp()
-        with zipfile.ZipFile(self.empty_zip_archive, mode="w") as z:
+        with zipfile.ZipFile(self.empty_zip_archive, mode="w"):
             pass
-        with tarfile.open(self.empty_tar_archive, mode="w") as t:
+        with tarfile.open(self.empty_tar_archive, mode="w"):
             pass
 
         # Improper archives that contain no drivers.

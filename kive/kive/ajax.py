@@ -14,7 +14,6 @@ from rest_framework.exceptions import APIException
 from archive.models import summarize_redaction_plan
 from metadata.models import AccessControl
 from portal.views import developer_check, admin_check
-from archive.exceptions import RunNotFinished
 
 
 def convert_validation(ex):
@@ -145,10 +144,7 @@ class RedactModelMixin(object):
     def partial_update(self, request, pk=None):
         is_redacted = request.data.get("is_redacted", "false") == "true"
         if is_redacted:
-            try:
-                self.get_object().redact()
-            except RunNotFinished as e:
-                raise APIException(e.msg)
+            self.get_object().redact()
             return Response({'message': 'Object redacted.'})
         return self.patch_object(request, pk)
 
@@ -181,10 +177,7 @@ class RemoveModelMixin(mixins.DestroyModelMixin):
             raise APIException(ex.message)
 
     def perform_destroy(self, instance):
-        try:
-            instance.remove()
-        except RunNotFinished as e:
-            raise APIException(e.msg)
+        instance.remove()
 
 
 class RemovableModelViewSet(RemoveModelMixin,

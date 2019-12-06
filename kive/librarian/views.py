@@ -24,12 +24,6 @@ import librarian.models
 LOGGER = logging.getLogger(__name__)
 
 
-def _build_raw_viewer(request, file, name, download=None, return_to_url=None):
-    t = loader.get_template("librarian/raw_view.html")
-    c = {"file": file, "name": name, 'download': download, 'return': return_to_url}
-    return HttpResponse(t.render(c, request))
-
-
 @login_required
 def datasets(request):
     """
@@ -59,28 +53,14 @@ def dataset_view(request, dataset_id):
     """
     Display the file associated with the dataset in the browser, or update its name/description.
     """
-    return_to_run = request.GET.get('run_id', None)
-    is_view_results = "view_results" in request.GET
-    is_view_run = "view_run" in request.GET
     return_url = reverse("datasets")
-    if return_to_run is not None:
-        if is_view_run:
-            return_url = reverse('view_run', kwargs={'run_id': return_to_run})
-        elif is_view_results:
-            return_url = reverse('view_results', kwargs={'run_id': return_to_run})
 
     try:
         if admin_check(request.user):
             accessible_datasets = Dataset.objects
         else:
             accessible_datasets = Dataset.filter_by_user(request.user)
-        dataset = accessible_datasets.prefetch_related(
-            'structure',
-            'structure__compounddatatype',
-            'structure__compounddatatype__members',
-            'structure__compounddatatype__members__datatype',
-            'structure__compounddatatype__members__datatype__basic_constraints'
-        ).get(pk=dataset_id)
+        dataset = accessible_datasets.get(pk=dataset_id)
 
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
@@ -90,10 +70,7 @@ def dataset_view(request, dataset_id):
     # if it was generated, it's anyone who had access to the generating run.
     addable_users, addable_groups = dataset.other_users_groups()
 
-    if dataset.file_source is None:
-        generating_run = None
-    else:
-        generating_run = dataset.file_source.top_level_run
+    generating_run = None
     container_dataset = dataset.containers.filter(argument__type='O').first()  # Output from which runs?
     if container_dataset is None:
         container_run = None
@@ -154,7 +131,7 @@ def dataset_view(request, dataset_id):
             c["missing_data_message"] = "Data was not retained or has been purged."
         rendered_response = t.render(c, request)
 
-    elif dataset.is_raw():
+    else:
         t = loader.get_template("librarian/raw_dataset_view.html")
 
         # Test whether this is a binary file or not.
@@ -173,32 +150,6 @@ def dataset_view(request, dataset_id):
             c["is_binary"] = True
             del c["sample_content"]
             rendered_response = t.render(c, request)
-    else:
-        extra_errors = []
-        # If we have a mismatched output, we do an alignment
-        # over the columns.
-        if dataset.content_matches_header:
-            col_matching, processed_rows = None, dataset.rows(
-                True,
-                limit=settings.DATASET_DISPLAY_MAX,
-                extra_errors=extra_errors)
-        else:
-            col_matching, insert = dataset.column_alignment()
-            processed_rows = dataset.rows(data_check=True,
-                                          insert_at=insert,
-                                          limit=settings.DATASET_DISPLAY_MAX,
-                                          extra_errors=extra_errors)
-        t = loader.get_template("librarian/csv_dataset_view.html")
-        processed_rows = list(processed_rows)
-        c.update(
-            {
-                'column_matching': col_matching,
-                'processed_rows': processed_rows,
-                'extra_errors': extra_errors,
-                "are_rows_truncated": len(processed_rows) >= settings.DATASET_DISPLAY_MAX
-            }
-        )
-        rendered_response = t.render(c, request)
     return HttpResponse(rendered_response)
 
 
@@ -224,9 +175,7 @@ def datasets_add_archive(request):
         try:
             archive_add_dataset_form = ArchiveAddDatasetForm(
                 data=request.POST,
-                files=request.FILES,
-                user=request.user,
-            )
+                files=request.FILES)
             # Try to retrieve new datasets. If this fails, we return to our current page
             is_ok = archive_add_dataset_form.is_valid()
             if is_ok:
@@ -310,7 +259,7 @@ def datasets_add_archive(request):
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_archive.html')
-        c['archiveAddDatasetForm'] = ArchiveAddDatasetForm(user=request.user)
+        c['archiveAddDatasetForm'] = ArchiveAddDatasetForm()
 
     return HttpResponse(t.render(c, request))
 
@@ -327,8 +276,7 @@ def datasets_add_bulk(request):
         try:
             # Add new datasets.
             bulk_add_dataset_form = BulkAddDatasetForm(data=request.POST,
-                                                       files=request.FILES,
-                                                       user=request.user)
+                                                       files=request.FILES)
             isok = bulk_add_dataset_form.is_valid()
             if isok:
                 CDT_obj, add_results = bulk_add_dataset_form.create_datasets(request.user)
@@ -400,7 +348,7 @@ def datasets_add_bulk(request):
 
     else:  # return an empty form for the user to fill in
         t = loader.get_template('librarian/datasets_add_bulk.html')
-        c.update({'bulkAddDatasetForm': BulkAddDatasetForm(user=request.user)})
+        c.update({'bulkAddDatasetForm': BulkAddDatasetForm()})
 
     return HttpResponse(t.render(c, request))
 
@@ -451,7 +399,7 @@ def datasets_bulk(request):
         # You must access the /datasets_bulk.html page by adding datasets in bulk form /datasets_add_bulk.html
         # A GET to /datasets_bulk.html will only redirect to you the /dataset_add_bulk.html page
         t = loader.get_template('librarian/datasets_add_bulk.html')
-        bulk_dataset_form = BulkAddDatasetForm(user=request.user)
+        bulk_dataset_form = BulkAddDatasetForm()
         c.update({'bulkAddDatasetForm': bulk_dataset_form})
 
     return HttpResponse(t.render(c, request))

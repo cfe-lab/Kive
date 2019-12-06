@@ -9,7 +9,7 @@ set -e
 apt-get update -qq --fix-missing
 
 echo ========== Installing PostgreSQL ==========
-apt-get install -qq postgresql postgresql-contrib postgresql-client
+apt-get install -qq postgresql postgresql-contrib postgresql-client libpq-dev
 
 echo  ========== Installing Singularity ==========
 apt-get install -qq python dh-autoreconf build-essential libarchive-dev squashfs-tools
@@ -62,12 +62,16 @@ useradd --system kive
 mkdir /home/kive /etc/kive /var/log/kive
 chown kive:kive /home/kive /etc/kive /var/log/kive
 chmod go-rx /home/kive /etc/kive /var/log/kive
+# Add vagrant user to kive group
+usermod -a -G kive vagrant
 
 cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/apache2/sites-available/
 a2ensite 001-kive
 sed -ie 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-available/000-default.conf
 sed -ie 's/Listen 80$/Listen 8080/' /etc/apache2/ports.conf
 cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/apache2/envvars
+# All users will now have the proper environment variables set
+cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf | grep KIVE_MEDIA_ROOT >> /etc/environment
 echo "
 export APACHE_RUN_USER=kive
 export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars

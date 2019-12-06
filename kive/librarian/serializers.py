@@ -4,7 +4,6 @@ from django.template.defaultfilters import filesizeformat
 from rest_framework import serializers
 
 from librarian.models import Dataset, ExternalFileDirectory
-from metadata.models import CompoundDatatype
 
 from kive.serializers import AccessControlSerializer
 
@@ -41,12 +40,6 @@ class ExternalFileDirectoryListFilesSerializer(ExternalFileDirectorySerializer):
 
 class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
 
-    compounddatatype = serializers.PrimaryKeyRelatedField(
-        source="structure.compounddatatype",
-        queryset=CompoundDatatype.objects.all(),
-        required=False,
-        allow_null=True)
-
     filename = serializers.SerializerMethodField()
     filesize = serializers.IntegerField(source='get_filesize', read_only=True)
     filesize_display = serializers.SerializerMethodField()
@@ -77,7 +70,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'filename',
             'date_created',
             'download_url',
-            'compounddatatype',
             'filesize',
             'filesize_display',
             'MD5_checksum',
@@ -93,10 +85,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             'removal_plan',
             'redaction_plan'
         )
-
-    def __init__(self, *args, **kwargs):
-        super(DatasetSerializer, self).__init__(*args, **kwargs)
-        self.fields["compounddatatype"].queryset = CompoundDatatype.filter_by_user(self.context["request"].user)
 
     def get_filename(self, obj):
         if not obj:
@@ -123,6 +111,7 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             if efd_exists:
                 errors.append("externalfiledirectory should not be specified if dataset_file is")
             if errors:
+                # noinspection PyTypeChecker
                 raise serializers.ValidationError(errors)
 
         if ep_exists and not efd_exists:
@@ -137,10 +126,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
         """
         Create a Dataset object from deserialized and validated data.
         """
-        cdt = None
-        if "structure" in validated_data:
-            cdt = validated_data["structure"].get("compounddatatype", None)
-
         # The default behaviour for keep_file depends on the mode of creation.
         keep_file = True
         file_path = validated_data.get("external_path", "")
@@ -159,7 +144,6 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             user=self.context["request"].user,
             users_allowed=validated_data["users_allowed"],
             groups_allowed=validated_data["groups_allowed"],
-            cdt=cdt,
             keep_file=keep_file,
             name=validated_data["name"],
             description=validated_data.get("description"),

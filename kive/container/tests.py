@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import warnings
+import subprocess as sp
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
@@ -35,8 +36,10 @@ from rest_framework import status
 from rest_framework.test import force_authenticate
 
 from container.management.commands import purge, runcontainer
+# import container.models as cm
 from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus, ExistingRunsError
+    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus,\
+    ExistingRunsError, multi_check_output
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
@@ -92,6 +95,44 @@ def create_valid_tar_content(container=None):
                       outputs=[dict(dataset_name="out1",
                                     source_step=1,
                                     source_dataset_name="out1")])))
+
+
+@patch('container.models.SLEEP_SECS', 0)
+class TestMultiCheckOutput(TestCase):
+    """Perform tests on multi_check_output ."""
+
+    @patch('container.models.check_output')
+    def test_oserror01(self, mock_check_output):
+        """An OSError exception that check_output raises should be propagated up."""
+        # mock_check_output.side_effect = FileNotFoundError
+        mock_check_output.side_effect = OSError(99, 'Forgetaboutit')
+        with self.assertRaises(OSError):
+            multi_check_output(['bla'])
+
+    @patch('container.models.check_output')
+    def test_callprocerror01(self, mock_check_output):
+        """A CalledProcessError exception that check_output raises
+        should be propagated up, but only after a number of retries,
+        """
+        mock_check_output.side_effect = sp.CalledProcessError(returncode=2,
+                                                              cmd=["baddy"])
+        num_retries = 3
+        with self.assertRaises(sp.CalledProcessError):
+            multi_check_output(['bla'], num_retry=num_retries)
+        self.assertEqual(mock_check_output.call_count, num_retries)
+
+    @patch('container.models.check_output')
+    def test_callprocerror02(self, mock_check_output):
+        """If a CalledProcessError exception is raised by check_output less
+        than num_retries times, then the call should succeed.
+        """
+        proc_err = sp.CalledProcessError(returncode=2, cmd=["baddy"])
+        num_retries = 3
+        res_str = 'hello baby'
+        mock_check_output.side_effect = [proc_err, proc_err, res_str]
+        res_got = multi_check_output(['bla'], num_retry=num_retries)
+        self.assertEqual(mock_check_output.call_count, num_retries)
+        self.assertEqual(res_got, res_str)
 
 
 @skipIfDBFeature('is_mocked')
@@ -692,6 +733,12 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             'singularity',
             'python2-alpine-trimmed.simg'))
         self.assertTrue(os.path.exists(self.image_path), self.image_path)
+    
+    def test_removal(self):
+        request = self.factory.delete(self.removal_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_create_singularity(self):
         request1 = self.factory.get(self.list_path)
@@ -1911,6 +1958,9 @@ class RunContainerTests(TestCase):
                                    expected_dataset_name)
         self.assertTrue(os.path.exists(upload_path),
                         upload_path + ' should exist.')
+        command_log_path = os.path.join(sandbox_path, 'logs', 'command.txt')
+        self.assertTrue(os.path.exists(command_log_path),
+                        command_log_path + ' should exist.')
 
         self.assertEqual(2, run.datasets.count())
         self.assertIsNotNone(run.submit_time)
@@ -2235,6 +2285,17 @@ sum,product,bigger
             argument__type=ContainerArgument.OUTPUT).dataset
         summary = output_dataset.dataset_file.read()
         self.assertEqual(expected_summary, summary)
+        sandbox_path = run.full_sandbox_path
+        command1_log_path = os.path.join(sandbox_path,
+                                         'logs',
+                                         'step_1_command.txt')
+        self.assertTrue(os.path.exists(command1_log_path),
+                        command1_log_path + ' should exist.')
+        command2_log_path = os.path.join(sandbox_path,
+                                         'logs',
+                                         'step_2_command.txt')
+        self.assertTrue(os.path.exists(command2_log_path),
+                        command2_log_path + ' should exist.')
 
     def test_run_multistep_archive_bin_directories(self):
         run = self._test_run_multistep_archive_helper()
@@ -2735,7 +2796,7 @@ Line 3
         content_file = ContentFile('x,y\n1,2')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file)
-        output1.set_MD5()
+        output1.set_md5()
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 
@@ -2749,7 +2810,7 @@ Line 3
         output2 = Dataset.objects.create(user=run2.user, name='output2')
         content_file2 = ContentFile('greeting\n')
         output2.dataset_file.save('out.csv', content_file2)
-        output2.set_MD5()
+        output2.set_md5()
         output2.save()
         run2.datasets.create(argument=output_argument, dataset=output2)
         run2.set_md5()
@@ -2765,7 +2826,7 @@ Line 3
                                            state=ContainerRun.COMPLETE)
         output1b = Dataset.objects.create(user=run1.user, name='output1b')
         output1b.dataset_file.save('example_b.csv', content_file)
-        output1b.set_MD5()
+        output1b.set_md5()
         output1b.save()
         run3.datasets.create(argument=output_argument, dataset=output1b)
 
@@ -2791,7 +2852,7 @@ Line 3
         content_file1b = ContentFile('x,y\n10,20')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file1)
-        output1.set_MD5()
+        output1.set_md5()
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 
@@ -2805,7 +2866,7 @@ Line 3
         output2 = Dataset.objects.create(user=run2.user, name='output2')
         content_file2 = ContentFile('greeting\n')
         output2.dataset_file.save('out.csv', content_file2)
-        output2.set_MD5()
+        output2.set_md5()
         output2.save()
         run2.datasets.create(argument=output_argument, dataset=output2)
         run2.set_md5()
@@ -2821,7 +2882,7 @@ Line 3
                                            state=ContainerRun.COMPLETE)
         output1b = Dataset.objects.create(user=run1.user, name='output1b')
         output1b.dataset_file.save('example_b.csv', content_file1b)
-        output1b.set_MD5()
+        output1b.set_md5()
         output1b.save()
         run3.datasets.create(argument=output_argument, dataset=output1b)
 
@@ -2846,7 +2907,7 @@ Line 3
         content_file = ContentFile('x,y\n1,2')
         output1 = Dataset.objects.create(user=run1.user, name='output1')
         output1.dataset_file.save('example.csv', content_file)
-        output1.set_MD5(output1.dataset_file.path)
+        output1.set_md5(output1.dataset_file.path)
         output1.save()
         run1.datasets.create(argument=output_argument, dataset=output1)
 
@@ -4007,3 +4068,42 @@ class PipelineCompletionStatusTests(TestCase):
         self.assertTrue(pcs.has_outputs)
         self.assertListEqual(pcs.inputs_not_connected, [])
         self.assertListEqual(pcs.dangling_outputs, [])
+
+@skipIfDBFeature('is_mocked')
+class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        super(ContainerFamilyApiTests, self).setUp()
+        user = User.objects.first()
+        family = ContainerFamily.objects.create(user=user)
+
+        self.detail_pk = family.pk
+
+        self.list_path = reverse("container-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_path = reverse("containerfamily-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.removal_path = reverse("containerfamily-removal-plan",
+                                    kwargs={'pk': self.detail_pk})
+
+        self.detail_view, _, _ = resolve(self.detail_path)
+        self.removal_view, _, _ = resolve(self.removal_path)
+
+        self.family_path = reverse("containerfamily-detail",
+                                   kwargs={'pk': family.pk})
+
+        self.image_path = os.path.abspath(os.path.join(
+            __file__,
+            '..',
+            '..',
+            '..',
+            'samplecode',
+            'singularity',
+            'python2-alpine-trimmed.simg'))
+        self.assertTrue(os.path.exists(self.image_path), self.image_path)
+
+    def test_removal(self):
+        request = self.factory.delete(self.family_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT) 

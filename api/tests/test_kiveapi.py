@@ -10,6 +10,7 @@ from requests import Session
 from kiveapi.dataset import Dataset
 
 
+# noinspection PyUnresolvedReferences
 @pytest.fixture
 def mocked_api():
     with patch.multiple('requests.Session',
@@ -19,6 +20,11 @@ def mocked_api():
                         patch=DEFAULT,
                         delete=DEFAULT,
                         head=DEFAULT):
+        Session.head.return_value.status_code = 200
+        Session.get.return_value.status_code = 200
+        Session.post.return_value.status_code = 200
+        Session.delete.return_value.status_code = 200
+        Session.patch.return_value.status_code = 200
         yield KiveAPI('http://localhost')
 
 

@@ -13,7 +13,7 @@ before_install:
     - sudo apt-get install -y -q nodejs dh-autoreconf build-essential libarchive-dev squashfs-tools
 install:
     - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install -r requirements-dev.txt ; fi
-    - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then pip install -r requirements-test.py34.txt ; fi
+    - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then pip install -r requirements-dev.py34.txt ; fi
     - curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
     - node --version
     - nodejs --version  # Not relevant?
@@ -27,17 +27,16 @@ install:
     - make
     - sudo make install
     - cd ..
-before_script:
-    - cp kive/kive/settings_default.py kive/kive/settings.py
 script:
   - set -e
   - npm run test:travis
   - cd kive
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then ./manage.py test --setting kive.settings_mocked ; fi
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run manage.py test --setting kive.settings_test_pg ; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg container librarian fleet transformation stopwatch method.tests kive.tests_file_access_utils kive.tests datachecking archive portal rest_framework ; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg ; fi
   - cd ../api
   - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run --source=kiveapi -m pytest ; fi
+  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then PYTHONPATH=kiveapi python -m pytest ; fi
   - set +e
 after_success:
     - pip install codecov
