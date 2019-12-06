@@ -31,7 +31,7 @@ from rest_framework.test import force_authenticate, APIRequestFactory
 from rest_framework import status
 
 from constants import groups
-from container.models import ContainerFamily
+from container.models import ContainerFamily, ContainerArgument, Container
 from librarian.ajax import ExternalFileDirectoryViewSet, DatasetViewSet
 from librarian.models import Dataset, ExternalFileDirectory
 from librarian.serializers import DatasetSerializer
@@ -40,6 +40,7 @@ from metadata.models import kive_user, everyone_group
 import file_access_utils
 import kive.testing_utils as tools
 from kive.tests import BaseTestCases, DuckContext, capture_log_stream
+from librarian.management.commands import find_orphans
 
 FROM_FILE_END = 2
 
@@ -536,6 +537,123 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
 
         self.assertEquals({u'detail': u'Unknown filter key: bogus'},
                           response.data)
+
+
+@skipIfDBFeature('is_mocked')
+class PurgeDataTests(TestCase):
+
+    @staticmethod
+    def create_dataset(is_uploaded=False, name='Test name', description='Test description'):
+        with tempfile.TemporaryFile() as f:
+            f.write('I am a file!'.encode())
+            f.seek(0)
+            dataset = Dataset.create_dataset(
+                file_path=None,
+                user=kive_user(),
+                users_allowed=None,
+                groups_allowed=None,
+                cdt=None,
+                keep_file=True,
+                name=name,
+                description=description,
+                file_source=None,
+                check=True,
+                file_handle=f,
+                is_uploaded=is_uploaded
+            )
+        return dataset
+
+    @staticmethod
+    def create_container():
+        user = kive_user()
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        return container
+
+    @staticmethod
+    def create_app(container):
+        app = container.apps.create(memory=200, threads=1)
+        app.write_inputs('test_input')
+        app.write_outputs('test_output')
+        return app
+
+    @staticmethod
+    def create_run(app):
+        run = app.runs.create(name='test_run', user=kive_user())
+        return run
+
+    @staticmethod
+    def add_dataset_to_run(app, run, dataset, atype='input'):
+        if atype == 'input':
+            aatype = ContainerArgument.INPUT
+        elif atype == 'output':
+            aatype = ContainerArgument.OUTPUT
+        else:
+            raise UserWarning('Must provide a string, either "input" or "output"')
+        run.datasets.create(
+            argument=app.arguments.get(
+                type=aatype,
+                position=1
+            ),
+            dataset=dataset
+        )
+        run.save(schedule=False)
+
+    def test_find_orphans(self):
+        datasets = {
+            'orphan': self.create_dataset(name='Orphan name', description='Orphan description'),
+            'input_dataset': self.create_dataset(is_uploaded=True, name='Input name', description='Input description'),
+            'output_dataset': self.create_dataset(name='Output name', description='Output description'),
+            'unused_dataset': self.create_dataset(is_uploaded=True, name='Unused name', description='Unused description')
+        }
+        container = self.create_container()
+        app = self.create_app(container)
+        run = self.create_run(app)
+        self.add_dataset_to_run(app, run, datasets['input_dataset'])
+        self.add_dataset_to_run(app, run, datasets['output_dataset'], atype='output')
+        orphans = find_orphans.Command.find_orphans()
+        ids_and_paths = []
+        # Verify the input and output datasets exist
+        import pdb; pdb.set_trace()
+        self.dataset_exists(datasets['input_dataset'].id, datasets['input_dataset'].dataset_file.path)
+        self.dataset_exists(datasets['output_dataset'].id, datasets['input_dataset'].dataset_file.path)
+        for orphan in orphans:
+            _id = orphan.id
+            path = orphan.dataset_file.path
+            # Verify the orphans exist
+            self.dataset_exists(_id, path)
+            ids_and_paths.append((_id, path))
+        find_orphans.Command.remove_orphans(orphans)
+        for _id, path in ids_and_paths:
+            # Verify the orphans no longer exist
+            self.dataset_does_not_exist(_id, path)
+        # Verify the input and output datasets still exist
+        self.dataset_exists(datasets['input_dataset'].id, datasets['input_dataset'].dataset_file.path)
+        self.dataset_exists(datasets['output_dataset'].id, datasets['input_dataset'].dataset_file.path)
+
+    def dataset_exists(self, dataset_id, dataset_path):
+        """[summary]
+
+        Arguments:
+            dataset {Dataset} -- A Dataset object
+        """
+        assert os.path.isfile(dataset_path)
+        try:
+            Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            raise ValidationError('Dataset should exist')
+
+    def dataset_does_not_exist(self, dataset_id, dataset_path):
+        """[summary]
+
+        Arguments:
+            dataset {Dataset} -- A Dataset object
+        """
+        assert not os.path.isfile(dataset_path)
+        try:
+            Dataset.objects.get(id=dataset_id)
+        except Dataset.DoesNotExist:
+            pass
 
 
 @skipIfDBFeature('is_mocked')

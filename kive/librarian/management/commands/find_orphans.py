@@ -4,52 +4,59 @@ import psycopg2
 import argparse
 import os
 from django.core.management.base import BaseCommand
+from librarian.models import Dataset
+from container.models import ContainerDataset
+from django.conf import settings
+
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('-df', '--delete_files', action='store_true', help='Delete orphaned files')
         parser.add_argument('-dr', '--delete_records', action='store_true', help='Delete database records for orphaned files')
         parser.add_argument('-da', '--delete_all', action='store_true', help='Combine options -df and -dr')
-        parser.add_argument('-r', '--root_path', default='/var/kive/media_root', help='Path to kive media root folder')
+        parser.add_argument('-r', '--root_path', default=settings.MEDIA_ROOT, help='Path to kive media root folder')
 
     def handle(self, *args, **options):
-        name = 'kive'
-        user = ''
-        password = ''
-
-        conn = psycopg2.connect(
-            dbname=name,
-            user=user,
-            password=password
+        orphans = self.find_orphans()
+        self.display_orphans(orphans, root_path=options['root_path'])
+        self.remove_orphans(
+            orphans,
+            delete_all=options['delete_all'],
+            delete_files=options['delete_files'],
+            delete_records=options['delete_records'],
+            root_path=options['root_path']
         )
 
-        cur = conn.cursor()
-        query = 'SELECT * FROM librarian_dataset AS ld WHERE ld.id NOT IN (SELECT dataset_id FROM container_containerdataset)'
-        cur.execute(query)
-        rows = cur.fetchall()
+    @staticmethod
+    def find_orphans():
+        orphans = Dataset.objects.filter(
+            is_uploaded__exact=False
+        ).exclude(
+            id__in=ContainerDataset.objects.all().values_list('dataset_id', flat=True)
+        )
+        return orphans
 
-        n_orphaned = len(rows)
-        if options['verbosity'] > 0:
-            for row in rows:
-                path = os.path.join(options['root_path'], row[4])
-                print(path)
+    @staticmethod
+    def display_orphans(orphans, root_path=settings.MEDIA_ROOT, verbosity=1):
+        norphans = len(orphans)
+        if verbosity > 0:
+            for orphan in orphans:
+                print(os.path.join(root_path, str(orphan.dataset_file)))
         else:
             print(n_orphaned)
-        
-        if (options['delete_files'] or options['delete_records'] or options['delete_all']):
-            for row in rows:
-                path = os.path.join(options['root_path'], row[4])
-                if (options['delete_files'] or options['delete_all']):
-                    print('Deleting file {} ...'.format(path))
-                    os.remove(path)
-                    print('File deleted successfully')
-                if (options['delete_records'] or options['delete_all']):
-                    print('Removing database record ...')
-                    delete_query = 'DELETE FROM librarian_dataset WHERE id = {}'.format(row[0])
-                    print('Executing SQL query "{}"'.format(delete_query))
-                    cur.execute(delete_query)
-                    conn.commit()
-                    print('Query executed successfully')
 
-        cur.close()
-        conn.close()
+    @staticmethod
+    def remove_orphans(orphans, delete_all=True, delete_files=True, delete_records=True, root_path=settings.MEDIA_ROOT):
+        if any((delete_all, delete_records, delete_files)):
+            for orphan in orphans:
+                print('For orphan {}'.format(orphan))
+                # path = os.path.join(options['root_path'], orphan.dataset_file.name)
+                if delete_all or delete_files:
+                    # print('Deleting file "{}"'.format(path))
+                    print('Deleting file "{}"'.format(orphan.dataset_file.path))
+                    orphan.dataset_file.delete()
+                    print('File deleted successfully')
+                if delete_all or delete_records:
+                    print('Deleting database record')
+                    orphan.delete()
+                    print('Record deleted successfully')
