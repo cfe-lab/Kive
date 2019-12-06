@@ -7,6 +7,7 @@ from django.core.management.base import BaseCommand
 from librarian.models import Dataset
 from container.models import ContainerDataset
 from django.conf import settings
+import sys
 
 
 class Command(BaseCommand):
