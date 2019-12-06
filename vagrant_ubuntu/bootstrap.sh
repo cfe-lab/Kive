@@ -131,6 +131,7 @@ systemctl start kive_purge_synch.timer
 echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu
 ./dbcreate.sh
+./configure_vagrant_user.sh create
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:

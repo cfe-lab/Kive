@@ -18,6 +18,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         orphans = self.find_orphans()
+        if not orphans:
+            print('No orphan files found')
+            sys.exit(0)
         self.display_orphans(orphans, root_path=options['root_path'])
         self.remove_orphans(
             orphans,
