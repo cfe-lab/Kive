@@ -12,7 +12,7 @@ then
   echo "Creating user 'vagrant'"
   sudo -u postgres createuser vagrant
   echo "Granting privileges to user 'vagrant'"
-  sudo -u postgres psql -c 'GRANT ALL PRIVILEGES ON DATABASE kive TO vagrant;'
+  sudo -u postgres psql -c 'GRANT kive TO vagrant;'
   sudo -u postgres psql -c 'ALTER USER vagrant CREATEDB;'  # Only needed to run tests
 elif [ "$operation" = "drop" ]
 then

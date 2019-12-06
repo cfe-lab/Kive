@@ -614,7 +614,6 @@ class PurgeDataTests(TestCase):
         orphans = find_orphans.Command.find_orphans()
         ids_and_paths = []
         # Verify the input and output datasets exist
-        import pdb; pdb.set_trace()
         self.dataset_exists(datasets['input_dataset'].id, datasets['input_dataset'].dataset_file.path)
         self.dataset_exists(datasets['output_dataset'].id, datasets['input_dataset'].dataset_file.path)
         for orphan in orphans:

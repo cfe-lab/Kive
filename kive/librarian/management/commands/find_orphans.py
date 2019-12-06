@@ -34,18 +34,17 @@ class Command(BaseCommand):
         orphans = Dataset.objects.filter(
             is_uploaded__exact=False
         ).exclude(
-            id__in=ContainerDataset.objects.all().values_list('dataset_id', flat=True)
+            id__in=ContainerDataset.objects.values('dataset_id')
         )
         return orphans
 
     @staticmethod
     def display_orphans(orphans, verbosity=1):
-        norphans = len(orphans)
         if verbosity > 0:
             for orphan in orphans:
                 print(orphan.dataset_file.path)
         else:
-            print(n_orphans)
+            print(orphans.count())
 
     @staticmethod
     def remove_orphans(orphans, delete_all=True, delete_files=True, delete_records=True):

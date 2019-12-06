@@ -71,7 +71,7 @@ sed -ie 's/<VirtualHost \*:80>/<VirtualHost *:8080>/' /etc/apache2/sites-availab
 sed -ie 's/Listen 80$/Listen 8080/' /etc/apache2/ports.conf
 cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/apache2/envvars
 # All users will now have the proper environment variables set
-cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/environment
+cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf | grep KIVE_MEDIA_ROOT >> /etc/environment
 echo "
 export APACHE_RUN_USER=kive
 export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars
@@ -131,7 +131,6 @@ systemctl start kive_purge_synch.timer
 echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu
 ./dbcreate.sh
-./configure_vagrant_user.sh create
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:
