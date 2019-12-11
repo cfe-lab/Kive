@@ -616,24 +616,30 @@ class PurgeDataTests(TestCase):
         run = self.create_run(app)
         self.add_dataset_to_run(app, run, datasets['input_dataset'])
         self.add_dataset_to_run(app, run, datasets['output_dataset'], atype='output')
-        orphans = find_orphans.Command.grouper(10,find_orphans.Command.find_orphans())
+        orphans = find_orphans.Command.find_orphans()
         ids_and_paths = []
 
         # Verify the input and output datasets exist
         self.dataset_exists(datasets['input_dataset'].id, datasets['input_dataset'].dataset_file.path)
         self.dataset_exists(datasets['output_dataset'].id, datasets['input_dataset'].dataset_file.path)
-        for chunk in orphans:
-            for orphan in chunk:
-                _id = orphan.id
-                path = orphan.dataset_file.path
 
-                # Verify the orphans exist
-                self.dataset_exists(_id, path)
-                ids_and_paths.append((_id, path))
-            find_orphans.Command.remove_orphans(chunk)
+        # Check all the orphan files and records exist
+        for orphan in orphans:
+            _id = orphan.id
+            try:
+                path = orphan.dataset_file.path
+            except ValueError:
+                path = None
+
+            # Verify the orphans exist
+            self.dataset_exists(_id, path)
+            ids_and_paths.append((_id, path))
+
+        # Remove orphan records and files
+        find_orphans.Command.remove_orphans(orphans)
         for _id, path in ids_and_paths:
 
-            # Verify the orphans no longer exist
+            # Verify the orphan record and path no longer exist
             self.dataset_does_not_exist(_id, path)
 
         # Verify the input and output datasets still exist
@@ -646,7 +652,8 @@ class PurgeDataTests(TestCase):
         Arguments:
             dataset {Dataset} -- A Dataset object
         """
-        assert os.path.isfile(dataset_path)
+        if dataset_path:
+            assert os.path.isfile(dataset_path)
         try:
             Dataset.objects.get(id=dataset_id)
         except Dataset.DoesNotExist:
