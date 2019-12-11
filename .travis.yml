@@ -31,12 +31,9 @@ script:
   - set -e
   - npm run test:travis
   - cd kive
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then ./manage.py test --setting kive.settings_mocked ; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run manage.py test --setting kive.settings_test_pg ; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then ./manage.py test --setting kive.settings_test_pg ; fi
+  - coverage run -m pytest --ds kive.settings_test_pg
   - cd ../api
-  - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then coverage run --source=kiveapi -m pytest ; fi
-  - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then PYTHONPATH=kiveapi python -m pytest ; fi
+  - coverage run --source=kiveapi -m pytest
   - set +e
 after_success:
     - pip install codecov
