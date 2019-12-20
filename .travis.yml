@@ -14,7 +14,7 @@ before_install:
 install:
     - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install -r requirements-dev.txt ; fi
     - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then pip install -r requirements-dev.py34.txt ; fi
-    - curl -sL https://deb.nodesource.com/setup_6.x | sudo -E bash -
+    - curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
     - node --version
     - nodejs --version  # Not relevant?
     - npm --version
