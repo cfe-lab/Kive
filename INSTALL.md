@@ -706,7 +706,7 @@ One easy way to install node, particularly on a developer workstation, is with
     curl -sL https://raw.githubusercontent.com/creationix/nvm/v0.33.11/install.sh -o install_nvm.sh
     bash install_nvm.sh
     nvm ls-remote
-    nvm install 6.14.4
+    nvm install 12.13.1
 
 [nvm]: https://github.com/creationix/nvm
 
