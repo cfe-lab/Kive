@@ -10,13 +10,13 @@ env:
   global:
     - KIVE_DB_USER=postgres
 before_install:
-    - curl -sL https://deb.nodesource.com/setup_12.x | sudo -E bash -
-    - sudo apt-get install -y -q nodejs dh-autoreconf build-essential libarchive-dev squashfs-tools
+    - sudo apt-get install -y -q dh-autoreconf build-essential libarchive-dev squashfs-tools
+    - nvm install 12.13.1
+    - nvm use 12.13.1
 install:
     - if [[ $TRAVIS_PYTHON_VERSION == '2.7' ]]; then pip install -r requirements-dev.txt ; fi
     - if [[ $TRAVIS_PYTHON_VERSION == '3.6' ]]; then pip install -r requirements-dev.py34.txt ; fi
     - node --version
-    - nodejs --version  # Not relevant?
     - npm --version
     - npm install
     - git clone https://github.com/singularityware/singularity.git
