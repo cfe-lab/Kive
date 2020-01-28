@@ -7,7 +7,7 @@ cd /root
 
 echo ========== Installing PostgreSQL ==========
 sudo rpm -Uvh https://yum.postgresql.org/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm
-yum install -q -y postgresql10-server postgresql10-contrib postgresql-devel
+yum install -q -y postgresql10-server postgresql10-contrib
 /usr/pgsql-10/bin/postgresql-10-setup initdb
 
 # Order matters for access rules.
