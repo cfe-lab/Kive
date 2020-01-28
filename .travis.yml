@@ -5,7 +5,6 @@ python:
 sudo: required
 services:
   - postgresql
-  - docker
 env:
   global:
     - KIVE_DB_USER=postgres

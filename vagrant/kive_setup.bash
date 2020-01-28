@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Exit immediately if any untested command fails.
+set -e
+
 REQUIREMENTS=$1
 
 # Use the virtualenv Python which is assumed to be set up prior to calling this script.
@@ -15,7 +18,6 @@ chown -R kive:kive /var/kive
 chmod -R 770 /var/kive
 chmod -R g+s /var/kive
 usermod -a -G kive vagrant
-ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r $REQUIREMENTS
 if [ ! -f kive/kive/settings.py ]; then
     cp kive/kive/settings_default.py kive/kive/settings.py

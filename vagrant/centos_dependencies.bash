@@ -7,7 +7,7 @@ cd /root
 
 echo ========== Installing PostgreSQL ==========
 sudo rpm -Uvh https://yum.postgresql.org/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm
-yum install -q -y postgresql10-server postgresql10-contrib
+yum install -q -y postgresql10-server postgresql10-contrib postgresql-devel
 /usr/pgsql-10/bin/postgresql-10-setup initdb
 
 # Order matters for access rules.
@@ -38,17 +38,6 @@ rpmbuild --quiet -ta singularity/singularity-2.5.2.tar.gz
 yum install -q -y rpmbuild/RPMS/x86_64/singularity-2.5.2-1.el7.centos.x86_64.rpm \
     rpmbuild/RPMS/x86_64/singularity-runtime-2.5.2-1.el7.centos.x86_64.rpm
 rm -rf singularity rpmbuild
-
-echo ========== Installing Docker ==========
-yum install -q -y yum-utils \
-  device-mapper-persistent-data \
-  lvm2
-yum-config-manager \
-    --add-repo \
-    https://download.docker.com/linux/centos/docker-ce.repo
-yum install -q -y docker-ce
-systemctl enable docker
-systemctl start docker
 
 echo ========== Installing MySQL/MariaDB for Slurm ==========
 yum install -q -y mariadb-server mariadb-devel

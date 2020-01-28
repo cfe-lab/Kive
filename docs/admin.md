@@ -15,7 +15,6 @@ detailed in those scripts.
 
 * Install PostgreSQL - main database for the project
 * Install Singularity - isolates developer pipelines from the host machine
-* Install Docker - for backward compatibility, now replaced by Singularity
 * Install MySQL/MariDB - stores Slurm's accounting data
 * Install Slurm - allocates memory and processors for multiple jobs across the
     cluster

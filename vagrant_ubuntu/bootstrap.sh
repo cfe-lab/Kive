@@ -23,19 +23,6 @@ make install
 cd ..
 rm -rf singularity
 
-echo ========== Installing Docker ==========
-apt-get install -qq \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    software-properties-common
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-add-apt-repository \
-   "deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-   $(lsb_release -cs) \
-   stable"
-apt-get install -qq docker-ce
-
 echo ========== Installing MySQL for Slurm ==========
 apt-get install -qq mysql-server
 
@@ -102,7 +89,6 @@ mkdir --parents /var/kive/media_root
 chown -R kive:kive /var/kive
 chmod go-rx /var/kive
 
-ln -s /usr/local/share/Kive/kive/fleet/docker_wrap.py /usr/local/bin/docker_wrap.py
 pip install -r requirements-dev.txt
 if [ ! -f kive/kive/settings.py ]; then
     cp kive/kive/settings_default.py kive/kive/settings.py
