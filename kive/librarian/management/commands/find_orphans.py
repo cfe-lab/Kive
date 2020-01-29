@@ -52,8 +52,8 @@ class Command(BaseCommand):
             for orphan in orphans:
                 print('For orphan "{}"'.format(orphan.id))
                 if delete_all or delete_files:
-                    print('Deleting file "{}"'.format(orphan.dataset_file.path))
                     try:
+                        print('Deleting file "{}"'.format(orphan.dataset_file.path))
                         orphan.dataset_file.delete()
                     except ValueError:
                         print('File has already been deleted')
