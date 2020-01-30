@@ -17,7 +17,7 @@ cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/h
 systemctl restart httpd
 ${PYTHON} -m venv /opt/venv_kive
 
-./kive_setup.bash requirements-dev.py34.txt
+./kive_setup.bash requirements-dev.txt
 
 echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu
