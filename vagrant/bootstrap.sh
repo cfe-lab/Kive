@@ -7,17 +7,13 @@ cd /root
 
 /usr/local/share/Kive/vagrant/centos_dependencies.bash
 
-echo ========== Installing virtualenv ==========
-curl --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
-tar xfz virtualenv-15.1.0.tar.gz
-python pypa-virtualenv-bcc2a4c/virtualenv.py /opt/venv_kive
-rm -r pypa-virtualenv-bcc2a4c/ virtualenv-15.1.0.tar.gz
-. /opt/venv_kive/bin/activate
-
-echo ========== Installing pip ==========
-wget -q https://bootstrap.pypa.io/get-pip.py
-python get-pip.py pip==9.0.1
-rm get-pip.py
+echo ========== Installing Python 3 ==========
+yum install -q -y centos-release-scl
+yum install -q -y python36 python36-devel rh-python36-mod_wsgi
+cp /opt/rh/httpd24/root/usr/lib64/httpd/modules/mod_rh-python36-wsgi.so /lib64/httpd/modules
+cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/httpd/conf.modules.d
+systemctl restart httpd
+python3 -m venv /opt/venv_kive
 
 cd /usr/local/share/Kive/vagrant
 ./kive_setup.bash requirements-dev.txt
