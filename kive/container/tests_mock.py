@@ -86,6 +86,7 @@ class ContainerMockTests(TestCase):
         self.assertEqual(expected_plan, strip_removal_plan(plan))
 
 
+# noinspection DuplicatedCode
 class ContainerCleanMockTests(TestCase):
     def setUp(self):
         super(ContainerCleanMockTests, self).setUp()
@@ -596,8 +597,8 @@ class ContainerAppMockTests(TestCase):
 
     def test_write_arguments_bad_name(self):
         app = ContainerApp()
-        with self.assertRaisesRegexp(ValueError,
-                                     r'Invalid argument name: @greetings_csv'):
+        with self.assertRaisesRegex(ValueError,
+                                    r'Invalid argument name: @greetings_csv'):
             app.write_outputs('@greetings_csv names_csv')
 
     def test_write_optional(self):
@@ -629,14 +630,14 @@ class ContainerAppMockTests(TestCase):
 
     def test_write_input_bad_multiple(self):
         app = ContainerApp()
-        with self.assertRaisesRegexp(ValueError,
-                                     r'Invalid argument name: greetings_csv/'):
+        with self.assertRaisesRegex(ValueError,
+                                    r'Invalid argument name: greetings_csv/'):
             app.write_inputs('greetings_csv/ names_csv')
 
     def test_write_output_bad_multiple(self):
         app = ContainerApp()
-        with self.assertRaisesRegexp(ValueError,
-                                     r'Invalid argument name: greetings_csv*'):
+        with self.assertRaisesRegex(ValueError,
+                                    r'Invalid argument name: greetings_csv*'):
             app.write_outputs('greetings_csv* names_csv')
 
     def test_write_inputs_divider(self):
@@ -739,8 +740,8 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.my_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 3)
-        self.assertEquals(response.data[2]['name'], 'backup')
+        self.assertEqual(len(response.data), 3)
+        self.assertEqual(response.data[2]['name'], 'backup')
 
     def test_filter_smart(self):
         """
@@ -751,9 +752,9 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.my_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 2)
-        self.assertEquals(response.data[0]['name'], 'compress')
-        self.assertEquals(response.data[1]['description'], 'impressive')
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['name'], 'compress')
+        self.assertEqual(response.data[1]['description'], 'impressive')
 
     def test_filter_name(self):
         """
@@ -764,8 +765,8 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.my_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'compress')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'compress')
 
     def test_filter_description(self):
         """
@@ -776,8 +777,8 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.my_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['description'], 'impressive')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['description'], 'impressive')
 
     def test_filter_unknown(self):
         """
@@ -788,10 +789,11 @@ class ContainerAppApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.my_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
-                          response.data)
+        self.assertEqual({u'detail': u'Unknown filter key: bogus'},
+                         response.data)
 
 
+# noinspection DuplicatedCode
 @mocked_relations(ContainerRun,
                   ContainerApp,
                   ContainerArgument,
@@ -947,8 +949,8 @@ class ContainerRunMockTests(TestCase):
     def test_remove_running(self):
         run = ContainerRun(id=42, state=ContainerRun.RUNNING)
 
-        with self.assertRaisesRegexp(ValueError,
-                                     r'ContainerRun id 42 is still active.'):
+        with self.assertRaisesRegex(ValueError,
+                                    r'ContainerRun id 42 is still active.'):
             run.build_removal_plan()
 
     def test_change_on_rerun(self):

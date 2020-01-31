@@ -279,10 +279,10 @@ class Command(BaseCommand):
                 row_date = row.extra__date
                 file_name = os.path.relpath(ex.filename, settings.MEDIA_ROOT)
                 setattr(row, file_field, '')
-                logger.warn('Missing %s file %r from %s.',
-                            model_name,
-                            str(file_name),
-                            naturaltime(row_date))
+                logger.warning('Missing %s file %r from %s.',
+                               model_name,
+                               str(file_name),
+                               naturaltime(row_date))
                 if min_missing_date is None or row_date < min_missing_date:
                     min_missing_date = row_date
                 if max_missing_date is None or max_missing_date < row_date:

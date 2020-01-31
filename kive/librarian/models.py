@@ -7,7 +7,6 @@ Dataset, etc.
 from __future__ import unicode_literals
 
 import csv
-import hashlib
 import logging
 import os
 import os.path
@@ -406,7 +405,7 @@ class Dataset(metadata.models.AccessControl):
         """
         data_handle = self.get_open_file_handle("rb")
         if data_handle is None:
-            self.logger.warn('cannot access file handle')
+            self.logger.warning('cannot access file handle')
             return None
         with data_handle:
             return file_access_utils.compute_md5(data_handle.file)
@@ -427,10 +426,10 @@ class Dataset(metadata.models.AccessControl):
                 filename = self.dataset_file.name
             else:
                 filename = self.external_absolute_path()
-            self.logger.warn('MD5 mismatch for %s: expected %s, but was %s.',
-                             filename,
-                             self.MD5_checksum,
-                             new_md5)
+            self.logger.warning('MD5 mismatch for %s: expected %s, but was %s.',
+                                filename,
+                                self.MD5_checksum,
+                                new_md5)
             return False
         return True
 

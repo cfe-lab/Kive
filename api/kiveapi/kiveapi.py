@@ -146,10 +146,10 @@ class KiveAPI(Session):
     def _validate_response(self, response, is_json=True):
         try:
             if not response.ok:
-                logger.warn('Error response %d for %s: %s',
-                            response.status_code,
-                            response.url,
-                            response.text)
+                logger.warning('Error response %d for %s: %s',
+                               response.status_code,
+                               response.url,
+                               response.text)
             if is_server_error(response.status_code):
                 raise KiveServerException("Server error {} on {}.".format(
                     response.status_code,

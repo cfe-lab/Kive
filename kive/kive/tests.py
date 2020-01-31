@@ -123,7 +123,7 @@ class BaseTestCases(object):
             request = self.factory.get(self.list_path)
             # noinspection PyUnresolvedReferences
             response = self.list_view(request)
-            self.assertEquals(response.data["detail"], "Authentication credentials were not provided.")
+            self.assertEqual(response.data["detail"], "Authentication credentials were not provided.")
 
             # Now log in and check that "detail" is not passed in the response.
             force_authenticate(request, user=self.kive_user)

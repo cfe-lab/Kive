@@ -40,7 +40,6 @@ from file_access_utils import compute_md5, use_field_file
 from metadata.models import AccessControl, empty_removal_plan, remove_helper
 from stopwatch.models import Stopwatch
 import container.deffile as deffile
-import fleet.slurmlib as slurmlib
 
 
 logger = logging.getLogger(__name__)
@@ -84,8 +83,11 @@ def multi_check_output(cmd_lst, stderr=None, env=None, num_retry=NUM_RETRY):
             # typically happens if the executable did run, but returned an error
             # ==> assume the slurm command timed out, so we retry
             cmd_retry = True
-            logger.warn("timeout #%d/%d on command %s (retcode %s)",
-                        itry, num_retry, cmd_lst[0], e.returncode)
+            logger.warning("timeout #%d/%d on command %s (retcode %s)",
+                           itry,
+                           num_retry,
+                           cmd_lst[0],
+                           e.returncode)
             if itry < num_retry:
                 itry += 1
                 time.sleep(SLEEP_SECS)

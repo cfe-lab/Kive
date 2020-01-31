@@ -738,7 +738,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_create_singularity(self):
         request1 = self.factory.get(self.list_path)
@@ -760,15 +760,15 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             request2.close()  # Closes uploaded temp files.
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['tag'], expected_tag)
+        self.assertEqual(resp['tag'], expected_tag)
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
 
-        self.assertEquals(len(resp), start_count + 1)
-        self.assertEquals(resp[0]['description'], expected_description)
-        self.assertNotEquals(resp[0]['md5'], '')
+        self.assertEqual(len(resp), start_count + 1)
+        self.assertEqual(resp[0]['description'], expected_description)
+        self.assertNotEqual(resp[0]['md5'], '')
         self.assertIsNotNone(resp[0]['md5'])
 
     def test_create_zip(self):
@@ -787,7 +787,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['tag'], expected_tag)
+        self.assertEqual(resp['tag'], expected_tag)
 
     def test_get_content(self):
         self.test_container.file_type = Container.ZIP
@@ -1100,23 +1100,23 @@ class ContainerAppApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['name'], "zoo app")
+        self.assertEqual(resp['name'], "zoo app")
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
 
-        self.assertEquals(len(resp), start_count + 1)
-        self.assertEquals(resp[-1]['description'], "A really cool app")
-        self.assertEquals(resp[-1]['inputs'], expected_inputs)
-        self.assertEquals(resp[-1]['outputs'], expected_outputs)
+        self.assertEqual(len(resp), start_count + 1)
+        self.assertEqual(resp[-1]['description'], "A really cool app")
+        self.assertEqual(resp[-1]['inputs'], expected_inputs)
+        self.assertEqual(resp[-1]['outputs'], expected_outputs)
 
     def test_removal_plan(self):
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
 
-        self.assertEquals(response.data['ContainerApps'], 1)
+        self.assertEqual(response.data['ContainerApps'], 1)
 
     def test_removal(self):
         start_count = ContainerApp.objects.all().count()
@@ -1124,10 +1124,10 @@ class ContainerAppApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = ContainerApp.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
+        self.assertEqual(end_count, start_count - 1)
 
 
 @skipIfDBFeature('is_mocked')
@@ -1166,7 +1166,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
 
-        self.assertEquals(response.data['ContainerRuns'], 1)
+        self.assertEqual(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
         self.test_run.state = ContainerRun.COMPLETE
@@ -1176,10 +1176,10 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = ContainerRun.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
+        self.assertEqual(end_count, start_count - 1)
 
     def test_add(self):
         request1 = self.factory.get(self.list_path)
@@ -1209,15 +1209,15 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['name'], "my run")
+        self.assertEqual(resp['name'], "my run")
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
         resp_run = resp[0]
 
-        self.assertEquals(len(resp), start_count + 1)
-        self.assertEquals(resp_run['description'], "A really cool run")
+        self.assertEqual(len(resp), start_count + 1)
+        self.assertEqual(resp_run['description'], "A really cool run")
 
     def test_add_rerun(self):
         self.test_run.name = 'original name'
@@ -1242,16 +1242,16 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals("original name (rerun)", resp['name'])
+        self.assertEqual("original name (rerun)", resp['name'])
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
         resp_run = resp[0]
 
-        self.assertEquals(len(resp), start_count + 1)
+        self.assertEqual(len(resp), start_count + 1)
         expected_app_url = request3.build_absolute_uri(app_url)
-        self.assertEquals(expected_app_url, resp_run['app'])
+        self.assertEqual(expected_app_url, resp_run['app'])
         run = ContainerRun.objects.get(id=resp_run['id'])
         run_dataset = run.datasets.get()
         self.assertEqual(input_argument.id, run_dataset.argument_id)
@@ -1303,14 +1303,14 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals("(rerun)", resp['name'])
+        self.assertEqual("(rerun)", resp['name'])
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
         resp_run = resp[0]
 
-        self.assertEquals(len(resp), start_count + 1)
+        self.assertEqual(len(resp), start_count + 1)
         run = ContainerRun.objects.get(id=resp_run['id'])
         run_dataset = run.datasets.get()
         self.assertEqual(output1b.id, run_dataset.dataset_id)
@@ -1354,13 +1354,13 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals("example run (rerun)", resp['name'])
+        self.assertEqual("example run (rerun)", resp['name'])
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
 
-        self.assertEquals(len(resp), start_count + 2)
+        self.assertEqual(len(resp), start_count + 2)
         resp_run = resp[1]
         run = ContainerRun.objects.get(id=resp_run['id'])
         self.assertEqual(0, run.datasets.count())
@@ -1853,18 +1853,18 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         resp = self.list_view(request2).render().data
 
         self.assertIn('id', resp)
-        self.assertEquals(resp['name'], "my batch")
+        self.assertEqual(resp['name'], "my batch")
 
         request3 = self.factory.get(self.list_path)
         force_authenticate(request3, user=self.kive_user)
         resp = self.list_view(request3).data
         resp_batch = resp[0]
 
-        self.assertEquals(len(resp), start_count + 1)
-        self.assertEquals(resp_batch['description'], "A really cool batch")
+        self.assertEqual(len(resp), start_count + 1)
+        self.assertEqual(resp_batch['description'], "A really cool batch")
 
         resp_run = resp_batch['runs'][0]
-        self.assertEquals(resp_run['name'], 'my run')
+        self.assertEqual(resp_run['name'], 'my run')
 
     def test_removal_plan(self):
         self.test_run.state = ContainerRun.COMPLETE
@@ -1873,8 +1873,8 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
 
-        self.assertEquals(response.data['Batches'], 1)
-        self.assertEquals(response.data['ContainerRuns'], 1)
+        self.assertEqual(response.data['Batches'], 1)
+        self.assertEqual(response.data['ContainerRuns'], 1)
 
     def test_removal(self):
         self.test_run.state = ContainerRun.COMPLETE
@@ -1884,10 +1884,10 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = Batch.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
+        self.assertEqual(end_count, start_count - 1)
 
 
 @skipIfDBFeature('is_mocked')
@@ -2667,7 +2667,7 @@ Line 3
         run.state = ContainerRun.LOADING
         run.save()
 
-        with self.assertRaisesRegexp(
+        with self.assertRaisesRegex(
                 CommandError,
                 r'Expected state N for run id \d+, but was L'):
             call_command('runcontainer', str(run.id))
@@ -4106,4 +4106,4 @@ class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.family_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT) 
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT) 

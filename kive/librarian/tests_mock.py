@@ -114,8 +114,8 @@ Dave,40
         argument = ContainerArgument(type=ContainerArgument.INPUT)
         dataset.containers.create(run=run, argument=argument)
 
-        with self.assertRaisesRegexp(ValueError,
-                                     r'ContainerRun id 43 is still active\.'):
+        with self.assertRaisesRegex(ValueError,
+                                    r'ContainerRun id 43 is still active\.'):
             dataset.build_removal_plan()
 
     def test_removal_skips_output_runs(self):

@@ -22,5 +22,5 @@ class ParseFileSizeTests(TestCase):
     def test_invalid(self):
         for text in ['42X', '4 2', 'k', 'kb', 'b', '']:
             expected_message = 'Invalid file size: {!r}'.format(text)
-            with self.assertRaisesRegexp(ValueError, expected_message):
+            with self.assertRaisesRegex(ValueError, expected_message):
                 parse_file_size(text)

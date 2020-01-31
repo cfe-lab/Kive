@@ -62,7 +62,7 @@ class StopwatchTests(TestCase):
         end_time set and start_time unset.  This is not coherent.
         """
         self.pE_run.end_time = timezone.now()
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             ValidationError,
             re.escape('Stopwatch "{}" does not have a start time but it has an end time'.format(self.pE_run)),
             self.pE_run.clean

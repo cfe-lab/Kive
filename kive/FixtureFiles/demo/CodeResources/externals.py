@@ -129,7 +129,7 @@ class CommandWrapper(AssetWrapper):
             p = self.create_process(args, stdout=outfile, stderr=subprocess.PIPE)
             for line in p.stderr:
                 if not ignored or not re.search(ignored, line):
-                    self.logger.warn(format_string, line.rstrip())
+                    self.logger.warning(format_string, line.rstrip())
             p.wait()
             if p.returncode:
                 raise subprocess.CalledProcessError(p.returncode,

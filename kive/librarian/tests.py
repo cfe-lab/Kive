@@ -302,8 +302,8 @@ class DatasetTests(LibrarianTestCase):
 
         self.assertEqual(2, response.context['num_files_added'])
         dataset2, dataset1 = Dataset.objects.all()[:2]
-        self.assertRegexpMatches(dataset1.name, r'file1\.txt.*')
-        self.assertRegexpMatches(dataset2.name, r'file2\.txt.*')
+        self.assertRegex(dataset1.name, r'file1\.txt.*')
+        self.assertRegex(dataset2.name, r'file2\.txt.*')
         self.assertTrue(dataset1.is_uploaded)
 
     def test_archive_upload(self):
@@ -330,8 +330,8 @@ class DatasetTests(LibrarianTestCase):
 
         self.assertEqual(2, response.context['num_files_added'])
         dataset2, dataset1 = Dataset.objects.all()[:2]
-        self.assertRegexpMatches(dataset1.name, r'foo\.txt.*')
-        self.assertRegexpMatches(dataset2.name, r'bar\.txt.*')
+        self.assertRegex(dataset1.name, r'foo\.txt.*')
+        self.assertRegex(dataset2.name, r'bar\.txt.*')
         self.assertTrue(dataset1.is_uploaded)
 
 
@@ -371,10 +371,10 @@ class DatasetWithFileTests(TestCase):
         self.raw_dataset.dataset_file.close()
         self.raw_dataset.dataset_file.open(mode='w')
         self.raw_dataset.dataset_file.close()
-        self.assertRaisesRegexp(ValidationError,
-                                re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                          'checksum "{}"'.format(self.raw_dataset, new_md5, old_md5)),
-                                self.raw_dataset.clean)
+        self.assertRaisesRegex(ValidationError,
+                               re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
+                                         'checksum "{}"'.format(self.raw_dataset, new_md5, old_md5)),
+                               self.raw_dataset.clean)
 
     def test_Dataset_filename_MD5_clash(self):
         ds1, ds2 = Dataset.objects.all()[:2]
@@ -382,9 +382,10 @@ class DatasetWithFileTests(TestCase):
         ds1.MD5_checksum = ds2.MD5_checksum
         ds1.save()
         msg = "A Dataset with that name and MD5 already exists"
-        self.assertRaisesRegexp(ValidationError, msg, ds1.validate_uniqueness_on_upload)
+        self.assertRaisesRegex(ValidationError, msg, ds1.validate_uniqueness_on_upload)
 
 
+# noinspection DuplicatedCode
 class DatasetApiMockTests(BaseTestCases.ApiTestCase):
 
     def setUp(self):
@@ -439,8 +440,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 3)
-        self.assertEquals(response.data[2]['name'], 'bananas')
+        self.assertEqual(len(response.data), 3)
+        self.assertEqual(response.data[2]['name'], 'bananas')
 
     def test_filter_smart(self):
         """
@@ -451,9 +452,9 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 2)
-        self.assertEquals(response.data[0]['name'], 'cherries')
-        self.assertEquals(response.data[1]['description'], 'chosen')
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['name'], 'cherries')
+        self.assertEqual(response.data[1]['description'], 'chosen')
 
     def test_filter_name(self):
         """
@@ -464,8 +465,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'cherries')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'cherries')
 
     def test_filter_description(self):
         """
@@ -476,8 +477,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['description'], 'chosen')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['description'], 'chosen')
 
     def test_filter_user(self):
         """
@@ -488,7 +489,7 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 3)
+        self.assertEqual(len(response.data), 3)
 
     def test_filter_uploaded(self):
         """
@@ -499,7 +500,7 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 2)
+        self.assertEqual(len(response.data), 2)
 
     def test_filter_md5(self):
         """
@@ -510,8 +511,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'cherries')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'cherries')
 
     def test_filter_date(self):
         """
@@ -523,8 +524,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'cherries')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'cherries')
 
     def test_filter_unknown(self):
         """
@@ -535,8 +536,8 @@ class DatasetApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
-                          response.data)
+        self.assertEqual({u'detail': u'Unknown filter key: bogus'},
+                         response.data)
 
 
 @skipIfDBFeature('is_mocked')
@@ -604,7 +605,10 @@ class PurgeDataTests(TestCase):
             'orphan': self.create_dataset(name='Orphan name', description='Orphan description'),
             'input_dataset': self.create_dataset(is_uploaded=True, name='Input name', description='Input description'),
             'output_dataset': self.create_dataset(name='Output name', description='Output description'),
-            'unused_dataset': self.create_dataset(is_uploaded=True, name='Unused name', description='Unused description')
+            'unused_dataset': self.create_dataset(
+                is_uploaded=True,
+                name='Unused name',
+                description='Unused description')
         }
         for i in range(20):
             datasets['orphan_{}'.format(i)] = self.create_dataset(
@@ -672,6 +676,7 @@ class PurgeDataTests(TestCase):
             pass
 
 
+# noinspection DuplicatedCode
 @skipIfDBFeature('is_mocked')
 class DatasetApiTests(BaseTestCases.ApiTestCase):
 
@@ -748,16 +753,16 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                 resp = self.list_view(request).render().data
 
                 self.assertIsNone(resp.get('errors'))
-                self.assertEquals(resp['name'], "My cool file %d" % i)
+                self.assertEqual(resp['name'], "My cool file %d" % i)
 
         request = self.factory.get(self.list_path)
         force_authenticate(request, user=self.kive_user)
         resp = self.list_view(request).data
 
-        self.assertEquals(len(resp), num_files + self.n_preexisting_datasets)
+        self.assertEqual(len(resp), num_files + self.n_preexisting_datasets)
         summaries = [(entry['name'], entry['uploaded'])
                      for entry in resp]
-        self.assertEquals(expected_summaries, summaries)
+        self.assertEqual(expected_summaries, summaries)
 
     def test_dataset_add_with_blank_externals(self):
         """ Browser API leaves external dir and path blank. """
@@ -774,15 +779,15 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
 
         self.assertIsNone(resp.get('errors'))
         self.assertIsNone(resp.get('non_field_errors'))
-        self.assertEquals(resp['name'], "Some file")
+        self.assertEqual(resp['name'], "Some file")
 
     def test_dataset_removal_plan(self):
         request = self.factory.get(self.removal_path)
         force_authenticate(request, user=self.kive_user)
         response = self.removal_view(request, pk=self.detail_pk)
 
-        self.assertEquals(response.data['Datasets'], 1)
-        self.assertEquals(response.data['Containers'], 0)
+        self.assertEqual(response.data['Datasets'], 1)
+        self.assertEqual(response.data['Containers'], 0)
 
     def test_dataset_removal(self):
         start_count = Dataset.objects.all().count()
@@ -790,17 +795,17 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
         end_count = Dataset.objects.all().count()
-        self.assertEquals(end_count, start_count - 1)
+        self.assertEqual(end_count, start_count - 1)
 
     def test_dataset_redaction_plan(self):
         request = self.factory.get(self.redaction_path)
         force_authenticate(request, user=self.kive_user)
         response = self.redaction_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['Datasets'], 1)
-        self.assertEquals(response.data['OutputLogs'], 0)
+        self.assertEqual(response.data['Datasets'], 1)
+        self.assertEqual(response.data['OutputLogs'], 0)
 
     def test_dataset_redaction(self):
 
@@ -808,7 +813,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                                      {'is_redacted': "true"})
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         dataset = Dataset.objects.get(pk=self.detail_pk)
         self.assertTrue(dataset.is_redacted())
@@ -819,7 +824,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                                      content_type='application/json')
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         dataset = Dataset.objects.get(pk=self.detail_pk)
         self.assertFalse(dataset.has_data())
@@ -834,7 +839,7 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
                                      content_type='application/json')
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
         dataset = Dataset.objects.get(pk=self.detail_pk)
         self.assertFalse(dataset.has_data())
@@ -846,13 +851,14 @@ class DatasetApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(
+        self.assertEqual(
             response.data['description'],
             "Test data for a test that tests test data")
         self.assertFalse(response.data['has_data'])
         self.assertFalse(response.data['is_redacted'])
 
 
+# noinspection DuplicatedCode
 @skipIfDBFeature('is_mocked')
 class DatasetSerializerTests(TestCase):
     """
@@ -1036,9 +1042,9 @@ baz
             dataset = ds.save()
 
             # Probe the Dataset to make sure everything looks fine.
-            self.assertEquals(dataset.name, self.data_to_serialize["name"])
-            self.assertEquals(dataset.description, self.data_to_serialize["description"])
-            self.assertEquals(dataset.user, self.kive_user)
+            self.assertEqual(dataset.name, self.data_to_serialize["name"])
+            self.assertEqual(dataset.description, self.data_to_serialize["description"])
+            self.assertEqual(dataset.user, self.kive_user)
             self.assertTrue(bool(dataset.dataset_file))
 
     def test_create_do_not_retain(self):
@@ -1060,9 +1066,9 @@ baz
             dataset = ds.save()
 
             # Probe the Dataset to make sure everything looks fine.
-            self.assertEquals(dataset.name, self.data_to_serialize["name"])
-            self.assertEquals(dataset.description, self.data_to_serialize["description"])
-            self.assertEquals(dataset.user, self.kive_user)
+            self.assertEqual(dataset.name, self.data_to_serialize["name"])
+            self.assertEqual(dataset.description, self.data_to_serialize["description"])
+            self.assertEqual(dataset.user, self.kive_user)
             self.assertFalse(bool(dataset.dataset_file))
 
     def test_create_with_users_allowed(self):
@@ -1122,11 +1128,11 @@ baz
         dataset = ds.save()
 
         # Probe the Dataset to make sure everything looks fine.
-        self.assertEquals(dataset.name, self.data_to_serialize["name"])
-        self.assertEquals(dataset.description, self.data_to_serialize["description"])
-        self.assertEquals(dataset.user, self.kive_user)
-        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
-        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertEqual(dataset.name, self.data_to_serialize["name"])
+        self.assertEqual(dataset.description, self.data_to_serialize["description"])
+        self.assertEqual(dataset.user, self.kive_user)
+        self.assertEqual(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEqual(dataset.externalfiledirectory, self.efd)
         self.assertFalse(bool(dataset.dataset_file))
 
     def test_create_externally_backed_internal_copy(self):
@@ -1146,17 +1152,18 @@ baz
         dataset = ds.save()
 
         # Probe the Dataset to make sure everything looks fine.
-        self.assertEquals(dataset.name, self.data_to_serialize["name"])
-        self.assertEquals(dataset.description, self.data_to_serialize["description"])
-        self.assertEquals(dataset.user, self.kive_user)
-        self.assertEquals(dataset.external_path, os.path.basename(self.ext_fn))
-        self.assertEquals(dataset.externalfiledirectory, self.efd)
+        self.assertEqual(dataset.name, self.data_to_serialize["name"])
+        self.assertEqual(dataset.description, self.data_to_serialize["description"])
+        self.assertEqual(dataset.user, self.kive_user)
+        self.assertEqual(dataset.external_path, os.path.basename(self.ext_fn))
+        self.assertEqual(dataset.externalfiledirectory, self.efd)
         self.assertTrue(bool(dataset.dataset_file))
         dataset.dataset_file.open("rb")
         with dataset.dataset_file:
-            self.assertEquals(dataset.dataset_file.read(), self.raw_file_contents)
+            self.assertEqual(dataset.dataset_file.read(), self.raw_file_contents)
 
 
+# noinspection DuplicatedCode
 class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
     def setUp(self):
         self.mock_viewset(ExternalFileDirectoryViewSet)
@@ -1188,8 +1195,8 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 3)
-        self.assertEquals(response.data[2]['name'], 'bananas')
+        self.assertEqual(len(response.data), 3)
+        self.assertEqual(response.data[2]['name'], 'bananas')
 
     def test_filter_smart(self):
         """
@@ -1200,9 +1207,9 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 2)
-        self.assertEquals(response.data[0]['name'], 'bananas')
-        self.assertEquals(response.data[1]['path'], '/bank/apples')
+        self.assertEqual(len(response.data), 2)
+        self.assertEqual(response.data[0]['name'], 'bananas')
+        self.assertEqual(response.data[1]['path'], '/bank/apples')
 
     def test_filter_name(self):
         """
@@ -1213,8 +1220,8 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['name'], 'bananas')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['name'], 'bananas')
 
     def test_filter_path(self):
         """
@@ -1225,8 +1232,8 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals(len(response.data), 1)
-        self.assertEquals(response.data[0]['path'], '/bank/apples')
+        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data[0]['path'], '/bank/apples')
 
     def test_filter_unknown(self):
         """
@@ -1237,14 +1244,14 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.list_view(request, pk=None)
 
-        self.assertEquals({u'detail': u'Unknown filter key: bogus'},
-                          response.data)
+        self.assertEqual({u'detail': u'Unknown filter key: bogus'},
+                         response.data)
 
     def test_detail(self):
         request = self.factory.get(self.detail_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEquals(response.data['name'], 'cherries')
+        self.assertEqual(response.data['name'], 'cherries')
 
     @patch('os.walk')
     def test_list_files(self, mock_walk):
@@ -1267,6 +1274,7 @@ class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
         self.assertDictEqual(expected_data, response.data)
 
 
+# noinspection DuplicatedCode
 @skipIfDBFeature('is_mocked')
 class ExternalFileTests(TestCase):
 
@@ -1332,7 +1340,7 @@ class ExternalFileTests(TestCase):
         new_working_dir = tempfile.mkdtemp()
         unnamed_efd = ExternalFileDirectory(name="TestSaveDir", path="{}/./".format(new_working_dir))
         unnamed_efd.save()
-        self.assertEquals(unnamed_efd.path, os.path.normpath(new_working_dir))
+        self.assertEqual(unnamed_efd.path, os.path.normpath(new_working_dir))
         shutil.rmtree(new_working_dir)
 
     def test_list_files(self):
@@ -1354,14 +1362,14 @@ class ExternalFileTests(TestCase):
             externalfiledirectory=self.efd
         )
 
-        self.assertEquals(external_file_ds.external_path, self.ext1_path)
+        self.assertEqual(external_file_ds.external_path, self.ext1_path)
 
         external_file_ds.dataset_file.open("r")
         with external_file_ds.dataset_file:
-            self.assertEquals(external_file_ds.dataset_file.read(), self.ext1_contents)
+            self.assertEqual(external_file_ds.dataset_file.read(), self.ext1_contents)
 
         with open(os.path.join(self.working_dir, self.ext1_path), "rb") as f:
-            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+            self.assertEqual(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
 
     def test_create_dataset_external_file_no_internal_copy(self):
         """
@@ -1374,11 +1382,11 @@ class ExternalFileTests(TestCase):
             externalfiledirectory=self.efd
         )
 
-        self.assertEquals(external_file_ds.external_path, self.ext1_path)
+        self.assertEqual(external_file_ds.external_path, self.ext1_path)
         self.assertFalse(bool(external_file_ds.dataset_file))
 
         with open(os.path.join(self.working_dir, self.ext1_path), "rb") as f:
-            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+            self.assertEqual(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
 
     def test_create_dataset_external_file_subdirectory(self):
         """
@@ -1390,15 +1398,15 @@ class ExternalFileTests(TestCase):
             externalfiledirectory=self.efd
         )
 
-        self.assertEquals(external_file_ds.externalfiledirectory, self.efd)
-        self.assertEquals(external_file_ds.external_path, self.ext_sub1_path)
+        self.assertEqual(external_file_ds.externalfiledirectory, self.efd)
+        self.assertEqual(external_file_ds.external_path, self.ext_sub1_path)
 
         external_file_ds.dataset_file.open("r")
         with external_file_ds.dataset_file:
-            self.assertEquals(external_file_ds.dataset_file.read(), self.ext_sub1_contents)
+            self.assertEqual(external_file_ds.dataset_file.read(), self.ext_sub1_contents)
 
         with open(os.path.join(self.working_dir, self.ext_sub1_path), "rb") as f:
-            self.assertEquals(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
+            self.assertEqual(file_access_utils.compute_md5(f), external_file_ds.MD5_checksum)
 
     def test_get_file_handle(self):
         """
@@ -1413,12 +1421,12 @@ class ExternalFileTests(TestCase):
 
         # Where possible get_file_handle uses the internal copy.
         with external_file_ds.get_open_file_handle("r") as data_handle:
-            self.assertEquals(data_handle, external_file_ds.dataset_file)
+            self.assertEqual(data_handle, external_file_ds.dataset_file)
 
         # It falls back on the external copy.
         external_file_ds.dataset_file.delete()
         with external_file_ds.get_open_file_handle('r') as external_file_handle:
-            self.assertEquals(os.path.abspath(external_file_handle.name), ext_sub1_path)
+            self.assertEqual(os.path.abspath(external_file_handle.name), ext_sub1_path)
 
     def test_get_file_handle_subdirectory(self):
         """
@@ -1426,11 +1434,11 @@ class ExternalFileTests(TestCase):
         """
         # Where possible get_file_handle uses the internal copy.
         with self.external_file_ds.get_open_file_handle('r') as data_handle:
-            self.assertEquals(data_handle, self.external_file_ds.dataset_file)
+            self.assertEqual(data_handle, self.external_file_ds.dataset_file)
 
         # It falls back on the external copy.
         with self.external_file_ds_no_internal.get_open_file_handle('r') as external_file_handle:
-            self.assertEquals(
+            self.assertEqual(
                 os.path.abspath(external_file_handle.name),
                 os.path.abspath(os.path.join(self.working_dir, self.ext1_path))
             )
@@ -1442,9 +1450,9 @@ class ExternalFileTests(TestCase):
         ext1_path = os.path.join(self.working_dir, self.ext1_path)
         ext_sub1_path = os.path.join(self.working_dir, self.ext_sub1_path)
 
-        self.assertEquals(self.external_file_ds.external_absolute_path(), ext1_path)
-        self.assertEquals(self.external_file_ds_no_internal.external_absolute_path(), ext1_path)
-        self.assertEquals(self.external_file_ds_subdir.external_absolute_path(), ext_sub1_path)
+        self.assertEqual(self.external_file_ds.external_absolute_path(), ext1_path)
+        self.assertEqual(self.external_file_ds_no_internal.external_absolute_path(), ext1_path)
+        self.assertEqual(self.external_file_ds_subdir.external_absolute_path(), ext_sub1_path)
         self.assertIsNone(self.non_external_dataset.external_absolute_path())
 
     def test_has_data(self):
@@ -1472,7 +1480,7 @@ class ExternalFileTests(TestCase):
         os.remove(external_path)
         assert not external_file_ds_no_internal.has_data()
         expected_error = r"No such file or directory: .*ext_test_has_data\.txt"
-        with self.assertRaisesRegexp(IOError, expected_error):
+        with self.assertRaisesRegex(IOError, expected_error):
             external_file_ds_no_internal.has_data(raise_errors=True)
 
         # Now test when the file exists but is unreadable.
@@ -1482,7 +1490,7 @@ class ExternalFileTests(TestCase):
         os.chmod(external_path, stat.S_IWUSR | stat.S_IXUSR)
         assert not external_file_ds_no_internal.has_data()
         expected_error = r"Permission denied: .*ext_test_has_data\.txt"
-        with self.assertRaisesRegexp(IOError, expected_error):
+        with self.assertRaisesRegex(IOError, expected_error):
             external_file_ds_no_internal.has_data(raise_errors=True)
 
     def test_has_no_data(self):
@@ -1499,7 +1507,7 @@ class ExternalFileTests(TestCase):
         self.external_file_ds.clean()
 
         self.external_file_ds.externalfiledirectory = None
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             ValidationError,
             "Both externalfiledirectory and external_path should be set or neither should be set",
             self.external_file_ds.clean
@@ -1507,7 +1515,7 @@ class ExternalFileTests(TestCase):
 
         self.external_file_ds.externalfiledirectory = self.efd
         self.external_file_ds.external_path = ""
-        self.assertRaisesRegexp(
+        self.assertRaisesRegex(
             ValidationError,
             "Both externalfiledirectory and external_path should be set or neither should be set",
             self.external_file_ds.clean
@@ -1523,7 +1531,7 @@ class ExternalFileTests(TestCase):
         """
         self.external_file_ds.redact_this()
         self.external_file_ds.refresh_from_db()
-        self.assertEquals(self.external_file_ds.external_path, "")
+        self.assertEqual(self.external_file_ds.external_path, "")
         self.assertIsNone(self.external_file_ds.externalfiledirectory)
 
     def test_file_check_passes(self):
