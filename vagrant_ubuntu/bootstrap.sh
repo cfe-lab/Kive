@@ -12,7 +12,7 @@ echo ========== Installing PostgreSQL ==========
 apt-get install -qq postgresql postgresql-contrib postgresql-client libpq-dev
 
 echo  ========== Installing Singularity ==========
-apt-get install -qq python dh-autoreconf build-essential libarchive-dev squashfs-tools
+apt-get install -qq python3-venv python3-dev dh-autoreconf build-essential libarchive-dev squashfs-tools
 git clone https://github.com/singularityware/singularity.git
 cd singularity
 git checkout -q tags/2.5.2
@@ -43,7 +43,7 @@ systemctl restart slurmdbd
 systemctl restart slurmctld
 
 echo ========== Installing Apache ==========
-apt-get install -qq apache2 libapache2-mod-wsgi
+apt-get install -qq apache2 libapache2-mod-wsgi-py3
 
 useradd --system kive
 mkdir /home/kive /etc/kive /var/log/kive
@@ -68,17 +68,8 @@ export APACHE_RUN_GROUP=kive" >> /etc/apache2/envvars
 systemctl restart apache2
 
 echo ========== Installing virtualenv ==========
-curl -Ss --location --output virtualenv-15.1.0.tar.gz https://github.com/pypa/virtualenv/tarball/15.1.0
-tar xfz virtualenv-15.1.0.tar.gz
-python pypa-virtualenv-bcc2a4c/virtualenv.py /opt/venv_kive
-rm -r pypa-virtualenv-bcc2a4c/ virtualenv-15.1.0.tar.gz
+python3 -m venv /opt/venv_kive
 . /opt/venv_kive/bin/activate
-
-echo ========== Installing pip ==========
-apt-get install -qq wget
-wget -q https://bootstrap.pypa.io/get-pip.py
-python get-pip.py pip==9.0.1
-rm get-pip.py
 
 echo ========== Installing Kive ==========
 apt-get install -qq python-dev libsqlite3-dev wamerican graphviz libgraphviz-dev pkg-config
@@ -89,10 +80,7 @@ mkdir --parents /var/kive/media_root
 chown -R kive:kive /var/kive
 chmod go-rx /var/kive
 
-pip install -r requirements-dev.txt
-if [ ! -f kive/kive/settings.py ]; then
-    cp kive/kive/settings_default.py kive/kive/settings.py
-fi
+/opt/venv_kive/bin/python -m pip install -r requirements-dev.txt
 cd kive
 ./manage.py collectstatic
 ./manage.py shell -c "
