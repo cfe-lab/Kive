@@ -1117,6 +1117,11 @@ class ContainerRun(Stopwatch, AccessControl):
         self.save()
 
         child_env = dict(os.environ)
+        extra_path = settings.SLURM_PATH
+        if extra_path is not None:
+            old_system_path = child_env['PATH']
+            system_path = extra_path + os.pathsep + old_system_path
+            child_env['PATH'] = system_path
         child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
         child_env.pop('KIVE_LOG', None)
         output = multi_check_output(self.build_slurm_command(settings.SLURM_QUEUES,
