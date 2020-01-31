@@ -113,7 +113,7 @@ html #inner_wrap {
   #insert_one_dataset {
     text-indent: -999em;
     overflow: hidden;
-    background-image: url("/static/sandbox/down32.png");
+    background-image: url("/static/container/img/down32.png");
     background-repeat: no-repeat;
     background-position: center;
     background-color: transparent;
@@ -126,7 +126,7 @@ html #inner_wrap {
   #insert_many_dataset {
     text-indent: -999em;
     overflow: hidden;
-    background-image: url("/static/sandbox/menu_white32.png");
+    background-image: url("/static/container/img/menu_white32.png");
     background-repeat: no-repeat;
     background-position: center;
     background-color: transparent;
@@ -141,7 +141,7 @@ html #inner_wrap {
   #insert_many_dataset.active {
     text-indent: -999em;
     overflow: hidden;
-    background-image: url("/static/sandbox/menu_green32.png");
+    background-image: url("/static/container/img/menu_green32.png");
     background-repeat: no-repeat;
     background-position: center;
     background-color: transparent;
