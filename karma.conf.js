@@ -31,8 +31,7 @@ module.exports = function(config) {
     // simulate the way Django structures directories for static file serving
     serveDjangoPath(cfgObj, {
         'container': ['templates', 'static', 'test_assets'],
-        'pipeline': ['templates', 'static', 'test_assets'],
-        'portal': ['static'],
+        'portal': ['static']
     });
     cfgObj.proxies['/portal/'] = '/base/portal/';
     config.set(cfgObj);
