@@ -367,12 +367,14 @@ var permissions = (function() {
         var query_params = permissions_table.getQueryParams();
         query_params.page_size = permissions_table.page_size;
         query_params.page = permissions_table.page;
+        permissions_table.$navigation_links.addClass('busy');
 
         permissions_table.ajax_request = $.getJSON(permissions_table.list_url, query_params)
             .done(handleTableUpdate.bind(permissions_table, callback))
             .fail(handleTableFail.bind(permissions_table))
             .always(function() {
                 permissions_table.ajax_request = undefined;
+                permissions_table.$navigation_links.removeClass('busy');
             });
     };
     

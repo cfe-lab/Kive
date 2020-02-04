@@ -16,6 +16,7 @@
     $(function(){
         var table = new permissions.ContainerRunTable(
             $("#runs"),
+            "{{ user.get_username }}",
             {{ is_user_admin|lower }},
             $(".navigation_links")
         );

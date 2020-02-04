@@ -29,6 +29,10 @@
     border: 1px solid transparent;
 }
 
+.busy {
+  background-color: #ffd5d7;
+}
+
 .navigation_links .record_count {
     font-style: italic;
     font-size: 0.8em;

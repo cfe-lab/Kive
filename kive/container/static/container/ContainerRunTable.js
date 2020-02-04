@@ -1,8 +1,9 @@
 (function(permissions) {//dependent on PermissionsTable class
 	"use strict";
-	permissions.ContainerRunTable = function($table, is_user_admin, $navigation_links) {
+	permissions.ContainerRunTable = function($table, user, is_user_admin, $navigation_links) {
 	    permissions.PermissionsTable.call(this, $table, is_user_admin, $navigation_links);
         var runsTable = this;
+        this.user = user;
 	    this.list_url = "/api/containerruns/";
         this.session_filters_key = "containerrunFilters";
         this.session_page_key = "containerrunPage";
