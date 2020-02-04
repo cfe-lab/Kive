@@ -449,7 +449,6 @@ describe("Container MethodDialog fixture", function() {
 
         let methods = canvasState.getMethodNodes();
         expect(methods.length).toEqual(1);
-        expect(methods[0].label).toBe('custom_name');
         expect(methods[0].n_outputs).toEqual(3);
         expect(methods[0].n_inputs).toEqual(1);
     });
