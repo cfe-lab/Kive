@@ -48,7 +48,7 @@
     "postinstall": "grunt pngicons",
     "install": "webpack --mode production",
     "watch:all": "npm run build:watch & npm run sass:watch",
-    "build:watch": "webpack --watch",
+    "build:watch": "webpack --watch --mode development",
     "sass:watch": "node-sass --watch --recursive --output kive --source-map true --source-map-contents kive",
     "test:travis": "karma start --browsers ChromeHeadless --single-run --reporters progress --log-level error",
     "test:browser": "karma start --browsers Chrome",

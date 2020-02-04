@@ -294,7 +294,10 @@ contributions.
 Run both the Webpack and Sass watchers simultaneously with `npm run watch:all`.
 
 To debug TypeScript code in the browser, change the `devtool` setting in
-`webpack.config.js`.
+`webpack.config.js`. Then open the page in your browser, open the Chrome
+developer tools, and switch to the Sources tab. You should find the TypeScript
+source code under `webpack://./kive/something/static/something`. You can add
+breakpoints and step through the code there.
 
 ### Updating embedded icon files ###
 
