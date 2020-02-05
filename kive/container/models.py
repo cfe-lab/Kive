@@ -1109,31 +1109,36 @@ class ContainerRun(Stopwatch, AccessControl):
         self.sandbox_path = os.path.relpath(full_sandbox_path, settings.MEDIA_ROOT)
 
     def schedule(self, dependencies=None):
-        dependency_job_ids = []
-        if dependencies:
-            for source_run_id, source_dependencies in dependencies.items():
-                source_run = ContainerRun.objects.get(id=source_run_id)
-                source_run.schedule(source_dependencies)
-                dependency_job_ids.append(source_run.slurm_job_id)
-        self.create_sandbox()
-        self.save()
+        try:
+            dependency_job_ids = []
+            if dependencies:
+                for source_run_id, source_dependencies in dependencies.items():
+                    source_run = ContainerRun.objects.get(id=source_run_id)
+                    source_run.schedule(source_dependencies)
+                    dependency_job_ids.append(source_run.slurm_job_id)
+            self.create_sandbox()
+            self.save()
 
-        child_env = dict(os.environ)
-        extra_path = settings.SLURM_PATH
-        if extra_path is not None:
-            old_system_path = child_env['PATH']
-            system_path = extra_path + os.pathsep + old_system_path
-            child_env['PATH'] = system_path
-        child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
-        child_env.pop('KIVE_LOG', None)
-        output = multi_check_output(self.build_slurm_command(settings.SLURM_QUEUES,
-                                                             dependency_job_ids),
-                                    env=child_env)
+            child_env = dict(os.environ)
+            extra_path = settings.SLURM_PATH
+            if extra_path is not None:
+                old_system_path = child_env['PATH']
+                system_path = extra_path + os.pathsep + old_system_path
+                child_env['PATH'] = system_path
+            child_env['PYTHONPATH'] = os.pathsep.join(sys.path)
+            child_env.pop('KIVE_LOG', None)
+            output = multi_check_output(self.build_slurm_command(settings.SLURM_QUEUES,
+                                                                 dependency_job_ids),
+                                        env=child_env)
 
-        self.slurm_job_id = int(output)
-        # It's just possible the slurm job has already started modifying the
-        # run, so only update one field.
-        self.save(update_fields=['slurm_job_id'])
+            self.slurm_job_id = int(output)
+            # It's just possible the slurm job has already started modifying the
+            # run, so only update one field.
+            self.save(update_fields=['slurm_job_id'])
+        except Exception:
+            self.state = self.FAILED
+            self.save(update_fields=['state'])
+            raise
 
     def build_slurm_command(self, slurm_queues=None, dependency_job_ids=None):
         """Build a list of strings representing a slurm command"""
