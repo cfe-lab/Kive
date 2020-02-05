@@ -24,6 +24,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='containerrun',
             name='state',
-            field=models.CharField(choices=[(b'N', b'New'), (b'L', b'Loading'), (b'R', b'Running'), (b'S', b'Saving'), (b'C', b'Complete'), (b'F', b'Failed'), (b'X', b'Cancelled')], default=b'N', max_length=1),
+            field=models.CharField(choices=[('N', 'New'), ('L', 'Loading'), ('R', 'Running'), ('S', 'Saving'), ('C', 'Complete'), ('F', 'Failed'), ('X', 'Cancelled')], default='N', max_length=1),
         ),
     ]

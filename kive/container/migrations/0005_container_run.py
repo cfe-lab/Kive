@@ -46,7 +46,7 @@ class Migration(migrations.Migration):
             name='ContainerLog',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('type', models.CharField(choices=[(b'O', b'stdout'), (b'E', b'stderr')], max_length=1)),
+                ('type', models.CharField(choices=[('O', 'stdout'), ('E', 'stderr')], max_length=1)),
                 ('short_text', models.CharField(blank=True, help_text="Holds the log text if it's shorter than the max length.", max_length=2000)),
                 ('long_text', models.FileField(help_text="Holds the log text if it's longer than the max length.", upload_to=b'')),
             ],
@@ -71,12 +71,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerapp',
             name='memory',
-            field=models.PositiveIntegerField(default=6000, help_text='Megabytes of memory Slurm will allocate for this app (0 allocates all memory)', verbose_name=b'Memory required (MB)'),
+            field=models.PositiveIntegerField(default=6000, help_text='Megabytes of memory Slurm will allocate for this app (0 allocates all memory)', verbose_name='Memory required (MB)'),
         ),
         migrations.AddField(
             model_name='containerapp',
             name='threads',
-            field=models.PositiveIntegerField(default=1, help_text='How many threads does this app use during execution?', validators=[django.core.validators.MinValueValidator(1)], verbose_name=b'Number of threads'),
+            field=models.PositiveIntegerField(default=1, help_text='How many threads does this app use during execution?', validators=[django.core.validators.MinValueValidator(1)], verbose_name='Number of threads'),
         ),
         migrations.AddField(
             model_name='containerrun',

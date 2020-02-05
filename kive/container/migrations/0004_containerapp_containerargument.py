@@ -18,7 +18,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(blank=True, help_text='Leave blank for default', max_length=60)),
-                ('description', models.CharField(blank=True, max_length=1000, verbose_name=b'Description')),
+                ('description', models.CharField(blank=True, max_length=1000, verbose_name='Description')),
                 ('container', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='apps', to='container.Container')),
             ],
             options={
@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=60)),
                 ('position', models.IntegerField(blank=True, help_text='Position in the arguments (gaps and duplicates are allowed). Leave position blank to pass as an option with --name.', null=True)),
-                ('type', models.CharField(choices=[(b'I', b'Input'), (b'O', b'Output')], max_length=1)),
+                ('type', models.CharField(choices=[('I', 'Input'), ('O', 'Output')], max_length=1)),
                 ('allow_multiple', models.BooleanField(default=False, help_text='True for optional inputs that accept multiple datasets and outputs that just collect all files written to a directory')),
                 ('app', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='arguments', to='container.ContainerApp')),
             ],

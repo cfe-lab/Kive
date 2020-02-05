@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerlog',
             name='log_size',
-            field=models.BigIntegerField(blank=True, help_text=b'Size of the log file in bytes.  If null, this has not been computed yet, or the log is shortand not stored in a file.', null=True),
+            field=models.BigIntegerField(blank=True, help_text='Size of the log file in bytes.  If null, this has not been computed yet, or the log is shortand not stored in a file.', null=True),
         ),
     ]

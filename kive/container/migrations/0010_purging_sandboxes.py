@@ -20,6 +20,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='containerrun',
             name='sandbox_size',
-            field=models.BigIntegerField(blank=True, help_text=b'Size of the sandbox in bytes.  If null, this has not been computed yet.', null=True),
+            field=models.BigIntegerField(blank=True, help_text='Size of the sandbox in bytes.  If null, this has not been computed yet.', null=True),
         ),
     ]

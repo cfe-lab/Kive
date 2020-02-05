@@ -23,7 +23,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='batch',
             name='name',
-            field=models.CharField(blank=True, help_text='Name of this batch of container runs', max_length=60, verbose_name=b'Batch Name'),
+            field=models.CharField(blank=True, help_text='Name of this batch of container runs', max_length=60, verbose_name='Batch Name'),
         ),
         migrations.AlterField(
             model_name='containerdataset',
