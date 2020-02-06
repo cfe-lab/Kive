@@ -1,5 +1,8 @@
 #! /opt/venv_kive/bin/python
 from __future__ import print_function
+
+import logging
+
 import psycopg2
 import argparse
 import os
@@ -9,6 +12,8 @@ from container.models import ContainerDataset
 from django.conf import settings
 import sys
 import itertools
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -20,7 +25,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         orphans = self.find_orphans()
         if not orphans:
-            print('No orphan files found')
+            logger.error('No orphan files found')
             sys.exit(0)
         self.display_orphans(orphans, verbosity=options['verbosity'])
         self.remove_orphans(
@@ -42,23 +47,23 @@ class Command(BaseCommand):
     def display_orphans(orphans, verbosity=1):
         if verbosity > 0:
             for orphan in orphans:
-                print(orphan.id)
+                logger.info(orphan.id)
         else:
-            print(orphans.count())
+            logger.info(orphans.count())
 
     @staticmethod
     def remove_orphans(orphans, delete_all=True, delete_files=True, delete_records=True):
         if any((delete_all, delete_records, delete_files)):
             for orphan in orphans:
-                print('For orphan "{}"'.format(orphan.id))
+                logger.info('For orphan "{}"'.format(orphan.id))
                 if delete_all or delete_files:
                     try:
-                        print('Deleting file "{}"'.format(orphan.dataset_file.path))
+                        logger.info('Deleting file "{}"'.format(orphan.dataset_file.path))
                         orphan.dataset_file.delete()
                     except ValueError:
-                        print('File has already been deleted')
-                    print('File deleted successfully')
+                        logger.error('File has already been deleted')
+                    logger.info('File deleted successfully')
                 if delete_all or delete_records:
-                    print('Deleting database record')
+                    logger.info('Deleting database record')
                     orphan.delete()
-                    print('Record deleted successfully')
+                    logger.info('Record deleted successfully')

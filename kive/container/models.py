@@ -1031,6 +1031,9 @@ class ContainerRun(Stopwatch, AccessControl):
             message="MD5 checksum is not either 32 hex characters or blank")],
         blank=True,
         help_text="Summary of MD5's for inputs, outputs, and containers.")
+    is_warned = models.BooleanField(
+        default=False,
+        help_text="True if a warning was logged because the Slurm job failed.")
 
     class Meta(object):
         ordering = ('-submit_time',)
@@ -1308,17 +1311,36 @@ class ContainerRun(Stopwatch, AccessControl):
                                      '-o', 'jobid,end',
                                      '--noheader',
                                      '--parsable2'])
-        max_end_time = datetime.now() - timedelta(minutes=1)
-        max_end_time_text = max_end_time.strftime('%Y-%m-%dT%H:%M:%S')
+        slurm_date_format = '%Y-%m-%dT%H:%M:%S'
+        warn_end_time = datetime.now() - timedelta(minutes=1)
+        max_end_time = warn_end_time - timedelta(minutes=14)
+        warn_end_time_text = warn_end_time.strftime(slurm_date_format)
+        max_end_time_text = max_end_time.strftime(slurm_date_format)
         for line in output.splitlines():
             job_id, end_time = line.split('|')
-            if end_time > max_end_time_text:
+            if end_time > warn_end_time_text:
                 continue
             run = job_runs.get(job_id)
             if run is not None:
-                run.state = cls.FAILED
-                run.end_time = Now()
-                run.save()
+                if end_time > max_end_time_text:
+                    if not run.is_warned:
+                        logger.warning(
+                            'Slurm reports that run id %d ended at %s without '
+                            'updating Kive. Waiting 15 minutes to allow '
+                            'rescheduling.',
+                            run.id,
+                            end_time)
+                        run.is_warned = True
+                        run.save(update_fields=['is_warned'])
+                else:
+                    logger.error(
+                        'Slurm reports that run id %d ended at %s without '
+                        'updating Kive. Marked as failed.',
+                        run.id,
+                        end_time)
+                    run.state = cls.FAILED
+                    run.end_time = Now()
+                    run.save()
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """

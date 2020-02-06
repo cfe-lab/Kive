@@ -1371,14 +1371,14 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual(1, len(mock_on_commit.call_args_list))
 
     @patch('container.models.check_output')
-    def test_slurm_ended(self, mock_check_output):
+    def test_slurm_ended_a_while_ago(self, mock_check_output):
         ContainerRun.objects.update(slurm_job_id=None)
         self.test_run.slurm_job_id = 42
         self.test_run.save()
         other_run = self.test_run.app.runs.create(user=self.test_run.user,
                                                   slurm_job_id=43)
         end_time = (datetime.now() -
-                    timedelta(seconds=61)).strftime('%y-%m-%dT%H:%M:%S')
+                    timedelta(minutes=15, seconds=1)).strftime('%y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
 42|<end-time>
 42.batch|<end-time>
@@ -1395,6 +1395,33 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual(ContainerRun.NEW, other_run.state)
         self.assertIsNotNone(self.test_run.end_time)
         self.assertIsNone(other_run.end_time)
+
+    @patch('container.models.check_output')
+    def test_slurm_ended_recently(self, mock_check_output):
+        ContainerRun.objects.update(slurm_job_id=None)
+        self.test_run.slurm_job_id = 42
+        self.test_run.save()
+        other_run = self.test_run.app.runs.create(user=self.test_run.user,
+                                                  slurm_job_id=43)
+        end_time = (datetime.now() -
+                    timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_check_output.return_value = """\
+42|<end-time>
+42.batch|<end-time>
+""".replace('<end-time>', end_time)
+
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.test_run.refresh_from_db()
+        other_run.refresh_from_db()
+        self.assertEqual(ContainerRun.NEW, self.test_run.state)
+        self.assertEqual(ContainerRun.NEW, other_run.state)
+        self.assertIsNone(self.test_run.end_time)
+        self.assertIsNone(other_run.end_time)
+        self.assertTrue(self.test_run.is_warned)
 
     @patch('container.models.check_output')
     def test_slurm_just_ended(self, mock_check_output):
@@ -1454,7 +1481,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         other_run = self.test_run.app.runs.create(user=self.test_run.user,
                                                   slurm_job_id=43)
         end_time = (datetime.now() -
-                    timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
 42|<end-time>
 42.batch|<end-time>
@@ -1482,7 +1509,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         other_run = self.test_run.app.runs.create(user=self.test_run.user,
                                                   slurm_job_id=43)
         end_time = (datetime.now() -
-                    timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
 42|<end-time>
 42.batch|<end-time>
