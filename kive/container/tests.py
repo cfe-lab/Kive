@@ -1664,6 +1664,7 @@ class ContainerRunTests(TestCase):
         self.assertEqual('Complete', response.context['state_name'])
         self.assertListEqual(expected_entries, response.context['data_entries'])
 
+    # noinspection PyUnresolvedReferences
     @patch.dict('os.environ', KIVE_LOG='/tmp/forbidden.log')
     @patch('container.models.check_output')
     def test_launch_run(self, mock_check_output):
@@ -1684,6 +1685,7 @@ class ContainerRunTests(TestCase):
         self.assertEqual('sbatch', check_output_args[0][0])
         self.assertNotIn('KIVE_LOG', check_output_kwargs['env'])
 
+    # noinspection PyUnresolvedReferences
     @patch.dict('os.environ', KIVE_LOG='/tmp/forbidden.log')
     @patch('container.models.check_output')
     def test_launch_without_kive_log(self, mock_check_output):
@@ -1826,6 +1828,98 @@ class ContainerLogTests(TestCase):
 
         self.assertEqual(expected_display, log.preview)
         self.assertEqual(expected_size_display, log.size_display)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerLogApiTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        user = User.objects.first()
+        self.assertIsNotNone(user)
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        app = ContainerApp.objects.create(container=container, name='test')
+        run = app.runs.create(user=user)
+        self.test_log = run.logs.create(type=ContainerLog.STDOUT,
+                                        short_text='log content')
+
+        self.list_path = reverse("containerlog-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_pk = self.test_log.pk
+        self.detail_path = reverse("containerlog-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.detail_view, _, _ = resolve(self.detail_path)
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(response.data['type'], ContainerLog.STDOUT)
+
+    def test_download(self):
+        download_path = reverse("containerlog-download",
+                                kwargs={'pk': self.detail_pk})
+        download_view, _, _ = resolve(download_path)
+        request = self.factory.get(download_path)
+        force_authenticate(request, user=self.kive_user)
+        response = download_view(request, pk=self.detail_pk)
+
+        self.assertEqual(response.content, b'log content')
+
+    def test_download_permission(self):
+        user = User.objects.create()
+        self.test_log.run.grant_everyone_access()
+        download_path = reverse("containerlog-download",
+                                kwargs={'pk': self.detail_pk})
+        download_view, _, _ = resolve(download_path)
+        request = self.factory.get(download_path)
+        force_authenticate(request, user=user)
+        response = download_view(request, pk=self.detail_pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.content, b'log content')
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerArgumentApiTests(BaseTestCases.ApiTestCase):
+    def setUp(self):
+        super().setUp()
+        user = User.objects.first()
+        self.assertIsNotNone(user)
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        app = ContainerApp.objects.create(container=container, name='test')
+        self.test_argument = app.arguments.create(name='test_arg')
+
+        self.list_path = reverse("containerargument-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        self.detail_pk = self.test_argument.pk
+        self.detail_path = reverse("containerargument-detail",
+                                   kwargs={'pk': self.detail_pk})
+        self.detail_view, _, _ = resolve(self.detail_path)
+
+    def test_detail(self):
+        request = self.factory.get(self.detail_path)
+        force_authenticate(request, user=self.kive_user)
+        response = self.detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(response.data['name'], 'test_arg')
+
+    def test_detail_permission(self):
+        user = User.objects.create()
+        self.test_argument.app.container.grant_everyone_access()
+        detail_path = reverse("containerargument-detail",
+                              kwargs={'pk': self.detail_pk})
+        detail_view, _, _ = resolve(detail_path)
+        request = self.factory.get(detail_path)
+        force_authenticate(request, user=user)
+        response = detail_view(request, pk=self.detail_pk)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['name'], 'test_arg')
 
 
 @skipIfDBFeature('is_mocked')
@@ -4096,6 +4190,7 @@ class PipelineCompletionStatusTests(TestCase):
         self.assertListEqual(pcs.inputs_not_connected, [])
         self.assertListEqual(pcs.dangling_outputs, [])
 
+
 @skipIfDBFeature('is_mocked')
 class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
     def setUp(self):
@@ -4133,4 +4228,4 @@ class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
         request = self.factory.delete(self.family_path)
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
-        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT) 
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)

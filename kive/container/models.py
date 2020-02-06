@@ -896,6 +896,9 @@ class ContainerArgument(models.Model):
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
 
+    def can_be_accessed(self, user):
+        return self.app.container.can_be_accessed(user)
+
     @property
     def formatted(self):
         text = self.name
@@ -1433,6 +1436,9 @@ class ContainerLog(models.Model):
                   "and not stored in a file.")
 
     objects = None  # Filled in later by Django.
+
+    def can_be_accessed(self, user):
+        return self.run.can_be_accessed(user)
 
     def get_absolute_url(self):
         return reverse('container_log_detail', kwargs=dict(pk=self.pk))
