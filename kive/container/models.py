@@ -11,6 +11,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from itertools import count
+from pathlib import Path
 from subprocess import STDOUT, CalledProcessError, check_output, check_call
 import tarfile
 from tarfile import TarFile, TarInfo
@@ -1341,6 +1342,10 @@ class ContainerRun(Stopwatch, AccessControl):
                     run.state = cls.FAILED
                     run.end_time = Now()
                     run.save()
+                    logs_path = Path(run.full_sandbox_path) / 'logs'
+                    log_matches = list(logs_path.glob('job*_node*_stderr.txt'))
+                    if log_matches:
+                        run.load_log(log_matches[0], ContainerLog.STDERR)
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """
