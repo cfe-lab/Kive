@@ -1,7 +1,8 @@
 var permissions = (function() {
     "use strict";
     var my = {};
-    
+    let status_subscribers = $(); // create a private member by placing in closure scope
+
     /** A base class for building a table with permissions columns.
      * 
      * Also includes a lock button for administrators to show all records and
@@ -42,6 +43,7 @@ var permissions = (function() {
         this.registered_columns = [];
         this.$lockImage = $('<img/>');
         this.$lockSpan = $('<span/>');
+        status_subscribers = $table.add($navigation_links);
 
         this.page_size = 25;
         this.page = 1;
@@ -367,15 +369,19 @@ var permissions = (function() {
         var query_params = permissions_table.getQueryParams();
         query_params.page_size = permissions_table.page_size;
         query_params.page = permissions_table.page;
-        permissions_table.$navigation_links.addClass('busy');
+        status_subscribers.addClass('busy');
 
         permissions_table.ajax_request = $.getJSON(permissions_table.list_url, query_params)
             .done(handleTableUpdate.bind(permissions_table, callback))
             .fail(handleTableFail.bind(permissions_table))
             .always(function() {
                 permissions_table.ajax_request = undefined;
-                permissions_table.$navigation_links.removeClass('busy');
+                status_subscribers.removeClass('busy');
             });
+    };
+
+    my.PermissionsTable.prototype.subscribeToStatus = function($el) {
+        status_subscribers = status_subscribers.add($el);
     };
     
     my.PermissionsTable.prototype.setCaption = function(text) {
