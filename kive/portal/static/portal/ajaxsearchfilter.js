@@ -27,6 +27,8 @@ var AjaxSearchFilter = (function(permissions) {
 	    	table.ajax_request.complete(trackTableWidth);
 	    }
 
+	    table.subscribeToStatus($asf);
+
         table.filterSet = new permissions.FilterSet(
             this.active_filters,
             function() {

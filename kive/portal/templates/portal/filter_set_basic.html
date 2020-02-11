@@ -1,0 +1,22 @@
+{% comment %}
+Include this template to build basic search controls for permissions.FilterSet.
+{% endcomment %}
+
+    <form class="asf-form">
+        <div class="asf-main-search">
+            <div class="asf-active-filters"></div>
+            <input type="text" name="{{ name|default:'smart' }}" class="asf-search-field">
+            <div class="la-ball-spin la-sm">
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+            <input type="button" class="advanced ctrl" value="Advanced">
+            <input type="submit" value="Filter" class="asf-search-button">
+        </div>
+    </form>

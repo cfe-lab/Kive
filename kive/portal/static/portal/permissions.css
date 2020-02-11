@@ -29,8 +29,11 @@
     border: 1px solid transparent;
 }
 
-.busy {
-  background-color: #ffd5d7;
+.navigation_links.busy {
+  opacity: 0.4
+}
+.results table.busy {
+  opacity: 0.4
 }
 
 .navigation_links .record_count {

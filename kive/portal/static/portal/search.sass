@@ -1,6 +1,7 @@
 /* This is a SASS-generated file. If you are seeing this in the CSS and
  * need to edit, close this file and find the corresponding SASS file instead.
  */
+@import './ball-spin.css'
 $submit_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg=='
 $gear_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg=='
 $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////8tKmBAQLAEWd0vT/yZ9v6P//udP0gGzkJgAAADdJREFUeNq0TTkOACAMopTW//9YN8XVSMIA4QC+oQTE2DqYWsTpkNnWIYU7Idto36j2l0dMAQYAOMUAcmo6uwMAAAAASUVORK5CYII='
@@ -21,12 +22,11 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
   // margin: .5em 0
 =submit-btn
   display: block
-  background-position: .6em 4px
+  background-position: .65em 6px
   background-image: url($submit_icon)
 =advanced-ctrl-btn
   cursor: pointer
   width: 24px
-  margin: 0
   padding: 0
   box-shadow: none
   background-color: transparent
@@ -35,6 +35,14 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
 =offset-2px
   position: relative
   top: 2px
+
+.asf-form, .asf-advanced-form
+  .la-ball-spin
+    display: none
+.busy
+  .asf-form, .asf-advanced-form
+    .la-ball-spin
+      display: block
 
 .filter_ctrl,
 .asf-form
@@ -46,7 +54,6 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
   h4
     margin: .25em 0 .5em
   input[type='text']
-    margin: .25em 0
     width: 12em
   input[type='submit']
     +icon-btn
@@ -55,18 +62,29 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
     +icon-btn
   .short-filter input
     display: inline
+  .la-ball-spin
+    color: #000
 
 .search_form,
 .asf-main-search
+  max-width: 45rem
   border: 1px solid #ccc
   background-color: #fff
   margin: 
     bottom: .5em
     right: 1em
-  padding: .2em .5em
+  padding: .3em .5em
   cursor: text
   position: relative
   box-sizing: border-box
+  display: flex
+  & > *
+    margin: 0 0.25em
+    &:first-child
+      margin-left: 0
+    &:last-child
+      margin-right: 0
+  align-items: center
   .active_filters,
   .asf-active-filters
     display: inline
@@ -78,8 +96,6 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
       +no-select
       display: inline-block
       white-space: normal
-      // font-size: 1em
-      margin-bottom: .25em
   input[type='submit']
     +icon-btn
     +submit-btn
@@ -87,29 +103,24 @@ $close_icon: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9T
     +icon-btn
   input[type="text"]
     border: 0
-    // font-size: 1em
-    margin-bottom: .25em
+    flex-grow: 1
   /* Remove button padding in FF */
   input::-moz-focus-inner
     border: 0
     padding: 0
     margin: 0
   input.advanced.ctrl
-    position: absolute
-    right: 2.5em
-    bottom: .17em
     +advanced-ctrl-btn
     background-image: url($gear_icon)
+    height: 24px
   .search_button,
   .asf-search-button
-    position: absolute
-    right: .25em
-    bottom: .17em
-    margin: 0
     cursor: pointer
 
 .asf-advanced-form
   display: none
+  .la-ball-spin
+    color: #000
 
 // asf-form
 //   asf-main-search
@@ -191,7 +202,6 @@ a.remove
         background-image: none
 
 .asf-active-filters
-  padding: .2em 0 .75em
   &:empty
     display: none
 .asf-advanced-form
@@ -231,11 +241,14 @@ a.remove
     background-image: url($gear_icon)
   .asf-search-button
     display: block
-    margin-top: .5em
     box-sizing: border-box
     cursor: pointer
+    margin-right: 1em
   .asf-active-filters
     padding: 1em 0 0
+  .asf-submit-wrapper
+    margin-top: .5em
+    display: flex
 .dev_results
   clear: left
 
@@ -243,7 +256,4 @@ a.remove
 @media (max-height: 1000px) and (min-height: 701px)
   .asf-main-search
     .filter 
-      margin-bottom: .2em
     .asf-search-field
-      margin-bottom: .1em
-    margin-bottom: .2em

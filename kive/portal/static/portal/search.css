@@ -1,6 +1,13 @@
 /* This is a SASS-generated file. If you are seeing this in the CSS and
  * need to edit, close this file and find the corresponding SASS file instead.
  */
+@import url(./ball-spin.css);
+.asf-form .la-ball-spin, .asf-advanced-form .la-ball-spin {
+  display: none; }
+
+.busy .asf-form .la-ball-spin, .busy .asf-advanced-form .la-ball-spin {
+  display: block; }
+
 .filter_ctrl,
 .asf-form {
   min-width: 550px;
@@ -14,7 +21,6 @@
     margin: 0.25em 0 0.5em; }
   .filter_ctrl input[type='text'],
   .asf-form input[type='text'] {
-    margin: 0.25em 0;
     width: 12em; }
   .filter_ctrl input[type='submit'],
   .asf-form input[type='submit'] {
@@ -24,7 +30,7 @@
     overflow: hidden;
     font-size: 1.5em;
     display: block;
-    background-position: 0.6em 4px;
+    background-position: 0.65em 6px;
     background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg=="); }
   .filter_ctrl input.ctrl,
   .asf-form input.ctrl {
@@ -36,18 +42,33 @@
   .filter_ctrl .short-filter input,
   .asf-form .short-filter input {
     display: inline; }
+  .filter_ctrl .la-ball-spin,
+  .asf-form .la-ball-spin {
+    color: #000; }
 
 .search_form,
 .asf-main-search {
+  max-width: 45rem;
   border: 1px solid #ccc;
   background-color: #fff;
   margin-bottom: 0.5em;
   margin-right: 1em;
-  padding: 0.2em 0.5em;
+  padding: 0.3em 0.5em;
   cursor: text;
   position: relative;
   box-sizing: border-box;
+  display: flex;
+  align-items: center;
   /* Remove button padding in FF */ }
+  .search_form > *,
+  .asf-main-search > * {
+    margin: 0 0.25em; }
+    .search_form > *:first-child,
+    .asf-main-search > *:first-child {
+      margin-left: 0; }
+    .search_form > *:last-child,
+    .asf-main-search > *:last-child {
+      margin-right: 0; }
   .search_form .active_filters,
   .search_form .asf-active-filters,
   .asf-main-search .active_filters,
@@ -69,8 +90,7 @@
       -ms-user-select: none;
       user-select: none;
       display: inline-block;
-      white-space: normal;
-      margin-bottom: 0.25em; }
+      white-space: normal; }
       .search_form .active_filters .filter:last-child,
       .search_form .active_filters .asf-filter:last-child,
       .search_form .asf-active-filters .filter:last-child,
@@ -88,7 +108,7 @@
     overflow: hidden;
     font-size: 1.5em;
     display: block;
-    background-position: 0.6em 4px;
+    background-position: 0.65em 6px;
     background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRFREVJBAYL7Ozso6SmzM3Ob3BzgYKE////8GOoMQAAAAh0Uk5T/////////wDeg71ZAAAAaklEQVR42lSO0RbAMARDo6j//+ORtDubF1wRUFUOM+xVDNTqlhEHzDj3UGrg3U81mQDKVSlJS1MgzFxgC6wD3hXXHaQGI5BpF5YRbscMY3ZjE1TwVUAa7oV78JEm58R9zfILSH6gST4CDAA1OgRo8O828AAAAABJRU5ErkJggg=="); }
   .search_form input.ctrl,
   .asf-main-search input.ctrl {
@@ -100,7 +120,7 @@
   .search_form input[type="text"],
   .asf-main-search input[type="text"] {
     border: 0;
-    margin-bottom: 0.25em; }
+    flex-grow: 1; }
   .search_form input::-moz-focus-inner,
   .asf-main-search input::-moz-focus-inner {
     border: 0;
@@ -108,30 +128,25 @@
     margin: 0; }
   .search_form input.advanced.ctrl,
   .asf-main-search input.advanced.ctrl {
-    position: absolute;
-    right: 2.5em;
-    bottom: 0.17em;
     cursor: pointer;
     width: 24px;
-    margin: 0;
     padding: 0;
     box-shadow: none;
     background-color: transparent;
     border-radius: 0;
     border: 0;
-    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg=="); }
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg==");
+    height: 24px; }
   .search_form .search_button,
   .search_form .asf-search-button,
   .asf-main-search .search_button,
   .asf-main-search .asf-search-button {
-    position: absolute;
-    right: 0.25em;
-    bottom: 0.17em;
-    margin: 0;
     cursor: pointer; }
 
 .asf-advanced-form {
   display: none; }
+  .asf-advanced-form .la-ball-spin {
+    color: #000; }
 
 a.remove {
   padding: 0.5em 0 0.5em 0.5em;
@@ -200,10 +215,8 @@ a.remove {
     .results table tr:not(.selected) select {
       background-image: none; }
 
-.asf-active-filters {
-  padding: 0.2em 0 0.75em; }
-  .asf-active-filters:empty {
-    display: none; }
+.asf-active-filters:empty {
+  display: none; }
 
 .asf-advanced-form {
   background-color: #fff;
@@ -240,7 +253,6 @@ a.remove {
     font-size: 1.5em;
     cursor: pointer;
     width: 24px;
-    margin: 0;
     padding: 0;
     box-shadow: none;
     background-color: transparent;
@@ -251,21 +263,16 @@ a.remove {
     background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAGXRFWHRTb2Z0d2FyZQBBZG9iZSBJbWFnZVJlYWR5ccllPAAAABhQTFRF////xsbGu7u74+Pj6enp9PT0qKiorq6u7VtU0wAAAFpJREFUeNpkT0kOADEIUlH7/x+PdEszcmgJuCEyEWO4XBTVTJ2EpqVZFuq1oJ8PZg1tBZRFsgXwxxJ8zSPIXNiJvY28C78W9KF9bTusnX7CVbnHDRx54n8CDAB7ZwLNNKLfPAAAAABJRU5ErkJggg=="); }
   .asf-advanced-form .asf-search-button {
     display: block;
-    margin-top: 0.5em;
     box-sizing: border-box;
-    cursor: pointer; }
+    cursor: pointer;
+    margin-right: 1em; }
   .asf-advanced-form .asf-active-filters {
     padding: 1em 0 0; }
+  .asf-advanced-form .asf-submit-wrapper {
+    margin-top: 0.5em;
+    display: flex; }
 
 .dev_results {
   clear: left; }
-
-@media (max-height: 1000px) and (min-height: 701px) {
-  .asf-main-search {
-    margin-bottom: 0.2em; }
-    .asf-main-search .filter {
-      margin-bottom: 0.2em; }
-    .asf-main-search .asf-search-field {
-      margin-bottom: 0.1em; } }
 
 /*# sourceMappingURL=search.css.map */
