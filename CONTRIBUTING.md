@@ -48,7 +48,9 @@ Once you have set up your production server, this is how to deploy a new release
         cd /path/to/git/Kive
         npm run test:travis
         cd kive
-        ./manage.py test --settings kive.settings_test_pg
+        pytest --ds kive.settings_test_pg
+        cd ../api
+        pytest
 
 2. Check if the kiveapi package needs to update its version number by looking
    for new commits in the `/api` folder.
@@ -77,12 +79,7 @@ Once you have set up your production server, this is how to deploy a new release
     a binary below the description, not as an attachment in the description.
 8. Check on the site that there are no active runs (as an administrator, go to the 
     Runs page under the User portal, and click the lock to give yourself the ability to
-    view all runs), then kill the fleet.
-
-        ssh user@server
-        ps aux|grep runfleet
-        sudo kill -int <pid for runfleet>
-
+    view all runs).
 9. Stop the web server and scheduled job timer. Check that no scheduled jobs are
     already running.
 
@@ -152,7 +149,7 @@ Once you have set up your production server, this is how to deploy a new release
         cd /path/to/static/..
         sudo rm -Rf static
         sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz -O static_root.tar.gz
-        sudo tar -xzvf static_root.tar.gz
+        sudo tar --no-same-owner -xzvf static_root.tar.gz
         sudo mv static_root static
         sudo rm static_root.tar.gz
         
