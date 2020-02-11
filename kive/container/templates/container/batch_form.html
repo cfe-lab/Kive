@@ -64,24 +64,7 @@
     <h3>Container Runs:</h3>
 
     <div id="asf">
-        <form class="asf-form">
-            <div class="asf-main-search">
-                <div class="asf-active-filters"></div>
-                <input type="text" name="smart" class="asf-search-field">
-                <div class="la-ball-spin la-sm">
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                </div>
-                <input type="button" class="advanced ctrl" value="Advanced">
-                <input type="submit" value="Filter" class="asf-search-button">
-            </div>
-        </form>
+        {% include "portal/filter_set_basic.html" %}
         <form class="asf-advanced-form">
             <input type="button" class="advanced ctrl" value="Advanced">
             <h4>Advanced search</h4>
@@ -148,19 +131,7 @@
                     type="checkbox"
                     class="asf-search-fixed-field">
             </div>
-            <div class="asf-submit-wrapper">
-                <input type="submit" value="Filter" class="asf-search-button">
-                <div class="la-ball-spin la-sm">
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                    <div></div>
-                </div>
-            </div>
+            {% include "portal/filter_set_advanced_submit.html" %}
         </form>
     </div>
 
