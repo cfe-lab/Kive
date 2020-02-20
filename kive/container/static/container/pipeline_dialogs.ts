@@ -771,7 +771,7 @@ export class OutputDialog extends NodePreviewDialog {
                 this.reset();
             } else {
                 /* Non-unique name entered */
-                this.$error.html('<img src="/static/pipeline/img/warning_icon.png"> That name has already been used.');
+                this.$error.html('<img src="/static/container/img/warning_icon.png"> That name has already been used.');
             }
         } else {
             let pos = this.translateToOtherCanvas(canvasState);
@@ -781,7 +781,7 @@ export class OutputDialog extends NodePreviewDialog {
                 // required field
                 this.$error.text("Label is required.");
             } else if (!CanvasState.isUniqueName(canvasState.getOutputNodes(), label)) {
-                this.$error.html('<img src="/static/pipeline/img/warning_icon.png"> That name has already been used.');
+                this.$error.html('<img src="/static/container/img/warning_icon.png"> That name has already been used.');
             } else {
                 let shape = new OutputNode(pos.left, pos.top, label);
                 canvasState.addShape(shape);

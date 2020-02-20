@@ -1,6 +1,6 @@
 /* Pipeline-specific formatting. */
 html body {
-  background-image: url("/static/pipeline/img/isogrid.png"); }
+  background-image: url("/static/container/img/isogrid.png"); }
 
 #inner_wrap {
   margin-bottom: 0 !important; }
@@ -218,15 +218,5 @@ html body {
 #context_menu li:hover,
 #id_add_ctrl li:hover {
   background-color: #eee; }
-
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
-/*# sourceMappingURL=drydock.css.map */
 
 /*# sourceMappingURL=drydock.css.map */

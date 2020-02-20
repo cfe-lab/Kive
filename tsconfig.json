@@ -10,10 +10,7 @@
         "baseUrl": "kive",
         "paths": {
             "@container/*": ["container/static/container/*"],
-            "@pipeline/*":  ["pipeline/static/pipeline/*"],
-            "@canvas/*":    ["pipeline/static/pipeline/canvas/*"],
             "@portal/*":    ["portal/static/portal/*"],
-            "@sandbox/*":   ["sandbox/static/sandbox/*"],
             "@librarian/*": ["librarian/static/librarian/*"]
         }
     },

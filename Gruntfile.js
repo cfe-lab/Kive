@@ -49,7 +49,7 @@ module.exports = function (grunt) {
         },
         "regex-replace": {
             inlinedpngs: {
-                src: ['kive/pipeline/static/pipeline/drydock_objects.ts'],
+                src: ['kive/container/static/container/canvas/drydock_objects.ts'],
                 actions: [
                     {
                         name: 'inlinedpngs',
