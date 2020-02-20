@@ -25,7 +25,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.template.defaultfilters import filesizeformat, pluralize
 from django.db.models.signals import post_delete
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 import metadata.models
 import archive.models
@@ -133,7 +133,8 @@ class Dataset(metadata.models.AccessControl):
         verbose_name="External file directory",
         help_text="External file directory containing the data file",
         null=True,
-        blank=True
+        blank=True,
+        on_delete=models.CASCADE
     )
     external_path = models.CharField(
         help_text="Relative path of the file within the specified external file directory",

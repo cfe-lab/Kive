@@ -271,7 +271,9 @@ class Container(AccessControl):
         'inadmissible_driver': 'Step drivers must start with "#!"'
     }
 
-    family = models.ForeignKey(ContainerFamily, related_name="containers")
+    family = models.ForeignKey(ContainerFamily,
+                               related_name="containers",
+                               on_delete=models.CASCADE)
 
     file = models.FileField(
         "Container file",
@@ -288,7 +290,8 @@ class Container(AccessControl):
         related_name="children",
         null=True,
         blank=True,
-        help_text='Singularity container that an archive container runs in')
+        help_text='Singularity container that an archive container runs in',
+        on_delete=models.CASCADE)
 
     tag = models.CharField('Tag',
                            help_text='Git tag or revision name',
@@ -754,7 +757,9 @@ class TarHandler(ZipHandler):
 
 
 class ContainerApp(models.Model):
-    container = models.ForeignKey(Container, related_name="apps")
+    container = models.ForeignKey(Container,
+                                  related_name="apps",
+                                  on_delete=models.CASCADE)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH,
                             help_text="Leave blank for default",
                             blank=True)
@@ -875,7 +880,9 @@ class ContainerArgument(models.Model):
     TYPES = ((INPUT, 'Input'),
              (OUTPUT, 'Output'))
 
-    app = models.ForeignKey(ContainerApp, related_name="arguments")
+    app = models.ForeignKey(ContainerApp,
+                            related_name="arguments",
+                            on_delete=models.CASCADE)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH)
     position = models.IntegerField(
         null=True,
@@ -988,8 +995,14 @@ class ContainerRun(Stopwatch, AccessControl):
     ]
     SANDBOX_ROOT = os.path.join(settings.MEDIA_ROOT, 'ContainerRuns')
 
-    app = models.ForeignKey(ContainerApp, related_name="runs")
-    batch = models.ForeignKey(Batch, related_name="runs", blank=True, null=True)
+    app = models.ForeignKey(ContainerApp,
+                            related_name="runs",
+                            on_delete=models.CASCADE)
+    batch = models.ForeignKey(Batch,
+                              related_name="runs",
+                              blank=True,
+                              null=True,
+                              on_delete=models.CASCADE)
     name = models.CharField(max_length=maxlengths.MAX_NAME_LENGTH, blank=True)
     description = models.CharField(max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
                                    blank=True)
@@ -1008,7 +1021,8 @@ class ContainerRun(Stopwatch, AccessControl):
                                    help_text="User that stopped this run",
                                    null=True,
                                    blank=True,
-                                   related_name="container_runs_stopped")
+                                   related_name="container_runs_stopped",
+                                   on_delete=models.CASCADE)
     is_redacted = models.BooleanField(
         default=False,
         help_text="True if the outputs or logs were redacted for sensitive data")
@@ -1027,7 +1041,8 @@ class ContainerRun(Stopwatch, AccessControl):
         help_text="This run is a rerun of the original.",
         null=True,
         blank=True,
-        related_name="reruns")
+        related_name="reruns",
+        on_delete=models.CASCADE)
     md5 = models.CharField(
         max_length=64,
         validators=[RegexValidator(
@@ -1373,9 +1388,15 @@ class ContainerRun(Stopwatch, AccessControl):
 
 
 class ContainerDataset(models.Model):
-    run = models.ForeignKey(ContainerRun, related_name="datasets")
-    argument = models.ForeignKey(ContainerArgument, related_name="datasets")
-    dataset = models.ForeignKey("librarian.Dataset", related_name="containers")
+    run = models.ForeignKey(ContainerRun,
+                            related_name="datasets",
+                            on_delete=models.CASCADE)
+    argument = models.ForeignKey(ContainerArgument,
+                                 related_name="datasets",
+                                 on_delete=models.CASCADE)
+    dataset = models.ForeignKey("librarian.Dataset",
+                                related_name="containers",
+                                on_delete=models.CASCADE)
     name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Local file name, also used to sort multiple inputs for a "
@@ -1421,7 +1442,9 @@ class ContainerLog(models.Model):
     TYPES = ((STDOUT, 'stdout'),
              (STDERR, 'stderr'))
     type = models.CharField(max_length=1, choices=TYPES)
-    run = models.ForeignKey(ContainerRun, related_name="logs")
+    run = models.ForeignKey(ContainerRun,
+                            related_name="logs",
+                            on_delete=models.CASCADE)
     short_text = models.CharField(
         max_length=2000,
         blank=True,

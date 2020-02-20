@@ -20,7 +20,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, skipIfDBFeature, Client
-from django.core.urlresolvers import reverse, resolve
+from django.urls import reverse, resolve
 from django.core.files import File
 from django.core.files.base import ContentFile
 # from django.utils.timezone import get_default_timezone, get_current_timezone

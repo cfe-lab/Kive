@@ -5,7 +5,7 @@ from zipfile import ZipFile
 from django.contrib.auth.models import Group, User
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 from django.test import TestCase
 from django_mock_queries.mocks import mocked_relations
 import mock

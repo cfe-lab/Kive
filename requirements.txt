@@ -1,7 +1,7 @@
 binaryornot==0.4.4
 chardet==3.0.4
-Django==1.11.28
-djangorestframework==3.9.4
+Django==2.2.10
+djangorestframework==3.11.0
 funcsigs==1.0.2
 pbr==5.4.4
 psycopg2-binary==2.8.4

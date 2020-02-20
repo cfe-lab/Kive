@@ -45,12 +45,14 @@ urlpatterns = [
     # new way for Django 2.0 goinf forward
     url(r'^admin/', admin.site.urls),
     url(r'^$', portal.views.home, name='home'),
-    url(r'^login/$', django.contrib.auth.views.login,
-        {"template_name": "portal/login.html",
-         "authentication_form": LoginForm,
-         "current_app": "portal"}, name='login'),
-    url(r'^logout_then_login/$', django.contrib.auth.views.logout_then_login,
-        {"current_app": "portal"}, name='logout'),
+    url(r'^login/$',
+        django.contrib.auth.views.LoginView.as_view(
+            template_name="portal/login.html",
+            authentication_form=LoginForm),
+        name='login'),
+    url(r'^logout_then_login/$',
+        django.contrib.auth.views.logout_then_login,
+        name='logout'),
 
     url(r'^dev.html$', portal.views.dev, name='dev'),
     url(r'^usr.html$', portal.views.usr, name='usr'),

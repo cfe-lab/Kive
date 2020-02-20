@@ -6,7 +6,7 @@ from operator import itemgetter
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
-from django.core.urlresolvers import reverse, resolve
+from django.urls import reverse, resolve
 from django.db import connection
 from rest_framework.test import APIRequestFactory, force_authenticate
 

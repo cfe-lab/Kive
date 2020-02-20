@@ -112,7 +112,7 @@ class AccessControl(models.Model):
     """
     Represents anything that belongs to a certain user.
     """
-    user = models.ForeignKey(User)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     users_allowed = models.ManyToManyField(
         User,
         related_name="%(app_label)s_%(class)s_has_access_to",
