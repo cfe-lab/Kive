@@ -21,7 +21,7 @@
     "karma-sourcemap-loader": "^0.3.7",
     "karma-spec-reporter": "0.0.31",
     "karma-webpack": "^2.0.4",
-    "shelljs": "^0.7.5",
+    "shelljs": "^0.8.3",
     "tslint": "^3.15.1",
     "webpack-cli": "^3.3.10"
   },
