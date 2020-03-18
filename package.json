@@ -14,7 +14,7 @@
     "jasmine-jquery": "^2.1.1",
     "jshint": "^2.9.4",
     "karma": "^4.2.0",
-    "karma-chrome-launcher": "^2.2.0",
+    "karma-chrome-launcher": "^3.1.0",
     "karma-jasmine": "^3.1.0",
     "karma-jasmine-ajax": "^0.1.13",
     "karma-jasmine-html-reporter": "naganowl/karma-jasmine-html-reporter#a89c5e2eff1b332dcb857b4d01eee6a63ccee229",
