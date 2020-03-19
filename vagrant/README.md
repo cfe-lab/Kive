@@ -11,6 +11,10 @@ restarting all the daemons:
     sudo systemctl restart slurmctld
     sudo scontrol reconfigure
 
+You can test the multi-machine Slurm deployment with the following command:
+
+    srun -n2 python -c "import socket; print(socket.gethostname())"
+
 [Vagrant]: https://www.vagrantup.com/downloads.html
 [VirtualBox]: https://www.vagrantup.com/docs/virtualbox/
 [slurm.conf]: https://slurm.schedmd.com/slurm.conf.html
