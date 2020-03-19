@@ -36,9 +36,8 @@ yum install -q -y epel-release
 
 yum groups install -q -y 'Development Tools'
 
-yum install -q -y munge munge-libs munge-devel rng-tools
-rngd -r /dev/urandom
-create-munge-key -r
+yum install -q -y munge munge-libs munge-devel
+cp /usr/local/share/Kive/vagrant/munge-test.key /etc/munge/munge.key
 systemctl enable munge
 systemctl start munge
 
