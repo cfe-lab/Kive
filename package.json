@@ -20,7 +20,7 @@
     "karma-jasmine-html-reporter": "naganowl/karma-jasmine-html-reporter#a89c5e2eff1b332dcb857b4d01eee6a63ccee229",
     "karma-sourcemap-loader": "^0.3.7",
     "karma-spec-reporter": "0.0.32",
-    "karma-webpack": "^2.0.4",
+    "karma-webpack": "^4.0.2",
     "shelljs": "^0.8.3",
     "tslint": "^6.1.0",
     "webpack-cli": "^3.3.11"
