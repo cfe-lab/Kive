@@ -54,9 +54,8 @@ mysql --execute "create user slurm@localhost;"
 mysql --execute "grant all on slurm_acct_db.* TO slurm@localhost;"
 mysql --execute "create database slurm_acct_db;"
 yum install -q -y epel-release
-yum install -q -y munge munge-libs munge-devel rng-tools
-rngd -r /dev/urandom
-create-munge-key -r
+yum install -q -y munge munge-libs munge-devel
+cp /usr/local/share/Kive/vagrant/munge-test.key /etc/munge/munge.key
 systemctl enable munge
 systemctl start munge
 yum install -q -y openssl openssl-devel pam-devel numactl numactl-devel \
