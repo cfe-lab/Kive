@@ -1,5 +1,5 @@
 const webpack = require('webpack');
-const UglifyJSPlugin = require('uglifyjs-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
 const { TsConfigPathsPlugin } = require('awesome-typescript-loader');
 
 module.exports = {
@@ -21,7 +21,6 @@ module.exports = {
                 NODE_ENV: JSON.stringify('production')
             }
         }),
-        new UglifyJSPlugin(),
 
         new webpack.ProvidePlugin({
             $: 'jquery',
@@ -34,6 +33,10 @@ module.exports = {
         })
 
     ],
+    optimization: {
+        minimize: true,
+        minimizer: [new TerserPlugin()],
+    },
 
     resolve: {
         // Add '.ts' and '.tsx' as resolvable extensions.
