@@ -56,6 +56,8 @@ mysql --execute "create database slurm_acct_db;"
 yum install -q -y epel-release
 yum install -q -y munge munge-libs munge-devel
 cp /usr/local/share/Kive/vagrant/munge-test.key /etc/munge/munge.key
+chown munge:munge /etc/munge/munge.key
+chmod g-r,o-r /etc/munge/munge.key
 systemctl enable munge
 systemctl start munge
 yum install -q -y openssl openssl-devel pam-devel numactl numactl-devel \
