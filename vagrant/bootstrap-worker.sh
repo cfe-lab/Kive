@@ -38,6 +38,8 @@ yum groups install -q -y 'Development Tools'
 
 yum install -q -y munge munge-libs munge-devel
 cp /usr/local/share/Kive/vagrant/munge-test.key /etc/munge/munge.key
+chown munge:munge /etc/munge/munge.key
+chmod 400 /etc/munge/munge.key
 systemctl enable munge
 systemctl start munge
 
