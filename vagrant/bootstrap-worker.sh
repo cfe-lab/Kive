@@ -67,3 +67,13 @@ systemctl start slurmd
 
 # sacctmgr -i add cluster localhost
 systemctl restart slurmd
+
+
+echo ========== Preparing for Kive ==========
+
+useradd --system --key UMASK=002 kive
+mkdir -p /home/kive /etc/kive /var/log/kive
+chown kive:kive /home/kive /etc/kive /var/log/kive
+chmod go-rx /home/kive
+chmod 770 /etc/kive /var/log/kive
+chmod g+s /etc/kive /var/log/kive
