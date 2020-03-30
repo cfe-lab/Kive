@@ -38,3 +38,9 @@ You can check that the multi-machine Slurm deployment is operating by running th
 (on either node):
 
     srun -n2 python -c "import socket; print(socket.gethostname())"
+
+Slurm takes a conservative posture towards machines restarting, so if the worker node is
+restarted (e.g. with `vagrant reload`) you'll have to manually return it to service with
+
+    sudo scontrol update NodeName=worker State=RESUME
+
