@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
+# Run on the Kive head node to set up Kive, the Slurm controller,
+# and a Slurm worker.
 
-# Exit immediately if any untested command fails.
-set -e
+set -eu -o pipefail
+IFS=$"\n\t"
 
-cd /root
+# shellcheck source="./setuplib.sh"
+. "/usr/local/share/Kive/vagrant/setuplib.sh"
 
-/usr/local/share/Kive/vagrant/centos_dependencies.bash
-
-echo ========== Installing Python 3 ==========
-yum install -q -y centos-release-scl
-yum install -q -y python36 python36-devel rh-python36-mod_wsgi
-cp /opt/rh/httpd24/root/usr/lib64/httpd/modules/mod_rh-python36-wsgi.so /lib64/httpd/modules
-cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/httpd/conf.modules.d
-systemctl restart httpd
-python3 -m venv /opt/venv_kive
-
-cd /usr/local/share/Kive/vagrant
-./kive_setup.bash requirements-dev.txt
-
-echo ========== Creating Kive database ==========
-cd /usr/local/share/Kive/vagrant_ubuntu
-./dbcreate.sh
+setuplib::python3
+setuplib::vagrant_user
+setuplib::kive_user
+setuplib::postgres
+setuplib::singularity
+setuplib::mariadb
+setuplib::munge
+setuplib::slurm_user
+setuplib::slurm_controller
+setuplib::slurm_worker
+setuplib::apache
+setuplib::mod_wsgi
+setuplib::kive
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:
