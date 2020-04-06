@@ -194,11 +194,15 @@ function setuplib::apache {
 function setuplib::kive_user {
     echo "========= Configuring kive user ==========="
     useradd --system --key UMASK=002 kive
-    mkdir /home/kive /etc/kive /var/log/kive
+
+    mkdir --parents /home/kive /etc/kive /var/log/kive
     chown kive:kive /home/kive /etc/kive /var/log/kive
     chmod go-rx /home/kive
     chmod 770 /etc/kive /var/log/kive
     chmod g+s /etc/kive /var/log/kive
+
+    # Can't change ownership, but should have lax permissions
+    mkdir --parents /data/kive/media_root
 }
 
 function setuplib::vagrant_user {
@@ -223,11 +227,35 @@ function setuplib::mod_wsgi {
     systemctl restart httpd
 }
 
-function setuplib::kive {
-    echo "========= Installing Kive ==========="
+# Prepare a node to be a Kive worker 
+function setuplib::kive_worker {
+    echo "========= Installing Kive worker components ==========="
+    usermod -a -G kive vagrant
+    yum groupinstall -q -y 'Development Tools'
+    yum install -q -y python-devel libsqlite3x-devel words lsof graphviz graphviz-devel
+
+    python3 -m venv /opt/venv_kive
+    . /opt/venv_kive/bin/activate
+    python -m pip install --upgrade pip
+    pushd /usr/local/share/Kive/
+    python -m pip install -r requirements-dev.txt
+    popd
+}
+
+# Set a node up to host the Kive web application
+function setuplib::kive_head {
+    echo "========= Installing Kive application ==========="
     python3 -m venv /opt/venv_kive
     cd /usr/local/share/Kive/vagrant
     ./kive_setup.bash requirements-dev.txt
     cd /usr/local/share/Kive/vagrant_ubuntu
     ./dbcreate.sh
+
+    local secretkey
+    secretkey="$(python3 -c 'import secrets; print(secrets.token_urlsafe())')"
+    echo "
+KIVE_SECRET_KEY='$secretkey'
+KIVE_MEDIA_ROOT='/data/kive/media_root'
+KIVE_ALLOWED_HOSTS='[\"*\"]'
+" >> /etc/sysconfig/httpd
 }

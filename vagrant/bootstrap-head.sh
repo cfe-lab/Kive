@@ -20,7 +20,7 @@ setuplib::slurm_controller
 setuplib::slurm_worker
 setuplib::apache
 setuplib::mod_wsgi
-setuplib::kive
+setuplib::kive_head
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:

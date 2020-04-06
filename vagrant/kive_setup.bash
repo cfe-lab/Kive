@@ -13,10 +13,6 @@ yum install -q -y python-devel libsqlite3x-devel words lsof graphviz graphviz-de
 cd /usr/local/share/Kive/api
 python setup.py install
 cd ..
-mkdir --parents /var/kive/media_root
-chown -R kive:kive /var/kive
-chmod -R 770 /var/kive
-chmod -R g+s /var/kive
 usermod -a -G kive vagrant
 pip install -r $REQUIREMENTS
 if [ ! -f kive/kive/settings.py ]; then
@@ -26,9 +22,6 @@ fi
 . vagrant_ubuntu/envvars.conf  # Lets this script run manage.py
 cd kive
 ./manage.py collectstatic
-./manage.py shell -c "
-from django.core.management.utils import get_random_secret_key
-print('KIVE_SECRET_KEY='+repr(get_random_secret_key()))" >> /etc/sysconfig/httpd
 systemctl restart httpd
 
 echo ========== Installing Kive purge tasks ==========
