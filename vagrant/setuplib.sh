@@ -9,7 +9,7 @@ function setuplib::postgres {
     pushd /root
 
     echo "========== Installing PostgreSQL =========="
-    sudo rpm -Uvh https://yum.postgresql.org/10/redhat/rhel-7-x86_64/pgdg-centos10-10-2.noarch.rpm
+    sudo rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
     yum install -q -y postgresql10-server postgresql10-contrib
     /usr/pgsql-10/bin/postgresql-10-setup initdb
 
