@@ -12,6 +12,7 @@ setuplib::python3
 setuplib::kive_user
 setuplib::vagrant_user
 setuplib::kive_worker
+setuplib::install_postgres
 setuplib::singularity
 setuplib::munge
 setuplib::slurm_user

@@ -11,7 +11,8 @@ IFS=$"\n\t"
 setuplib::python3
 setuplib::vagrant_user
 setuplib::kive_user
-setuplib::postgres
+setuplib::install_postgres
+setuplib::configure_postgres_server
 setuplib::singularity
 setuplib::mariadb
 setuplib::munge
@@ -19,8 +20,8 @@ setuplib::slurm_user
 setuplib::slurm_controller
 setuplib::slurm_worker
 setuplib::apache
-setuplib::mod_wsgi
 setuplib::kive_head
+setuplib::kive_data
 
 # Apache should be active on port 8080.
 # Launch development server on port 8000 like this:

@@ -3,29 +3,45 @@
 set -eu -o pipefail
 IFS=$'\t\n'
 
-# Install a PostGreSQL database, configure it for use with
-# Kive and Vagrant, and start it.
-function setuplib::postgres {
+# Install a PostGreSQL database and client; open the necessary ports.
+function setuplib::install_postgres {
     pushd /root
 
     echo "========== Installing PostgreSQL =========="
     sudo rpm -Uvh https://download.postgresql.org/pub/repos/yum/reporpms/EL-7-x86_64/pgdg-redhat-repo-latest.noarch.rpm
     yum install -q -y postgresql10-server postgresql10-contrib
+    systemctl start firewalld
+    firewall-cmd --add-service=postgresql --permanent
+}
+
+# Configure Postgresql for use with Kive and Vagrant, and start it.
+function setuplib::configure_postgres_server {
+    yum install -q -y patch
+
     /usr/pgsql-10/bin/postgresql-10-setup initdb
 
-    # Order matters for access rules.
-    sudo sed -i '0,/^local/s/^local/local all kive      peer map=vagrantkive\n&/' \
-        /var/lib/pgsql/10/data/pg_hba.conf
+    patch --backup /var/lib/pgsql/10/data/pg_hba.conf <<EOF
+81a82
+> host    kive            kive            127.0.0.1/32            scram-sha-256
+89a91,93
+> 
+> # private remote connections
+> host    kive            kive            192.168.0.0/16          scram-sha-256
+EOF
 
-    echo "
-    # MAPNAME       SYSTEM-USERNAME         PG-USERNAME
-    vagrantkive     vagrant                 kive
-    vagrantkive     kive                    kive
-    " >> /var/lib/pgsql/10/data/pg_ident.conf
+    patch --backup /var/lib/pgsql/10/data/postgresql.conf <<EOF
+59c59
+< #listen_addresses = 'localhost'		# what IP address(es) to listen on;
+---
+> listen_addresses = '*'		# what IP address(es) to listen on;
+88c88
+< #password_encryption = md5		# md5 or scram-sha-256
+---
+> password_encryption = scram-sha-256		# md5 or scram-sha-256
+EOF
+
     systemctl enable postgresql-10
     systemctl start postgresql-10
-
-    popd
 }
 
 # Install MariaDB (for use with Slurm).
@@ -168,13 +184,13 @@ function setuplib::slurm_worker {
     popd
 }
 
-
+# Install the Apache web server and mod_wsgi.
 function setuplib::apache {
     echo "========== Installing Apache =========="
     yum install -q -y httpd mod_wsgi
 
     cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
-    sed -e 's/^export //' /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> /etc/sysconfig/httpd
+    sed -e 's/^export //' /usr/local/share/Kive/vagrant/envvars.conf >> /etc/sysconfig/httpd
     # KIVE_SECRET_KEY gets added to /etc/sysconfig/httpd in the Kive section below.
 
     cp /usr/local/share/Kive/vagrant/purge_apache_logs /usr/sbin
@@ -188,9 +204,19 @@ function setuplib::apache {
         -i /etc/httpd/conf/httpd.conf
     systemctl enable httpd
     systemctl start httpd
+
+    firewall-cmd --permanent --add-port=8080/tcp
+    systemctl restart firewalld
+
+    echo "========= Installing Mod WSGI for Python 3 ==========="
+    yum install -q -y centos-release-scl
+    yum install -q -y rh-python36-mod_wsgi
+    cp /opt/rh/httpd24/root/usr/lib64/httpd/modules/mod_rh-python36-wsgi.so /lib64/httpd/modules
+    cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/httpd/conf.modules.d
+    systemctl restart httpd
 }
 
-
+# Create and configure the Kive user and associated directories.
 function setuplib::kive_user {
     echo "========= Configuring kive user ==========="
     useradd --system --key UMASK=002 kive
@@ -201,13 +227,16 @@ function setuplib::kive_user {
     chmod 770 /etc/kive /var/log/kive
     chmod g+s /etc/kive /var/log/kive
 
-    # Can't change ownership, but should have lax permissions
     mkdir --parents /data/kive/media_root
+
+    cat /usr/local/share/Kive/vagrant/envvars.conf >> ~kive/.bash_profile
+    echo ". ~/.bash_profile" >> ~/.bashrc
 }
 
+# Configure the Vagrant user.
 function setuplib::vagrant_user {
     echo "========= Configuring vagrant user ==========="
-    cat /usr/local/share/Kive/vagrant_ubuntu/envvars.conf >> ~vagrant/.bash_profile
+    cat /usr/local/share/Kive/vagrant/envvars.conf >> ~vagrant/.bash_profile
     echo ". /opt/venv_kive/bin/activate" >> ~vagrant/.bash_profile
 }
 
@@ -218,14 +247,6 @@ function setuplib::python3 {
     yum install -q -y python36 python36-devel
 }
 
-function setuplib::mod_wsgi {
-    echo "========= Installing Mod WSGI for Python 3 ==========="
-    yum install -q -y centos-release-scl
-    yum install -q -y rh-python36-mod_wsgi
-    cp /opt/rh/httpd24/root/usr/lib64/httpd/modules/mod_rh-python36-wsgi.so /lib64/httpd/modules
-    cp /opt/rh/httpd24/root/etc/httpd/conf.modules.d/10-rh-python36-wsgi.conf /etc/httpd/conf.modules.d
-    systemctl restart httpd
-}
 
 # Prepare a node to be a Kive worker 
 function setuplib::kive_worker {
@@ -248,8 +269,6 @@ function setuplib::kive_head {
     python3 -m venv /opt/venv_kive
     cd /usr/local/share/Kive/vagrant
     ./kive_setup.bash requirements-dev.txt
-    cd /usr/local/share/Kive/vagrant_ubuntu
-    ./dbcreate.sh
 
     local secretkey
     secretkey="$(python3 -c 'import secrets; print(secrets.token_urlsafe())')"
@@ -258,4 +277,28 @@ KIVE_SECRET_KEY='$secretkey'
 KIVE_MEDIA_ROOT='/data/kive/media_root'
 KIVE_ALLOWED_HOSTS='[\"*\"]'
 " >> /etc/sysconfig/httpd
+    systemctl restart httpd
+}
+
+# Create and configure the Kive user in PostGreSQL,
+# run the database migrations, and apply data and media files
+# from "dumps" directory.
+function setuplib::kive_data {
+    echo "========= Setting up Kive database ==========="
+    sudo -u postgres createdb kive
+    sudo -u postgres createuser kive
+    sudo -u postgres psql -c "ALTER USER kive WITH ENCRYPTED PASSWORD 'YZcGRH8AZAj6VAF6qj8KOy'"
+
+    sudo -u postgres psql -c 'GRANT ALL PRIVILEGES ON DATABASE kive TO kive;'
+    sudo -u postgres psql -c 'ALTER USER kive CREATEDB;'  # Only needed to run tests.
+
+    sudo -u kive /opt/venv_kive/bin/python /usr/local/share/Kive/kive/manage.py migrate
+
+    if [ -e dumps/db_data.sql ] ;then
+        sudo -u kive psql --set ON_ERROR_STOP=on kive < ./dumps/db_data.sql
+    fi
+
+    if [ -e dumps/media_root ] ;then
+        sudo rsync -a dumps/media_root/ /var/kive/media_root
+    fi
 }
