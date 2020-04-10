@@ -56,6 +56,8 @@ Thorough:
 
 - [Playbooks](https://docs.ansible.com/ansible/2.3/playbooks.html)
 - [How to build your inventory](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html#intro-inventory)
+- [Creating Reusable Playbooks](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse.html)
+- [Module Index](https://docs.ansible.com/ansible/latest/modules/list_of_all_modules.html)
 
 Extended:
 

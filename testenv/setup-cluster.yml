@@ -1,0 +1,4 @@
+---
+- hosts: head
+  roles:
+    - slurm_controller

@@ -1,0 +1,9 @@
+---
+- name: install python3
+  become: true
+  become_user: root
+  yum:
+    name:
+      - python36
+      - python36-devel
+    state: latest
