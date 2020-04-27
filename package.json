@@ -22,7 +22,7 @@
     "karma-spec-reporter": "0.0.32",
     "karma-webpack": "^4.0.2",
     "shelljs": "^0.8.3",
-    "terser-webpack-plugin": "^2.3.5",
+    "terser-webpack-plugin": "^2.3.6",
     "tslint": "^6.1.1",
     "webpack-cli": "^3.3.11"
   },
