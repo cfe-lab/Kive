@@ -270,8 +270,13 @@ function setuplib::kive_head {
     cd /usr/local/share/Kive/vagrant
     ./kive_setup.bash requirements-dev.txt
 
+    # The following generates a random string that's suitable for using
+    # as a password and stores it in the `secretkey` local variable.
+    # See Python's 'secrets' module for more information:
+    # https://docs.python.org/3/library/secrets.html#secrets.token_urlsafe
     local secretkey
     secretkey="$(python3 -c 'import secrets; print(secrets.token_urlsafe())')"
+
     echo "
 KIVE_SECRET_KEY='$secretkey'
 KIVE_MEDIA_ROOT='/data/kive/media_root'
