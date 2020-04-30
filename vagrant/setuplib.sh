@@ -259,7 +259,7 @@ function setuplib::kive_worker {
     . /opt/venv_kive/bin/activate
     python -m pip install --upgrade pip
     pushd /usr/local/share/Kive/
-    python -m pip install -r requirements-dev.txt
+    python -m pip install -r requirements.txt
     popd
 }
 
@@ -268,7 +268,7 @@ function setuplib::kive_head {
     echo "========= Installing Kive application ==========="
     python3 -m venv /opt/venv_kive
     cd /usr/local/share/Kive/vagrant
-    ./kive_setup.bash requirements-dev.txt
+    ./kive_setup.bash requirements.txt
 
     # The following generates a random string that's suitable for using
     # as a password and stores it in the `secretkey` local variable.
