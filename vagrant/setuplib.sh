@@ -3,6 +3,36 @@
 set -eu -o pipefail
 IFS=$'\t\n'
 
+
+# (private) Generate a secret key (suitable for use as a password, for example).
+function setuplib::_genkey {
+    # The following generates a random string that's suitable for using
+    # as a password and stores it in the `secretkey` local variable.
+    # See Python's 'secrets' module for more information:
+    # https://docs.python.org/3/library/secrets.html#secrets.token_urlsafe
+    local secretkey
+    secretkey="$(python3 -c 'import secrets; print(secrets.token_urlsafe())')"
+    echo "$secretkey"
+}
+
+# (private) Generate a database user password for Kive (if necessary) and then
+# return it. Generated password persists between calls and is consistent for
+# hosts with a shared `/data` directory.
+function setuplib::_get_kive_db_password {
+    if [ ! -f /data/kive_db_password ]; then
+        setuplib::_genkey > /data/kive_db_password
+    fi
+    cat /data/kive_db_password
+}
+
+# (private) Substitute the kive database password into a text stream (for
+# creating configuration files).
+function setuplib::_with_kive_db_password {
+    local password
+    password="$(setuplib::_get_kive_db_password)"
+    sed -e "s/SETUPLIB_KIVE_DB_PASSWORD_TARGET/$password/" -
+}
+
 # Install a PostGreSQL database and client; open the necessary ports.
 function setuplib::install_postgres {
     pushd /root
@@ -190,7 +220,9 @@ function setuplib::apache {
     yum install -q -y httpd mod_wsgi
 
     cp /usr/local/share/Kive/vagrant_ubuntu/001-kive.conf /etc/httpd/conf.d/
-    sed -e 's/^export //' /usr/local/share/Kive/vagrant/envvars.conf >> /etc/sysconfig/httpd
+    setuplib::_with_kive_db_password < /usr/local/share/Kive/vagrant/envvars.conf \
+        | sed -e 's/^export //'  >> /etc/sysconfig/httpd
+
     # KIVE_SECRET_KEY gets added to /etc/sysconfig/httpd in the Kive section below.
 
     cp /usr/local/share/Kive/vagrant/purge_apache_logs /usr/sbin
@@ -229,14 +261,14 @@ function setuplib::kive_user {
 
     mkdir --parents /data/kive/media_root
 
-    cat /usr/local/share/Kive/vagrant/envvars.conf >> ~kive/.bash_profile
+    setuplib::_with_kive_db_password < /usr/local/share/Kive/vagrant/envvars.conf >> ~kive/.bash_profile
     echo ". ~/.bash_profile" >> ~/.bashrc
 }
 
 # Configure the Vagrant user.
 function setuplib::vagrant_user {
     echo "========= Configuring vagrant user ==========="
-    cat /usr/local/share/Kive/vagrant/envvars.conf >> ~vagrant/.bash_profile
+    setuplib::_with_kive_db_password < /usr/local/share/Kive/vagrant/envvars.conf >> ~vagrant/.bash_profile
     echo ". /opt/venv_kive/bin/activate" >> ~vagrant/.bash_profile
 }
 
@@ -270,15 +302,8 @@ function setuplib::kive_head {
     cd /usr/local/share/Kive/vagrant
     ./kive_setup.bash requirements.txt
 
-    # The following generates a random string that's suitable for using
-    # as a password and stores it in the `secretkey` local variable.
-    # See Python's 'secrets' module for more information:
-    # https://docs.python.org/3/library/secrets.html#secrets.token_urlsafe
-    local secretkey
-    secretkey="$(python3 -c 'import secrets; print(secrets.token_urlsafe())')"
-
     echo "
-KIVE_SECRET_KEY='$secretkey'
+KIVE_SECRET_KEY='$(setuplib::_genkey)'
 KIVE_MEDIA_ROOT='/data/kive/media_root'
 KIVE_ALLOWED_HOSTS='[\"*\"]'
 " >> /etc/sysconfig/httpd
@@ -290,9 +315,12 @@ KIVE_ALLOWED_HOSTS='[\"*\"]'
 # from "dumps" directory.
 function setuplib::kive_data {
     echo "========= Setting up Kive database ==========="
+    local password
+    password="$(setuplib::_get_kive_db_password)"
+
     sudo -u postgres createdb kive
     sudo -u postgres createuser kive
-    sudo -u postgres psql -c "ALTER USER kive WITH ENCRYPTED PASSWORD 'YZcGRH8AZAj6VAF6qj8KOy'"
+    sudo -u postgres psql -c "ALTER USER kive WITH ENCRYPTED PASSWORD '$password'"
 
     sudo -u postgres psql -c 'GRANT ALL PRIVILEGES ON DATABASE kive TO kive;'
     sudo -u postgres psql -c 'ALTER USER kive CREATEDB;'  # Only needed to run tests.
