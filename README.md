@@ -45,6 +45,14 @@ they can be accessed.
 [VirtualBox]: https://www.virtualbox.org/wiki/Downloads
 
 
+# Architecture (for lack of a better name)
+
+Ansible executes *tasks* against one or more managed machines. Tasks may also
+depend on *variables*, *files*, or *templates*. These can be grouped into *roles*.
+
+This project uses roles to configure servers (e.g. Slurm worker, Kive server).
+
+
 # Ansible Docs
 
 Essential:
@@ -58,6 +66,7 @@ Thorough:
 - [How to build your inventory](https://docs.ansible.com/ansible/latest/user_guide/intro_inventory.html#intro-inventory)
 - [Creating Reusable Playbooks](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse.html)
 - [Module Index](https://docs.ansible.com/ansible/latest/modules/list_of_all_modules.html)
+- [Best Practices](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html#playbooks-best-practices)
 
 Extended:
 
