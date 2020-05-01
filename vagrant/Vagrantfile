@@ -13,12 +13,16 @@
 HEAD_IP = "192.168.233.10"
 WORKER_IP = "192.168.233.11"
 
+Dir.mkdir("./data") if not Dir.exists?("./data")
+
 Vagrant.configure("2") do |config|
 
   config.vm.box = "geerlingguy/centos7"
   config.vm.box_version = "1.2.6"
 
   config.vm.synced_folder "..", "/usr/local/share/Kive"
+  config.vm.synced_folder "./data", "/data",
+    mount_options: ["dmode=777", "fmode=664"]
   config.vm.synced_folder ".", "/vagrant", disabled: true
 
   config.vm.define :head do |head|

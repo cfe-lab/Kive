@@ -44,3 +44,12 @@ restarted (e.g. with `vagrant reload`) you'll have to manually return it to serv
 
     sudo scontrol update NodeName=worker State=RESUME
 
+
+# Development Dependencies
+
+Some development and testing tools aren't installed by default. They can be
+added by logging in to the head node, activating the Kive virtualenv and
+`pip` installing `requirements-dev.txt`.
+
+    . /opt/venv_kive/bin/activate
+    pip install -r /usr/local/share/Kive/requirements-dev.txt
