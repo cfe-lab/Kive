@@ -27,7 +27,7 @@
     "webpack-cli": "^3.3.11"
   },
   "dependencies": {
-    "@types/jquery": "^3.3.36",
+    "@types/jquery": "^3.3.37",
     "@types/node": "^13.13.4",
     "awesome-typescript-loader": "^5.2.1",
     "core-js": "^3.6.5",
