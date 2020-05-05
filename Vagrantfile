@@ -30,9 +30,8 @@ def add_key_access(vm)
 end
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "geerlingguy/centos7"
-  config.vm.box_version = "1.2.6"
-
+  config.vm.box = "centos/8"
+  
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
     vb.memory = "1024"
