@@ -75,3 +75,14 @@ Extended:
 - ["Dry Run" mode](https://docs.ansible.com/ansible/2.3/playbooks_checkmode.html)
 - [Asynchronous Actions and Polling](https://docs.ansible.com/ansible/2.3/playbooks_async.html)
 - [Vault](https://docs.ansible.com/ansible/2.3/playbooks_vault.html)
+
+
+# Useful modules
+
+- [copy](https://docs.ansible.com/ansible/latest/modules/copy_module.html#copy-module)
+- [user](https://docs.ansible.com/ansible/latest/modules/user_module.html#user-module)
+- [file](https://docs.ansible.com/ansible/latest/modules/file_module.html#file-module), for creating directories
+- [systemd](https://docs.ansible.com/ansible/latest/modules/systemd_module.html#systemd-module)
+- [debug](https://docs.ansible.com/ansible/latest/modules/debug_module.html#debug-module)
+- [dnf](https://docs.ansible.com/ansible/latest/modules/dnf_module.html#dnf-module) (use instead of `yum`, which is Python2 only)
+- [mysql_db](https://docs.ansible.com/ansible/latest/modules/mysql_db_module.html#mysql-db-module)
