@@ -67,6 +67,7 @@ Thorough:
 - [Creating Reusable Playbooks](https://docs.ansible.com/ansible/latest/user_guide/playbooks_reuse.html)
 - [Module Index](https://docs.ansible.com/ansible/latest/modules/list_of_all_modules.html)
 - [Best Practices](https://docs.ansible.com/ansible/latest/user_guide/playbooks_best_practices.html#playbooks-best-practices)
+- [Interpreter Discovery](https://docs.ansible.com/ansible/latest/reference_appendices/interpreter_discovery.html#interpreter-discovery)
 
 Extended:
 
@@ -86,3 +87,4 @@ Extended:
 - [debug](https://docs.ansible.com/ansible/latest/modules/debug_module.html#debug-module)
 - [dnf](https://docs.ansible.com/ansible/latest/modules/dnf_module.html#dnf-module) (use instead of `yum`, which is Python2 only)
 - [mysql_db](https://docs.ansible.com/ansible/latest/modules/mysql_db_module.html#mysql-db-module)
+- [get_url](https://docs.ansible.com/ansible/latest/modules/get_url_module.html)
