@@ -1,9 +1,154 @@
 ---
-- name: install python3
+
+- name: install epel-release
+  become: true
+  dnf:
+    name: epel-release
+    state: present
+
+
+- name: install and start mariadb
   become: true
   become_user: root
-  yum:
-    name:
-      - python36
-      - python36-devel
-    state: latest
+  tags: slurmdb
+  block:
+    - name: install mariadb
+      dnf:
+        name:
+          - mariadb-server
+          - mariadb-devel
+        state: present
+    - name: start mariadb service
+      systemd:
+        name: mariadb
+        state: started
+        enabled: true
+
+
+- name: install and start munge
+  become: true
+  block:
+    - name: install munge
+      dnf:
+        name:
+          - munge
+          - munge-libs
+        state: present
+    - name: deploy munge testing key
+      copy:
+        src: munge-test.key
+        dest: /etc/munge/munge.key
+        mode: "600"
+        owner: munge
+        group: munge
+    - name: start munge service
+      systemd:
+        name: munge
+        state: started
+        enabled: true
+
+
+- name: prepare slurm configuration
+  become: true
+  block:
+    - name: create slurm user
+      user:
+        name: slurm
+        system: true
+    - name: create slurm data directories
+      loop:
+        - /var/log/slurm
+        - /var/run/slurm
+        - /var/lib/slurm
+        - /etc/slurm
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: slurm
+        group: slurm
+        mode: 
+    - name: add slurm config files
+      loop:
+        - slurm.conf
+        - cgroup.conf
+        - slurmdbd.conf
+      copy:
+        src: "{{ item }}"
+        dest: /etc/slurm/
+        owner: slurm
+        group: slurm
+        mode: "644"
+    - name: create slurm database user
+      tags: slurmdb
+      become: true
+      block:
+        - mysql_db:
+            name: slurm_acct_db
+        - mysql_user:
+            name: slurm
+            priv: "slurm_acct_db.*:all"
+
+
+- name: install slurm
+  become: true
+  vars:
+    slurmbuilddir: "/root"
+  block:
+    - name: install development tools
+      dnf:
+        name: "@Development Tools"
+    - name: install slurm build requirements
+      dnf:
+        name:
+          - hwloc
+          - hwloc-devel
+          - libibmad
+          - libibumad
+          - lua
+          - lua-devel
+          - man2html
+          - munge-devel
+          - ncurses-devel
+          - numactl
+          - numactl-devel
+          - openssl
+          - openssl-devel
+          - pam-devel
+          - perl-devel
+          - readline-devel
+          - rpm-build
+          - rrdtool-devel
+    - name: create temporary build directory
+      file:
+        path: "{{ slurmbuilddir }}"
+        state: directory
+    - name: fetch slurm source files
+      get_url:
+        url: "https://download.schedmd.com/slurm/slurm-20.02.2.tar.bz2"
+        dest: "{{ slurmbuilddir }}/slurm-20.02.2.tar.bz2"
+    - name: build slurm rpm file
+      command:
+        cmd: rpmbuild -ta slurm-20.02.2.tar.bz2
+        chdir: "{{ slurmbuilddir }}"
+        creates: "{{ slurmbuilddir }}/rpmbuild/"
+    - name: install slurm from rpm files
+      dnf:
+        name:
+          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-20.02.2-1.el8.x86_64.rpm"
+          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-example-configs-20.02.2-1.el8.x86_64.rpm"
+          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-slurmctld-20.02.2-1.el8.x86_64.rpm"
+          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-slurmdbd-20.02.2-1.el8.x86_64.rpm"
+    - name: configure slurm tmpfiles
+      copy:
+        content: "d /var/run/slurm 0755 slurm slurm"
+        dest: /usr/lib/tmpfiles.d/slurm.conf
+    - name: enable slurm services
+      loop:
+        - slurmdbd
+        - slurmctld
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true
+
+# TODO(nknight) need to fix pidfile location?
