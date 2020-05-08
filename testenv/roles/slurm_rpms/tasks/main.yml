@@ -16,6 +16,8 @@
           - lua
           - lua-devel
           - man2html
+          - mariadb-server
+          - mariadb-devel
           - munge-devel
           - ncurses-devel
           - numactl

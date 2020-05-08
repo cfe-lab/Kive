@@ -4,3 +4,4 @@
     slurmbuilddir: "/root"
   roles:
     - slurm_controller
+    - slurm_worker

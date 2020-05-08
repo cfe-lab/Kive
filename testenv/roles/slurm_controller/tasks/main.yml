@@ -66,7 +66,6 @@
         state: directory
         owner: slurm
         group: slurm
-        mode: 
     - name: add slurm config files
       loop:
         - ../../common-files/slurm.conf
