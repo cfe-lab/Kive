@@ -69,8 +69,8 @@
         mode: 
     - name: add slurm config files
       loop:
-        - slurm.conf
-        - cgroup.conf
+        - ../../common-files/slurm.conf
+        - ../../common-files/cgroup.conf
         - slurmdbd.conf
       copy:
         src: "{{ item }}"
