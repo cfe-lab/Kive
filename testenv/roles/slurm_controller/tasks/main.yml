@@ -133,7 +133,7 @@
         - slurmdbd
         - slurmctld
       systemd:
-        daemon_reload: true  # necessary because we've edited the unit
+        daemon_reload: true  # necessary because we've edited the unit file
         name: "{{ item }}"
         state: started
         enabled: true
