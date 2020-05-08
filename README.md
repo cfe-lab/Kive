@@ -88,3 +88,4 @@ Extended:
 - [dnf](https://docs.ansible.com/ansible/latest/modules/dnf_module.html#dnf-module) (use instead of `yum`, which is Python2 only)
 - [mysql_db](https://docs.ansible.com/ansible/latest/modules/mysql_db_module.html#mysql-db-module)
 - [get_url](https://docs.ansible.com/ansible/latest/modules/get_url_module.html)
+- [replace](https://docs.ansible.com/ansible/latest/modules/replace_module.html)

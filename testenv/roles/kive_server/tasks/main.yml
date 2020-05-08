@@ -1,0 +1,10 @@
+---
+
+- name: install python3
+  become: true
+  become_user: root
+  dnf:
+    name:
+      - python36
+      - python36-devel
+    state: latest

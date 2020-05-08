@@ -91,46 +91,21 @@
 
 - name: install slurm
   become: true
-  vars:
-    slurmbuilddir: "/root"
   block:
-    - name: install development tools
-      dnf:
-        name: "@Development Tools"
-    - name: install slurm build requirements
+    - name: install slurm runtime requirements
       dnf:
         name:
           - hwloc
-          - hwloc-devel
           - libibmad
           - libibumad
           - lua
-          - lua-devel
           - man2html
-          - munge-devel
-          - ncurses-devel
           - numactl
-          - numactl-devel
           - openssl
-          - openssl-devel
           - pam-devel
           - perl-devel
-          - readline-devel
           - rpm-build
           - rrdtool-devel
-    - name: create temporary build directory
-      file:
-        path: "{{ slurmbuilddir }}"
-        state: directory
-    - name: fetch slurm source files
-      get_url:
-        url: "https://download.schedmd.com/slurm/slurm-20.02.2.tar.bz2"
-        dest: "{{ slurmbuilddir }}/slurm-20.02.2.tar.bz2"
-    - name: build slurm rpm file
-      command:
-        cmd: rpmbuild -ta slurm-20.02.2.tar.bz2
-        chdir: "{{ slurmbuilddir }}"
-        creates: "{{ slurmbuilddir }}/rpmbuild/"
     - name: install slurm from rpm files
       dnf:
         name:
@@ -142,11 +117,23 @@
       copy:
         content: "d /var/run/slurm 0755 slurm slurm"
         dest: /usr/lib/tmpfiles.d/slurm.conf
+    - block:
+        - name: fix slurmdbd pidfile path in systemd unit
+          replace:
+            path: /usr/lib/systemd/system/slurmdbd.service
+            regexp: /var/run/slurmdbd.pid
+            replace: /var/run/slurm/slurmdbd.pid
+        - name: fix slurmctld pidfile path in systemd unit
+          replace:
+            path: /usr/lib/systemd/system/slurmctld.service
+            regexp: /var/run/slurmctld.pid
+            replace: /var/run/slurm/slurmctld.pid
     - name: enable slurm services
       loop:
         - slurmdbd
         - slurmctld
       systemd:
+        daemon_reload: true  # necessary because we've edited the unit
         name: "{{ item }}"
         state: started
         enabled: true

@@ -1,4 +1,6 @@
 ---
 - hosts: head
+  vars:
+    slurmbuilddir: "/root"
   roles:
     - slurm_controller
