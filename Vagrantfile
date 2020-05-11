@@ -50,6 +50,10 @@ Vagrant.configure("2") do |config|
     worker.vm.hostname = "worker"
     worker.vm.network "private_network", ip: WORKER_IP
     add_key_access(worker.vm)
+    worker.vm.provision "shell", inline: <<-EOS
+      dnf install -q -y python3 epel-release
+      dnf config-manager --set-enabled PowerTools
+    EOS
   end
 
   config.vm.provision "shell", inline: <<-EOS

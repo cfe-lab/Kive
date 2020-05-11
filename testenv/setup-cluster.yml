@@ -1,7 +1,15 @@
 ---
+
+
 - hosts: head
   vars:
     slurmbuilddir: "/root"
   roles:
     - slurm_controller
+    - slurm_worker
+
+- hosts: worker
+  vars:
+    slurmbuilddir: "/root"
+  roles:
     - slurm_worker
