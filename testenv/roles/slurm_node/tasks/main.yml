@@ -1,0 +1,33 @@
+---
+
+- name: create slurm user
+  become: true
+  user:
+    name: slurm
+    system: true
+    uid: 9634
+
+- name: create slurm data directories
+  become: true
+  loop:
+    - /var/log/slurm
+    - /var/run/slurm
+    - /var/lib/slurm
+    - /etc/slurm
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: slurm
+    group: slurm
+
+- name: add slurm config files
+  become: true
+  loop:
+    - slurm.conf
+    - cgroup.conf
+  copy:
+    src: "{{ item }}"
+    dest: /etc/slurm/
+    owner: slurm
+    group: slurm
+    mode: "644"

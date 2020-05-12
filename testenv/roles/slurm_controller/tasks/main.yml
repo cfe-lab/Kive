@@ -23,46 +23,24 @@
         name: mariadb
         state: started
         enabled: true
-
-
-- name: prepare slurm configuration
-  become: true
-  block:
-    - name: create slurm user
-      user:
-        name: slurm
-        system: true
-    - name: create slurm data directories
-      loop:
-        - /var/log/slurm
-        - /var/run/slurm
-        - /var/lib/slurm
-        - /etc/slurm
-      file:
-        path: "{{ item }}"
-        state: directory
-        owner: slurm
-        group: slurm
-    - name: add slurm config files
-      loop:
-        - ../../common-files/slurm.conf
-        - ../../common-files/cgroup.conf
-        - slurmdbd.conf
-      copy:
-        src: "{{ item }}"
-        dest: /etc/slurm/
-        owner: slurm
-        group: slurm
-        mode: "644"
     - name: create slurm database user
       tags: slurmdb
-      become: true
       block:
         - mysql_db:
             name: slurm_acct_db
         - mysql_user:
             name: slurm
             priv: "slurm_acct_db.*:all"
+
+
+- name: copy slurmdbd configuration
+  become: true
+  copy:
+    src: "slurmdbd.conf"
+    dest: /etc/slurm/
+    owner: slurm
+    group: slurm
+    mode: "644"
 
 
 - name: install slurm
@@ -113,4 +91,3 @@
         name: "{{ item }}"
         state: started
         enabled: true
-
