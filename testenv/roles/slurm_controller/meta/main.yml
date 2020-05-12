@@ -1,5 +1,4 @@
 ---
 dependencies:
-  - role: munge_node
   - role: slurm_rpms
   - role: slurm_node

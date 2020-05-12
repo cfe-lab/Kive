@@ -7,11 +7,10 @@
   roles:
     - slurm_controller
     - slurm_worker
-    - munge_node
+    - kive_server
 
 - hosts: worker
   vars:
     slurmbuilddir: "/root"
   roles:
     - slurm_worker
-    - munge_node

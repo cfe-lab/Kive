@@ -7,7 +7,6 @@
         name:
           - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-20.02.2-1.el8.x86_64.rpm"
           - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-slurmd-20.02.2-1.el8.x86_64.rpm"
-
     - name: fix slurmd pidfile path in systemd unit
       replace:
         path: /usr/lib/systemd/system/slurmd.service
