@@ -89,3 +89,14 @@ Extended:
 - [mysql_db](https://docs.ansible.com/ansible/latest/modules/mysql_db_module.html#mysql-db-module)
 - [get_url](https://docs.ansible.com/ansible/latest/modules/get_url_module.html)
 - [replace](https://docs.ansible.com/ansible/latest/modules/replace_module.html)
+
+
+# Applying a single role
+
+Per [this](https://stackoverflow.com/questions/38350674/ansible-can-i-execute-role-from-command-line)
+stack overflow answer, a single role can be run with the following command:
+
+    ansible <hostname> -m include_role -a name=<role name>
+
+This has more verbose output and can be run in isolation, making it suitable
+for development and debugging.
