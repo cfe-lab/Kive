@@ -29,6 +29,11 @@ def add_key_access(vm)
   EOS
 end
 
+def add_data_dir(vm)
+  Dir.mkdir("./data") if not Dir.exists?("./data")
+  vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
+end
+
 Vagrant.configure("2") do |config|
   config.vm.box = "geerlingguy/centos8"
   
@@ -43,6 +48,7 @@ Vagrant.configure("2") do |config|
     head.vm.network "private_network", ip: HEAD_IP
     add_keys(head.vm)
     add_key_access(head.vm)
+    add_data_dir(head.vm)
     head.vm.provision "shell", path: "./setupfiles/install-ansible.sh"
   end
 
@@ -54,6 +60,7 @@ Vagrant.configure("2") do |config|
       dnf install -q -y python3 epel-release
       dnf config-manager --set-enabled PowerTools
     EOS
+    add_data_dir(worker.vm)
   end
 
   config.vm.provision "shell", inline: <<-EOS

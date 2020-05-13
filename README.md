@@ -92,7 +92,10 @@ Extended:
 - [firewalld](https://docs.ansible.com/ansible/latest/modules/firewalld_module.html)
 - [command](https://docs.ansible.com/ansible/latest/modules/command_module.html)
 - [Postgresql Modules](https://docs.ansible.com/ansible/latest/modules/list_of_database_modules.html#postgresql)
-
+- [lineinfile](https://docs.ansible.com/ansible/latest/modules/lineinfile_module.html)
+- [blockinfile](https://docs.ansible.com/ansible/latest/modules/blockinfile_module.html#blockinfile-module)
+- [git](https://docs.ansible.com/ansible/latest/modules/git_module.html#git-module)
+- [unarchive](https://docs.ansible.com/ansible/latest/modules/unarchive_module.html)
 
 # Applying a single role
 

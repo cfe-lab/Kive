@@ -1,0 +1,69 @@
+---
+
+- name: create kive user
+  become: true
+  user:
+    name: kive
+    system: yes
+    uid: 762  # random uid in system uid range (200, 999); hard-coded for consistency across hosts
+
+# NOTE(nknight): this is done with `file` isntead of during user creation so that we
+# can set the permissions explicitly
+- name: create kive home directory
+  file:
+    path: /home/kive/
+    state: directory
+    mode: "go-rx"
+    group: kive
+    owner: kive
+
+- name: create kive app directories
+  become: true
+  loop:
+    - /etc/kive/
+    - /var/log/kive/
+    - /data/kive/media_root/
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "2770"
+    owner: kive
+    group: kive
+
+# TODO(nknight): check that the permissions for /data/kive/media_root are okay
+
+- name: kive environment configuration
+  become: true
+  become_user: kive
+  vars:
+    # TODO(nknight): figure out how to deal with Postgres password
+    kive_db_password: "fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo"
+  block: 
+    - name: set kive environment varialbes
+      blockinfile:
+        path: /home/kive/.bash_profile
+        block: |
+          # This section gets appended to the kive user's .bash_profile
+          # and to /etc/sysconfig/httpd
+          export KIVE_DB_NAME=kive
+          export KIVE_DB_USER=kive
+          export KIVE_DB_HOST=head
+          export KIVE_DB_PASSWORD={{ kive_db_password }}
+          
+          export KIVE_MEDIA_ROOT=/var/kive/media_root
+          export KIVE_STATIC_ROOT=/var/www/html/kive/static
+          export KIVE_SLURM_PATH=/opt/venv_kive/bin
+          
+          # Other settings get appended by the bootstrap script.
+        create: true  # create the file if it doesn't exist
+        backup: true
+        owner: kive
+        group: kive
+    - name: ensure kive's bashrc loads bash_profile
+      lineinfile:
+        path: "/home/kive/.bashrc"
+        line: ". ~/.bash_profile"
+        create: true  # create the file if it doesn't exist
+        backup: true
+        owner: kive
+        group: kive
