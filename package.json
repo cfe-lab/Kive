@@ -41,7 +41,7 @@
     "script-loader": "^0.7.1",
     "source-map-loader": "^0.2.1",
     "style-loader": "^1.2.1",
-    "typescript": "^3.8.3",
+    "typescript": "^3.9.2",
     "webpack": "^4.43.0"
   },
   "scripts": {
