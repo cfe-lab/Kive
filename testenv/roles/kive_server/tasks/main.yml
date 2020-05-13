@@ -1,10 +1,82 @@
 ---
 
-- name: install python3
+- name: install postgresql
   become: true
-  become_user: root
-  dnf:
-    name:
-      - python36
-      - python36-devel
-    state: latest
+  block:
+    - name: add postgresl package repository
+      dnf:
+        name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    # disable CentOS's built-in Postgres module
+    - name: disable built-in postgres module
+      command:
+        cmd: dnf -qy module disable postgresql
+        warn: false  # dnf module doesn't include this sub-command, so have to use command directly
+    - name: install postgresql
+      dnf:
+        update_cache: true
+        name:
+          - postgresql12
+          - postgresql12-server
+
+
+- name: enable postgres network traffic
+  become: true
+  block:
+    - name: ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: true
+    - name: add postgres exceptions to firewall
+      firewalld:
+        service: postgresql
+        state: enabled
+        permanent: true
+
+
+# TODO(nknight): figure out how to install psycopg2
+- name: configure postgres server
+  become: true
+  become_user: postgres
+  block:
+    - name: ensure database is initialized
+      become: true
+      become_user: root
+      command:
+        cmd: "/usr/pgsql-12/bin/postgresql-12-setup initdb"
+        creates: "/var/lib/pgsql/12/data/PG_VERSION"
+    - name: start database service
+      become: true
+      become_user: root
+      systemd:
+        name: "postgresql-12"
+        state: started
+        enabled: true
+    - name: local database settings
+      loop:
+        - name: listen_addresses
+          value: "*"
+        - name: password_encryption
+          value: scram-sha-256
+      postgresql_set:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+    - name: add kive entries to pg_hba.conf
+      loop:
+        - "127.0.0.1/32"
+        - "192.168.0.0/16"
+      postgresql_pg_hba:
+        contype: host
+        dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+        databases: kive
+        users: kive
+        address: "{{ item }}"
+        method: "scram-sha-256"
+
+
+
+# setuplib::configure_postgres_server
+
+# setuplib::kive_head
+# setuplib::kive_data ?
+# TODO(nknight): depend on slurm roles?

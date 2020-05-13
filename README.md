@@ -89,6 +89,9 @@ Extended:
 - [mysql_db](https://docs.ansible.com/ansible/latest/modules/mysql_db_module.html#mysql-db-module)
 - [get_url](https://docs.ansible.com/ansible/latest/modules/get_url_module.html)
 - [replace](https://docs.ansible.com/ansible/latest/modules/replace_module.html)
+- [firewalld](https://docs.ansible.com/ansible/latest/modules/firewalld_module.html)
+- [command](https://docs.ansible.com/ansible/latest/modules/command_module.html)
+- [Postgresql Modules](https://docs.ansible.com/ansible/latest/modules/list_of_database_modules.html#postgresql)
 
 
 # Applying a single role
