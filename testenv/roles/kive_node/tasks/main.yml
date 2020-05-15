@@ -67,3 +67,10 @@
         backup: true
         owner: kive
         group: kive
+
+- name: fetch kive source code
+  become: true
+  git:
+    dest: /usr/local/share/Kive
+    repo: https://github.com/cfe-lab/Kive.git
+    version: "{{ kive_version | default('master') }}"
