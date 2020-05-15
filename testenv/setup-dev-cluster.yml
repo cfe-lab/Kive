@@ -1,0 +1,22 @@
+---
+
+
+- hosts: head
+  vars_files:
+    - kive_dev_vars.yml
+  roles:
+    - slurm_controller
+    - slurm_worker
+    - kive_server
+
+- hosts: worker
+  vars_files:
+    - kive_dev_vars.yml
+  roles:
+    - slurm_worker
+
+
+# Extra things for a kive_dev_node role?
+# TODO(nknight): activate kive virtualenv on login
+# TODO(nknight): set dev variables (eg: db password)
+# TODO(nknight): install kive test and dev requirements

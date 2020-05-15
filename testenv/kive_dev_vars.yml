@@ -1,0 +1,4 @@
+---
+# Variables needed to set up Kive. For a production system, these should be kept secret.
+kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
+kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM

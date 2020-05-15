@@ -7,8 +7,9 @@
     system: yes
     uid: 762  # random uid in system uid range (200, 999); hard-coded for consistency across hosts
 
-# NOTE(nknight): this is done with `file` isntead of during user creation so that we
-# can set the permissions explicitly
+
+# NOTE(nknight): this is done with `file` instead of during user creation so that we
+# can set the permissions explicitly.
 - name: create kive home directory
   file:
     path: /home/kive/
@@ -16,6 +17,7 @@
     mode: "go-rx"
     group: kive
     owner: kive
+
 
 - name: create kive app directories
   become: true
@@ -30,14 +32,10 @@
     owner: kive
     group: kive
 
-# TODO(nknight): check that the permissions for /data/kive/media_root are okay
 
 - name: kive environment configuration
   become: true
   become_user: kive
-  vars:
-    # TODO(nknight): figure out how to deal with Postgres password
-    kive_db_password: "fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo"
   block: 
     - name: set kive environment varialbes
       blockinfile:
@@ -68,9 +66,62 @@
         owner: kive
         group: kive
 
+
 - name: fetch kive source code
   become: true
   git:
     dest: /usr/local/share/Kive
     repo: https://github.com/cfe-lab/Kive.git
     version: "{{ kive_version | default('master') }}"
+
+
+- name: kive package dependencies
+  become: true
+  dnf:
+    name:
+      - platform-python-devel
+      - sqlite-devel
+      - words
+      - lsof
+      - graphviz
+      - graphviz-devel
+
+
+- name: install kive python dependencies
+  become: true
+  block:
+    - name: create virtualenv
+      command:
+        cmd: python3 -m venv /opt/venv_kive
+        creates: /opt/venv_kive
+    - name: install dependencies in virtualenv
+      pip:
+        requirements: /usr/local/share/Kive/requirements.txt
+
+
+- name: install postgres database libraries
+  become: true
+  block:
+    - name: add postgresl package repository
+      dnf:
+        name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    - name: disable built-in postgres module
+      command:
+        cmd: dnf -qy module disable postgresql
+        warn: false  # dnf module doesn't include this sub-command, so have to use command directly
+    - name: install client libraries
+      dnf:
+        update_cache: true
+        name: postgresql12
+    - name: enable postgres network traffic
+      block:
+        - name: ensure firewalld is running
+          systemd:
+            name: firewalld
+            state: started
+            enabled: true
+        - name: add postgres exceptions to firewall
+          firewalld:
+            service: postgresql
+            state: enabled
+            permanent: true
