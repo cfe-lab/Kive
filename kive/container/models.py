@@ -339,7 +339,7 @@ class Container(AccessControl):
         :return:
         """
         try:
-            check_output([SINGULARITY_COMMAND, 'check', file_path], stderr=STDOUT)
+            check_output([SINGULARITY_COMMAND, 'inspect', file_path], stderr=STDOUT)
         except CalledProcessError as ex:
             logger.warning('Invalid container file:\n%s', ex.output)
             raise ValidationError(cls.DEFAULT_ERROR_MESSAGES['invalid_singularity_container'],
