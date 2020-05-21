@@ -23,6 +23,7 @@
   become: true
   loop:
     - /etc/kive/
+    - /var/kive/
     - /var/log/kive/
     - /data/kive/media_root/
   file:
@@ -36,23 +37,19 @@
 - name: kive environment configuration
   become: true
   become_user: kive
-  block: 
+  block:
     - name: set kive environment varialbes
       blockinfile:
         path: /home/kive/.bash_profile
         block: |
-          # This section gets appended to the kive user's .bash_profile
-          # and to /etc/sysconfig/httpd
-          export KIVE_DB_NAME=kive
-          export KIVE_DB_USER=kive
-          export KIVE_DB_HOST=head
+          export KIVE_DB_NAME={{ kive_db_name }}
+          export KIVE_DB_USER={{ kive_db_user }}
+          export KIVE_DB_HOST={{ kive_db_host }}
           export KIVE_DB_PASSWORD={{ kive_db_password }}
-          
-          export KIVE_MEDIA_ROOT=/var/kive/media_root
-          export KIVE_STATIC_ROOT=/var/www/html/kive/static
-          export KIVE_SLURM_PATH=/opt/venv_kive/bin
-          
-          # Other settings get appended by the bootstrap script.
+
+          export KIVE_MEDIA_ROOT={{ kive_media_root }}
+          export KIVE_STATIC_ROOT={{ kive_static_root }}
+          export KIVE_SLURM_PATH={{ kive_slurm_path }}
         create: true  # create the file if it doesn't exist
         backup: true
         owner: kive
@@ -70,7 +67,7 @@
 - name: fetch kive source code
   become: true
   git:
-    dest: /usr/local/share/Kive
+    dest: "{{ kive_root }}"
     repo: https://github.com/cfe-lab/Kive.git
     version: "{{ kive_version | default('master') }}"
 
@@ -92,11 +89,12 @@
   block:
     - name: create virtualenv
       command:
-        cmd: python3 -m venv /opt/venv_kive
-        creates: /opt/venv_kive
-    - name: install dependencies in virtualenv
+        cmd: python3 -m venv {{ kive_venv }}
+        creates: "{{ kive_venv }}"
+    - name: kive python dependencies
       pip:
-        requirements: /usr/local/share/Kive/requirements.txt
+        requirements: "{{ kive_root }}/requirements.txt"
+        virtualenv: "{{ kive_venv }}"
 
 
 - name: install postgres database libraries

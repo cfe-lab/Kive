@@ -15,8 +15,46 @@
   roles:
     - slurm_worker
 
+- hosts: head
+  vars_files:
+    - kive_dev_vars.yml
+  tasks:
+    - name: create source-able dev vars file
+      blockinfile:
+        path: /home/vagrant/kive_dev_vars
+        create: true
+        mode: "644"
+        owner: vagrant
+        block: |
+          export KIVE_DEBUG="yes"
+          export KIVE_DB_NAME="{{ kive_db_name }}"
+          export KIVE_DB_USER="{{ kive_db_user }}"
+          export KIVE_DB_HOST="{{kive_db_host }}"
+          export KIVE_DB_PASSWORD="{{ kive_db_password}}"
+
+          export KIVE_MEDIA_ROOT="{{ kive_media_root }}"
+          export KIVE_STATIC_ROOT="{{ kive_static_root }}"
+          export KIVE_SLURM_PATH="{{ kive_slurm_path }}"
+
+          export KIVE_SECRET_KEY="{{kive_server_secret_key}}"
+          export KIVE_ALLOWED_HOSTS="{{ kive_allowed_hosts | to_json }}"
+    - name: add vagrant to kive group
+      become: true
+      user:
+        name: vagrant
+        append: true
+        groups: kive
+    - name: allow traffic to dev server
+      become: true
+      firewalld:
+        port: "8080/tcp"
+        state: enabled
+        permanent: true
+        immediate: true
 
 # Extra things for a kive_dev_node role?
 # TODO(nknight): activate kive virtualenv on login
-# TODO(nknight): set dev variables (eg: db password)
 # TODO(nknight): install kive test and dev requirements
+# TODO(nknight):     sudo -u postgres psql -c 'ALTER USER kive CREATEDB;'  # Only needed to run tests.
+# TODO(nknight): vagrant entry in pg_hba.conf
+

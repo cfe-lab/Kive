@@ -1,0 +1,19 @@
+[Unit]
+Description=Purge old Kive files.
+
+[Service]
+WorkingDirectory=/usr/local/share/Kive/kive
+
+# See the relevant KIVE_PURGE_* environment variables in settings.py.
+# They can also be set in the following configuration file (using standard BASH variable assignment syntax):
+EnvironmentFile=/etc/kive/kive_purge.conf
+
+# Each service gets its own log file.
+Environment=KIVE_LOG=/var/log/kive/kive_purge.log
+
+User=kive
+
+ExecStart=/opt/venv_kive/bin/python manage.py purge
+
+# Allow the process to log its exit.
+KillSignal=SIGINT
