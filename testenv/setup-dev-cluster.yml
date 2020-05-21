@@ -1,5 +1,8 @@
 ---
+# Set up a development cluster running Kive.
 
+# The `Vagrantfile` in this directory creates VMs suitable for hosting such
+# a cluster.
 
 - hosts: head
   vars_files:
@@ -51,10 +54,3 @@
         state: enabled
         permanent: true
         immediate: true
-
-# Extra things for a kive_dev_node role?
-# TODO(nknight): activate kive virtualenv on login
-# TODO(nknight): install kive test and dev requirements
-# TODO(nknight):     sudo -u postgres psql -c 'ALTER USER kive CREATEDB;'  # Only needed to run tests.
-# TODO(nknight): vagrant entry in pg_hba.conf
-
