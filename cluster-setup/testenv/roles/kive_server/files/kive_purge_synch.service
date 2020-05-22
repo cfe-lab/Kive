@@ -1,0 +1,21 @@
+[Unit]
+Description=Purge Kive files that have no matching records in the database.
+
+[Service]
+WorkingDirectory=/usr/local/share/Kive/kive
+
+# See the relevant KIVE_PURGE_* environment variables in settings.py,
+# particularly KIVE_PURGE_WAIT that decides how long to wait until purging a
+# file with no entry in the database.
+# They can also be set in the following configuration file (using standard BASH variable assignment syntax):
+EnvironmentFile=/etc/kive/kive_purge.conf
+
+# Each service gets its own log file.
+Environment=KIVE_LOG=/var/log/kive/kive_purge_synch.log
+
+User=kive
+
+ExecStart=/opt/venv_kive/bin/python manage.py purge --synch
+
+# Allow the process to log its exit.
+KillSignal=SIGINT

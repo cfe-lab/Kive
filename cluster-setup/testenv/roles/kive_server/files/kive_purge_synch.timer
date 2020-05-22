@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer that launches the kive_purge_synch service
+
+[Timer]
+# https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
+# Weekly means Monday mornings at midnight.
+OnCalendar=weekly
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target
