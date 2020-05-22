@@ -12,7 +12,7 @@
     - slurm_worker
     - kive_server
 
-- hosts: worker
+- hosts: workers
   vars_files:
     - kive_dev_vars.yml
   roles:

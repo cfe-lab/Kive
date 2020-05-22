@@ -10,12 +10,12 @@ kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
 # The following are defaults, and probably don't need to be changed.
 # - DJango app settings
 kive_venv: /opt/venv_kive
+kive_slurm_path: "{{ kive_venv }}/bin"
 kive_db_name: kive
 kive_db_user: kive
 kive_db_host: head
 kive_media_root: /data/kive/media_root
 kive_static_root: /var/www/html/kive/static
-kive_slurm_path: "{{ kive_venv }}/bin"
 kive_root: /usr/local/share/Kive
 # - httpd configuration
 kive_httpd_user: kive

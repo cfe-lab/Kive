@@ -106,3 +106,7 @@ stack overflow answer, a single role can be run with the following command:
 
 This has more verbose output and can be run in isolation, making it suitable
 for development and debugging.
+
+
+<!-- TODO(nknight): Move ansible reference into its own document -->
+<!-- TODO(nknight): Overview of roles and environments -->

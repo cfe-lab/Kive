@@ -1,11 +1,5 @@
 ---
 
-- name: install epel-release
-  become: true
-  dnf:
-    name: epel-release
-    state: present
-
 
 - name: install and start mariadb
   become: true
