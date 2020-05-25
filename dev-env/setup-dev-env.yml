@@ -1,30 +1,20 @@
----
-# Set up a development cluster running Kive.
+# Configure a host to use as a Kive development environment.
 
-# The `Vagrantfile` in this directory creates VMs suitable for hosting such
-# a cluster.
+# The Vagrantfile in this directory creates a VM that is a suitable host.
 
 - hosts: head
   vars_files:
-    - kive_dev_vars.yml
+    - dev_env_vars.yml
   roles:
     - slurm_controller
     - slurm_worker
     - kive_server
-
-- hosts: worker
-  vars_files:
-    - kive_dev_vars.yml
-  roles:
-    - slurm_worker
-
-- hosts: head
-  vars_files:
-    - kive_dev_vars.yml
   tasks:
+    # NOTE(nknight): Some of the values in this file are sensitive and shouldn't be
+    # globally readable in production. Don't do this in any kind of sensitive environment!
     - name: create source-able dev vars file
       blockinfile:
-        path: /home/vagrant/kive_dev_vars
+        path: /tmp/kive_dev_vars
         create: true
         mode: "644"
         owner: vagrant
@@ -54,3 +44,10 @@
         state: enabled
         permanent: true
         immediate: true
+    - name: activate kive's virtualenv on vagrant login
+      blockinfile:
+        create: true
+        path: "/home/vagrant/.bash_profile"
+        block: |
+          . /opt/venv_kive/bin/activate
+          . /tmp/kive_dev_vars

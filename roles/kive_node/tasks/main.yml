@@ -54,14 +54,6 @@
         backup: true
         owner: kive
         group: kive
-    - name: ensure kive's bashrc loads bash_profile
-      lineinfile:
-        path: "/home/kive/.bashrc"
-        line: ". ~/.bash_profile"
-        create: true  # create the file if it doesn't exist
-        backup: true
-        owner: kive
-        group: kive
 
 
 - name: fetch kive source code
@@ -70,6 +62,7 @@
     dest: "{{ kive_root }}"
     repo: https://github.com/cfe-lab/Kive.git
     version: "{{ kive_version | default('master') }}"
+    update: "{{ update_kive_source | default('no') }}"
 
 
 - name: kive package dependencies

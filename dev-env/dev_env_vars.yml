@@ -2,14 +2,14 @@
 # Variables needed to set up Kive.
 kive_allowed_hosts: "[\"*\"]"
 kive_listen_port: 8080
-update_kive_source: yes
+update_kive_source: no
 
 # The following are sensitive, and should be kept secret for a production system.
 kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
 kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
 
 # The following are defaults, and probably don't need to be changed.
-# - DJango app settings
+# - Django app settings
 kive_venv: /opt/venv_kive
 kive_db_name: kive
 kive_db_user: kive
@@ -23,4 +23,5 @@ kive_httpd_user: kive
 kive_httpd_group: kive
 # - package variables
 slurmbuilddir: "/root"
+
 
