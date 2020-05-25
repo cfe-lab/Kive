@@ -51,3 +51,8 @@
         block: |
           . /opt/venv_kive/bin/activate
           . /tmp/kive_dev_vars
+    - name: install kive's dev and test dependencies
+      become: true
+      pip:
+        requirements: "{{ kive_root }}/requirements-dev.txt"
+        virtualenv: "{{ kive_venv }}"
