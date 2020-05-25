@@ -31,3 +31,16 @@
     owner: slurm
     group: slurm
     mode: "644"
+
+
+- name: open slurm ports
+  become: true
+  loop:
+    - 6817-6819/tcp
+    - 6817-6819/udp
+    - 7321/tcp
+  firewalld:
+    port: "{{ item }}"
+    state: enabled
+    permanent: true
+    immediate: true
