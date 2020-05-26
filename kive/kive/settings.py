@@ -118,6 +118,10 @@ STATICFILES_FINDERS = (
     # 'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
 
+# Add hashes to the names of static-files (to enable long cache times and 
+# avoid stale JS/CSS).
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+
 # Make this unique, and don't share it with anybody. Call this to generate a
 # new one, then set environment variable:
 # ./manage.py shell -c "import django; print(django.core.management.utils.get_random_secret_key())"
