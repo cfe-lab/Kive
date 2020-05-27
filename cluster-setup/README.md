@@ -17,7 +17,7 @@ be run from the `head` node.
 This will guide you through setting up your test environment and running your
 first Ansible commands. You'll need to have [Vagrant] and [VirtualBox] installed.
 
-To being, bring up the Vagrant VMs. This will create two VMs (`head` and
+To begin, bring up the Vagrant VMs. This will create two VMs (`head` and
 `worker`) and install Ansible on `head`.
 
     vagrant up
@@ -28,11 +28,11 @@ we'll do most of our testing and practice.
     vagrant ssh head
     cd /vagrant/testenv
 
-`ansible.cfg` contains holds the configuration for the test environment. Most
-importantly, it directs ansible to load it's inventory from
-`testenvironment/inventory.ini` instead of from the default location under `/etc`.
+`ansible.cfg` contains the configuration for the test environment. Most
+importantly, it directs ansible to load its inventory from
+`testenv/inventory.ini` instead of from the default location under `/etc`.
 
-From `./testenvironment`, you can run Ansible commands against the inventoried
+From `./testenv`, you can run Ansible commands against the inventoried
 hosts (including the head node).
 
 This command runs the Ansible's `ping` module against all hosts, which checks that
