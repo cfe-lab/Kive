@@ -3,12 +3,13 @@
 {% extends "portal/base.html" %}
 
 {% load filters %}
+{% load static %}
 
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
     <script>
     var is_owner = {{ is_owner|lower }},
         is_admin = {{ is_admin|lower }},
@@ -22,13 +23,13 @@
         });
     });
     </script>
-    <script src="/static/portal/edit_details.js"></script>
+    <script src="{% static 'portal/edit_details.js' %}"></script>
     {% block data_specific_js %}
     {% endblock %}
 {% endblock %}
 
 {% block stylesheets %}
-<link rel="stylesheet" href="/static/librarian/dataset_view.css">
+<link rel="stylesheet" href="{% static 'librarian/dataset_view.css' %}">
 {% endblock %}
 
 {% block widget_media %}

@@ -1,10 +1,11 @@
 <!-- Django template -->
-
 {% extends "portal/base.html" %}
+{% load static %}
+
 {% block title %}kive for Developers{% endblock %}
 
 {% block stylesheets %}
-<link rel="stylesheet" href="/static/portal/portal.css">
+<link rel="stylesheet" href="{% static 'portal/portal.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -12,7 +13,7 @@
 <a href="/" rel="prev">Return to homepage</a>
 
 
-<img class="header-icon" src="/static/portal/dev_icon.png">
+<img class="header-icon" src="{% static 'portal/dev_icon.png' %}">
 <h2>Developers</h2>
 
 

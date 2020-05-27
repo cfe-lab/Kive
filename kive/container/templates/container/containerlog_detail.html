@@ -1,17 +1,18 @@
 <!-- Django template -->
 
 {% extends "portal/base.html" %}
+{% load static %}
 
 {% block title %}Container Log{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/helptext.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
+    <script src="{% static 'portal/helptext.js' %}"></script>
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/librarian/dataset_view.css"/>
+    <link rel="stylesheet" href="{% static 'librarian/dataset_view.css' %}"/>
 {% endblock %}
 
 {% block widget_media %}

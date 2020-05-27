@@ -1,3 +1,5 @@
+{% load static %}
+
 <div id="{{ dlg_id }}" class="ctrl_menu">
     <h3>View Options</h3>
 
@@ -10,10 +12,10 @@
 
     <label>Align selected nodes:</label>
     <div class="form-inline-opts align-btn-grp">
-        <img src="/static/container/img/dim_x_icon.png" class="image-button align-btn" data-axis="x">
-        <img src="/static/container/img/iso_x_icon.png" class="image-button align-btn" data-axis="iso_x">
-        <img src="/static/container/img/iso_y_icon.png" class="image-button align-btn" data-axis="iso_y">
-        <img src="/static/container/img/iso_z_icon.png" class="image-button align-btn" data-axis="y">
+        <img src="{% static 'container/img/dim_x_icon.png' %}" class="image-button align-btn" data-axis="x">
+        <img src="{% static 'container/img/iso_x_icon.png' %}" class="image-button align-btn" data-axis="iso_x">
+        <img src="{% static 'container/img/iso_y_icon.png' %}" class="image-button align-btn" data-axis="iso_y">
+        <img src="{% static 'container/img/iso_z_icon.png' %}" class="image-button align-btn" data-axis="y">
     </div>
 
     <button id="id_revert">Revert</button>

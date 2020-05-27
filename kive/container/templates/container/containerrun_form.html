@@ -1,24 +1,25 @@
 <!-- Django template -->
 
 {% extends "portal/base.html" %}
+{% load static %}
 
 {% block title %}Container Run{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/permissions.js"></script>
-    <script src="/static/portal/ajaxsearchfilter.js"></script>
-    <script src="/static/portal/helptext.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
+    <script src="{% static 'portal/permissions.js' %}"></script>
+    <script src="{% static 'portal/ajaxsearchfilter.js' %}"></script>
+    <script src="{% static 'portal/helptext.js' %}"></script>
     <script>
     var is_owner = {{ is_owner|lower }},
         is_admin = {{ is_user_admin|lower }};
     </script>
-    <script src="/static/portal/edit_details.js"></script>
+    <script src="{% static 'portal/edit_details.js' %}"></script>
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="{% static 'portal/permissions.css' %}"/>
 {% endblock %}
 
 {% block widget_media %}
