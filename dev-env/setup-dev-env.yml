@@ -45,9 +45,11 @@
         permanent: true
         immediate: true
     - name: activate kive's virtualenv on vagrant login
+      become: true
+      become_user: kive
       blockinfile:
         create: true
-        path: "/home/vagrant/.bash_profile"
+        path: "/home/kive/.bash_profile"
         block: |
           . /opt/venv_kive/bin/activate
           . /tmp/kive_dev_vars

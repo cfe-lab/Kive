@@ -91,16 +91,20 @@
         name: "{{ item.name }}"
         value: "{{ item.value }}"
     - name: add kive entries to pg_hba.conf
-      loop:
-        - "127.0.0.1/32"
-        - "192.168.0.0/16"
-      postgresql_pg_hba:
-        contype: host
-        dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-        databases: kive
-        users: kive
-        address: "{{ item }}"
-        method: "scram-sha-256"
+      block:
+        - postgresql_pg_hba:
+            contype: local
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: all
+            users: kive
+            method: "scram-sha-256"
+        - postgresql_pg_hba:
+            contype: host
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: all
+            users: kive
+            source: "127.0.0.1/32"
+            method: "scram-sha-256"
 
 
 - name: kive installation
