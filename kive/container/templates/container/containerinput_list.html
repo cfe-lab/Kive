@@ -1,24 +1,25 @@
 {% extends "portal/base.html" %}
+{% load static %}
 
 {% block title %}Analysis{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/moment.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/permissions.js"></script>
-    <script src="/static/container/choose_inputs.js"></script>
-    <script src="/static/container/choose_multi_inputs.js"></script>
-    <script src="/static/portal/ajaxsearchfilter.js"></script>
-    <script src="/static/portal/helptext.js"></script>
-    <script src="/static/container/jq_color_anim.min.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/moment.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
+    <script src="{% static 'portal/permissions.js' %}"></script>
+    <script src="{% static 'container/choose_inputs.js' %}"></script>
+    <script src="{% static 'container/choose_multi_inputs.js' %}"></script>
+    <script src="{% static 'portal/ajaxsearchfilter.js' %}"></script>
+    <script src="{% static 'portal/helptext.js' %}"></script>
+    <script src="{% static 'container/jq_color_anim.min.js' %}"></script>
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/container/sandbox.css"/>
-    <link rel="stylesheet" href="/static/container/choose_inputs.css"/>
-    <link rel="stylesheet" href="/static/portal/search.css"/>
-    <link rel="stylesheet" href="/static/portal/permissions.css"/>
+    <link rel="stylesheet" href="{% static 'container/sandbox.css' %}"/>
+    <link rel="stylesheet" href="{% static 'container/choose_inputs.css' %}"/>
+    <link rel="stylesheet" href="{% static 'portal/search.css' %}"/>
+    <link rel="stylesheet" href="{% static 'portal/permissions.css' %}"/>
 {% endblock %}
 
 {% block widget_media %}

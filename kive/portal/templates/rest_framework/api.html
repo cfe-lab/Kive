@@ -1,8 +1,9 @@
 {% extends "rest_framework/base.html" %}
+{% load static %}
 
 {% block style %}
 {{ block.super }}
-<link rel="shortcut icon" type="image/png" href="/static/portal/favicon.png" />
+<link rel="shortcut icon" type="image/png" href="{% static 'portal/favicon.png' %}" />
 {% endblock %}
 
 {# This customizes the Django REST Framework's browsable API. #}

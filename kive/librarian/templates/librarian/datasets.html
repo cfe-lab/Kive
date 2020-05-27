@@ -2,17 +2,18 @@
 <!-- Display contents of Methods as a HTML table -->
 
 {% extends "portal/base.html" %}
+{% load static %}
 
 {% load filters %}
 
 {% block title %}Datasets{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/permissions.js"></script>
-    <script src="/static/librarian/DatasetsTable.js"></script>
-    <script src="/static/portal/ajaxsearchfilter.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
+    <script src="{% static 'portal/permissions.js' %}"></script>
+    <script src="{% static 'librarian/DatasetsTable.js' %}"></script>
+    <script src="{% static 'portal/ajaxsearchfilter.js' %}"></script>
     <script type="text/javascript">
     $(function(){
         var is_user_admin = {{ is_user_admin|lower }};
@@ -49,8 +50,8 @@
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/portal/permissions.css">
-    <link rel="stylesheet" href="/static/portal/search.css">
+    <link rel="stylesheet" href="{% static 'portal/permissions.css' %}">
+    <link rel="stylesheet" href="{% static 'portal/search.css' %}">
 {% endblock %}
 
 {% block content %}

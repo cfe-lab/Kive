@@ -4,12 +4,13 @@
 {% extends "portal/base.html" %}
 
 {% load filters %}
+{% load static %}
 
 {% block title %}Pipeline Lookup{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
 {% endblock %}
 
 {% block content %}

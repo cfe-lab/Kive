@@ -2,16 +2,17 @@
 <!-- View recently added bulk datasets -->
 
 {% extends "portal/base.html" %}
+{%load static %}
 
 {% block title %}Added Datasets{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/librarian/datasets_bulk.css"/>
+    <link rel="stylesheet" href="{% static 'librarian/datasets_bulk.css' %}"/>
 {% endblock %}
 
 
@@ -75,9 +76,9 @@
                         Will be handy if lots of large files -->
                         <td class="status_cell">
                             {% if dataset_form.status == "1" %}
-                            <img class="loading_img" src="/static/portal/img/fail.png" width="20" height="auto">
+                            <img class="loading_img" src="{% static 'portal/img/fail.png' %}" width="20" height="auto">
                             {% else %}
-                            <img class="loading_img" src="/static/portal/img/success.png" width="20" height="auto">
+                            <img class="loading_img" src="{% static 'portal/img/success.png' %}" width="20" height="auto">
                             {% endif %}
                         </td>
                         <td class="errortext">{{ dataset_form.non_field_errors }}</td>

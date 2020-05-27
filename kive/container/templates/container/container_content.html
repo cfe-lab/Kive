@@ -2,20 +2,21 @@
 <!-- Display contents of Methods as a HTML table -->
 
 {% extends "portal/base.html" %}
+{% load static %} 
 
 {% block title %}Pipeline{% endblock %}
 
 {% block javascript %}
     <!-- Do not remove - Accumulator still uses jQuery as a global. -->
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
 {% endblock %}
 
 {% block stylesheets %}
     <style>
         #canvas{}
     </style>
-    <link rel="stylesheet" href="/static/container/drydock.css"/>
+    <link rel="stylesheet" href="{% static 'container/drydock.css' %}"/>
 {% endblock %}
 
 {% block widget_media %}
@@ -75,6 +76,6 @@
         {% include 'container/content_output_dialog.tpl.html' with dlg_id="id_output_ctrl" %}
 
     </div>
-    <script src="/static/portal/container_content.bundle.js"></script>
+    <script src="{% static 'portal/container_content.bundle.js' %}"></script>
 
 {% endblock %}

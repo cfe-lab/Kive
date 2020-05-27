@@ -2,16 +2,17 @@
 <!-- Display container families -->
 
 {% extends "portal/base.html" %}
+{% load static %}
 
 {% block title %}Container Runs{% endblock %}
 
 {% block javascript %}
-    <script src="/static/portal/jquery-2.0.3.min.js"></script>
-    <script src="/static/portal/noxss.js"></script>
-    <script src="/static/portal/permissions.js"></script>
-    <script src="/static/container/ContainerRunTable.js"></script>
-    <script src="/static/portal/ajaxsearchfilter.js"></script>
-    <script src="/static/portal/helptext.js"></script>
+    <script src="{% static 'portal/jquery-2.0.3.min.js' %}"></script>
+    <script src="{% static 'portal/noxss.js' %}"></script>
+    <script src="{% static 'portal/permissions.js' %}"></script>
+    <script src="{% static 'container/ContainerRunTable.js' %}"></script>
+    <script src="{% static 'portal/ajaxsearchfilter.js' %}"></script>
+    <script src="{% static 'portal/helptext.js' %}"></script>
 
     <script type="text/javascript">
 
@@ -35,8 +36,8 @@
 {% endblock %}
 
 {% block stylesheets %}
-    <link rel="stylesheet" href="/static/portal/permissions.css"/>
-    <link rel="stylesheet" href="/static/portal/search.css"/>
+    <link rel="stylesheet" href="{% static 'portal/permissions.css' %}"/>
+    <link rel="stylesheet" href="{% static 'portal/search.css' %}"/>
 {% endblock %}
 
 {% block content %}

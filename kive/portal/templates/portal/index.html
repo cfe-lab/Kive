@@ -1,17 +1,18 @@
 <!-- Django template -->
-
 {% extends "portal/base.html" %}
+{% load static %}
+
 {% block title %}kive{% endblock %}
 
 {% block stylesheets %}
-<link rel="stylesheet" href="/static/portal/portal.css">
+<link rel="stylesheet" href="{% static 'portal/portal.css' %}">
 {% endblock %}
 
 {% block content %}
 <nav><ul>
     <li>
         <a href="/usr.html">
-        <img class="menu-icon" src="/static/portal/user_icon.png">
+        <img class="menu-icon" src="{% static 'portal/user_icon.png' %}">
         <h4 class="menu-item">Users</h4>
         <p class="menu-description">Upload data sets and process data using containers.</p>
         </a>
@@ -19,7 +20,7 @@
     {% if is_developer %}
     <li>
         <a href="/dev.html">
-        <img class="menu-icon" src="/static/portal/dev_icon.png">
+        <img class="menu-icon" src="{% static 'portal/dev_icon.png' %}">
         <h4 class="menu-item">Developers</h4>
         <p class="menu-description">Add or modify containers.</p>
         </a>
@@ -28,7 +29,7 @@
     {% if user.is_staff %}
     <li>
         <a href="/admin/">
-        <img class="menu-icon" src="/static/portal/admin_icon.png">
+        <img class="menu-icon" src="{% static 'portal/admin_icon.png' %}">
         <h4 class="menu-item">Administrators</h4>
         <p class="menu-description">Add, remove, or modify users and groups</p>
         </a>
