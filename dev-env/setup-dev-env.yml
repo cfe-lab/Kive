@@ -56,3 +56,9 @@
       pip:
         requirements: "{{ kive_root }}/requirements-dev.txt"
         virtualenv: "{{ kive_venv }}"
+    - name: let kive create databases for testing
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: kive
+        role_attr_flags: CREATEDB

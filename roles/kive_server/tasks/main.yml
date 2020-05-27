@@ -113,7 +113,7 @@
         creates: "{{ kive_root }}/api/build/"
     - name: collect kive's static files
       become: true
-      env:
+      environment:
         KIVE_STATIC_ROOT: "{{ kive_static_root }}"
       command:
         cmd: "{{ kive_venv }}/bin/python manage.py collectstatic --no-input"
