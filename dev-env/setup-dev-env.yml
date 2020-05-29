@@ -49,7 +49,7 @@
       become_user: kive
       blockinfile:
         create: true
-        path: "/home/kive/.bash_profile"
+        path: "/home/kive/.bashrc"
         block: |
           . /opt/venv_kive/bin/activate
           . /tmp/kive_dev_vars
