@@ -7,6 +7,7 @@ services:
 env:
   global:
     - KIVE_DB_USER=postgres
+    - KIVE_STATIC_ROOT=/tmp/kive_test_static_root
 before_install:
     - sudo apt-get install -y -q dh-autoreconf build-essential libarchive-dev squashfs-tools
     - nvm install 12.13.1
@@ -28,6 +29,7 @@ script:
   - set -e
   - npm run test:travis
   - cd kive
+  - python manage.py collectstatic --no-input
   - coverage run -m pytest --ds kive.settings_test_pg
   - cd ../api
   - coverage run --source=kiveapi -m pytest
