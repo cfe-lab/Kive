@@ -14,7 +14,7 @@ kive_venv: /opt/venv_kive
 kive_db_name: kive
 kive_db_user: kive
 kive_db_host: head
-kive_media_root: /data/kive/media_root
+kive_media_root: /tmp/kive/media_root
 kive_static_root: /var/www/html/kive/static
 kive_slurm_path: "{{ kive_venv }}/bin"
 kive_root: /usr/local/share/Kive
