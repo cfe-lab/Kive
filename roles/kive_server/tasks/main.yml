@@ -1,0 +1,190 @@
+---
+
+- name: install package dependencies
+  become: true
+  block:
+    - name: install postgresql
+      dnf:
+        name:
+          - postgresql12-server
+          - httpd
+          - python3-mod_wsgi
+
+
+- name: httpd configuration
+  become: true
+  block:
+    - name: httpd conf file
+      copy:
+        src: 001-kive.conf
+        dest: /etc/httpd/conf.d/
+    - name: server environment variables via systemd
+      blockinfile:
+        path: /etc/systemd/system/httpd.service.d/override.conf
+        create: true
+        backup: true
+        mode: "644"
+        block: |
+          [Service]
+          Environment=KIVE_DB_NAME="{{ kive_db_name }}"
+          Environment=KIVE_DB_USER="{{ kive_db_user }}"
+          Environment=KIVE_DB_HOST="{{kive_db_host }}"
+          Environment=KIVE_DB_PASSWORD="{{ kive_db_password}}"
+          Environment=KIVE_MEDIA_ROOT="{{ kive_media_root }}"
+          Environment=KIVE_STATIC_ROOT="{{ kive_static_root }}"
+          Environment=KIVE_SLURM_PATH="{{ kive_slurm_path }}"
+          Environment=KIVE_SECRET_KEY="{{kive_server_secret_key}}"
+          Environment=KIVE_ALLOWED_HOSTS="{{ kive_allowed_hosts | to_json }}"
+    - name: update httpd.conf
+      loop:
+        - from: "Listen 80$"
+          to: "Listen {{ kive_listen_port }}"
+        - from: "User apache$"
+          to: "User {{ kive_httpd_user }}"
+        - from: "Group apache$"
+          to: "Group {{kive_httpd_group }}"
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "{{ item.from }}"
+        replace: "{{ item.to }}"
+    - name: apache log purge settings
+      loop:
+        - from: 'ErrorLog "logs/error_log"'
+          to: ErrorLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/error_log.%Y-%m-%d-%H%M%S 15M
+        - from: 'CustomLog "logs/access_log" combined'
+          to: CustomLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/access_log.%Y-%m-%d-%H%M%S 15M" combined
+      replace:
+        path: /etc/httpd/conf/httpd.conf
+        regexp: "{{ item.from }}"
+        replace: "{{ item.to }}"
+    - name: enable httpd
+      systemd:
+        name: httpd
+        state: started
+        enabled: true
+
+
+- name: configure postgres server
+  become: true
+  become_user: postgres
+  block:
+    - name: ensure database is initialized
+      become: true
+      become_user: root
+      command:
+        cmd: "/usr/pgsql-12/bin/postgresql-12-setup initdb"
+        creates: "/var/lib/pgsql/12/data/PG_VERSION"
+    - name: start database service
+      become: true
+      become_user: root
+      systemd:
+        name: "postgresql-12"
+        state: started
+        enabled: true
+    - name: local database settings
+      loop:
+        - name: listen_addresses
+          value: "*"
+        - name: password_encryption
+          value: scram-sha-256
+      postgresql_set:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+    - name: add kive entries to pg_hba.conf
+      loop:
+        - "127.0.0.1/32"
+        - "192.168.0.0/16"
+      postgresql_pg_hba:
+        contype: host
+        dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+        databases: kive
+        users: kive
+        address: "{{ item }}"
+        method: "scram-sha-256"
+
+
+- name: kive installation
+  block:
+    - name: build kive API
+      become: true
+      command:
+        cmd: "{{ kive_venv }}/bin/python setup.py install"
+        chdir: "{{ kive_root }}/api/"
+        creates: "{{ kive_root }}/api/build/"
+    - name: collect kive's static files
+      become: true
+      environment:
+        KIVE_STATIC_ROOT: "{{ kive_static_root }}"
+      command:
+        cmd: "{{ kive_venv }}/bin/python manage.py collectstatic --no-input"
+        chdir: "{{ kive_root }}/kive"
+    - name: restart http server
+      become: true
+      systemd:
+        name: httpd
+        state: restarted
+
+
+- name: set up log purging
+  become: true
+  block:
+    - name: apache log purge script
+      copy:
+        src: purge_apache_logs
+        dest: /usr/sbin
+        mode: "755"
+    - name: purge service files
+      loop:
+        - kive_purge.service
+        - kive_purge.timer
+        - kive_purge_synch.service
+        - kive_purge_synch.timer
+      copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system
+    - name: purge config file
+      copy:
+        src: kive_purge.conf
+        dest: /etc/kive
+        owner: kive
+        group: kive
+    - name: enable kive_purge units
+      loop:
+        - kive_purge.service
+        - kive_purge.timer
+        - kive_purge_synch.service
+        - kive_purge_synch.timer
+      systemd:
+        name: "{{ item }}"
+        enabled: true
+    - name: start kive_purge timers
+      loop:
+        - kive_purge.timer
+        - kive_purge_synch.timer
+      systemd:
+        name: "{{ item }}"
+        state: started
+
+
+
+- name: set up kive database
+  block:
+    - name: create kive database
+      become: true
+      become_user: postgres
+      postgresql_db:
+        name: kive
+    - name: create kive database user
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: kive
+        password: "{{ kive_db_password }}"
+        db: kive
+        priv: ALL
+    - name: run django migrations
+      become: true
+      become_user: kive
+      command:
+        cmd: "{{ kive_venv }}/bin/python manage.py migrate"
+        chdir: "{{ kive_root }}/kive"

@@ -1,0 +1,59 @@
+HEAD_IP = "192.168.45.10"
+
+# Copy the test SSH keys into `/home/vagrant/.ssh/`. Keys are copied manually
+# to allow easy SSH traffic between VMs.
+def add_keys(vm)
+  vm.provision "file",
+    source: "./vagrant_testkey",
+    destination: "/home/vagrant/.ssh/id_ed25519"
+  vm.provision "file",
+    source: "./vagrant_testkey.pub",
+    destination: "/home/vagrant/.ssh/id_ed25519.pub"
+  vm.provision "shell", inline: <<-EOS
+    chmod 600 /home/vagrant/.ssh/id_ed25519
+    chmod 644 /home/vagrant/.ssh/id_ed25519.pub
+  EOS
+end
+
+# Enable SSH access by copying the test SSH public key into
+# `/home/vagrant/.ssh/authorized_keys`
+def add_key_access(vm)
+  vm.provision "file",
+    source: "./vagrant_testkey.pub",
+    destination: "/tmp/vagrant_testkey.pub"
+  vm.provision "shell", inline: <<-EOS
+    cat /tmp/vagrant_testkey.pub >> /home/vagrant/.ssh/authorized_keys
+    chmod 600 /home/vagrant/.ssh/authorized_keys
+  EOS
+end
+
+# Add a synced folder to emulate the cluster's network drive.
+def add_data_dir(vm)
+  Dir.mkdir("./data") if not Dir.exists?("./data")
+  vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
+end
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "geerlingguy/centos8"
+  
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+    vb.memory = 8 * 1024
+    vb.cpus = 4
+  end
+
+  config.vm.hostname = "head"
+  config.vm.network "private_network", ip: HEAD_IP
+  config.vm.network "forwarded_port", guest: 8080, host: 8080
+  add_keys(config.vm)
+  add_key_access(config.vm)
+  add_data_dir(config.vm)
+  config.vm.provision "shell", path: "./install-ansible.sh"
+
+  # Add mapped directory with Kive source code
+  config.vm.synced_folder "..", "/usr/local/share/Kive"
+
+  config.vm.provision "shell", inline: <<-EOS
+    echo "#{HEAD_IP}\thead" >> /etc/hosts
+  EOS
+end

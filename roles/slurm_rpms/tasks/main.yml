@@ -1,0 +1,44 @@
+---
+
+- name: build slurm RPM files
+  become: true
+  block:
+    - name: install development tools
+      dnf:
+        name: "@Development Tools"
+    - name: install slurm build requirements
+      dnf:
+        name:
+          - hwloc
+          - hwloc-devel
+          - libibmad
+          - libibumad
+          - lua
+          - lua-devel
+          - man2html
+          - mariadb-server
+          - mariadb-devel
+          - munge-devel
+          - ncurses-devel
+          - numactl
+          - numactl-devel
+          - openssl
+          - openssl-devel
+          - pam-devel
+          - perl-devel
+          - readline-devel
+          - rpm-build
+          - rrdtool-devel
+    - name: create temporary build directory
+      file:
+        path: "{{ slurmbuilddir }}"
+        state: directory
+    - name: fetch slurm source files
+      get_url:
+        url: "https://download.schedmd.com/slurm/slurm-20.02.2.tar.bz2"
+        dest: "{{ slurmbuilddir }}/slurm-20.02.2.tar.bz2"
+    - name: build slurm rpm file
+      command:
+        cmd: rpmbuild -ta slurm-20.02.2.tar.bz2
+        chdir: "{{ slurmbuilddir }}"
+        creates: "{{ slurmbuilddir }}/rpmbuild/"

@@ -1,0 +1,53 @@
+---
+
+- name: create slurm user
+  become: true
+  user:
+    name: slurm
+    system: true
+    uid: 9634
+
+- name: create slurm data directories
+  become: true
+  loop:
+    - /var/log/slurm
+    - /var/run/slurm
+    - /var/lib/slurm
+    - /etc/slurm
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: slurm
+    group: slurm
+
+- name: add slurm config files
+  become: true
+  loop:
+    - slurm.conf
+    - cgroup.conf
+  copy:
+    src: "{{ item }}"
+    dest: /etc/slurm/
+    owner: slurm
+    group: slurm
+    mode: "644"
+
+
+- name: enable slurm network access
+  become: true
+  block:
+    - name: ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: true
+    - name: open slurm ports
+      loop:
+        - 6817-6819/tcp
+        - 6817-6819/udp
+        - 7321/tcp
+      firewalld:
+        port: "{{ item }}"
+        state: enabled
+        permanent: true
+        immediate: true

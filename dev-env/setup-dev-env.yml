@@ -1,0 +1,64 @@
+# Configure a host to use as a Kive development environment.
+
+# The Vagrantfile in this directory creates a VM that is a suitable host.
+
+- hosts: head
+  vars_files:
+    - dev_env_vars.yml
+  roles:
+    - slurm_controller
+    - slurm_worker
+    - kive_server
+  tasks:
+    # NOTE(nknight): Some of the values in this file are sensitive and shouldn't be
+    # globally readable in production. Don't do this in any kind of sensitive environment!
+    - name: create source-able dev vars file
+      blockinfile:
+        path: /tmp/kive_dev_vars
+        create: true
+        mode: "644"
+        owner: vagrant
+        block: |
+          export KIVE_DEBUG="yes"
+          export KIVE_DB_NAME="{{ kive_db_name }}"
+          export KIVE_DB_USER="{{ kive_db_user }}"
+          export KIVE_DB_HOST="{{kive_db_host }}"
+          export KIVE_DB_PASSWORD="{{ kive_db_password}}"
+
+          export KIVE_MEDIA_ROOT="{{ kive_media_root }}"
+          export KIVE_STATIC_ROOT="{{ kive_static_root }}"
+          export KIVE_SLURM_PATH="{{ kive_slurm_path }}"
+
+          export KIVE_SECRET_KEY="{{kive_server_secret_key}}"
+          export KIVE_ALLOWED_HOSTS="{{ kive_allowed_hosts | to_json }}"
+    - name: add vagrant to kive group
+      become: true
+      user:
+        name: vagrant
+        append: true
+        groups: kive
+    - name: allow traffic to dev server
+      become: true
+      firewalld:
+        port: "8080/tcp"
+        state: enabled
+        permanent: true
+        immediate: true
+    - name: activate kive's virtualenv on vagrant login
+      blockinfile:
+        create: true
+        path: "/home/vagrant/.bash_profile"
+        block: |
+          . /opt/venv_kive/bin/activate
+          . /tmp/kive_dev_vars
+    - name: install kive's dev and test dependencies
+      become: true
+      pip:
+        requirements: "{{ kive_root }}/requirements-dev.txt"
+        virtualenv: "{{ kive_venv }}"
+    - name: let kive create databases for testing
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: kive
+        role_attr_flags: CREATEDB

@@ -1,0 +1,16 @@
+- hosts: head
+  tasks:
+    - name: install nodejs 12
+      become: true
+      block:
+        - name: enable nodejs 12 module
+          command:
+            warn: false
+            cmd: dnf module enable nodejs:12 --assumeyes
+        - name: install nodejs
+          dnf:
+            name: nodejs
+            state: latest
+    - name: install kive nodejs tools
+      npm:
+        path: /usr/local/share/Kive
