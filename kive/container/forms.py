@@ -59,7 +59,12 @@ class ContainerForm(ContainerUpdateForm):
         self.cleaned_data = super(ContainerForm, self).clean()
 
         # Check the file extension of the file.
-        the_file = self.cleaned_data["file"]
+        the_file = self.cleaned_data.get("file")
+        if the_file is None:
+            raise ValidationError(
+                Container.DEFAULT_ERROR_MESSAGES["invalid_archive"],
+                code="invalid_archive",
+            )
         upload_name = getattr(the_file, 'name', 'container.simg')
         upload_base, upload_ext = os.path.splitext(upload_name)
         upload_lower = upload_name.lower()

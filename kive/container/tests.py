@@ -3847,6 +3847,12 @@ echo Hello World
         self.assertTrue(form.is_valid())
         self.assertTrue(form.instance.singularity_validated)
 
+    def test_uploaded_empty(self):
+        empty_file = BytesIO(b"")
+        form = ContainerForm(self.form_data, files={"file": empty_file})
+        self.assertFalse(form.is_valid())
+        self.assertTrue(form.has_error(NON_FIELD_ERRORS, code="invalid_archive"))
+
     def test_temp_file_invalid(self):
         file_data = b'garbage content'
 

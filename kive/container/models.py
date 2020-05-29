@@ -355,6 +355,11 @@ class Container(AccessControl):
         Confirm that the file is of the correct type.
         :return:
         """
+        if not self.file:
+            raise ValidationError(
+                self.DEFAULT_ERROR_MESSAGES["invalid_archive"],
+                code="invalid_archive",
+            )
         if self.file_type == Container.SIMG:
             if self.parent is not None:
                 raise ValidationError(self.DEFAULT_ERROR_MESSAGES["singularity_cannot_have_parent"],
