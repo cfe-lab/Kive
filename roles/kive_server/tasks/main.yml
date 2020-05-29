@@ -187,6 +187,12 @@
         db: kive
         priv: ALL
     - name: run django migrations
+      tags: apropos
+      environment:
+          KIVE_DB_NAME: "{{ kive_db_name }}"
+          KIVE_DB_USER: "{{ kive_db_user }}"
+          KIVE_DB_HOST: "{{kive_db_host }}"
+          KIVE_DB_PASSWORD: "{{ kive_db_password}}"
       become: true
       become_user: kive
       command:
