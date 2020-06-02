@@ -325,13 +325,13 @@ class Command(BaseCommand):
         for file_path in sandbox_files:
             file_size = self.get_file_size(file_path, newest_allowed)
             if file_size is None:
-                return  # File was too new.
+                return  # File was too new, or was deleted (indicating an active run).
             size_accumulator += file_size
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
     @staticmethod
     def get_file_size(file_path, newest_allowed=None):
-        """ Get the size of a file, if it's not too new.
+        """ Get the size of a file, if it exists and isn't too new.
 
         :param str file_path: the absolute path of the file to check
         :param datetime newest_allowed: if the file is newer than this,
@@ -342,7 +342,10 @@ class Command(BaseCommand):
         if os.path.islink(file_path):
             file_stat = os.lstat(file_path)
         else:
-            file_stat = os.stat(file_path)
+            try:
+                file_stat = os.stat(file_path)
+            except FileNotFoundError:
+                return
         if newest_allowed is not None:
             modification_time = datetime.fromtimestamp(
                 file_stat.st_mtime,
@@ -409,7 +412,7 @@ class Command(BaseCommand):
             else:
                 file_size = self.get_file_size(file_path, remove_older_than)
                 if file_size is None:
-                    continue  # File was too new.
+                    continue  # File was too new or already deleted.
                 os.remove(file_path)
             logger.warning(
                 'Purged unregistered file %r containing %s.',
