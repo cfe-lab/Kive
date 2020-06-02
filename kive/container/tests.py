@@ -1,6 +1,4 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
 import json
 import logging
 import os
@@ -3777,6 +3775,19 @@ Purged 1 unregistered container file containing 400 bytes.
 
         self.assertEqual(Container.UPLOAD_DIR, path_prefix)
         self.assertLogStreamEqual(expected_log_messages, log_messages)
+
+    @patch("os.stat")
+    @patch("os.path.islink")
+    def test_skip_deleting_missing_file(self, islink, stat):
+        islink.return_value = False
+        stat.side_effect = OSError(2, "No such file or directory")
+        fakepath = "fake_file_path"
+
+        size = purge.Command.get_file_size(fakepath)
+
+        self.assertIsNone(size)
+        islink.assert_called_with(fakepath)
+        stat.assert_called_with(fakepath)
 
 
 @skipIfDBFeature('is_mocked')

@@ -329,7 +329,8 @@ class Command(BaseCommand):
             size_accumulator += file_size
         return size_accumulator  # we don't set self.sandbox_size here, we do that explicitly elsewhere.
 
-    def get_file_size(self, file_path, newest_allowed=None):
+    @staticmethod
+    def get_file_size(file_path, newest_allowed=None):
         """ Get the size of a file, if it's not too new.
 
         :param str file_path: the absolute path of the file to check
