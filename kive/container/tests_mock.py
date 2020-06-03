@@ -1036,14 +1036,14 @@ class RunContainerMockTests(TestCase):
     def test_build_dataset_name(self):
         run = ContainerRun(id=42)
         handler = runcontainer.Command()
-        
+
         scenarios = [('example_csv', 'example_42.csv'),
                      ('example_tar_gz', 'example_42.tar.gz'),
                      ('csv', '42.csv'),
                      ('_csv', '_42.csv'),
                      ('_', '__42'),
                      ('no_extension', 'no_extension_42')]
-        
+
         for argument_name, expected_dataset_name in scenarios:
             dataset_name = handler.build_dataset_name(run, argument_name)
 

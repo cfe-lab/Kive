@@ -19,9 +19,9 @@ try:
     output = csv.writer(csvfile)
     output.writerow(['FASTA header', 'FASTA sequence'])
     header = ''
-    
+
     with open(args.input_fasta, "rb") as f:
-        try:            
+        try:
             sequence = ''
             for line in f:
                 if line.startswith('>'):
@@ -31,14 +31,14 @@ try:
                     header = line.lstrip('>').rstrip('\n')
                 else:
                     sequence += line.strip('\n').upper()
-            
+
             output.writerow([header, sequence])
-                
+
         except:
             print('Error parsing FASTA file')
             raise
             sys.exit(1)
-    
+
     csvfile.close()
     # If no errors, return with code 0 (success)
     sys.exit(0)

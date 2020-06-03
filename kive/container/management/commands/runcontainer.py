@@ -165,7 +165,7 @@ class Command(BaseCommand):
                 folder = '/mnt/output'
             command.append(os.path.join(folder, argument.name))
         return command
-    
+
     def build_dataset_name(self, run, argument_name):
         parts = argument_name.split('_')
         extension = parts[-1]

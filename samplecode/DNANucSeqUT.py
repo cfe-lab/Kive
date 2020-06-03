@@ -22,7 +22,7 @@ def is_nucleotide_sequence(possible_seq):
         result = True;
 
     return(result);
-    
+
 
 # Driver code
 if __name__ == "__main__":
