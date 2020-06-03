@@ -731,7 +731,7 @@ class ContainerApiTests(BaseTestCases.ApiTestCase):
             'singularity',
             'python2-alpine-trimmed.simg'))
         self.assertTrue(os.path.exists(self.image_path), self.image_path)
-    
+
     def test_removal(self):
         request = self.factory.delete(self.removal_path)
         force_authenticate(request, user=self.kive_user)

@@ -28,7 +28,7 @@ From: python:2.7.15-alpine3.6
     # mkdir /mnt/input
     # mkdir /mnt/output
     # mkdir /mnt/bin
-    
+
     # Trim a bunch of extra features to reduce image size by about 25%.
     cd /usr/local/lib/python2.7
     rm -r site-packages/* ensurepip hotshot distutils curses

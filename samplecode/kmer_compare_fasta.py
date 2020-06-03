@@ -5,7 +5,7 @@ import re
 import csv
 
 scriptDescription = 'Count all shared k-mers between every pair of sequences \
-between two FASTAs using a very simple direct lookup of Python dicts.' 
+between two FASTAs using a very simple direct lookup of Python dicts.'
 
 parser = argparse.ArgumentParser(scriptDescription);
 
@@ -61,17 +61,17 @@ for h, s in rows:
     for ref, kdict in dref.iteritems():
         numer = 0
         denom = 0
-        for kmer, ref_count in kdict.iteritems():        
+        for kmer, ref_count in kdict.iteritems():
             query_count = len(re.findall('(?=%s)' % kmer.replace('?', '\?'), s))
             numer += query_count * ref_count
             denom += ref_count * ref_count
-        
+
         score = float(numer) / denom
         if score > best_score:
             best_score = score
             best_ref = ref
     outfile.writerow([h, best_ref, best_score])
-    
+
 f2.close()
 f.close()
 
