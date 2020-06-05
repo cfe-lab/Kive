@@ -12,6 +12,7 @@ from io import BytesIO
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
 from time import time
+import unittest.mock
 from zipfile import ZipFile
 from filecmp import cmp
 
@@ -3093,6 +3094,65 @@ Line 3
 
         self.assertEqual(len(args), 2, "Expected run to have two arguments")
         self.assertEqual(expected, command[-len(expected):])
+
+    def test_argument_formatting(self):
+        # Set up test data
+        argspecs = [
+            {"name": "positional_input_1", "position": 0, "type": ContainerArgument.INPUT},
+            {"name": "positional_input_2", "position": 1, "type": ContainerArgument.INPUT},
+            {"name": "positional_output_1", "position": 2, "type": ContainerArgument.OUTPUT},
+            {"name": "optional_input_1", "position": None, "type": ContainerArgument.INPUT, "allow_multiple": True},
+            {"name": "optional_output_1", "position": None, "type": ContainerArgument.OUTPUT, "allow_multiple": True},
+        ]
+
+        app = ContainerApp(
+            container=Container.objects.get(pk=1),
+        )
+        app.save()
+
+        for spec in argspecs:
+            arg = ContainerArgument(app=app, **spec)
+            arg.save()
+
+        mock_run = unittest.mock.Mock()
+        mock_run.app = app
+        mock_run.container.file.path = "mock_container_path"
+        mock_run.full_sandbox_path = "mock_sandbox_path"
+
+        # Exercise method under test
+        full_command = runcontainer.Command.build_command(mock_run)
+
+        # Catch changes to the command list's length
+        self.assertNotIn("--app", full_command, "Unexpected '--app' name in command")
+        command_args = full_command[7:]
+
+        # Parse optional and positional args
+        self.assertIn(
+            "--",
+            command_args,
+            "Expected optional and positional args to be separated by '--'",
+        )
+        keyword_args = []
+        positional_args = []
+        command_args.reverse()
+        while command_args[-1] != "--":
+            keyword_args.append(command_args.pop())
+        positional_args = list(reversed(command_args[:-1]))
+
+        # Check command formatting
+        self.assertEqual(
+            ["/mnt/input/positional_input_1", "/mnt/input/positional_input_2", "/mnt/output/positional_output_1"],
+            positional_args,
+        )
+
+        keyword_arg_pairs = dict(zip(keyword_args[0::2], keyword_args[1::2]))
+        self.assertEqual(
+            keyword_arg_pairs,
+            {
+                "--optional_input_1": "optional_input_1",
+                "--optional_output_1": "optional_output_1",
+            }
+        )
 
 
 @skipIfDBFeature('is_mocked')
