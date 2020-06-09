@@ -4323,3 +4323,78 @@ class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class ContainerArgumentTests(TestCase):
+
+    def test_required_poly_input_is_forbidden(self):
+        with self.assertRaises(ValidationError):
+            arg = ContainerArgument(
+                position=0, type=ContainerArgument.INPUT, allow_multiple=True,
+            )
+            arg.argtype
+
+    def test_argument_classification(self):
+        from container.models import ContainerArgumentType
+        specs = [
+            (
+                ContainerArgumentType.FIXED_INPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.FIXED_OUTPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.OPTIONAL_INPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.OPTIONAL_OUTPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": True,
+                },
+            ),
+            (
+                ContainerArgumentType.OPTIONAL_DIRECTORY_OUTPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": True,
+                },
+            ),
+            (
+                ContainerArgumentType.FIXED_DIRECTORY_OUTPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": True,
+                },
+            ),
+        ]
+
+        for expected_type, kwargs in specs:
+            arg = ContainerArgument(name="test_arg", **kwargs)
+            self.assertEqual(expected_type, arg.argtype)

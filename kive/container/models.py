@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+import enum
 import errno
 import hashlib
 import json
@@ -879,6 +879,19 @@ class ContainerApp(models.Model):
         remove_helper(removal_plan)
 
 
+@enum.unique
+class ContainerArgumentType(enum.Enum):
+    FIXED_INPUT = 1
+    FIXED_OUTPUT = 2
+    OPTIONAL_INPUT = 3
+    OPTIONAL_OUTPUT = 5
+    OPTIONAL_MULTIPLE_INPUT = 4
+    OPTIONAL_DIRECTORY_OUTPUT = 6
+    FIXED_DIRECTORY_OUTPUT = 7
+    # NOTE(nknight): Fixed position multiple-input arguments are forbidden, as
+    # they would make argument parsing in pipelines ambiguous.
+
+
 class ContainerArgument(models.Model):
     INPUT = 'I'
     OUTPUT = 'O'
@@ -920,6 +933,36 @@ class ContainerArgument(models.Model):
         if self.allow_multiple:
             text += '*' if self.type == ContainerArgument.INPUT else '/'
         return text
+
+    @property
+    def argtype(self) -> ContainerArgumentType:
+        if self.position is not None:
+            if self.allow_multiple:
+                if self.type == self.INPUT:
+                    raise ValidationError("Multi-valued positional input argumens are not allowed")
+                elif self.type == self.OUTPUT:
+                    return ContainerArgumentType.FIXED_DIRECTORY_OUTPUT
+            else:
+                if self.type == self.INPUT:
+                    return ContainerArgumentType.FIXED_INPUT
+                elif self.type == self.OUTPUT:
+                    return ContainerArgumentType.FIXED_OUTPUT
+        else:
+            if self.allow_multiple:
+                if self.type == self.INPUT:
+                    return ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+                elif self.type == self.OUTPUT:
+                    return ContainerArgumentType.OPTIONAL_DIRECTORY_OUTPUT
+            else:
+                if self.type == self.INPUT:
+                    return ContainerArgumentType.OPTIONAL_INPUT
+                elif self.type == self.OUTPUT:
+                    return ContainerArgumentType.OPTIONAL_OUTPUT
+        # If the above fell through, something is asmiss with the parameters.
+        raise ValidationError(
+            "Could not assigned valid ContainerArgumentType: "
+            "invalid parameters"
+        )
 
 
 @receiver(models.signals.post_delete, sender=Container)
