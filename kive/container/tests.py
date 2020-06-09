@@ -3077,6 +3077,23 @@ Line 3
 
         self.assert_run_fails(run4, 'RuntimeError: Inputs missing from reruns')
 
+    def test_fixed_argument_formatting(self):
+        app = ContainerApp.objects.first()
+        run = app.runs.first()
+        args = list(app.arguments.all())
+        # TODO(nknight): this could be a classmethod
+        command = runcontainer.Command().build_command(run)
+
+        expected = []
+        for arg in args:
+            if arg.type == ContainerArgument.INPUT:
+                expected.append("/mnt/input/{}".format(arg.name))
+            else:
+                expected.append("/mnt/output/{}".format(arg.name))
+
+        self.assertEqual(len(args), 2, "Expected run to have two arguments")
+        self.assertEqual(expected, command[-len(expected):])
+
 
 @skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):
