@@ -881,15 +881,11 @@ class ContainerApp(models.Model):
 
 @enum.unique
 class ContainerArgumentType(enum.Enum):
-    FIXED_INPUT = 1
-    FIXED_OUTPUT = 2
-    OPTIONAL_INPUT = 3
-    OPTIONAL_OUTPUT = 5
-    OPTIONAL_MULTIPLE_INPUT = 4
-    OPTIONAL_DIRECTORY_OUTPUT = 6
-    FIXED_DIRECTORY_OUTPUT = 7
-    # NOTE(nknight): Fixed position multiple-input arguments are forbidden, as
-    # they would make argument parsing in pipelines ambiguous.
+    FIXED_INPUT = enum.auto()
+    FIXED_OUTPUT = enum.auto()
+    OPTIONAL_INPUT = enum.auto()
+    OPTIONAL_MULTIPLE_INPUT = enum.auto()
+    FIXED_DIRECTORY_OUTPUT = enum.auto()
 
 
 class ContainerArgument(models.Model):
@@ -897,6 +893,16 @@ class ContainerArgument(models.Model):
     OUTPUT = 'O'
     TYPES = ((INPUT, 'Input'),
              (OUTPUT, 'Output'))
+
+    KEYWORD_ARG_TYPES = set([
+        ContainerArgumentType.OPTIONAL_INPUT,
+        ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+    ])
+    FIXED_ARG_TYPES = set([
+        ContainerArgumentType.FIXED_INPUT,
+        ContainerArgumentType.FIXED_OUTPUT,
+        ContainerArgumentType.FIXED_DIRECTORY_OUTPUT,
+    ])
 
     app = models.ForeignKey(ContainerApp,
                             related_name="arguments",
@@ -948,16 +954,13 @@ class ContainerArgument(models.Model):
                 elif self.type == self.OUTPUT:
                     return ContainerArgumentType.FIXED_OUTPUT
         else:
-            if self.allow_multiple:
-                if self.type == self.INPUT:
+            if self.type == self.INPUT:
+                if self.allow_multiple:
                     return ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-                elif self.type == self.OUTPUT:
-                    return ContainerArgumentType.OPTIONAL_DIRECTORY_OUTPUT
-            else:
-                if self.type == self.INPUT:
+                else:
                     return ContainerArgumentType.OPTIONAL_INPUT
-                elif self.type == self.OUTPUT:
-                    return ContainerArgumentType.OPTIONAL_OUTPUT
+            else:
+                raise ValidationError("Optional output arguments are not allowed")
         # If the above fell through, something is asmiss with the parameters.
         raise ValidationError(
             "Could not assigned valid ContainerArgumentType: "

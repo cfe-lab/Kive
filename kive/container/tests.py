@@ -3082,8 +3082,7 @@ Line 3
         app = ContainerApp.objects.first()
         run = app.runs.first()
         args = list(app.arguments.all())
-        # TODO(nknight): this could be a classmethod
-        command = runcontainer.Command().build_command(run)
+        command = runcontainer.Command.build_command(run)
 
         expected = []
         for arg in args:
@@ -3091,18 +3090,31 @@ Line 3
                 expected.append("/mnt/input/{}".format(arg.name))
             else:
                 expected.append("/mnt/output/{}".format(arg.name))
-
         self.assertEqual(len(args), 2, "Expected run to have two arguments")
         self.assertEqual(expected, command[-len(expected):])
 
-    def test_argument_formatting(self):
+    def test_full_argument_formatting(self):
         # Set up test data
+        # NOTE(nknight): The order of these specs matters; it matches the order that the
+        # associated ContainerDataset objects would be returned from the database.
         argspecs = [
-            {"name": "positional_input_1", "position": 0, "type": ContainerArgument.INPUT},
-            {"name": "positional_input_2", "position": 1, "type": ContainerArgument.INPUT},
-            {"name": "positional_output_1", "position": 2, "type": ContainerArgument.OUTPUT},
-            {"name": "optional_input_1", "position": None, "type": ContainerArgument.INPUT, "allow_multiple": True},
-            {"name": "optional_output_1", "position": None, "type": ContainerArgument.OUTPUT, "allow_multiple": True},
+            {
+                "name": "positional_input",
+                "position": 0,
+                "type": ContainerArgument.INPUT,
+            },
+            {
+                "name": "positional_output",
+                "position": 2,
+                "type": ContainerArgument.OUTPUT
+            },
+            {
+                "name": "optional_input",
+                "position": None,
+                "type": ContainerArgument.INPUT,
+            },
+            # TODO(nknight): Add spec for an optional multiple input
+            # TODO(nknight): Add spec for a positional output directory
         ]
 
         app = ContainerApp(
@@ -3110,14 +3122,22 @@ Line 3
         )
         app.save()
 
-        for spec in argspecs:
-            arg = ContainerArgument(app=app, **spec)
+        args = [ContainerArgument(app=app, **spec) for spec in argspecs]
+        for arg in args:
             arg.save()
+
+        datasets = []
+        for arg in (a for a in args if a.type == ContainerArgument.INPUT):
+            dataset = unittest.mock.Mock()
+            dataset.argument = arg
+            dataset.name = arg.name
+            datasets.append(dataset)
 
         mock_run = unittest.mock.Mock()
         mock_run.app = app
         mock_run.container.file.path = "mock_container_path"
         mock_run.full_sandbox_path = "mock_sandbox_path"
+        mock_run.datasets.all = unittest.mock.Mock(return_value=iter(datasets))
 
         # Exercise method under test
         full_command = runcontainer.Command.build_command(mock_run)
@@ -3141,7 +3161,10 @@ Line 3
 
         # Check command formatting
         self.assertEqual(
-            ["/mnt/input/positional_input_1", "/mnt/input/positional_input_2", "/mnt/output/positional_output_1"],
+            [
+                "/mnt/input/positional_input",
+                "/mnt/output/positional_output",
+            ],
             positional_args,
         )
 
@@ -3149,8 +3172,7 @@ Line 3
         self.assertEqual(
             keyword_arg_pairs,
             {
-                "--optional_input_1": "optional_input_1",
-                "--optional_output_1": "optional_output_1",
+                "--optional_input": "/mnt/input/optional_input",
             }
         )
 
