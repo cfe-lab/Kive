@@ -16,6 +16,7 @@ from subprocess import STDOUT, CalledProcessError, check_output, check_call
 import tarfile
 from tarfile import TarFile, TarInfo
 from tempfile import mkdtemp, mkstemp
+import typing
 import shutil
 import io
 from io import BytesIO
@@ -941,12 +942,11 @@ class ContainerArgument(models.Model):
         return text
 
     @property
-    def argtype(self) -> ContainerArgumentType:
+    def argtype(self) -> typing.Optional[ContainerArgumentType]:
+        "Classify this argument, or return None if it's unclassifiable."
         if self.position is not None:
             if self.allow_multiple:
-                if self.type == self.INPUT:
-                    raise ValidationError("Multi-valued positional input argumens are not allowed")
-                elif self.type == self.OUTPUT:
+                if self.type == self.OUTPUT:
                     return ContainerArgumentType.FIXED_DIRECTORY_OUTPUT
             else:
                 if self.type == self.INPUT:
@@ -959,14 +959,12 @@ class ContainerArgument(models.Model):
                     return ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
                 else:
                     return ContainerArgumentType.OPTIONAL_INPUT
-            else:
-                raise ValidationError("Optional output arguments are not allowed")
-        # If the above fell through, something is asmiss with the parameters.
-        raise ValidationError(
-            "Could not assigned valid ContainerArgumentType: "
-            "invalid parameters"
-        )
+        # If the above fell through, the model is in a corrupted or partially
+        # initialized state, and cannot assigned a type.
 
+    def clean(self):
+        if self.argtype is None:
+            raise ValidationError("Could not assign a ContainerArgumentType to this argument")
 
 @receiver(models.signals.post_delete, sender=Container)
 def delete_container_file(instance, **_kwargs):

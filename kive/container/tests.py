@@ -2799,7 +2799,9 @@ Line 3
         """ Configure an extra output that the image doesn't know about. """
         run = ContainerRun.objects.get(name='fixture run')
         dataset = Dataset.objects.first()
-        extra_arg = run.app.arguments.create(name='extra_csv')
+        extra_arg = run.app.arguments.create(name='extra_csv',
+                                             position=None,
+                                             type=ContainerArgument.INPUT)
         run.datasets.create(argument=extra_arg, dataset=dataset)
 
         call_command('runcontainer', str(run.id))
@@ -4354,7 +4356,7 @@ class ContainerArgumentTests(TestCase):
             arg = ContainerArgument(
                 position=0, type=ContainerArgument.INPUT, allow_multiple=True,
             )
-            arg.argtype
+            arg.clean()
 
     def test_argument_classification(self):
         from container.models import ContainerArgumentType
@@ -4383,14 +4385,7 @@ class ContainerArgumentTests(TestCase):
                     "allow_multiple": False,
                 },
             ),
-            (
-                ContainerArgumentType.OPTIONAL_OUTPUT,
-                {
-                    "position": None,
-                    "type": ContainerArgument.OUTPUT,
-                    "allow_multiple": False,
-                },
-            ),
+
             (
                 ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
                 {
@@ -4399,14 +4394,7 @@ class ContainerArgumentTests(TestCase):
                     "allow_multiple": True,
                 },
             ),
-            (
-                ContainerArgumentType.OPTIONAL_DIRECTORY_OUTPUT,
-                {
-                    "position": None,
-                    "type": ContainerArgument.OUTPUT,
-                    "allow_multiple": True,
-                },
-            ),
+
             (
                 ContainerArgumentType.FIXED_DIRECTORY_OUTPUT,
                 {
