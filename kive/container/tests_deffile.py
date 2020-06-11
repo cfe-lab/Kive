@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
 """Test module for deffile.py"""
 
-from __future__ import unicode_literals
 from django.test import TestCase
 
 import container.deffile as deffile

@@ -90,7 +90,7 @@ class IsDeveloperOrGrantedReadOnly(IsGrantedReadOnly):
         return developer_check(request.user) and request.method in ("POST", "PATCH")
 
 
-class GrantedModelMixin(object):
+class GrantedModelMixin:
     """ Filter instances that the user has been granted access to.
 
     Mix this in with a view set to add a query parameter:
@@ -120,7 +120,7 @@ class GrantedModelMixin(object):
                                             queryset=queryset)
 
 
-class RedactModelMixin(object):
+class RedactModelMixin:
     """ Redacts a model instance and build a redaction plan.
 
     Mix this in with a view set to provide default behaviour for data redaction.

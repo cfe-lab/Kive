@@ -1,6 +1,4 @@
 #! /opt/venv_kive/bin/python
-from __future__ import print_function
-
 import logging
 
 import psycopg2

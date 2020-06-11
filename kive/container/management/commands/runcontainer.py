@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import errno
 import logging
 import os
@@ -358,7 +356,7 @@ class Command(BaseCommand):
         return final_return_code
 
 
-class DependencyFilter(object):
+class DependencyFilter:
     def __init__(self, archive_directory, step):
         self.archive_directory = archive_directory
         # The dependencies list is only used when converting old pipelines.

@@ -64,7 +64,7 @@ logger = miseq_logging.init_logging_console_only(logging.DEBUG)
 MAX_CUTOFF = 'MAX'
 
 
-class SequenceReport(object):
+class SequenceReport:
     """ Hold the data for several reports related to a sample's genetic sequence.
 
     To use a report object, read a group of aligned reads that mapped to a
@@ -519,7 +519,7 @@ class SequenceReport(object):
                                      self.reports[coordinate_name])
 
 
-class SeedAmino(object):
+class SeedAmino:
     """
     Records the frequencies of amino acids at a given position of the
     aligned reads as determined by the consensus sequence.
@@ -564,7 +564,7 @@ class SeedAmino(object):
         return '-' if not consensus else consensus[0][0]
 
 
-class SeedNucleotide(object):
+class SeedNucleotide:
     """
     Records the frequencies of nucleotides at a given position of the
     aligned reads as determined by the consensus sequence.
@@ -634,7 +634,7 @@ class SeedNucleotide(object):
         return consensus
 
 
-class ReportAmino(object):
+class ReportAmino:
     def __init__(self, seed_amino, position):
         """ Create a new instance.
 
@@ -647,7 +647,7 @@ class ReportAmino(object):
         return 'ReportAmino({!r}, {})'.format(self.seed_amino, self.position)
 
 
-class InsertionWriter(object):
+class InsertionWriter:
     def __init__(self, insert_file):
         """ Initialize a writer object.
 
