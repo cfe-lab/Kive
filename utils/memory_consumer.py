@@ -40,7 +40,7 @@ def parse_args():
     return parser.parse_args()
 
 
-class Consumer(object):
+class Consumer:
     def __init__(self,
                  size=1,
                  grow=1,

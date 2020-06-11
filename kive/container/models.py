@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 import enum
 import errno
 import hashlib
@@ -109,7 +108,7 @@ class ContainerFamily(AccessControl):
         blank=True)
     containers = None  # Filled in later from child table.
 
-    class Meta(object):
+    class Meta:
         ordering = ['name']
 
     def __str__(self):
@@ -144,7 +143,7 @@ class ChildNotConfigured(Exception):
     pass
 
 
-class PipelineCompletionStatus(object):
+class PipelineCompletionStatus:
     def __init__(self, pipeline):
         self.has_inputs = False
         self.has_steps = False
@@ -709,7 +708,7 @@ class Container(AccessControl):
             yield os.path.join(relative_root, file_name)
 
 
-class ZipHandler(object):
+class ZipHandler:
     MemberInfo = namedtuple('MemberInfo', 'name original')
 
     def __init__(self, fileobj=None, mode='r', archive=None):
@@ -922,7 +921,7 @@ class ContainerArgument(models.Model):
 
     objects = None  # Filled in later by Django.
 
-    class Meta(object):
+    class Meta:
         ordering = ('app_id', 'type', 'position', 'name')
 
     def __repr__(self):
@@ -988,7 +987,7 @@ class Batch(AccessControl):
 
     runs = None  # Filled in later by Django.
 
-    class Meta(object):
+    class Meta:
         ordering = ('-id',)
 
     def __str__(self):
@@ -1103,7 +1102,7 @@ class ContainerRun(Stopwatch, AccessControl):
         default=False,
         help_text="True if a warning was logged because the Slurm job failed.")
 
-    class Meta(object):
+    class Meta:
         ordering = ('-submit_time',)
 
     def __str__(self):
@@ -1457,7 +1456,7 @@ class ContainerDataset(models.Model):
 
     objects = None  # Filled in later by Django.
 
-    class Meta(object):
+    class Meta:
         ordering = ('run',
                     'argument__type',
                     'argument__position',

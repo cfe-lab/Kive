@@ -809,7 +809,7 @@ def map_to_reference(fastq1,
     return unmapped_count
 
 
-class MixedReferenceSplitter(object):
+class MixedReferenceSplitter:
     def __init__(self):
         self.splits = {}
 

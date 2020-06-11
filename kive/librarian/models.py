@@ -4,8 +4,6 @@ librarian.models
 Shipyard data models pertaining to the lookup of the past: ExecRecord,
 Dataset, etc.
 """
-from __future__ import unicode_literals
-
 import csv
 import logging
 import os

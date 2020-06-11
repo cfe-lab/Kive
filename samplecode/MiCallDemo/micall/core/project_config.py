@@ -2,7 +2,7 @@ import json
 import os
 
 
-class ProjectConfig(object):
+class ProjectConfig:
     @classmethod
     def search(cls, project_paths):
         projects = None

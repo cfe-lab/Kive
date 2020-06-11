@@ -1,4 +1,3 @@
-from __future__ import print_function
 from datetime import datetime
 import json
 import os
@@ -18,7 +17,7 @@ from librarian.models import Dataset
 from portal.management.commands.reset import Command as ResetCommand
 
 
-class FixtureBuilder(object):
+class FixtureBuilder:
     def __init__(self):
         self.next_output_num = self.next_step_num = 1
 

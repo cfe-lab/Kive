@@ -5,7 +5,7 @@ object, and some support methods.
 from . import KiveMalformedDataException
 
 
-class Dataset(object):
+class Dataset:
     """
     A wrapper class for Kive's Dataset object
     """

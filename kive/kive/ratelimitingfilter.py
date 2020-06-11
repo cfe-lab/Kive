@@ -105,7 +105,7 @@ class RateLimitingFilter(logging.Filter):
         return self._auto_buckets[record.msg]
 
 
-class TokenBucket(object):
+class TokenBucket:
     """
     An implementation of the Token Bucket algorithm.
     """

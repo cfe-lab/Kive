@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import unicode_literals
-
 from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
 from csv import DictWriter
 import os
@@ -26,7 +24,7 @@ def parse_args():
     return parser.parse_args()
 
 
-class ZoneInfoScanner(object):
+class ZoneInfoScanner:
     def __init__(self, zone_info):
         self.zone_info = zone_info
 
@@ -63,7 +61,7 @@ class ZoneInfoScanner(object):
                 i += 1
 
 
-class LogWriter(object):
+class LogWriter:
     def __init__(self, log):
         self.log = log
         self.writer = None

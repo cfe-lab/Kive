@@ -1,5 +1,3 @@
-from __future__ import unicode_literals
-
 from argparse import Namespace, ArgumentTypeError
 from datetime import datetime, timedelta
 from io import StringIO

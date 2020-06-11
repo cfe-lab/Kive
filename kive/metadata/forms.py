@@ -14,7 +14,7 @@ class UsersAllowedWidget(forms.SelectMultiple):
     """
     A sub-widget of the PermissionsWidget.  This should not be created on its own.
     """
-    class Media(object):
+    class Media:
         css = {
             "all": ("metadata/accumulator.css",)
         }
@@ -25,7 +25,7 @@ class GroupsAllowedWidget(forms.SelectMultiple):
     """
     A sub-widget of the PermissionsWidget.  This should not be created on its own.
     """
-    class Media(object):
+    class Media:
         css = {
             "all": ("metadata/accumulator.css",)
         }

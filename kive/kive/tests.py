@@ -23,7 +23,7 @@ from constants import users
 from metadata.models import kive_user, KiveUser
 
 
-class DuckRequest(object):
+class DuckRequest:
     """ A fake request used to test serializers. """
     def __init__(self, user=None):
         self.user = user or kive_user()
@@ -70,7 +70,7 @@ class ViewMockTestCase(TestCase, object):
         return client
 
 
-class BaseTestCases(object):
+class BaseTestCases:
     """ A class to hide our base classes so they won't be executed as tests.
     """
     def __init__(self):
