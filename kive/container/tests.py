@@ -3144,38 +3144,16 @@ Line 3
         # Exercise method under test
         full_command = runcontainer.Command.build_command(mock_run)
 
-        # Catch changes to the command list's length
+        # Ignore unrelated changes in the command format
         self.assertNotIn("--app", full_command, "Unexpected '--app' name in command")
         command_args = full_command[7:]
 
-        # Parse optional and positional args
-        self.assertIn(
-            "--",
+        self.assertEqual(
             command_args,
-            "Expected optional and positional args to be separated by '--'",
-        )
-        keyword_args = []
-        positional_args = []
-        command_args.reverse()
-        while command_args[-1] != "--":
-            keyword_args.append(command_args.pop())
-        positional_args = list(reversed(command_args[:-1]))
-
-        # Check command formatting
-        self.assertEqual(
             [
-                "/mnt/input/positional_input",
-                "/mnt/output/positional_output",
+                "--optional_input", "/mnt/input/optional_input", "--",
+                "/mnt/input/positional_input", "/mnt/output/positional_output"
             ],
-            positional_args,
-        )
-
-        keyword_arg_pairs = dict(zip(keyword_args[0::2], keyword_args[1::2]))
-        self.assertEqual(
-            keyword_arg_pairs,
-            {
-                "--optional_input": "/mnt/input/optional_input",
-            }
         )
 
 
