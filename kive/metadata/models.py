@@ -4,8 +4,6 @@ metadata.models
 Shipyard data models relating to metadata: Datatypes and their related
 paraphernalia, CompoundDatatypes, etc.
 """
-from __future__ import unicode_literals
-
 from django.db import models, transaction
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from django.http import Http404

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 
-from __future__ import unicode_literals
-
 from argparse import ArgumentParser, FileType, ArgumentDefaultsHelpFormatter
 from csv import DictWriter
 import os
