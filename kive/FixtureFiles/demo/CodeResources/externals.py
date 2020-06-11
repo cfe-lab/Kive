@@ -4,7 +4,7 @@ import sys
 import re
 
 
-class AssetWrapper(object):
+class AssetWrapper:
     """ Wraps a packaged asset, and finds its path. """
     def __init__(self, path):
         app_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))

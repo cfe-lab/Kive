@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class BatchForm(PermissionsForm):
-    class Meta(object):
+    class Meta:
         model = Batch
         fields = ['name', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
 
 
 class ContainerFamilyForm(PermissionsForm):
-    class Meta(object):
+    class Meta:
         model = ContainerFamily
         fields = ['name', 'git', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
@@ -32,7 +32,7 @@ class ContainerUpdateForm(PermissionsForm):
         queryset=Container.objects.filter(file_type=Container.SIMG),
         required=False)
 
-    class Meta(object):
+    class Meta:
         model = Container
         fields = ['parent', 'tag', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
@@ -119,14 +119,14 @@ class ContainerAppForm(forms.ModelForm):
                   'prefixes and suffixes for different kinds of arguments: '
                   '--optional, folder/, and --optional_folder/.')
 
-    class Meta(object):
+    class Meta:
         model = ContainerApp
         exclude = ['container']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))
 
 
 class ContainerRunForm(PermissionsForm):
-    class Meta(object):
+    class Meta:
         model = ContainerRun
         fields = ['name', 'description', 'permissions']
         widgets = dict(description=forms.Textarea(attrs=dict(cols=50, rows=10)))

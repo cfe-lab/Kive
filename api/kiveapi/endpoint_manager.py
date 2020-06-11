@@ -1,7 +1,7 @@
 import re
 
 
-class EndpointManager(object):
+class EndpointManager:
     def __init__(self, session):
         self.session = session
 
@@ -9,7 +9,7 @@ class EndpointManager(object):
         return SessionContext(self.session, name)
 
 
-class SessionContext(object):
+class SessionContext:
     def __init__(self, session, name):
         self.session = session
         self.prefix = '/api/{}/'.format(name)

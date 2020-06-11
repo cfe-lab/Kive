@@ -13,7 +13,7 @@ import gotoh
 from micall.utils.translation import translate
 
 
-class Pssm(object):
+class Pssm:
     def __init__(self, std='g2p', path_to_lookup=None, path_to_matrix=None):
         if std == 'pssm':
             self.std_v3 = 'CTRPNNNTRKGIHIGPGRAFYATGEIIGDIRQAHC'

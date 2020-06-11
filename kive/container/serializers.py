@@ -135,7 +135,7 @@ class ContainerArgumentSerializer(serializers.ModelSerializer):
         lookup_field='pk',
         queryset=ContainerApp.objects.all())
 
-    class Meta(object):
+    class Meta:
         model = ContainerArgument
         fields = ('id',
                   'url',

@@ -43,7 +43,7 @@ def parseOptions():
     return parser.parse_args()
 
 
-class SlowTestReport(object):
+class SlowTestReport:
     def load(self, report_files, count):
         self.tests = []  # [Test()]
         self.files = []  # [(-time, file_name)]
@@ -70,7 +70,7 @@ class SlowTestReport(object):
         return self
 
 
-class Test(object):
+class Test:
     def __init__(self, testcase):
         self.time = float(testcase.attrib['time'])
         path = testcase.attrib['classname'].split('.')
