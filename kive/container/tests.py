@@ -37,7 +37,7 @@ from rest_framework.test import force_authenticate
 from container.management.commands import purge, runcontainer
 # import container.models as cm
 from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerArgument, Batch, ContainerLog, PipelineCompletionStatus,\
+    ContainerRun, ContainerDataset, ContainerArgument, ContainerArgumentType, Batch, ContainerLog, PipelineCompletionStatus,\
     ExistingRunsError, multi_check_output
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
@@ -1765,6 +1765,26 @@ class ContainerRunTests(TestCase):
         mock_check_call.assert_called_with(['scancel', '-f', '42'])
 
 
+class ContainerDatasetTest(TestCase):
+
+    def test_multi_input_validation(self):
+        # Mono-valued input should have no multi_position
+        arg = ContainerArgument(type=ContainerArgument.INPUT, position=0, allow_multiple=False)
+        dataset = ContainerDataset(argument=arg)
+        dataset.clean()
+        dataset.multi_position = 0
+        with self.assertRaises(ValidationError):
+            dataset.clean()
+
+        # Multi-valued input should have a multi_position
+        arg = ContainerArgument(type=ContainerArgument.INPUT, position=None, allow_multiple=True)
+        dataset = ContainerDataset(argument=arg, multi_position=0)
+        dataset.clean()
+        dataset.multi_position = None
+        with self.assertRaises(ValidationError):
+            dataset.clean()
+
+
 @skipIfDBFeature('is_mocked')
 class ContainerLogTests(TestCase):
     fixtures = ['container_run']
@@ -3115,7 +3135,12 @@ Line 3
                 "position": None,
                 "type": ContainerArgument.INPUT,
             },
-            # TODO(nknight): Add spec for an optional multiple input
+            {
+                "name": "multiple_optional_input",
+                "position": None,
+                "type": ContainerArgument.INPUT,
+                "allow_multiple": True,
+            }
             # TODO(nknight): Add spec for a positional output directory
         ]
 
@@ -3129,11 +3154,22 @@ Line 3
             arg.save()
 
         datasets = []
-        for arg in (a for a in args if a.type == ContainerArgument.INPUT):
+
+        def make_dataset(arg, multi_position=None):
             dataset = unittest.mock.Mock()
             dataset.argument = arg
             dataset.name = arg.name
+            if multi_position is not None:
+                dataset.name += str(multi_position)
+            dataset.multi_position = multi_position
             datasets.append(dataset)
+
+        for arg in (a for a in args if a.type == ContainerArgument.INPUT):
+            if arg.allow_multiple:
+                make_dataset(arg, multi_position=0)
+                make_dataset(arg, multi_position=1)
+            else:
+                make_dataset(arg)
 
         mock_run = unittest.mock.Mock()
         mock_run.app = app
@@ -3151,7 +3187,9 @@ Line 3
         self.assertEqual(
             command_args,
             [
-                "--optional_input", "/mnt/input/optional_input", "--",
+                "--optional_input", "/mnt/input/optional_input",
+                "--multiple_optional_input*", "/mnt/input/multiple_optional_input0",
+                "/mnt/input/multiple_optional_input1", "--",
                 "/mnt/input/positional_input", "/mnt/output/positional_output"
             ],
         )
@@ -4337,7 +4375,6 @@ class ContainerArgumentTests(TestCase):
             arg.clean()
 
     def test_argument_classification(self):
-        from container.models import ContainerArgumentType
         specs = [
             (
                 ContainerArgumentType.FIXED_INPUT,

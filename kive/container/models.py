@@ -1445,6 +1445,12 @@ class ContainerDataset(models.Model):
     dataset = models.ForeignKey("librarian.Dataset",
                                 related_name="containers",
                                 on_delete=models.CASCADE)
+    multi_position = models.PositiveIntegerField(
+        help_text="Position in a multi-valued argument"
+                  " (None for single-value arguments).",
+        null=True,
+        default=None,
+    )
     name = models.CharField(
         max_length=maxlengths.MAX_NAME_LENGTH,
         help_text="Local file name, also used to sort multiple inputs for a "
@@ -1481,6 +1487,14 @@ class ContainerDataset(models.Model):
             if dataset is not None:
                 return dataset, None
         return None, output_container_dataset.run
+
+    def clean(self):
+        # Check that a position has been supplied for multiple-input arguments
+        if self.argument.argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+            if self.multi_position is None:
+                raise ValidationError("multi_position is required for a multi-valued input")
+        elif self.multi_position is not None:
+            raise ValidationError("multi_position should be None for single-valued argtype")
 
 
 class ContainerLog(models.Model):
