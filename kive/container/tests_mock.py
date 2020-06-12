@@ -993,8 +993,8 @@ class RunContainerMockTests(TestCase):
         run.app.container = Container()
         run.app.container.file = Namespace(path='/tmp/foo.simg')
         run.sandbox_path = '/tmp/box23'
-        run.app.arguments.create(type=ContainerArgument.INPUT, name='in_csv')
-        run.app.arguments.create(type=ContainerArgument.OUTPUT, name='out_csv')
+        run.app.arguments.create(type=ContainerArgument.INPUT, name='in_csv', position=0)
+        run.app.arguments.create(type=ContainerArgument.OUTPUT, name='out_csv', position=1)
         return run
 
     def test_default_app(self):

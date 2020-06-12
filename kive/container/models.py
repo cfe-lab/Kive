@@ -1,3 +1,4 @@
+import enum
 import errno
 import hashlib
 import json
@@ -14,6 +15,7 @@ from subprocess import STDOUT, CalledProcessError, check_output, check_call
 import tarfile
 from tarfile import TarFile, TarInfo
 from tempfile import mkdtemp, mkstemp
+import typing
 import shutil
 import io
 from io import BytesIO
@@ -877,11 +879,30 @@ class ContainerApp(models.Model):
         remove_helper(removal_plan)
 
 
+@enum.unique
+class ContainerArgumentType(enum.Enum):
+    FIXED_INPUT = enum.auto()
+    FIXED_OUTPUT = enum.auto()
+    OPTIONAL_INPUT = enum.auto()
+    OPTIONAL_MULTIPLE_INPUT = enum.auto()
+    FIXED_DIRECTORY_OUTPUT = enum.auto()
+
+
 class ContainerArgument(models.Model):
     INPUT = 'I'
     OUTPUT = 'O'
     TYPES = ((INPUT, 'Input'),
              (OUTPUT, 'Output'))
+
+    KEYWORD_ARG_TYPES = set([
+        ContainerArgumentType.OPTIONAL_INPUT,
+        ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+    ])
+    FIXED_ARG_TYPES = set([
+        ContainerArgumentType.FIXED_INPUT,
+        ContainerArgumentType.FIXED_OUTPUT,
+        ContainerArgumentType.FIXED_DIRECTORY_OUTPUT,
+    ])
 
     app = models.ForeignKey(ContainerApp,
                             related_name="arguments",
@@ -919,6 +940,30 @@ class ContainerArgument(models.Model):
             text += '*' if self.type == ContainerArgument.INPUT else '/'
         return text
 
+    @property
+    def argtype(self) -> typing.Optional[ContainerArgumentType]:
+        "Classify this argument, or return None if it's unclassifiable."
+        if self.position is not None:
+            if self.allow_multiple:
+                if self.type == self.OUTPUT:
+                    return ContainerArgumentType.FIXED_DIRECTORY_OUTPUT
+            else:
+                if self.type == self.INPUT:
+                    return ContainerArgumentType.FIXED_INPUT
+                elif self.type == self.OUTPUT:
+                    return ContainerArgumentType.FIXED_OUTPUT
+        else:
+            if self.type == self.INPUT:
+                if self.allow_multiple:
+                    return ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+                else:
+                    return ContainerArgumentType.OPTIONAL_INPUT
+        # If the above fell through, the model is in a corrupted or partially
+        # initialized state, and cannot assigned a type.
+
+    def clean(self):
+        if self.argtype is None:
+            raise ValidationError("Could not assign a ContainerArgumentType to this argument")
 
 @receiver(models.signals.post_delete, sender=Container)
 def delete_container_file(instance, **_kwargs):

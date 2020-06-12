@@ -12,6 +12,7 @@ from io import BytesIO
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
 from time import time
+import unittest.mock
 from zipfile import ZipFile
 from filecmp import cmp
 
@@ -2798,7 +2799,9 @@ Line 3
         """ Configure an extra output that the image doesn't know about. """
         run = ContainerRun.objects.get(name='fixture run')
         dataset = Dataset.objects.first()
-        extra_arg = run.app.arguments.create(name='extra_csv')
+        extra_arg = run.app.arguments.create(name='extra_csv',
+                                             position=None,
+                                             type=ContainerArgument.INPUT)
         run.datasets.create(argument=extra_arg, dataset=dataset)
 
         call_command('runcontainer', str(run.id))
@@ -3076,6 +3079,82 @@ Line 3
                                            original_run=run2)
 
         self.assert_run_fails(run4, 'RuntimeError: Inputs missing from reruns')
+
+    def test_fixed_argument_formatting(self):
+        app = ContainerApp.objects.first()
+        run = app.runs.first()
+        args = list(app.arguments.all())
+        command = runcontainer.Command.build_command(run)
+
+        expected = []
+        for arg in args:
+            if arg.type == ContainerArgument.INPUT:
+                expected.append("/mnt/input/{}".format(arg.name))
+            else:
+                expected.append("/mnt/output/{}".format(arg.name))
+        self.assertEqual(len(args), 2, "Expected run to have two arguments")
+        self.assertEqual(expected, command[-len(expected):])
+
+    def test_full_argument_formatting(self):
+        # Set up test data
+        # NOTE(nknight): The order of these specs matters; it matches the order that the
+        # associated ContainerDataset objects would be returned from the database.
+        argspecs = [
+            {
+                "name": "positional_input",
+                "position": 0,
+                "type": ContainerArgument.INPUT,
+            },
+            {
+                "name": "positional_output",
+                "position": 2,
+                "type": ContainerArgument.OUTPUT
+            },
+            {
+                "name": "optional_input",
+                "position": None,
+                "type": ContainerArgument.INPUT,
+            },
+            # TODO(nknight): Add spec for an optional multiple input
+            # TODO(nknight): Add spec for a positional output directory
+        ]
+
+        app = ContainerApp(
+            container=Container.objects.get(pk=1),
+        )
+        app.save()
+
+        args = [ContainerArgument(app=app, **spec) for spec in argspecs]
+        for arg in args:
+            arg.save()
+
+        datasets = []
+        for arg in (a for a in args if a.type == ContainerArgument.INPUT):
+            dataset = unittest.mock.Mock()
+            dataset.argument = arg
+            dataset.name = arg.name
+            datasets.append(dataset)
+
+        mock_run = unittest.mock.Mock()
+        mock_run.app = app
+        mock_run.container.file.path = "mock_container_path"
+        mock_run.full_sandbox_path = "mock_sandbox_path"
+        mock_run.datasets.all = unittest.mock.Mock(return_value=iter(datasets))
+
+        # Exercise method under test
+        full_command = runcontainer.Command.build_command(mock_run)
+
+        # Ignore unrelated changes in the command format
+        self.assertNotIn("--app", full_command, "Unexpected '--app' name in command")
+        command_args = full_command[7:]
+
+        self.assertEqual(
+            command_args,
+            [
+                "--optional_input", "/mnt/input/optional_input", "--",
+                "/mnt/input/positional_input", "/mnt/output/positional_output"
+            ],
+        )
 
 
 @skipIfDBFeature('is_mocked')
@@ -4246,3 +4325,64 @@ class ContainerFamilyApiTests(BaseTestCases.ApiTestCase):
         force_authenticate(request, user=self.kive_user)
         response = self.detail_view(request, pk=self.detail_pk)
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+
+class ContainerArgumentTests(TestCase):
+
+    def test_required_poly_input_is_forbidden(self):
+        with self.assertRaises(ValidationError):
+            arg = ContainerArgument(
+                position=0, type=ContainerArgument.INPUT, allow_multiple=True,
+            )
+            arg.clean()
+
+    def test_argument_classification(self):
+        from container.models import ContainerArgumentType
+        specs = [
+            (
+                ContainerArgumentType.FIXED_INPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.FIXED_OUTPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": False,
+                },
+            ),
+            (
+                ContainerArgumentType.OPTIONAL_INPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": False,
+                },
+            ),
+
+            (
+                ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                {
+                    "position": None,
+                    "type": ContainerArgument.INPUT,
+                    "allow_multiple": True,
+                },
+            ),
+
+            (
+                ContainerArgumentType.FIXED_DIRECTORY_OUTPUT,
+                {
+                    "position": 0,
+                    "type": ContainerArgument.OUTPUT,
+                    "allow_multiple": True,
+                },
+            ),
+        ]
+
+        for expected_type, kwargs in specs:
+            arg = ContainerArgument(name="test_arg", **kwargs)
+            self.assertEqual(expected_type, arg.argtype)

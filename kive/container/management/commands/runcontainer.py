@@ -4,13 +4,14 @@ import os
 import shutil
 import sys
 from subprocess import call
+import typing
 import json
 from traceback import format_exception_only
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from container.models import ContainerRun, ContainerArgument, ContainerLog
+from container.models import ContainerRun, ContainerArgument, ContainerLog, ContainerDataset
 from librarian.models import Dataset
 
 KNOWN_EXTENSIONS = ('csv',
@@ -141,7 +142,8 @@ class Command(BaseCommand):
                 )
         run.state = ContainerRun.SAVING
 
-    def build_command(self, run):
+    @classmethod
+    def build_command(cls, run):
         container_path = run.app.container.file.path
         input_path = os.path.join(run.full_sandbox_path, 'input')
         output_path = os.path.join(run.full_sandbox_path, 'output')
@@ -156,13 +158,43 @@ class Command(BaseCommand):
             command.append('--app')
             command.append(run.app.name)
         command.append(container_path)
-        for argument in run.app.arguments.all():
-            if argument.type == ContainerArgument.INPUT:
-                folder = '/mnt/input'
-            else:
-                folder = '/mnt/output'
-            command.append(os.path.join(folder, argument.name))
+        datasets = list(run.datasets.all())
+        # Add optional input arguments specified with ContainerDataset
+        optional_arguments = [
+            (d, d.argument) for d in datasets
+            if d.argument.argtype in ContainerArgument.KEYWORD_ARG_TYPES
+        ]
+        if optional_arguments:
+            for dataset, arg in optional_arguments:
+                command.extend(cls._format_kw_arg(dataset, arg))
+            command.append("--")
+        # Add fixed arguments as specified by the ContainerApp
+        fixed_arguments = [
+            arg for arg in run.app.arguments.all()
+            if arg.argtype in ContainerArgument.FIXED_ARG_TYPES
+        ]
+        command.extend(cls._format_fixed_arg(arg) for arg in fixed_arguments)
         return command
+
+    @staticmethod
+    def _format_kw_arg(dataset: ContainerDataset,
+                       arg: ContainerArgument) -> typing.List[str]:
+        if arg.type == ContainerArgument.INPUT:
+            datasetfolder = "/mnt/input"
+        else:
+            datasetfolder = "/mnt/output"
+        datasetpath = os.path.join(datasetfolder, dataset.name)
+        return [
+            arg.formatted,
+            datasetpath,
+        ]
+
+    def _format_fixed_arg(arg: ContainerArgument) -> str:
+        if arg.type == ContainerArgument.INPUT:
+            datasetfolder = "/mnt/input"
+        else:
+            datasetfolder = "/mnt/output"
+        return os.path.join(datasetfolder, arg.name)
 
     def build_dataset_name(self, run, argument_name):
         parts = argument_name.split('_')
