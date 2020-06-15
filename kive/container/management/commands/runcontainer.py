@@ -161,12 +161,11 @@ class Command(BaseCommand):
         datasets = list(run.datasets.all())
         # Add optional input arguments specified with ContainerDataset
         optional_arguments = [
-            (d, d.argument) for d in datasets
+            d for d in datasets
             if d.argument.argtype in ContainerArgument.KEYWORD_ARG_TYPES
         ]
         if optional_arguments:
-            for dataset, arg in optional_arguments:
-                command.extend(cls._format_kw_arg(dataset, arg))
+            command.extend(cls._format_kw_args(optional_arguments))
             command.append("--")
         # Add fixed arguments as specified by the ContainerApp
         fixed_arguments = [
@@ -177,18 +176,27 @@ class Command(BaseCommand):
         return command
 
     @staticmethod
-    def _format_kw_arg(dataset: ContainerDataset,
-                       arg: ContainerArgument) -> typing.List[str]:
-        if arg.type == ContainerArgument.INPUT:
-            datasetfolder = "/mnt/input"
-        else:
-            datasetfolder = "/mnt/output"
-        datasetpath = os.path.join(datasetfolder, dataset.name)
-        return [
-            arg.formatted,
-            datasetpath,
-        ]
+    def _format_kw_args(
+            datasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
+        def sort_by_position(
+            ds: typing.Iterable[ContainerDataset]
+        ) -> typing.List[ContainerDataset]:
+            return sorted(ds, key=lambda d: d.multi_position)
 
+        grouped = {
+            arg: sort_by_position(d for d in datasets if d.argument == arg)
+            for arg in set(d.argument for d in datasets)
+        }
+        for arg, argdatasets in grouped.items():
+            if arg.type == ContainerArgument.INPUT:
+                datasetfolder = "/mnt/input"
+            else:
+                datasetfolder = "/mnt/output"
+            yield "--{}".format(arg.name)
+            yield from (os.path.join(datasetfolder, dataset.name)
+                        for dataset in argdatasets)
+
+    @staticmethod
     def _format_fixed_arg(arg: ContainerArgument) -> str:
         if arg.type == ContainerArgument.INPUT:
             datasetfolder = "/mnt/input"
