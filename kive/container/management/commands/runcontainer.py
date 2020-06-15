@@ -192,10 +192,11 @@ class Command(BaseCommand):
                 datasetfolder = "/mnt/input"
             else:
                 datasetfolder = "/mnt/output"
-            yield arg.formatted
+            yield "--{}".format(arg.name)
             yield from (os.path.join(datasetfolder, dataset.name)
                         for dataset in argdatasets)
 
+    @staticmethod
     def _format_fixed_arg(arg: ContainerArgument) -> str:
         if arg.type == ContainerArgument.INPUT:
             datasetfolder = "/mnt/input"

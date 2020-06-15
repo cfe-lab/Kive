@@ -3188,7 +3188,7 @@ Line 3
             command_args,
             [
                 "--optional_input", "/mnt/input/optional_input",
-                "--multiple_optional_input*", "/mnt/input/multiple_optional_input0",
+                "--multiple_optional_input", "/mnt/input/multiple_optional_input0",
                 "/mnt/input/multiple_optional_input1", "--",
                 "/mnt/input/positional_input", "/mnt/output/positional_output"
             ],
