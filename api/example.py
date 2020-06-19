@@ -1,63 +1,77 @@
-import os
-import sched
+from pprint import pprint
 import time
 
 from kiveapi import KiveAPI
 
+RULE = " " + 66 * "-"
+ACTIVE_STATES = "NRLS"
+
+
 # Use HTTPS on a real server, so your password is encrypted.
-KiveAPI.SERVER_URL = 'http://localhost:8000'
+KiveAPI.SERVER_URL = 'http://localhost:8080'
 # Don't put your real password in source code, store it in a text file
 # that is only readable by your user account or some more secure storage.
-kive = KiveAPI()
-kive.login('kive', 'kive')
+session = KiveAPI()
+session.login('kive', 'kive')
 
 # Get the data by ID
-fastq1 = kive.get_dataset(2)
-fastq2 = kive.get_dataset(3)
+dataset1 = session.get_dataset(1)
+dataset2 = session.get_dataset(2)
 
 # or get the data by name
-fastq1 = kive.find_datasets(name='1234A_R1.fastq')[0]
-fastq2 = kive.find_datasets(name='1234A_R2.fastq')[0]
-
-# Pipeline
-pipeline = kive.get_pipeline(13)
-
-print(pipeline)
-# # Get the pipeline by family ID
-# pipeline_family = kive.get_pipeline_family(2)
-#
-# print('Using data:')
-# print(fastq1, fastq2)
-#
-# print('With pipeline:')
-# print(pipeline_family.published_or_latest())
-
-# Run the pipeline
-status = kive.run_pipeline(
-    pipeline,
-    [fastq1, fastq2]
-)
-
-# Start polling Kive
-s = sched.scheduler(time.time, time.sleep)
+dataset1 = session.find_datasets(name='example_pairs.csv_20200615170532257697')[0]
+dataset2 = session.find_datasets(name='example_names.csv_20200615170519866442')[0]
 
 
-def check_run(sc, run):
-    # do your stuff
-    print(run.get_status())
-
-    if run.is_running() or run.is_complete():
-        print('{} {:.0f}%'.format(run.get_progress(), run.get_progress_percent()))
-
-    if not run.is_complete():
-        sc.enter(5, 1, check_run, (sc, run,))
+# Get app information
+app = session.endpoints.containerapps.get(1)
+appargs = session.endpoints.containerapps.get(f"{app['id']}/argument_list")
+print("App" + RULE)
+pprint(app)
+print("App Args" + RULE)
+pprint(appargs)
 
 
-s.enter(5, 1, check_run, (s, status,))
-s.run()
+# Start a pipeline run
+inputarg = next(a for a in appargs if a['type'] == 'I')
+kiveuser = session.endpoints.users.get(1)
+dataset = session.endpoints.datasets.get(1)
+runspec = {
+    "name": "example",
 
-print('Finished Run, nabbing files')
+    "app": app["url"],
+    "datasets": [
+        {
+            "argument": inputarg["url"],
+            "dataset": dataset["url"],
+        },
+    ],
+}
+created_containerrun = session.endpoints.containerruns.post(json=runspec)
+print("Created a Run" + RULE)
+pprint(created_containerrun)
 
-for dataset in status.get_results():
-    with open(os.path.join('results', dataset.filename), 'wb') as file_handle:
-        dataset.download(file_handle)
+
+# Monitor for completion
+runid = created_containerrun["id"]
+starttime = time.time()
+while True:
+    containerrun = session.endpoints.containerruns.get(runid)
+    state = containerrun["state"]
+    if state in ACTIVE_STATES:
+        elapsed = round(time.time() - starttime, 2)
+        print(f"Run in progress (state={state}, {elapsed}s elapsed))\r", end="")
+        time.sleep(4)
+    elif state == "C":
+        print("Run finished" + RULE)
+        pprint(containerrun)
+        break
+    else:
+        print("Run failed" + RULE)
+        pprint(containerrun)
+        exit(1)
+
+
+# Retrieve the output and save to a file
+
+# TODO(nknight)
