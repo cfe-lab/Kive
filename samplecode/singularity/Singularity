@@ -1,6 +1,6 @@
 # Generate the Singularity container to run MiCall on Kive.
 Bootstrap: docker
-From: python:2.7.15-alpine3.6
+From: python:3.6-alpine3.12
 
 %help
     Minimal example that can run simple Python scripts under Kive.
@@ -25,16 +25,6 @@ From: python:2.7.15-alpine3.6
 %files
     *.py /usr/local/share
 
-%post
-    # Trim a bunch of extra features to reduce image size by about 25%.
-    # This is totally optional!
-    cd /usr/local/lib/python2.7
-    rm -r site-packages/* ensurepip hotshot distutils curses
-    cd lib-dynload
-    rm pyexpat.so unicodedata.so _ctypes.so _tkinter.so parser.so cPickle.so \
-        _sqlite3.so _ssl.so _socket.so _curses*.so _elementtree.so \
-        zlib.so bz2.so _json.so cmath.so array.so _multibytecodec.so audioop.so \
-        _hotshot.so ossaudiodev.so _ctypes_test.so linuxaudiodev.so
 
 %runscript
     /usr/local/bin/python /usr/local/share/greetings.py "$@"
@@ -55,3 +45,18 @@ From: python:2.7.15-alpine3.6
 
 %apprun sums_and_products
     /usr/local/bin/python /usr/local/share/sums_and_products.py "$@"
+
+%apphelp collation
+    Concatenate CSV files into a single output file.
+
+    Run it with:
+
+        singularity run --app collation -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg --inputfiles /mnt/input/example_names.csv /mnt/input/example_pairs.csv -- /mnt/output/concatenated.csv
+
+%applabels collation
+    KIVE_INPUTS --inputfiles*
+    KIVE_OUTPUTS output_csv
+    KIVE_MEMORY 128
+
+%apprun collation
+    /usr/local/bin/python3 /usr/local/share/concat_csv.py "$@"
