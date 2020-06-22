@@ -25,7 +25,7 @@
     - /etc/kive/
     - /var/kive/
     - /var/log/kive/
-    - /data/kive/media_root/
+    - "{{ kive_media_root }}"
   file:
     path: "{{ item }}"
     state: directory
