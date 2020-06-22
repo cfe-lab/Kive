@@ -105,6 +105,12 @@
             users: kive
             source: "127.0.0.1/32"
             method: "scram-sha-256"
+    - name: restart database service
+      become: true
+      become_user: root
+      systemd:
+        name: "postgresql-12"
+        state: restarted
 
 
 - name: kive installation
