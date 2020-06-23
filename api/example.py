@@ -5,7 +5,7 @@ import kiveapi
 # Use HTTPS on a real server, so your password is encrypted.
 # Don't put your real password in source code, store it in a text file
 # that is only readable by your user account or some more secure storage.
-session = kiveapi.KiveAPI("http://localhost:8080")
+session = kiveapi.KiveAPI("http://localhost:8000")
 session.login('kive', 'kive')
 
 # Get the data by ID
