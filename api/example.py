@@ -1,6 +1,6 @@
-import time
-
+"Run an existing pipeline on an existing dataset."
 import kiveapi
+import example_tools
 
 # Use HTTPS on a real server, so your password is encrypted.
 # Don't put your real password in source code, store it in a text file
@@ -30,35 +30,11 @@ runspec = {
         },
     ],
 }
-print("Starting example run... ", end="")
-created_containerrun = session.endpoints.containerruns.post(json=runspec)
+print("Starting example run... ")
+containerrun = session.endpoints.containerruns.post(json=runspec)
 
 # Monitor the run for completion
-ACTIVE_STATES = "NSLR"
-INTERVAL = 1.0
-MAX_WAIT = 300.0
-starttime = time.time()
-elapsed = 0.0
-
-runid = created_containerrun["id"]
-print(f"Waiting for run {runid} to finish.")
-while elapsed < MAX_WAIT:
-    containerrun = session.endpoints.containerruns.get(runid)
-    state = containerrun["state"]
-    elapsed = round(time.time() - starttime, 2)
-    if state in ACTIVE_STATES:
-        print(f"Run in progress (state={state}, {elapsed}s elapsed)")
-        time.sleep(INTERVAL)
-    elif state == "C":
-        print(f"Run {runid} finished after {elapsed}s; fetching results")
-        break
-    else:
-        import pprint
-        print(f"Run {runid} failed after {elapsed}s; exiting")
-        pprint.pprint(containerrun)
-        exit(1)
-else:
-    exit("Example timed out")
+containerrun = example_tools.await_containerrun(session, containerrun)
 
 # Retrieve the output and save to a file
 run_datasets = session.get(containerrun["dataset_list"]).json()

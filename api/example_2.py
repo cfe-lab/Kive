@@ -1,60 +1,56 @@
-import os
-import sched
-import time
-
+"""Upload (or find, if it's already been uploaded) a dataset and use it
+with an app from a container family.
+"""
+import example_tools
 from kiveapi import KiveAPI, KiveMalformedDataException
 
-# This is how I would recommend authenticating to Kive
-KiveAPI.SERVER_URL = 'http://localhost:8000'
+# Use HTTPS on a real server, so your password is encrypted.
 # Don't put your real password in source code, store it in a text file
 # that is only readable by your user account or some more secure storage.
-kive = KiveAPI()
+kive = KiveAPI('http://localhost:8000')
 kive.login('kive', 'kive')
 
-# Upload data
+# Upload (or retrieve) an input file
 try:
-    fastq1 = kive.add_dataset('New fastq file 1', 'None', open('exfastq1.fastq', 'r'), None, None, ["Everyone"])
+    dataset = kive.add_dataset('API Example 2 Names File prime', 'None',
+                               open('names.csv', 'r'), None, None,
+                               ["Everyone"])
 except KiveMalformedDataException:
-    fastq1 = kive.find_datasets(name='New fastq file 1')[0]
+    dataset = kive.find_datasets(name='API Example 2 Names File')[0]
 
-try:
-    fastq2 = kive.add_dataset('New fastq file 2', 'None', open('exfastq2.fastq', 'r'), None, None, ["Everyone"])
-except KiveMalformedDataException:
-    fastq2 = kive.find_datasets(name='New fastq file 2')[0]
+# Get the app from a container family.
+containerfamily = kive.filter("/api/containerfamilies/", "name",
+                              "samplecode").json()[0]
+container = kive.get(containerfamily["containers"]).json()[0]
+app = kive.filter(
+    container["app_list"], "smart",
+    "Minimal example that can run simple Python scripts").json()[0]
 
-# Get the pipeline by family ID
-pipeline_family = kive.get_pipeline_family(2)
+# Create a run of this app using the file we uploaded
+appargs = kive.get(app["argument_list"]).json()
+inputarg = next(a for a in appargs if a["type"] == "I")
 
-print('Using data:')
-print(fastq1, fastq2)
+runspec = {
+    "name": "uploaded-file-example",
+    "app": app["url"],
+    "datasets": [{
+        "argument": inputarg["url"],
+        "dataset": dataset.raw["url"],
+    }],
+}
 
-print('With pipeline:')
-print(pipeline_family.published_or_latest())
+print("Starting uploaded file example...", end="", flush=True)
+containerrun = kive.endpoints.containerruns.post(json=runspec)
 
-# Run the pipeline
-status = kive.run_pipeline(
-    pipeline_family.published_or_latest(),
-    [fastq1, fastq2]
-)
+# Wait for the pipeline to finish
+containerrun = example_tools.await_containerrun(kive, containerrun)
 
-# Start polling Kive
-s = sched.scheduler(time.time, time.sleep)
-
-
-def check_run(sc, run):
-    print(run.get_status())
-
-    if run.is_running() or run.is_complete():
-        print(run.get_progress(), run.get_progress_percent(), '%')
-
-    if not run.is_complete():
-        sc.enter(5, 1, check_run, (sc, run,))
-
-
-s.enter(5, 1, check_run, (s, status,))
-s.run()
-
-print('Finished Run, nabbing files')
-for dataset in status.get_results():
-    with open(os.path.join('results', dataset.filename), 'wb') as file_handle:
-        dataset.download(file_handle)
+# Retrieve files
+run_datasets = kive.get(containerrun["dataset_list"]).json()
+for run_dataset in run_datasets:
+    if run_dataset.get("argument_type") == "O":
+        dataset = kive.get(run_dataset["dataset"]).json()
+        filename = dataset["name"]
+        print(f"  downloading {filename}")
+        with open(filename, "wb") as outf:
+            kive.download_file(outf, dataset["download_url"])
