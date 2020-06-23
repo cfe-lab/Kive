@@ -58,8 +58,7 @@ while elapsed < MAX_WAIT:
         pprint.pprint(containerrun)
         exit(1)
 else:
-    print("Example timed out")
-    exit(1)
+    exit("Example timed out")
 
 # Retrieve the output and save to a file
 run_datasets = session.get(containerrun["dataset_list"]).json()
@@ -67,9 +66,8 @@ for run_dataset in run_datasets:
     if run_dataset.get("argument_type") == "O":
         dataset = session.get(run_dataset["dataset"]).json()
         filename = dataset["name"]
+        print(f"  downloading {filename}")
         with open(filename, "wb") as outf:
-            print(f"  downloading {filename}...", end="")
             session.download_file(outf, dataset["download_url"])
-        print(" done.")
 
 print("Example run finished.")
