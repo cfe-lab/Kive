@@ -40,6 +40,7 @@ Vagrant.configure("2") do |config|
   config.vm.hostname = "head"
   config.vm.network "private_network", ip: HEAD_IP
   config.vm.network "forwarded_port", guest: 8080, host: 8080
+  config.vm.network "forwarded_port", guest: 8000, host: 8000
   add_keys(config.vm)
   add_key_access(config.vm)
   config.vm.provision "shell", path: "./install-ansible.sh"
