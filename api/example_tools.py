@@ -1,5 +1,7 @@
-"Tools to reduce boilerplate in the API examples."
+"Examples of utility functions that use the Kive API."
 import time
+
+from kiveapi import KiveMalformedDataException
 
 
 def await_containerrun(session, containerrun):
@@ -35,3 +37,14 @@ def await_containerrun(session, containerrun):
         exit(f"RUn {runid} timed out after {elapsed}s")
 
     return containerrun
+
+
+def upload_or_retrieve_dataset(session, name, inputfile, users=None, groups=None):
+    "Create a dataset by uploading a file to Kive."
+    if users is None and groups is None:
+        raise ValueError("A list of users or a list of groups is required")
+    try:
+        dataset = session.add_dataset(name, 'None', inputfile, None, users, groups)
+    except KiveMalformedDataException:
+        dataset = session.find_dataset(name=name)[0]
+    return dataset

@@ -12,7 +12,7 @@ kive.login('kive', 'kive')
 
 # Upload (or retrieve) an input file
 try:
-    dataset = kive.add_dataset('API Example 2 Names File prime', 'None',
+    dataset = kive.add_dataset('API Example 2 Names File', 'None',
                                open('names.csv', 'r'), None, None,
                                ["Everyone"])
 except KiveMalformedDataException:
