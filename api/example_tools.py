@@ -34,7 +34,7 @@ def await_containerrun(session, containerrun):
             pprint.pprint(containerrun)
             exit(1)
     else:
-        exit(f"RUn {runid} timed out after {elapsed}s")
+        exit(f"Run {runid} timed out after {elapsed}s")
 
     return containerrun
 
