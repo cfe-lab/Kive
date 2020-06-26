@@ -11,7 +11,10 @@ from traceback import format_exception_only
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from container.models import ContainerRun, ContainerArgument, ContainerLog, ContainerDataset
+from container.models import (
+    ContainerRun, ContainerArgument, ContainerArgumentType,
+    ContainerLog, ContainerDataset,
+)
 from librarian.models import Dataset
 
 KNOWN_EXTENSIONS = ('csv',
@@ -86,7 +89,12 @@ class Command(BaseCommand):
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
         for dataset in run.datasets.all():
-            target_path = os.path.join(input_path, dataset.argument.name)
+            if dataset.argument.argtype in (
+                    ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                    ContainerArgumentType.OPTIONAL_INPUT):
+                target_path = os.path.join(input_path, dataset.dataset.name)
+            else:
+                target_path = os.path.join(input_path, dataset.argument.name)
             source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
