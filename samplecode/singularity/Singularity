@@ -7,11 +7,11 @@ From: python:3.6-alpine3.12
 
     Build it with a command like this:
 
-        sudo singularity build python2-alpine-trimmed.simg Singularity
+        sudo singularity build python3-alpine-trimmed.simg Singularity
 
     Run it with a command like this:
 
-        singularity run -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
+        singularity run -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
 
     The main app generates "Hello, World!" messages for a list of names.
 
@@ -34,7 +34,7 @@ From: python:3.6-alpine3.12
 
     Run it with a command like this:
 
-        singularity run --app sums_and_products -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
+        singularity run --app sums_and_products -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg /mnt/input/example_names.csv /mnt/output/greetings.csv
 
 %applabels sums_and_products
     KIVE_INPUTS input_csv
@@ -51,7 +51,7 @@ From: python:3.6-alpine3.12
 
     Run it with:
 
-        singularity run --app collation -B host_input:/mnt/input,host_output:/mnt/output python2-alpine-trimmed.simg --inputfiles /mnt/input/example_names.csv /mnt/input/example_pairs.csv -- /mnt/output/concatenated.csv
+        singularity run --app collation -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg --inputfiles /mnt/input/example_names.csv /mnt/input/example_pairs.csv -- /mnt/output/concatenated.csv
 
 %applabels collation
     KIVE_INPUTS --inputfiles*
