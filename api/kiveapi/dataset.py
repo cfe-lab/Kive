@@ -42,8 +42,9 @@ class Dataset:
 
         :param handle: A file handle
         """
-
-        for block in self._request_download().iter_content(1024):
+        blocks = self._request_download().iter_content(chunk_size=1024,
+                                                       decode_unicode=True)
+        for block in blocks:
             handle.write(block)
 
     def _request_download(self):

@@ -170,5 +170,9 @@ class DatasetViewSet(RemovableModelViewSet,
         Handles downloading of the Dataset.
         """
         dataset = self.get_object()
+        dataset_handle = dataset.get_open_file_handle()
 
-        return build_download_response(dataset.dataset_file)
+        if dataset_handle is not None:
+            return build_download_response(dataset_handle)
+        else:
+            raise APIException(f"Couldn't find dataset file for {dataset.name}")

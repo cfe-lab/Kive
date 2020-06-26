@@ -1,63 +1,49 @@
-import os
-import sched
-import time
-
-from kiveapi import KiveAPI
+"Run an existing pipeline on an existing dataset."
+import kiveapi
+import example_tools
 
 # Use HTTPS on a real server, so your password is encrypted.
-KiveAPI.SERVER_URL = 'http://localhost:8000'
 # Don't put your real password in source code, store it in a text file
 # that is only readable by your user account or some more secure storage.
-kive = KiveAPI()
-kive.login('kive', 'kive')
+session = kiveapi.KiveAPI("http://localhost:8000")
+session.login('kive', 'kive')
 
 # Get the data by ID
-fastq1 = kive.get_dataset(2)
-fastq2 = kive.get_dataset(3)
+dataset1 = session.get_dataset(1)
+# or get the data by name.
+example_names = session.find_datasets(name="example_names.csv")[0]
 
-# or get the data by name
-fastq1 = kive.find_datasets(name='1234A_R1.fastq')[0]
-fastq2 = kive.find_datasets(name='1234A_R2.fastq')[0]
+# Get app information
+app = session.endpoints.containerapps.get(1)
+# and app arguments information.
+appargs = session.endpoints.containerapps.get(f"{app['id']}/argument_list")
 
-# Pipeline
-pipeline = kive.get_pipeline(13)
+# Start a run of the app, giving the dataset as an argument.
+inputarg = next(a for a in appargs if a['type'] == 'I')
+runspec = {
+    "name": "example",
+    "app": app["url"],
+    "datasets": [
+        {
+            "argument": inputarg["url"],
+            "dataset": example_names.raw["url"],
+        },
+    ],
+}
+print("Starting example run... ")
+containerrun = session.endpoints.containerruns.post(json=runspec)
 
-print(pipeline)
-# # Get the pipeline by family ID
-# pipeline_family = kive.get_pipeline_family(2)
-#
-# print('Using data:')
-# print(fastq1, fastq2)
-#
-# print('With pipeline:')
-# print(pipeline_family.published_or_latest())
+# Monitor the run for completion
+containerrun = example_tools.await_containerrun(session, containerrun)
 
-# Run the pipeline
-status = kive.run_pipeline(
-    pipeline,
-    [fastq1, fastq2]
-)
+# Retrieve the output and save to a file
+run_datasets = session.get(containerrun["dataset_list"]).json()
+for run_dataset in run_datasets:
+    if run_dataset.get("argument_type") == "O":
+        dataset = session.get(run_dataset["dataset"]).json()
+        filename = dataset["name"]
+        print(f"  downloading {filename}")
+        with open(filename, "wb") as outf:
+            session.download_file(outf, dataset["download_url"])
 
-# Start polling Kive
-s = sched.scheduler(time.time, time.sleep)
-
-
-def check_run(sc, run):
-    # do your stuff
-    print(run.get_status())
-
-    if run.is_running() or run.is_complete():
-        print('{} {:.0f}%'.format(run.get_progress(), run.get_progress_percent()))
-
-    if not run.is_complete():
-        sc.enter(5, 1, check_run, (sc, run,))
-
-
-s.enter(5, 1, check_run, (s, status,))
-s.run()
-
-print('Finished Run, nabbing files')
-
-for dataset in status.get_results():
-    with open(os.path.join('results', dataset.filename), 'wb') as file_handle:
-        dataset.download(file_handle)
+print("Example run finished.")

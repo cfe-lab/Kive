@@ -39,8 +39,11 @@
         groups: kive
     - name: allow traffic to dev server
       become: true
+      loop:
+        - "8080/tcp"
+        - "8000/tcp"
       firewalld:
-        port: "8080/tcp"
+        port: "{{ item }}"
         state: enabled
         permanent: true
         immediate: true

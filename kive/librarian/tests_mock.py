@@ -195,6 +195,18 @@ class DatasetViewMockTests(ViewMockTestCase):
         self.assertIn('Content-Disposition: attachment; filename="example.txt"',
                       header_str)
 
+    def test_dataset_download_missing_file(self):
+        mockdataset = mock.Mock()
+        mockdataset.get_open_file_handle = mock.Mock(return_value=None)
+        mockgetobj = mock.Mock(return_value=mockdataset)
+        with patch("librarian.ajax.DatasetViewSet.get_object", new=mockgetobj):
+            request = reverse("dataset-download", kwargs={"pk": 9999})
+            response = self.client.get(request)
+            self.assertEqual(response.status_code, 500, "Expected a server error")
+            self.assertIn("Couldn't find dataset file for", response.json()["detail"])
+        mockgetobj.assert_called_once()
+        mockdataset.get_open_file_handle.assert_called_once()
+
     def test_dataset_view_404(self):
         response = self.client.get(reverse('dataset_view',
                                            kwargs=dict(dataset_id='1000')))
