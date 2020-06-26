@@ -60,3 +60,18 @@ From: python:3.6-alpine3.12
 
 %apprun collation
     /usr/local/bin/python3 /usr/local/share/concat_csv.py "$@"
+
+%apphelp kw_salutations
+    Match names with greetings from two different CSV files.
+
+    Run it with:
+
+        singularity run --app kw_salutations -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg --names /mnt/input/example_names.csv --salutations /mnt/input/salutations.csv -- /mnt/output/kw_salutations.csv
+
+%applabels kw_salutations
+    KIVE_INPUTS --names --salutations
+    KIVE_OUTPUTS greetings_csv
+    KIVE_MEMORY 128
+
+%apprun kw_salutations
+    /usr/local/bin/python3 /usr/local/share/kw_salutations.py "$@"
