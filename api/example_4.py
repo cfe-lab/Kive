@@ -32,6 +32,7 @@ containerfamily = session.endpoints.containerfamilies.filter(
     "name", "samplecode")[0]
 container = session.get(containerfamily["containers"]).json()[0]
 containerapps = session.get(container["app_list"]).json()
+# Retrieve the default app for the samplecode container.
 app = next(c for c in containerapps if c["name"] == "")
 appargs = session.get(app["argument_list"]).json()
 inputarg = next(a for a in appargs if a["type"] == "I")
@@ -69,7 +70,7 @@ runspec2 = {
 run1 = session.endpoints.containerruns.post(json=runspec1)
 run2 = session.endpoints.containerruns.post(json=runspec2)
 
-# Wait for all batches in run to be finished
+# Wait for all the runs in this batch to be finished
 ACTIVE_STATES = "NSRI"
 batchid = containerbatch["id"]
 print(f"Waiting for batch {batchid} to finish...")

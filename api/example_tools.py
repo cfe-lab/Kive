@@ -39,6 +39,10 @@ def await_containerrun(session, containerrun):
     return containerrun
 
 
+# This function is mostly useful in the API examples: when the example is re-run, this function
+# retrieves an existing dataset instead of creating a new one. Note that in production, we
+# also compare the MD5 hashes of the files to give us more confidence that they're actually
+# identical.
 def upload_or_retrieve_dataset(session, name, inputfile, users=None, groups=None):
     "Create a dataset by uploading a file to Kive."
     if users is None and groups is None:

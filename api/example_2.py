@@ -11,12 +11,10 @@ kive = KiveAPI('http://localhost:8000')
 kive.login('kive', 'kive')
 
 # Upload (or retrieve) an input file
-try:
-    dataset = kive.add_dataset('API Example 2 Names File', 'None',
-                               open('names.csv', 'r'), None, None,
-                               ["Everyone"])
-except KiveMalformedDataException:
-    dataset = kive.find_datasets(name='API Example 2 Names File')[0]
+dataset = example_tools.upload_or_retrieve_dataset(kive,
+                                                   "API Example 2 Names File",
+                                                   open("names.csv", "r"),
+                                                   groups=["Everyone"])
 
 # Get the app from a container family.
 containerfamily = kive.filter("/api/containerfamilies/", "name",

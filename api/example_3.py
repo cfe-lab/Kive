@@ -1,4 +1,15 @@
-"Create and use a dataset using an external file."
+"""Create and use a dataset using an external file.
+
+Note that this example:
+
+- Only works when it's run on the same host as the Kive server and Kive worker
+  (e.g. in the `dev-env` environment). On a production server, external files
+  are kept in a network share, so they can be accessed from different hosts.
+
+- Requires an instance of `librarian.models.ExternalFileDirectory` called "tmp"
+  pointing at `/tmp` to be created and saved on the server. This can be done
+  through the Djano shell (`python manage.py shell` in the `kive` directory).
+"""
 import io
 import pathlib
 import pprint
@@ -25,7 +36,7 @@ with (EFD_DIRECTORY / EFD_NAME).open("w") as outf:
 # Upload data
 try:
     uploaded_dataset = session.add_dataset(
-        'API Example 4 External Dataset',
+        'API Example 3 External Dataset',
         'None',
         None,
         None,
@@ -40,14 +51,15 @@ except kiveapi.KiveMalformedDataException as e:
 
 
 # Now get the file and check that the results make sense.
-retrieved_dataset = session.find_datasets(name='API Example 4 External Dataset')[0]
+retrieved_dataset = session.find_datasets(
+    dataset_id=uploaded_dataset.dataset_id)[0]
 
 pprint.pprint(retrieved_dataset.__dict__)
 
 
 assert retrieved_dataset.dataset_id == uploaded_dataset.dataset_id
 assert retrieved_dataset.filename == uploaded_dataset.filename
-assert retrieved_dataset.name == "API Example 4 External Dataset"
+assert retrieved_dataset.name == "API Example 3 External Dataset"
 assert retrieved_dataset.users_allowed == []
 assert retrieved_dataset.groups_allowed == ["Everyone"]
 assert retrieved_dataset.externalfiledirectory == EFD_DIRECTORY_NAME
