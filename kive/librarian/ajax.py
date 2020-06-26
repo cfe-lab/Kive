@@ -175,4 +175,4 @@ class DatasetViewSet(RemovableModelViewSet,
         if dataset_handle is not None:
             return build_download_response(dataset_handle)
         else:
-            return Response(status=500, msg="Couldn't find dataset file")
+            raise APIException(f"Couldn't find dataset file for {dataset.name}")
