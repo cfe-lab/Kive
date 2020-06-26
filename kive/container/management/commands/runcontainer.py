@@ -177,24 +177,26 @@ class Command(BaseCommand):
 
     @staticmethod
     def _format_kw_args(
-            datasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
+            containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
         def sort_by_position(
-            ds: typing.Iterable[ContainerDataset]
+            cds: typing.Iterable[ContainerDataset]
         ) -> typing.List[ContainerDataset]:
-            return sorted(ds, key=lambda d: d.multi_position)
+            return sorted(
+                cds,
+                key=lambda d: d.multi_position or 0)
 
         grouped = {
-            arg: sort_by_position(d for d in datasets if d.argument == arg)
-            for arg in set(d.argument for d in datasets)
+            arg: sort_by_position(d for d in containerdatasets if d.argument == arg)
+            for arg in set(d.argument for d in containerdatasets)
         }
-        for arg, argdatasets in grouped.items():
+        for arg, argcontainerdatasets in grouped.items():
             if arg.type == ContainerArgument.INPUT:
                 datasetfolder = "/mnt/input"
             else:
                 datasetfolder = "/mnt/output"
             yield "--{}".format(arg.name)
-            yield from (os.path.join(datasetfolder, dataset.name)
-                        for dataset in argdatasets)
+            yield from (os.path.join(datasetfolder, containerdataset.dataset.name)
+                        for containerdataset in argcontainerdatasets)
 
     @staticmethod
     def _format_fixed_arg(arg: ContainerArgument) -> str:
