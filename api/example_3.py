@@ -8,7 +8,7 @@ Note that this example:
 
 - Requires an instance of `librarian.models.ExternalFileDirectory` called "tmp"
   pointing at `/tmp` to be created and saved on the server. This can be done
-  through the Djano shell (`python manage.py shell` in the `kive` directory).
+  through the Django shell (`python manage.py shell` in the `kive` directory).
 """
 import io
 import pathlib
