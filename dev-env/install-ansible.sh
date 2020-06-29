@@ -14,5 +14,4 @@ python3 -m pip install -r /vagrant/requirements.txt
 
 # Add host keys to `known_hosts`
 mkdir -p ~/.ssh/
-touch ~/.ssh/known_hosts
 ssh-keyscan head >> ~/.ssh/known_hosts
