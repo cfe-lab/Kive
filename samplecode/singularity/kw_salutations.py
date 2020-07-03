@@ -10,7 +10,7 @@ import csv
 import typing as ty
 
 PARSER = argparse.ArgumentParser()
-PARSER.add_argument("--names", type=argparse.FileType())
+PARSER.add_argument("--names", type=argparse.FileType(), required=True)
 PARSER.add_argument("--salutations", type=argparse.FileType())
 PARSER.add_argument("outputfile", type=argparse.FileType("w"))
 
@@ -27,7 +27,13 @@ def main() -> None:
     args = PARSER.parse_args()
 
     names_reader = csv.DictReader(args.names)
-    salutations = get_salutations(csv.DictReader(args.salutations))
+    if args.salutations is not None:
+        salutations = get_salutations(csv.DictReader(args.salutations))
+    else:
+        salutations = {
+            "Grace Hopper": "Oh my goodness, it's Admiral",
+            "Radia Perlman": "Introducing the inventor of the spanning-tree protocol,",
+        }
 
     output_writer = csv.DictWriter(args.outputfile, fieldnames=["greeting"])
     output_writer.writeheader()
