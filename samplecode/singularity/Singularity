@@ -51,10 +51,10 @@ From: python:3.6-alpine3.12
 
     Run it with:
 
-        singularity run --app collation -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg --inputfiles /mnt/input/example_names.csv /mnt/input/example_pairs.csv -- /mnt/output/concatenated.csv
+        singularity run --app collation -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg --input_csvs /mnt/input/example_names.csv /mnt/input/example_pairs.csv -- /mnt/output/concatenated.csv
 
 %applabels collation
-    KIVE_INPUTS --inputfiles*
+    KIVE_INPUTS --input_csvs*
     KIVE_OUTPUTS output_csv
     KIVE_MEMORY 128
 
