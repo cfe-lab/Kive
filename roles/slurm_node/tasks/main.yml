@@ -22,15 +22,21 @@
 
 - name: add slurm config files
   become: true
-  loop:
-    - slurm.conf
-    - cgroup.conf
-  copy:
-    src: "{{ item }}"
-    dest: /etc/slurm/
-    owner: slurm
-    group: slurm
-    mode: "644"
+  block:
+    - name: copy cgroup config file
+      copy:
+        src: cgroup.conf
+        dest: /etc/slurm/
+        owner: slurm
+        group: slurm
+        mode: "644"
+    - name: generate and copy slurm config file
+      template:
+        src: slurm.conf.j2
+        dest: /etc/slurm/slurm.conf
+        owner: slurm
+        group: slurm
+        mode: "644"
 
 
 - name: enable slurm network access
