@@ -11,7 +11,10 @@ from traceback import format_exception_only
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
-from container.models import ContainerRun, ContainerArgument, ContainerLog, ContainerDataset
+from container.models import (
+    ContainerRun, ContainerArgument, ContainerArgumentType,
+    ContainerLog, ContainerDataset,
+)
 from librarian.models import Dataset
 
 KNOWN_EXTENSIONS = ('csv',
@@ -86,7 +89,17 @@ class Command(BaseCommand):
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
         for dataset in run.datasets.all():
-            target_path = os.path.join(input_path, dataset.argument.name)
+            if dataset.argument.argtype in (
+                    ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                    ContainerArgumentType.OPTIONAL_INPUT):
+                unique_filename = dataset.dataset.unique_filename()
+                target_path = os.path.join(input_path, unique_filename)
+                if os.path.exists(target_path):
+                    raise RuntimeError(
+                        "Supposedly unique output file already exists: {}".
+                        format(unique_filename))
+            else:
+                target_path = os.path.join(input_path, dataset.argument.name)
             source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
@@ -177,24 +190,26 @@ class Command(BaseCommand):
 
     @staticmethod
     def _format_kw_args(
-            datasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
+            containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
         def sort_by_position(
-            ds: typing.Iterable[ContainerDataset]
+            cds: typing.Iterable[ContainerDataset]
         ) -> typing.List[ContainerDataset]:
-            return sorted(ds, key=lambda d: d.multi_position)
+            return sorted(
+                cds,
+                key=lambda d: d.multi_position or 0)
 
         grouped = {
-            arg: sort_by_position(d for d in datasets if d.argument == arg)
-            for arg in set(d.argument for d in datasets)
+            arg: sort_by_position(d for d in containerdatasets if d.argument == arg)
+            for arg in set(d.argument for d in containerdatasets)
         }
-        for arg, argdatasets in grouped.items():
+        for arg, argcontainerdatasets in grouped.items():
             if arg.type == ContainerArgument.INPUT:
                 datasetfolder = "/mnt/input"
             else:
                 datasetfolder = "/mnt/output"
             yield "--{}".format(arg.name)
-            yield from (os.path.join(datasetfolder, dataset.name)
-                        for dataset in argdatasets)
+            yield from (os.path.join(datasetfolder, containerdataset.dataset.name)
+                        for containerdataset in argcontainerdatasets)
 
     @staticmethod
     def _format_fixed_arg(arg: ContainerArgument) -> str:

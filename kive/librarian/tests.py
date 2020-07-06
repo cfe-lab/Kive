@@ -334,6 +334,11 @@ class DatasetTests(LibrarianTestCase):
         self.assertRegex(dataset2.name, r'bar\.txt.*')
         self.assertTrue(dataset1.is_uploaded)
 
+    def test_unique_filename(self):
+        example_dataset = Dataset(name="asdf_jkl.example.txt", id=987654321)
+        unique_name = example_dataset.unique_filename()
+        self.assertEqual(unique_name, "asdf_jkl.example_987654321.txt")
+
 
 @skipIfDBFeature('is_mocked')
 class DatasetWithFileTests(TestCase):

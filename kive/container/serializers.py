@@ -234,6 +234,7 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
                   'dataset',
                   'dataset_name',
                   'dataset_purged',
+                  'multi_position',
                   'name',
                   'created')
 

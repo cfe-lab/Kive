@@ -832,6 +832,12 @@ class Dataset(metadata.models.AccessControl):
         """
         self.grant_from_json(permissions_json)
 
+    def unique_filename(self) -> str:
+        "Create a unique filename based on this dataset's name and ID."
+        unique_id = self.id
+        name, extension = os.path.splitext(
+            self.name)  # Splitext retains a '.' if it's present
+        return "{}_{}{}".format(name, unique_id, extension)
 
 # Register signals.
 post_delete.connect(librarian.signals.dataset_post_delete, sender=Dataset)

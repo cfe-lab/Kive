@@ -3158,9 +3158,9 @@ Line 3
         def make_dataset(arg, multi_position=None):
             dataset = unittest.mock.Mock()
             dataset.argument = arg
-            dataset.name = arg.name
+            dataset.dataset.name = arg.name
             if multi_position is not None:
-                dataset.name += str(multi_position)
+                dataset.dataset.name += str(multi_position)
             dataset.multi_position = multi_position
             datasets.append(dataset)
 
