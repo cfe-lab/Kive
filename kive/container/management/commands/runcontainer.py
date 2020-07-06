@@ -92,7 +92,12 @@ class Command(BaseCommand):
             if dataset.argument.argtype in (
                     ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
                     ContainerArgumentType.OPTIONAL_INPUT):
-                target_path = os.path.join(input_path, dataset.dataset.name)
+                unique_filename = dataset.dataset.unique_filename()
+                target_path = os.path.join(input_path, unique_filename)
+                if os.path.exists(target_path):
+                    raise RuntimeError(
+                        "Supposedly unique output file already exists: {}".
+                        format(unique_filename))
             else:
                 target_path = os.path.join(input_path, dataset.argument.name)
             source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
