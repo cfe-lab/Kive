@@ -193,7 +193,6 @@
         db: kive
         priv: ALL
     - name: run django migrations
-      tags: apropos
       environment:
           KIVE_DB_NAME: "{{ kive_db_name }}"
           KIVE_DB_USER: "{{ kive_db_user }}"
