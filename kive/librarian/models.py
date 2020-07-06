@@ -34,6 +34,7 @@ import six
 
 import file_access_utils
 
+
 LOGGER = logging.getLogger(__name__)
 
 
@@ -48,8 +49,7 @@ def get_upload_path(instance, filename):
     :return:  The upload directory for Dataset files.
     """
     # noinspection PyTypeChecker
-    return instance.UPLOAD_DIR + os.sep + time.strftime(
-        '%Y_%m') + os.sep + filename
+    return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
 @python_2_unicode_compatible
@@ -60,9 +60,12 @@ class ExternalFileDirectory(models.Model):
     name = models.CharField(
         help_text="Human-readable name for this external file directory",
         unique=True,
-        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
-    path = models.CharField(help_text="Absolute path",
-                            max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
+    )
+    path = models.CharField(
+        help_text="Absolute path",
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
+    )
 
     def __str__(self):
         return self.name
@@ -74,15 +77,12 @@ class ExternalFileDirectory(models.Model):
         The tuple looks like:
         ([absolute file path], [file path with external file directory name substituted])
         """
-        path_with_slash = self.path if self.path.endswith(
-            "/") else "{}/".format(self.path)
+        path_with_slash = self.path if self.path.endswith("/") else "{}/".format(self.path)
         all_files = []
         for root, _dirs, files in sorted(os.walk(self.path)):
             for f in files:
                 f = os.path.join(root, f)
-                all_files.append(
-                    (f, f.replace(path_with_slash, "[{}]/".format(self.name),
-                                  1)))
+                all_files.append((f, f.replace(path_with_slash, "[{}]/".format(self.name), 1)))
         return all_files
 
     def save(self, *args, **kwargs):
@@ -111,22 +111,20 @@ class Dataset(metadata.models.AccessControl):
     UPLOAD_DIR = "Datasets"  # This is relative to kive.settings.MEDIA_ROOT
 
     name = models.CharField(max_length=maxlengths.MAX_FILENAME_LENGTH)
-    description = models.TextField(
-        help_text="Description of this Dataset.",
-        max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
-        blank=True)
+    description = models.TextField(help_text="Description of this Dataset.",
+                                   max_length=maxlengths.MAX_DESCRIPTION_LENGTH,
+                                   blank=True)
     date_created = models.DateTimeField(default=timezone.now,
                                         help_text="Date of Dataset creation.",
                                         db_index=True)
 
     # Datasets are stored in the "Datasets" folder
-    dataset_file = models.FileField(
-        upload_to=get_upload_path,
-        help_text="Physical path where datasets are stored",
-        blank=True,
-        default='',
-        db_index=True,
-        max_length=maxlengths.MAX_FILENAME_LENGTH)
+    dataset_file = models.FileField(upload_to=get_upload_path,
+                                    help_text="Physical path where datasets are stored",
+                                    blank=True,
+                                    default='',
+                                    db_index=True,
+                                    max_length=maxlengths.MAX_FILENAME_LENGTH)
 
     externalfiledirectory = models.ForeignKey(
         ExternalFileDirectory,
@@ -134,12 +132,13 @@ class Dataset(metadata.models.AccessControl):
         help_text="External file directory containing the data file",
         null=True,
         blank=True,
-        on_delete=models.CASCADE)
+        on_delete=models.CASCADE
+    )
     external_path = models.CharField(
-        help_text=
-        "Relative path of the file within the specified external file directory",
+        help_text="Relative path of the file within the specified external file directory",
         blank=True,
-        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH)
+        max_length=maxlengths.MAX_EXTERNAL_PATH_LENGTH
+    )
 
     logger = logging.getLogger('librarian.Dataset')
 
@@ -148,12 +147,9 @@ class Dataset(metadata.models.AccessControl):
     # missing (not created when it was supposed to be created).
     MD5_checksum = models.CharField(
         max_length=64,
-        validators=[
-            RegexValidator(
-                regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
-                message="MD5 checksum is not either 32 hex characters or blank"
-            )
-        ],
+        validators=[RegexValidator(
+            regex=re.compile("(^[0-9A-Fa-f]{32}$)|(^$)"),
+            message="MD5 checksum is not either 32 hex characters or blank")],
         blank=True,
         default="",
         help_text="Validates file integrity")
@@ -163,17 +159,16 @@ class Dataset(metadata.models.AccessControl):
     # The last time a check was performed on this external file, to see whether
     # the external file referenced was still there.
     # See external_file_check() for details.
-    last_time_checked = models.DateTimeField(
-        default=timezone.now,
-        help_text="Date-time of last (external) dataset existence check.",
-        null=True)
+    last_time_checked = models.DateTimeField(default=timezone.now,
+                                             help_text="Date-time of last (external) dataset existence check.",
+                                             null=True)
 
     dataset_size = models.BigIntegerField(
         blank=True,
         null=True,
-        help_text=
-        "Size of the dataset file in bytes.  If null, this has not been computed yet or there is no "
-        "internally stored file.")
+        help_text="Size of the dataset file in bytes.  If null, this has not been computed yet or there is no "
+                  "internally stored file."
+    )
     is_external_missing = models.BooleanField(
         default=False,
         help_text='True if the external file was missing when last checked.')
@@ -202,8 +197,7 @@ class Dataset(metadata.models.AccessControl):
 
         display_name = self.name if self.name != "" else "[no name specified]"
 
-        return "{} (created by {} on {})".format(display_name, self.user,
-                                                 self.date_created)
+        return "{} (created by {} on {})".format(display_name, self.user, self.date_created)
 
     @property
     def is_purged(self):
@@ -212,8 +206,7 @@ class Dataset(metadata.models.AccessControl):
     def external_absolute_path(self):
         if not self.external_path:
             return None
-        return os.path.normpath(
-            os.path.join(self.externalfiledirectory.path, self.external_path))
+        return os.path.normpath(os.path.join(self.externalfiledirectory.path, self.external_path))
 
     def get_open_file_handle(self, mode="rb", raise_errors=False):
         """
@@ -250,11 +243,7 @@ class Dataset(metadata.models.AccessControl):
             raise ValueError('Dataset has no dataset_file or external_path.')
         return None
 
-    def all_rows(self,
-                 data_check=False,
-                 insert_at=None,
-                 limit=None,
-                 extra_errors=None):
+    def all_rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
         """ Returns an iterator over all rows of this Dataset.
 
         :param bool data_check: each field becomes a tuple: (value, [error])
@@ -293,8 +282,7 @@ class Dataset(metadata.models.AccessControl):
                         if failed_column is None:
                             new_errors = []
                         else:
-                            new_errors = failed_column.check_basic_constraints(
-                                value)
+                            new_errors = failed_column.check_basic_constraints(value)
                         new_row.append((value, new_errors))
 
                     row = new_row
@@ -310,11 +298,7 @@ class Dataset(metadata.models.AccessControl):
         rows = self.all_rows()
         return next(rows)
 
-    def rows(self,
-             data_check=False,
-             insert_at=None,
-             limit=None,
-             extra_errors=None):
+    def rows(self, data_check=False, insert_at=None, limit=None, extra_errors=None):
         rows = self.all_rows(data_check,
                              insert_at,
                              limit=limit,
@@ -335,19 +319,23 @@ class Dataset(metadata.models.AccessControl):
 
         Note that the MD5 checksum is already checked via a validator.
         """
-        if not (self.externalfiledirectory and self.external_path
-                or not self.externalfiledirectory and not self.external_path):
-            raise ValidationError({
-                "external_path":
-                "Both externalfiledirectory and external_path should be set or "
-                "neither should be set"
-            })
+        if not (self.externalfiledirectory and self.external_path or
+                not self.externalfiledirectory and not self.external_path):
+            raise ValidationError(
+                {
+                    "external_path": "Both externalfiledirectory and external_path should be set or "
+                                     "neither should be set"
+                }
+            )
 
         if self.has_data() and not self.check_md5():
-            error_str = (
-                'File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum '
-                + '"{}"').format(self, self.compute_md5(), self.MD5_checksum)
-            raise ValidationError({"dataset_file": error_str})
+            error_str = ('File integrity of "{}" lost. Current checksum "{}" does not equal expected checksum ' +
+                         '"{}"').format(self, self.compute_md5(), self.MD5_checksum)
+            raise ValidationError(
+                {
+                    "dataset_file": error_str
+                }
+            )
 
     # noinspection PyUnusedLocal
     def validate_uniqueness_on_upload(self, *args, **kwargs):
@@ -363,7 +351,11 @@ class Dataset(metadata.models.AccessControl):
 
         if query.exclude(pk=self.pk).exists():
             error_str = "A Dataset with that name and MD5 already exists."
-            raise ValidationError({"dataset_file": error_str})
+            raise ValidationError(
+                {
+                    "dataset_file": error_str
+                }
+            )
 
     def get_access_limits(self, access_limits=None):
         if access_limits is None:
@@ -433,9 +425,10 @@ class Dataset(metadata.models.AccessControl):
                 filename = self.dataset_file.name
             else:
                 filename = self.external_absolute_path()
-            self.logger.warning(
-                'MD5 mismatch for %s: expected %s, but was %s.', filename,
-                self.MD5_checksum, new_md5)
+            self.logger.warning('MD5 mismatch for %s: expected %s, but was %s.',
+                                filename,
+                                self.MD5_checksum,
+                                new_md5)
             return False
         return True
 
@@ -524,10 +517,10 @@ class Dataset(metadata.models.AccessControl):
 
         try:
             full_name = file_path
-            assert isinstance(
-                full_name,
-                six.string_types), "fname '{}' is not a string {}".format(
-                    file_handle.name, type(file_handle.name))
+            assert isinstance(full_name, six.string_types), "fname '{}' is not a string {}".format(
+                file_handle.name,
+                type(file_handle.name)
+            )
             fname = os.path.basename(full_name)
             self.dataset_file.save(fname, File(file_handle))
         finally:
@@ -538,13 +531,8 @@ class Dataset(metadata.models.AccessControl):
         self.save()
 
     @classmethod
-    def create_empty(cls,
-                     user=None,
-                     cdt=None,
-                     users_allowed=None,
-                     groups_allowed=None,
-                     file_source=None,
-                     instance=None):
+    def create_empty(cls, user=None, cdt=None, users_allowed=None, groups_allowed=None,
+                     file_source=None, instance=None):
         """Create an empty Dataset.
 
         INPUTS
@@ -565,10 +553,8 @@ class Dataset(metadata.models.AccessControl):
             groups_allowed = file_source.top_level_run.groups_allowed.all()
         elif file_source is not None:
             assert user == file_source.top_level_run.user
-            assert set(users_allowed) == set(
-                file_source.top_level_run.users_allowed.all())
-            assert set(groups_allowed) == set(
-                file_source.top_level_run.groups_allowed.all())
+            assert set(users_allowed) == set(file_source.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
         with transaction.atomic():
 
@@ -635,42 +621,33 @@ class Dataset(metadata.models.AccessControl):
             groups_allowed = file_source.top_level_run.groups_allowed.all()
         elif file_source is not None:
             assert user == file_source.top_level_run.user
-            assert set(users_allowed) == set(
-                file_source.top_level_run.users_allowed.all())
-            assert set(groups_allowed) == set(
-                file_source.top_level_run.groups_allowed.all())
+            assert set(users_allowed) == set(file_source.top_level_run.users_allowed.all())
+            assert set(groups_allowed) == set(file_source.top_level_run.groups_allowed.all())
 
         if file_path:
             LOGGER.debug("Creating Dataset from file {}".format(file_path))
             file_name = file_path
         elif file_handle:
-            LOGGER.debug("Creating Dataset from file {}".format(
-                file_handle.name))
+            LOGGER.debug("Creating Dataset from file {}".format(file_handle.name))
             file_name = str(file_handle.name)
         else:
             raise ValueError("Must supply either the file path or file handle")
 
         if not isinstance(file_name, six.string_types):
-            raise ValueError("file_name '{}' is not a string '{}'".format(
-                file_name, type(file_name)))
+            raise ValueError("file_name '{}' is not a string '{}'".format(file_name, type(file_name)))
         with transaction.atomic():
             external_path = ""
             # We do this in the transaction because we're accessing ExternalFileDirectory.
             if externalfiledirectory:
                 # Check that file_path is in the specified ExternalFileDirectory.
                 normalized_path = os.path.normpath(file_name)
-                normalized_efd_with_slash = "{}/".format(
-                    os.path.normpath(externalfiledirectory.path))
+                normalized_efd_with_slash = "{}/".format(os.path.normpath(externalfiledirectory.path))
                 assert normalized_path.startswith(normalized_efd_with_slash)
-                external_path = normalized_path.replace(
-                    normalized_efd_with_slash, "", 1)
+                external_path = normalized_path.replace(normalized_efd_with_slash, "", 1)
 
-            new_dataset = cls.create_empty(user,
-                                           cdt=cdt,
-                                           users_allowed=users_allowed,
-                                           groups_allowed=groups_allowed,
-                                           instance=instance,
-                                           file_source=file_source)
+            new_dataset = cls.create_empty(user, cdt=cdt,
+                                           users_allowed=users_allowed, groups_allowed=groups_allowed,
+                                           instance=instance, file_source=file_source)
 
             new_dataset.name = name or ""
             new_dataset.description = description or ""
@@ -687,8 +664,7 @@ class Dataset(metadata.models.AccessControl):
                 file_handle.seek(0)
 
             if keep_file:
-                new_dataset.register_file(file_path=file_name,
-                                          file_handle=file_handle)
+                new_dataset.register_file(file_path=file_name, file_handle=file_handle)
 
             new_dataset.clean()
             new_dataset.save()
@@ -699,8 +675,7 @@ class Dataset(metadata.models.AccessControl):
         """
         Create a list of what will be affected when redacting this Dataset.
         """
-        redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan(
-        )
+        redaction_plan = redaction_accumulator or archive.models.empty_redaction_plan()
         assert self not in redaction_plan["Datasets"]
         if self.is_redacted():
             return redaction_plan
@@ -725,10 +700,7 @@ class Dataset(metadata.models.AccessControl):
         self.externalfiledirectory = None
         if self.external_path:
             self.external_path = ""
-        self.save(update_fields=[
-            "_redacted", "MD5_checksum", "externalfiledirectory",
-            "external_path"
-        ])
+        self.save(update_fields=["_redacted", "MD5_checksum", "externalfiledirectory", "external_path"])
 
         if bool(self.dataset_file):
             self.dataset_file.delete(save=True)
@@ -753,15 +725,14 @@ class Dataset(metadata.models.AccessControl):
         """
         Make a manifest of objects to remove when removing this Dataset.
         """
-        removal_plan = removal_accumulator or metadata.models.empty_removal_plan(
-        )
+        removal_plan = removal_accumulator or metadata.models.empty_removal_plan()
         assert self not in removal_plan["Datasets"]
         removal_plan["Datasets"].add(self)
 
         for run_dataset in self.containers.all():
             run = run_dataset.run
-            if (run_dataset.argument.type == 'I'
-                    and run not in removal_plan['ContainerRuns']):
+            if (run_dataset.argument.type == 'I' and
+                    run not in removal_plan['ContainerRuns']):
                 run.build_removal_plan(removal_plan)
 
         # Make a special note if this Dataset is associated with an external file.
@@ -788,11 +759,10 @@ class Dataset(metadata.models.AccessControl):
 
         unneeded = cls.objects.filter(
             is_uploaded=False).exclude(  # Only purge outputs.
-                pk__in=active_dataset_ids
-            ).exclude(  # Don't purge while it's in use.
-                dataset_file=None).exclude(  # External file.
-                    dataset_file='').exclude(  # Already purged.
-                        dataset_size=None)  # New dataset.
+            pk__in=active_dataset_ids).exclude(  # Don't purge while it's in use.
+            dataset_file=None).exclude(  # External file.
+            dataset_file='').exclude(  # Already purged.
+            dataset_size=None)  # New dataset.
         return unneeded
 
     @classmethod
@@ -817,7 +787,7 @@ class Dataset(metadata.models.AccessControl):
         while True:
             batch = Dataset.objects.filter(
                 externalfiledirectory__isnull=False).order_by(
-                    'id').prefetch_related('externalfiledirectory')
+                'id').prefetch_related('externalfiledirectory')
             if last_id is not None:
                 batch = batch.filter(id__gt=last_id)
             batch = batch[:batch_size]
@@ -828,8 +798,7 @@ class Dataset(metadata.models.AccessControl):
                 last_id = dataset.id
                 path_name = dataset.external_absolute_path()
                 if path_name is None:
-                    raise RuntimeError(
-                        "Unexpected None for external dataset path!")
+                    raise RuntimeError("Unexpected None for external dataset path!")
                 if os.path.exists(path_name):
                     found_ids.append(dataset.id)
                 else:
@@ -842,13 +811,16 @@ class Dataset(metadata.models.AccessControl):
                             last_missing_path = path_name
                         dataset.save()
             Dataset.objects.filter(id__in=found_ids).update(
-                last_time_checked=Now(), is_external_missing=False)
+                last_time_checked=Now(),
+                is_external_missing=False)
             if batch_count < batch_size:
                 break
         if last_missing_date is not None:
             cls.logger.error(
                 "Missing %d external dataset%s. Most recent from %s, last checked %s.",
-                missing_count, pluralize(missing_count), last_missing_path,
+                missing_count,
+                pluralize(missing_count),
+                last_missing_path,
                 naturaltime(last_missing_date))
 
     def increase_permissions_from_json(self, permissions_json):
@@ -859,13 +831,6 @@ class Dataset(metadata.models.AccessControl):
         be by the permissions widget used in the UI.
         """
         self.grant_from_json(permissions_json)
-
-    def unique_filename(self) -> str:
-        "Create a unique filename based on this dataset's name and ID."
-        unique_id = self.id
-        name, extension = os.path.splitext(
-            self.name)  # Splitext retains a '.' if it's present
-        return "{}_{}{}".format(name, unique_id, extension)
 
 
 # Register signals.
