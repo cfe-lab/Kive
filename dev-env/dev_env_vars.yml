@@ -23,9 +23,7 @@ kive_httpd_user: kive
 kive_httpd_group: kive
 # - package variables
 slurmbuilddir: "/root"
+# - Nodes to tell Slurm about (with hostname and memory in MB)
 slurmnodes:
     - name: head
       memory: "7000"
-
-
-
