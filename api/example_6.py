@@ -1,4 +1,4 @@
-"Run the example collation pipeline, which has multiple inputs."
+"Run the example collation pipeline, which has multi-valued inputs."
 import kiveapi
 import example_tools
 
