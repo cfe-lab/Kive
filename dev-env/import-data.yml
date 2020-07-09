@@ -1,0 +1,39 @@
+- hosts: head
+  vars_files:
+    - dev_env_vars.yml
+  vars:
+    backup_dir: "/tmp/kivebackup/"
+    dbdump_file: "{{backup_dir}}/dbdump.sql"
+    archive_file: "/tmp/kivebackup.tar"
+  tasks:
+    - name: delete existing backup
+      become: true
+      file:
+        path: "{{ backup_dir }}"
+        state: absent
+    - name: create import directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+        mode: "777"
+    - name: upload and extract archive
+      unarchive:
+        dest: "{{ backup_dir }}"
+        src: "./kivebackup.tar"
+    - name: restore database backup
+      become: true
+      become_user: postgres
+      postgresql_db:
+        name: postgres
+        owner: kive
+        state: restore
+        target: "{{backup_dir}}/{{ dbdump_file }}"
+        target_opts: "--set ON_ERROR_STOP=on"
+    - name: restore media root
+      become: true
+      copy:
+        src: "{{ backup_dir }}/media_root"
+        dest: "{{ kive_media_root }}"
+        remote_src: true
+        owner: kive
+        group: kive
