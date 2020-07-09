@@ -27,12 +27,12 @@
         name: postgres
         owner: kive
         state: restore
-        target: "{{backup_dir}}/{{ dbdump_file }}"
+        target: "{{backup_dir}}{{ dbdump_file }}"
         target_opts: "--set ON_ERROR_STOP=on"
     - name: restore media root
       become: true
       copy:
-        src: "{{ backup_dir }}/media_root"
+        src: "{{ backup_dir }}{{ kive_media_root }}/"
         dest: "{{ kive_media_root }}"
         remote_src: true
         owner: kive
