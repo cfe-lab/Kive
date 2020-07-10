@@ -46,6 +46,7 @@ From: python:3.6-alpine3.12
 %apprun sums_and_products
     /usr/local/bin/python /usr/local/share/sums_and_products.py "$@"
 
+
 %apphelp collation
     Concatenate CSV files into a single output file.
 
@@ -61,6 +62,7 @@ From: python:3.6-alpine3.12
 %apprun collation
     /usr/local/bin/python3 /usr/local/share/concat_csv.py "$@"
 
+
 %apphelp kw_salutations
     Match names with greetings from two different CSV files.
 
@@ -75,3 +77,20 @@ From: python:3.6-alpine3.12
 
 %apprun kw_salutations
     /usr/local/bin/python3 /usr/local/share/kw_salutations.py "$@"
+
+
+%apphelp scraper
+    Download multiple URLs in parallel.
+
+    Run it with:
+
+        singularity run --app scraper -B host_input:/mnt/input,host_output:/mnt/output python3-alpine-trimmed.simg /mnt/input/example_urls.csv /mnt/output/scraper/
+
+%applabels scraper
+    KIVE_INPUTS urls_csv
+    KIVE_OUTPUTS outputfiles/
+    KIVE_MEMORY 256
+
+%apprun scraper
+    /usr/local/bin/python3 /usr/local/share/scraper.py "$@"
+

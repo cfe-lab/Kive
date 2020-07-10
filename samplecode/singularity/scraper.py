@@ -10,7 +10,7 @@ import pathlib
 import typing as ty
 from urllib.request import urlopen
 
-PARSER = argparse.ArgumentParser(__file__)
+PARSER = argparse.ArgumentParser("scraper.py")
 PARSER.add_argument("inputfile", type=argparse.FileType("r"))
 PARSER.add_argument("output_directory", type=pathlib.Path)
 
@@ -26,7 +26,7 @@ def main():
     logging.basicConfig(
         filename=(output_directory / "scraper.log"), level=logging.INFO,
     )
-    log = logging.getLogger(__file__)
+    log = logging.getLogger("scraper.py")
 
     def download(url: str, filename: str) -> None:
         outpath = output_directory / filename
