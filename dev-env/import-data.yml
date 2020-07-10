@@ -6,34 +6,55 @@
     dbdump_file: "{{backup_dir}}/dbdump.sql"
     archive_file: "/tmp/kivebackup.tar"
   tasks:
-    - name: delete existing backup
-      become: true
-      file:
-        path: "{{ backup_dir }}"
-        state: absent
-    - name: create import directory
-      file:
-        path: "{{ backup_dir }}"
-        state: directory
-        mode: "777"
-    - name: upload and extract archive
-      unarchive:
-        dest: "{{ backup_dir }}"
-        src: "./kivebackup.tar"
-    - name: restore database backup
-      become: true
-      become_user: postgres
-      postgresql_db:
-        name: postgres
-        owner: kive
-        state: restore
-        target: "{{backup_dir}}{{ dbdump_file }}"
-        target_opts: "--set ON_ERROR_STOP=on"
-    - name: restore media root
-      become: true
-      copy:
-        src: "{{ backup_dir }}{{ kive_media_root }}/"
-        dest: "{{ kive_media_root }}"
-        remote_src: true
-        owner: kive
-        group: kive
+    - name: confirmation prompt
+      register: confirm_delete
+      pause:
+        prompt: |-
+
+          ██╗    ██╗ █████╗ ██████╗ ███╗   ██╗██╗███╗   ██╗ ██████╗ ██╗
+          ██║    ██║██╔══██╗██╔══██╗████╗  ██║██║████╗  ██║██╔════╝ ██║
+          ██║ █╗ ██║███████║██████╔╝██╔██╗ ██║██║██╔██╗ ██║██║  ███╗██║
+          ██║███╗██║██╔══██║██╔══██╗██║╚██╗██║██║██║╚██╗██║██║   ██║╚═╝
+          ╚███╔███╔╝██║  ██║██║  ██║██║ ╚████║██║██║ ╚████║╚██████╔╝██╗
+          ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═══╝ ╚═════╝ ╚═╝
+
+          This playbook will DELETE EVERYTHING that's currently in the database.
+
+          HOST: {{ inventory_hostname }}
+
+          Push Enter to cancel.
+
+          If you understand and wish to continue, type "yes" and push Enter
+    - name: perform backup
+      when: confirm_delete.user_input == "yes"
+      block:
+        - name: create import directory
+          file:
+            path: "{{ backup_dir }}"
+            state: directory
+            mode: "777"
+        - name: upload and extract archive
+          unarchive:
+            dest: "{{ backup_dir }}"
+            src: "./kivebackup.tar"
+        - name: restore database backup
+          become: true
+          become_user: postgres
+          postgresql_db:
+            name: postgres
+            owner: kive
+            state: restore
+            target: "{{backup_dir}}{{ dbdump_file }}"
+            target_opts: "--set ON_ERROR_STOP=on"
+        - name: restore media root
+          become: true
+          copy:
+            src: "{{ backup_dir }}{{ kive_media_root }}/"
+            dest: "{{ kive_media_root }}"
+            remote_src: true
+            owner: kive
+            group: kive
+        - name: clean up
+          file:
+            path: "{{ backup_dir }}"
+            state: absent
