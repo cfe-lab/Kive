@@ -15,3 +15,6 @@ python3 -m pip install -r /vagrant/requirements.txt
 # Add host keys to `known_hosts`
 mkdir -p ~/.ssh/
 ssh-keyscan head >> ~/.ssh/known_hosts
+
+# Add ANSIBLE_CONFIG to environment
+echo "export ANSIBLE_CONFIG='/usr/local/share/Kive/dev-env/ansible.cfg'" >> /home/vagrant/.bashrc

@@ -1,0 +1,40 @@
+- hosts: head
+  vars_files:
+    - dev_env_vars.yml
+  vars:
+    backup_dir: "/tmp/kivebackup"
+    dbdump_file: "{{backup_dir}}/dbdump.sql"
+    archive_file: "/tmp/kivebackup.tar"
+  tasks:
+    - name: create save data directory
+      file:
+        path: "{{ backup_dir }}"
+        state: directory
+    - name: dump database contents
+      become: true
+      postgresql_db:
+        state: dump
+        name: kive
+        login_user: kive
+        login_password: "{{ kive_db_password }}"
+        target: "{{dbdump_file}}"
+        target_opts: "--create --clean --if-exists"  # only dump tables from the 'public' schema
+    - name: create backup archive
+      become: true
+      archive:
+        dest: "{{ archive_file }}"
+        format: tar
+        path:
+          - "{{ kive_media_root }}/*"
+          - "{{ dbdump_file}}"
+        exclude_path:
+          - "{{kive_media_root}}/ContainerRuns"
+    - name: download data
+      fetch:
+        src: "{{archive_file}}"
+        dest: "./kivebackup.tar"
+        flat: true
+    - name: clean up
+        file:
+          path: "{{ backup_dir }}"
+          state: absent
