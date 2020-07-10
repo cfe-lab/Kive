@@ -29,9 +29,12 @@
           - "{{ dbdump_file}}"
         exclude_path:
           - "{{kive_media_root}}/ContainerRuns"
-          - "{{kive_media_root}}/Sandboxes"
     - name: download data
       fetch:
         src: "{{archive_file}}"
         dest: "./kivebackup.tar"
         flat: true
+    - name: clean up
+        file:
+          path: "{{ backup_dir }}"
+          state: absent
