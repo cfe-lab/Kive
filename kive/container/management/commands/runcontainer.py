@@ -240,20 +240,7 @@ class Command(BaseCommand):
         upload_path = os.path.join(run.full_sandbox_path, 'upload')
         os.mkdir(upload_path)
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
-            argument_path = os.path.join(output_path, argument.name)
-            dataset_name = self.build_dataset_name(run, argument.name)
-            new_argument_path = os.path.join(upload_path, dataset_name)
-            try:
-                os.rename(argument_path, new_argument_path)
-                dataset = Dataset.create_dataset(new_argument_path,
-                                                 name=dataset_name,
-                                                 user=run.user)
-                dataset.copy_permissions(run)
-                run.datasets.create(dataset=dataset,
-                                    argument=argument)
-            except (OSError, IOError) as ex:
-                if ex.errno != errno.ENOENT:
-                    raise
+            self._save_output_file(run, argument, output_path, upload_path)
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
@@ -264,6 +251,23 @@ class Command(BaseCommand):
                      if run.return_code == 0
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
+
+    def _save_output_file(self, run: ContainerRun, argument: ContainerArgument, output_path: str, upload_path: str):
+        argument_path = os.path.join(output_path, argument.name)
+        dataset_name = self.build_dataset_name(run, argument.name)
+        new_argument_path = os.path.join(upload_path, dataset_name)
+        try:
+            os.rename(argument_path, new_argument_path)
+            dataset = Dataset.create_dataset(new_argument_path,
+                                                name=dataset_name,
+                                                user=run.user)
+            dataset.copy_permissions(run)
+            run.datasets.create(dataset=dataset,
+                                argument=argument)
+        except (OSError, IOError) as ex:
+            if ex.errno != errno.ENOENT:
+                raise
+
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')
