@@ -1,12 +1,13 @@
 import errno
+import json
 import logging
 import os
+import pathlib
 import shutil
-import sys
 from subprocess import call
-import typing
-import json
+import sys
 from traceback import format_exception_only
+import typing
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -241,7 +242,12 @@ class Command(BaseCommand):
         upload_path = os.path.join(run.full_sandbox_path, 'upload')
         os.mkdir(upload_path)
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
-            self._save_output_file(run, argument, output_path, upload_path)
+            if argument.argtype == ContainerArgumentType.FIXED_OUTPUT:
+                self._save_output_argument(run, argument, output_path, upload_path)
+            elif argument.argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
+                self._save_output_directory_argument(run, argument, output_path, upload_path)
+            else:
+                raise RuntimeError(f"Invalid output argument type in {run}: {argument.argtype}")
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
@@ -253,7 +259,7 @@ class Command(BaseCommand):
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
 
-    def _save_output_file(self, run: ContainerRun, argument: ContainerArgument, output_path: str, upload_path: str):
+    def _save_output_argument(self, run: ContainerRun, argument: ContainerArgument, output_path: str, upload_path: str):
         argument_path = os.path.join(output_path, argument.name)
         dataset_name = self.build_dataset_name(run, argument.name)
         new_argument_path = os.path.join(upload_path, dataset_name)
@@ -269,6 +275,39 @@ class Command(BaseCommand):
             if ex.errno != errno.ENOENT:
                 raise
 
+    @staticmethod
+    def _build_directory_dataset_name(runid: int, filepath: pathlib.Path) -> str:
+        directories = filepath.parent.parts[1:]  # Drop 'output_path'
+        directories_part = "_".join(directories)
+        suffixes = ''.join(filepath.suffixes)
+        filename = filepath.name[:-len(suffixes)] if suffixes else filepath.name
+        filename_part = "{name}_{runid}{suffixes}".format(name=filename,
+                                                          runid=runid,
+                                                          suffixes=suffixes)
+        return "_".join([directories_part, filename_part])
+
+    def _save_output_directory_argument(self, run: ContainerRun,
+                                        argument: ContainerArgument,
+                                        output_path: str,
+                                        upload_path: str) -> None:
+        output_dirpath = pathlib.Path(output_path) / argument.name
+        for dirpath, _, filenames in os.walk(output_dirpath):
+            dirpath = pathlib.Path(dirpath)
+            for filename in filenames:
+                datafile_path: pathlib.Path = dirpath / filename
+                dataset_name = self._build_directory_dataset_name(
+                    run.id, datafile_path)
+                destination_path = os.path.join(upload_path, dataset_name)
+                try:
+                    os.rename(datafile_path, destination_path)
+                    dataset = Dataset.create_dataset(destination_path,
+                                                     name=dataset_name,
+                                                     user=run.user)
+                    dataset.copy_permissions(run)
+                    run.datasets.create(dataset=dataset, argument=argument)
+                except (OSError, IOError) as ex:
+                    if ex.errno != errno.ENOENT:
+                        raise
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')
