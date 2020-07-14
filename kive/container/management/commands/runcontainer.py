@@ -219,7 +219,8 @@ class Command(BaseCommand):
             datasetfolder = "/mnt/output"
         return os.path.join(datasetfolder, arg.name)
 
-    def build_dataset_name(self, run, argument_name):
+    @staticmethod
+    def build_dataset_name(run, argument_name: str):
         parts = argument_name.split('_')
         extension = parts[-1]
         if extension.lower() in KNOWN_EXTENSIONS:
