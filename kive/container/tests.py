@@ -9,6 +9,7 @@ import subprocess as sp
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
+import pathlib
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
 from time import time
@@ -3194,6 +3195,31 @@ Line 3
             ],
         )
 
+    def test_output_argument_dataset_naming(self):
+        outputpath = pathlib.Path("asdf/jkl/semi")
+        runid = 2356
+
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                outputpath / "test.csv",
+            ),
+            "jkl_semi_test_2356.csv",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                outputpath / "test.tar.gz",
+            ),
+            "jkl_semi_test_2356.tar.gz",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                outputpath / "test",
+            ),
+            "jkl_semi_test_2356",
+        )
 
 @skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):
