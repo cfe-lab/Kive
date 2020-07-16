@@ -266,8 +266,8 @@ class Command(BaseCommand):
         try:
             os.rename(argument_path, new_argument_path)
             dataset = Dataset.create_dataset(new_argument_path,
-                                                name=dataset_name,
-                                                user=run.user)
+                                             name=dataset_name,
+                                             user=run.user)
             dataset.copy_permissions(run)
             run.datasets.create(dataset=dataset,
                                 argument=argument)
@@ -276,11 +276,12 @@ class Command(BaseCommand):
                 raise
 
     @staticmethod
-    def _build_directory_dataset_name(runid: int, filepath: pathlib.Path) -> str:
-        directories = filepath.parent.parts[1:]  # Drop 'output_path'
+    def _build_directory_dataset_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
+        # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
+        directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
         directories_part = "_".join(directories)
-        suffixes = ''.join(filepath.suffixes)
-        filename = filepath.name[:-len(suffixes)] if suffixes else filepath.name
+        suffixes = ''.join(file_path.suffixes)
+        filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
         filename_part = "{name}_{runid}{suffixes}".format(name=filename,
                                                           runid=runid,
                                                           suffixes=suffixes)
@@ -290,13 +291,14 @@ class Command(BaseCommand):
                                         argument: ContainerArgument,
                                         output_path: str,
                                         upload_path: str) -> None:
-        output_dirpath = pathlib.Path(output_path) / argument.name
-        for dirpath, _, filenames in os.walk(output_dirpath):
+        output_path = pathlib.Path(output_path)
+        dirarg_path = output_path / argument.name
+        for dirpath, _, filenames in os.walk(dirarg_path):
             dirpath = pathlib.Path(dirpath)
             for filename in filenames:
                 datafile_path: pathlib.Path = dirpath / filename
                 dataset_name = self._build_directory_dataset_name(
-                    run.id, datafile_path)
+                    run.id, output_path.absolute(), datafile_path.absolute())
                 destination_path = os.path.join(upload_path, dataset_name)
                 try:
                     os.rename(datafile_path, destination_path)

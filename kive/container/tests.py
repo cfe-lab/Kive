@@ -3196,29 +3196,39 @@ Line 3
         )
 
     def test_output_argument_dataset_naming(self):
-        outputpath = pathlib.Path("asdf/jkl/semi")
+        run_output_path = pathlib.Path("/asdf/output")  # Simulates the run's output dir
+        outputpath = run_output_path / "semi/"  # Simulates run's directory output argument
         runid = 2356
 
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
                 runid,
+                run_output_path,
                 outputpath / "test.csv",
             ),
-            "jkl_semi_test_2356.csv",
+            "semi_test_2356.csv",
         )
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
                 runid,
+                run_output_path,
                 outputpath / "test.tar.gz",
             ),
-            "jkl_semi_test_2356.tar.gz",
+            "semi_test_2356.tar.gz",
         )
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
                 runid,
+                run_output_path,
                 outputpath / "test",
             ),
-            "jkl_semi_test_2356",
+            "semi_test_2356",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid, run_output_path, outputpath / "colon" / "test.png"
+            ),
+            "semi_colon_test_2356.png",
         )
 
 @skipIfDBFeature('is_mocked')
