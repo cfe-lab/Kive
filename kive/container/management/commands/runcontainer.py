@@ -287,7 +287,8 @@ class Command(BaseCommand):
                                                           suffixes=suffixes)
         return "_".join([directories_part, filename_part])
 
-    def _save_output_directory_argument(self, run: ContainerRun,
+    @classmethod
+    def _save_output_directory_argument(cls, run: ContainerRun,
                                         argument: ContainerArgument,
                                         output_path: str,
                                         upload_path: str) -> None:
@@ -297,7 +298,7 @@ class Command(BaseCommand):
             dirpath = pathlib.Path(dirpath)
             for filename in filenames:
                 datafile_path: pathlib.Path = dirpath / filename
-                dataset_name = self._build_directory_dataset_name(
+                dataset_name = cls._build_directory_dataset_name(
                     run.id, output_path.absolute(), datafile_path.absolute())
                 destination_path = os.path.join(upload_path, dataset_name)
                 try:

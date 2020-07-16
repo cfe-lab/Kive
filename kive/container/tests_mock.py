@@ -12,7 +12,7 @@ from django.core.files.base import File
 from django.test import TestCase
 from django.urls import reverse, resolve
 from django_mock_queries.mocks import mocked_relations
-from mock import patch
+from mock import patch, Mock, call
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
@@ -1048,3 +1048,52 @@ class RunContainerMockTests(TestCase):
             dataset_name = handler.build_dataset_name(run, argument_name)
 
             self.assertEqual(expected_dataset_name, dataset_name)
+
+
+    @patch("container.management.commands.runcontainer.Dataset")
+    @patch("os.rename")
+    @patch("os.walk",
+           return_value=iter([
+               ('/tmp/runsandbox', ['datafiles'], []),
+               ('/tmp/runsandbox/datafiles', ['subdir'], ['a.txt', 'b.txt']),
+               ('/tmp/runsandbox/datafiles/subdir', [], ['c.txt'])
+           ]))
+    def test_save_output_directory(self, mock_walk, mock_rename, dataset_mock):
+        """Simulate saving a directory output called "files/" with the following structure:
+
+        /tmp/runsandbox/
+        └── outputfiles/
+            ├── a.txt
+            ├── b.txt
+            └── morefiles/
+                └── c.txt
+        """
+        from pathlib import Path
+
+        run = Mock()
+        run.id = 9981
+        argument = Mock()
+        argument.name = "datafiles"
+        output_path = "/tmp/runsandbox/"
+        upload_path = "/tmp/runsandbox/upload"
+
+        dataset_mock.create_dataset = Mock(return_value=Mock())
+
+
+        runcontainer.Command._save_output_directory_argument(
+            run,
+            argument,
+            output_path,
+            upload_path,
+        )
+
+        mock_walk.assert_called_with(Path("/tmp/runsandbox/datafiles"))
+
+        mock_rename.assert_has_calls(
+            [
+                call(Path("/tmp/runsandbox/datafiles/a.txt"), "/tmp/runsandbox/upload/datafiles_a_9981.txt"),
+                call(Path("/tmp/runsandbox/datafiles/b.txt"), "/tmp/runsandbox/upload/datafiles_b_9981.txt"),
+                call(Path("/tmp/runsandbox/datafiles/subdir/c.txt"), "/tmp/runsandbox/upload/datafiles_subdir_c_9981.txt"),
+            ],
+            any_order=True,
+        )
