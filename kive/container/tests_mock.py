@@ -1,5 +1,7 @@
+import datetime
 import os
 from argparse import Namespace
+import random
 import tempfile
 import io
 import zipfile
@@ -18,7 +20,8 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+    ContainerArgument, ContainerArgumentType, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+from container import runutils
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -1097,3 +1100,141 @@ class RunContainerMockTests(TestCase):
             ],
             any_order=True,
         )
+
+
+def random_string() -> str:
+    from string import ascii_letters
+    return ''.join(random.sample(ascii_letters, 32))
+
+
+class TestDatasetComparison(TestCase):
+
+    MD5_A = "60b725f10c9c85c70d97880dfe8191b3"
+    MD5_B = "3b5d5c3712955042212316173ccf37be"
+    MD5_EMPTY = "68b329da9893e34099c7d8ad5cb9c940"
+
+    @staticmethod
+    def make_mock_argument(argtype, type):
+        mock_argument = Mock()
+        mock_argument.argtype = argtype
+        mock_argument.type = type
+        return mock_argument
+
+    @staticmethod
+    def make_mock_dataset(md5_checksum):
+        mock_dataset = Mock()
+        mock_dataset.get_view_url = Mock(return_value=random_string())
+        mock_dataset.name = random_string()
+        mock_dataset.get_formatted_filesize = Mock(
+            return_value=random_string())
+        mock_dataset.created = datetime.datetime.now()
+        mock_dataset.MD5_checksum = md5_checksum
+        return mock_dataset
+
+    @staticmethod
+    def make_mock_containerdataset(argument, dataset):
+        mock_containerdataset = Mock()
+        mock_containerdataset.argument = argument
+        mock_containerdataset.dataset = dataset
+        return mock_containerdataset
+
+    @staticmethod
+    def make_mock_containerrun(app_arguments, containerdataset):
+        mock_containerrun = Mock()
+        mock_containerrun.app.arguments = app_arguments
+        mock_containerrun.datasets.get = Mock(return_value=containerdataset)
+        mock_containerrun.__containerdataset = containerdataset  # For verification
+        return mock_containerrun
+
+    def make_containerrun_case(self, type, argtype, md5):
+        arg = self.make_mock_argument(type=type, argtype=argtype)
+        dataset = self.make_mock_dataset(md5)
+        containerdataset = self.make_mock_containerdataset(argument=arg,
+                                                           dataset=dataset)
+        return self.make_mock_containerrun(
+            app_arguments=[arg], containerdataset=containerdataset)
+
+    def test_monovalent_comparison(self):
+        argcases = [
+            ("I", ContainerArgumentType.FIXED_INPUT),
+            ("O", ContainerArgumentType.FIXED_OUTPUT),
+        ]
+        for type, argtype in argcases:
+            case_a = self.make_containerrun_case(type, argtype, self.MD5_A)
+            case_b = self.make_containerrun_case(type, argtype, self.MD5_B)
+
+            argument = case_a.app.arguments[0]
+
+            comparison = runutils._compare_monovalent_args(
+                argument, case_a, case_a)
+            case_a.datasets.get.assert_called_with(argument=argument)
+            self.assertEqual(comparison.is_changed, "no")
+
+            comparison = runutils._compare_monovalent_args(
+                argument, case_a, case_b)
+            case_a.datasets.get.assert_called_with(argument=argument)
+            case_b.datasets.get.assert_called_with(argument=argument)
+            self.assertEqual(comparison.is_changed, "YES")
+
+    def test_apps_must_match(self):
+        original = Mock()
+        rerun = Mock()
+
+        original.app = 1
+        rerun.app = 2
+
+        with self.assertRaises(ValueError):
+            runutils.compare_rerun_datasets(original, rerun)
+
+    def test_argtype_must_be_defined(self):
+        arg = Mock()
+        arg.argtype = None
+        run = Mock()
+        run.app.arguments = [arg]
+        with self.assertRaises(ValueError):
+            runutils.compare_rerun_datasets(run, run)
+
+    def test_argtype_must_be_handled(self):
+        arg = Mock()
+        arg.argtype = "Not none, but not a known value"
+        run = Mock()
+        run.app = Mock()
+        run.app.arguments = [arg]
+        with self.assertRaises(ValueError):
+            runutils.compare_rerun_datasets(run, run)
+
+    @patch("container.runutils._compare_directory_outputs")
+    @patch("container.runutils._compare_optional_inputs")
+    @patch("container.runutils._compare_monovalent_args")
+    def test_comparison_selection(self, compare_mono, compare_optional, compare_dir):
+        "Verify that `compare_rerun_datasets` chooses the right comparison function"
+        def reset_mocks():
+            compare_mono.reset_mock()
+            compare_optional.reset_mock()
+            compare_dir.reset_mock()
+
+        def make_mock_run(argtype):
+            arg = Mock()
+            arg.argtype = argtype
+            run = Mock()
+            run.app = Mock()
+            run.app.arguments = [arg]
+            return run
+
+        cases = [
+            (ContainerArgumentType.FIXED_INPUT, [compare_mono]),
+            (ContainerArgumentType.FIXED_OUTPUT, [compare_mono]),
+            (ContainerArgumentType.OPTIONAL_INPUT, [compare_optional]),
+            (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT, [compare_optional]),
+            (ContainerArgumentType.FIXED_DIRECTORY_OUTPUT, [compare_dir]),
+        ]
+
+        for argtype, expect_called in cases:
+            run = make_mock_run(argtype)
+            runutils.compare_rerun_datasets(run, run)
+            for mock in [compare_mono, compare_optional, compare_dir]:
+                if mock in expect_called:
+                    mock.assert_called_with(run.app.arguments[0], run, run)
+                else:
+                    mock.assert_not_called()
+            reset_mocks()
