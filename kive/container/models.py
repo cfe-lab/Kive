@@ -959,7 +959,7 @@ class ContainerArgument(models.Model):
                 else:
                     return ContainerArgumentType.OPTIONAL_INPUT
         # If the above fell through, the model is in a corrupted or partially
-        # initialized state, and cannot assigned a type.
+        # initialized state, and cannot be assigned a type.
 
     def clean(self):
         if self.argtype is None:
