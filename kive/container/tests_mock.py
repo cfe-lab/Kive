@@ -1154,28 +1154,6 @@ class TestDatasetComparison(TestCase):
         return self.make_mock_containerrun(
             app_arguments=[arg], containerdataset=containerdataset)
 
-    def test_monovalent_comparison(self):
-        argcases = [
-            ("I", ContainerArgumentType.FIXED_INPUT),
-            ("O", ContainerArgumentType.FIXED_OUTPUT),
-        ]
-        for type, argtype in argcases:
-            case_a = self.make_containerrun_case(type, argtype, self.MD5_A)
-            case_b = self.make_containerrun_case(type, argtype, self.MD5_B)
-
-            argument = case_a.app.arguments[0]
-
-            comparison = runutils._compare_monovalent_args(
-                argument, case_a, case_a)
-            case_a.datasets.get.assert_called_with(argument=argument)
-            self.assertEqual(comparison.is_changed, "no")
-
-            comparison = runutils._compare_monovalent_args(
-                argument, case_a, case_b)
-            case_a.datasets.get.assert_called_with(argument=argument)
-            case_b.datasets.get.assert_called_with(argument=argument)
-            self.assertEqual(comparison.is_changed, "YES")
-
     def test_apps_must_match(self):
         original = Mock()
         rerun = Mock()
@@ -1238,3 +1216,25 @@ class TestDatasetComparison(TestCase):
                 else:
                     mock.assert_not_called()
             reset_mocks()
+
+    def test_monovalent_comparison(self):
+        argcases = [
+            ("I", ContainerArgumentType.FIXED_INPUT),
+            ("O", ContainerArgumentType.FIXED_OUTPUT),
+        ]
+        for type, argtype in argcases:
+            case_a = self.make_containerrun_case(type, argtype, self.MD5_A)
+            case_b = self.make_containerrun_case(type, argtype, self.MD5_B)
+
+            argument = case_a.app.arguments[0]
+
+            comparison = runutils._compare_monovalent_args(
+                argument, case_a, case_a)
+            case_a.datasets.get.assert_called_with(argument=argument)
+            self.assertEqual(comparison.is_changed, "no")
+
+            comparison = runutils._compare_monovalent_args(
+                argument, case_a, case_b)
+            case_a.datasets.get.assert_called_with(argument=argument)
+            case_b.datasets.get.assert_called_with(argument=argument)
+            self.assertEqual(comparison.is_changed, "YES")
