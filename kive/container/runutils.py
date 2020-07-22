@@ -1,7 +1,9 @@
 import datetime
+import itertools
 import typing as ty
 
-from .models import ContainerRun, ContainerArgument, ContainerArgumentType, ContainerDataset
+from .models import (ContainerArgument, ContainerArgumentType,
+                     ContainerDataset, ContainerRun)
 
 
 class DatasetComparison(ty.NamedTuple):
@@ -54,14 +56,13 @@ def _compare_optional_inputs(
     argument: ContainerArgument,
     original: ContainerRun,
     rerun: ContainerRun,
-) -> ty.Optional[DatasetComparison]:
+) -> ty.Iterable[DatasetComparison]:
     argtype = argument.argtype
 
-    # import pdb; pdb.set_trace()
-
-    if argtype is ContainerArgumentType.OPTIONAL_INPUT:
-        original_dataset = original.datasets.filter(argument=argument).first()
-        rerun_dataset = rerun.datasets.filter(argument=argument).first()
+    def compare_optional_datasets(
+        original_dataset: ty.Optional[ContainerDataset],
+        rerun_dataset: ty.Optional[ContainerDataset],
+    ) -> ty.Optional[DatasetComparison]:
         if original_dataset is None and rerun_dataset is None:
             return None
         elif original_dataset and rerun_dataset:
@@ -69,8 +70,10 @@ def _compare_optional_inputs(
                 changed = "YES"
             else:
                 changed = "no"
-            return DatasetComparison.from_containerdataset(rerun_dataset,
-                                                           changed=changed)
+            return DatasetComparison.from_containerdataset(
+                rerun_dataset,
+                changed=changed,
+            )
         elif original_dataset and not rerun_dataset:
             return DatasetComparison.from_containerdataset(
                 original_dataset,
@@ -81,10 +84,31 @@ def _compare_optional_inputs(
                 rerun_dataset,
                 changed="NEW",
             )
+
+    if argtype is ContainerArgumentType.OPTIONAL_INPUT:
+        original_dataset = original.datasets.filter(argument=argument).first()
+        rerun_dataset = rerun.datasets.filter(argument=argument).first()
+        comparison = compare_optional_datasets(original_dataset, rerun_dataset)
+        if comparison is not None:
+            yield comparison
     elif argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
-        ...
+        original_datasets = original.datasets.filter(
+            argument=argument).order_by("multi_position")
+        rerun_datasets = rerun.datasets.filter(
+            argument=argument).order_by("multi_position")
+        dataset_pairs = itertools.zip_longest(
+            original_datasets,
+            rerun_datasets,
+            fillvalue=None,
+        )
+        for orig_dataset, rerun_dataset in dataset_pairs:
+            comparison = compare_optional_datasets(orig_dataset, rerun_dataset)
+            if comparison is not None:
+                yield comparison
     else:
-        raise ValueError("_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments")
+        raise ValueError(
+            "_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments"
+        )
 
 
 def _compare_directory_outputs(
@@ -110,9 +134,7 @@ def _compare_rerun_datasets(
         if argtype in MONOVALENT_ARGTYPES:
             yield _compare_monovalent_args(argument, original, rerun)
         elif argtype in OPTIONAL_INPUT_ARGTYPES:
-            comparison = _compare_optional_inputs(argument, original, rerun)
-            if comparison is not None:
-                yield comparison
+            yield from _compare_optional_inputs(argument, original, rerun)
         elif argtype is ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
             yield from _compare_directory_outputs(argument, original, rerun)
         else:
