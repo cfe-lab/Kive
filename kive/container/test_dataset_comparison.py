@@ -334,11 +334,147 @@ class TestCompareOptionalInputs(BaseDatasetComparisonTestCase):
             ((self.containerrun_none, self.containerrun_a), "NEW"),
         ]
         for (original, rerun), expected in cases:
-            comparison = runutils._compare_optional_inputs(
-                self.arg, original, rerun)
+            comparisons = list(
+                runutils._compare_optional_inputs(self.arg, original, rerun))
+            self.assertEqual(
+                len(comparisons),
+                1,
+                "Expected one comparison for single optional args",
+            )
+            comparison = comparisons[0]
             self.assertEqual(
                 comparison.is_changed,
                 expected,
                 "Expected {} when comparing {} and {}".format(
                     expected, original, rerun),
             )
+
+
+class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
+    """Compare container runs that have optional multiple inputs.
+
+    This test has an imaginary app with a single optional multiply-valued
+    input.
+
+    The app has runs with the following input values:
+
+    - An empty input (the input being ommitted).
+    - Singly valued inputs with datasets A and B.
+    - Multiply valued inputs with datasets AA, AB, and BA.
+
+    Because we differentiate between NEW and MISSING datasets, comparisons are
+    not symetrical (i.e. `compare(A, B)` is not the same as `compare(B, A)`);
+    symmetrical comparisons are tested separately.
+
+    Comparisons are made between:
+
+    - The empty run and runs with values (and vice versa)
+    - Singly valued runs with and without changes
+    - Multiply valued and singlue valued runs with and without changes.
+    - Multiply valued runs with and without changes.
+    """
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+
+        cls.arg = cls.app.arguments.create(
+            name="optional_multiple_input_arg",
+            type=ContainerArgument.INPUT,
+            position=None,
+            allow_multiple=True,
+        )
+        assert cls.arg.argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+
+        containerrun_cases = [
+            ("empty", []),
+            ("a", [cls.dataset_a]),
+            ("b", [cls.dataset_b]),
+            ("aa", [cls.dataset_a, cls.dataset_a]),
+            ("bb", [cls.dataset_b, cls.dataset_b]),
+            ("ab", [cls.dataset_a, cls.dataset_b]),
+            ("ba", [cls.dataset_b, cls.dataset_a]),
+        ]
+
+        for name, datasets in containerrun_cases:
+            containerrun_name = f"containerrun_{name}"
+            containerrun = cls.app.runs.create(
+                name=containerrun_name,
+                user=cls._kive_user,
+                state=ContainerRun.COMPLETE,
+            )
+            for idx, dataset in enumerate(datasets):
+                containerrun.datasets.create(
+                    dataset=dataset,
+                    argument=cls.arg,
+                    multi_position=idx,
+                )
+            setattr(cls, containerrun_name, containerrun)
+
+    def check_case(
+        self,
+        orig_name: str,
+        rerun_name: str,
+        expected_comparisons: ty.List[str],
+    ) -> None:
+        original = getattr(self, f"containerrun_{orig_name}")
+        rerun = getattr(self, f"containerrun_{rerun_name}")
+        comparisons = list(
+            runutils._compare_optional_inputs(self.arg, original, rerun))
+        self.assertEqual(
+            len(comparisons),
+            len(expected_comparisons),
+            "Mismatched number of comparisons when comparing {} and {}".format(
+                original,
+                rerun,
+            ),
+        )
+        self.assertEqual(
+            [c.is_changed for c in comparisons], expected_comparisons,
+            "Mismatched comparisons when comparing {} and {}".format(
+                original,
+                rerun,
+            ))
+
+    def test_comparing_monovalued_present_inputs(self):
+        cases = [
+            ("a", "a", ["no"]),
+            ("a", "b", ["YES"]),
+            ("b", "a", ["YES"]),
+        ]
+        for case in cases:
+            self.check_case(*case)
+
+    def test_comparing_against_absent_inputs(self):
+        cases = [
+            ("empty", "a", ["NEW"]),
+            ("a", "empty", ["MISSING"]),
+            ("empty", "aa", ["NEW", "NEW"]),
+            ("aa", "empty", ["MISSING", "MISSING"]),
+        ]
+        for case in cases:
+            self.check_case(*case)
+
+    def test_comparing_pairs_of_inputs(self):
+        cases = [
+            ("aa", "aa", ["no", "no"]),
+            ("ab", "ab", ["no", "no"]),
+            ("aa", "ab", ["no", "YES"]),
+            ("ba", "aa", ["YES", "no"]),
+            ("aa", "bb", ["YES", "YES"]),
+        ]
+        for case in cases:
+            self.check_case(*case)
+
+    def test_comparing_mismatched_numbers_of_inputs(self):
+        cases = [
+            ("a", "aa", ["no", "NEW"]),
+            ("aa", "a", ["no", "MISSING"]),
+            ("a", "bb", ["YES", "NEW"]),
+            ("bb", "a", ["YES", "MISSING"]),
+            ("ab", "a", ["no", "MISSING"]),
+            ("a", "ab", ["no", "NEW"]),
+            ("a", "ba", ["YES", "NEW"]),
+            ("ba", "a", ["YES", "MISSING"]),
+        ]
+        for case in cases:
+            self.check_case(*case)
