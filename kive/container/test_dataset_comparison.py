@@ -446,6 +446,7 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
 
     def test_comparing_against_absent_inputs(self):
         cases = [
+            ("empty", "empty", []),
             ("empty", "a", ["NEW"]),
             ("a", "empty", ["MISSING"]),
             ("empty", "aa", ["NEW", "NEW"]),
