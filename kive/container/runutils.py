@@ -5,6 +5,7 @@ from .models import ContainerRun, ContainerArgument, ContainerArgumentType, Cont
 
 
 class DatasetComparison(ty.NamedTuple):
+    "Result of comparing two datasets"
     type: str
     url: str
     name: str
@@ -13,8 +14,10 @@ class DatasetComparison(ty.NamedTuple):
     is_changed: str
 
     @staticmethod
-    def from_containerdataset(containerdataset: ContainerDataset,
-                              changed: str) -> "DatasetComparison":
+    def from_containerdataset(
+        containerdataset: ContainerDataset,
+        changed: str,
+    ) -> "DatasetComparison":
         dataset = containerdataset.dataset
         return DatasetComparison(
             type=containerdataset.argument.type,
@@ -32,9 +35,11 @@ OPTIONAL_INPUT_ARGTYPES = (ContainerArgumentType.OPTIONAL_INPUT,
                            ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT)
 
 
-def _compare_monovalent_args(argument: ContainerArgument,
-                             original: ContainerRun,
-                             rerun: ContainerRun) -> DatasetComparison:
+def _compare_monovalent_args(
+    argument: ContainerArgument,
+    original: ContainerRun,
+    rerun: ContainerRun,
+) -> DatasetComparison:
     "Compare the datasets for a single-valued argument on a re-run and its original."
     original_dataset = original.datasets.get(argument=argument)
     rerun_dataset = rerun.datasets.get(argument=argument)
@@ -58,8 +63,9 @@ def _compare_directory_outputs(
 
 
 def _compare_rerun_datasets(
-        original: ContainerRun,
-        rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
+    original: ContainerRun,
+    rerun: ContainerRun,
+) -> ty.Iterable[DatasetComparison]:
     if original.app != rerun.app:
         raise ValueError(
             "Expect re-runs to have the same App as their original")
@@ -81,6 +87,12 @@ def _compare_rerun_datasets(
 
 
 def compare_rerun_datasets(
-        original: ContainerRun,
-        rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
+    original: ContainerRun,
+    rerun: ContainerRun,
+) -> ty.Iterable[DatasetComparison]:
+    """Return a list of difference in the datasets between a re-run ContainerRun
+    and its original.
+    
+    Datasets can be changed, not-changed, missing, or new.
+    """
     return list(_compare_rerun_datasets(original, rerun))
