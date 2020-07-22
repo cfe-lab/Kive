@@ -51,9 +51,40 @@ def _compare_monovalent_args(
 
 
 def _compare_optional_inputs(
-        argument: ContainerArgument, original: ContainerRun,
-        rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
-    ...
+    argument: ContainerArgument,
+    original: ContainerRun,
+    rerun: ContainerRun,
+) -> ty.Optional[DatasetComparison]:
+    argtype = argument.argtype
+
+    # import pdb; pdb.set_trace()
+
+    if argtype is ContainerArgumentType.OPTIONAL_INPUT:
+        original_dataset = original.datasets.filter(argument=argument).first()
+        rerun_dataset = rerun.datasets.filter(argument=argument).first()
+        if original_dataset is None and rerun_dataset is None:
+            return None
+        elif original_dataset and rerun_dataset:
+            if original_dataset.dataset.MD5_checksum != rerun_dataset.dataset.MD5_checksum:
+                changed = "YES"
+            else:
+                changed = "no"
+            return DatasetComparison.from_containerdataset(rerun_dataset,
+                                                           changed=changed)
+        elif original_dataset and not rerun_dataset:
+            return DatasetComparison.from_containerdataset(
+                original_dataset,
+                changed="MISSING",
+            )
+        elif rerun_dataset and not original_dataset:
+            return DatasetComparison.from_containerdataset(
+                rerun_dataset,
+                changed="NEW",
+            )
+    elif argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        ...
+    else:
+        raise ValueError("_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments")
 
 
 def _compare_directory_outputs(
@@ -79,7 +110,9 @@ def _compare_rerun_datasets(
         if argtype in MONOVALENT_ARGTYPES:
             yield _compare_monovalent_args(argument, original, rerun)
         elif argtype in OPTIONAL_INPUT_ARGTYPES:
-            yield from _compare_optional_inputs(argument, original, rerun)
+            comparison = _compare_optional_inputs(argument, original, rerun)
+            if comparison is not None:
+                yield comparison
         elif argtype is ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
             yield from _compare_directory_outputs(argument, original, rerun)
         else:
