@@ -18,7 +18,7 @@ class DatasetComparison(ty.NamedTuple):
     @staticmethod
     def from_containerdataset(
         containerdataset: ContainerDataset,
-        changed: str,
+        is_changed: str,
     ) -> "DatasetComparison":
         dataset = containerdataset.dataset
         return DatasetComparison(
@@ -27,8 +27,36 @@ class DatasetComparison(ty.NamedTuple):
             name=dataset.name,
             size=dataset.get_formatted_filesize(),
             created=dataset.date_created,
-            is_changed=changed,
+            is_changed=is_changed,
         )
+
+    @classmethod
+    def compare(
+        cls,
+        original: ContainerDataset,
+        rerun: ContainerDataset,
+    ) -> "DatasetComparison":
+        if original.dataset.MD5_checksum == rerun.dataset.MD5_checksum:
+            is_changed = "no"
+        else:
+            is_changed = "YES"
+        return cls.from_containerdataset(rerun,
+                                                       is_changed)
+
+    @classmethod
+    def compare_optional(
+        cls,
+        original: ty.Optional[ContainerDataset],
+        rerun: ty.Optional[ContainerDataset]
+    ) -> ty.Optional["DatasetComparison"]:
+        if original is None and rerun is None:
+            return None
+        elif original is None and rerun is not None:
+            return cls.from_containerdataset(rerun, is_changed="NEW")
+        elif original is not None and rerun is None:
+            return cls.from_containerdataset(original, is_changed="MISSING")
+        else:
+            return cls.compare(original, rerun)
 
 
 MONOVALENT_ARGTYPES = (ContainerArgumentType.FIXED_INPUT,
@@ -45,11 +73,7 @@ def _compare_monovalent_args(
     "Compare the datasets for a single-valued argument on a re-run and its original."
     original_dataset = original.datasets.get(argument=argument)
     rerun_dataset = rerun.datasets.get(argument=argument)
-    if original_dataset.dataset.MD5_checksum == rerun_dataset.dataset.MD5_checksum:
-        is_changed = "no"
-    else:
-        is_changed = "YES"
-    return DatasetComparison.from_containerdataset(rerun_dataset, is_changed)
+    return DatasetComparison.compare(original_dataset, rerun_dataset)
 
 
 def _compare_optional_inputs(
@@ -59,36 +83,10 @@ def _compare_optional_inputs(
 ) -> ty.Iterable[DatasetComparison]:
     argtype = argument.argtype
 
-    def compare_optional_datasets(
-        original_dataset: ty.Optional[ContainerDataset],
-        rerun_dataset: ty.Optional[ContainerDataset],
-    ) -> ty.Optional[DatasetComparison]:
-        if original_dataset is None and rerun_dataset is None:
-            return None
-        elif original_dataset and rerun_dataset:
-            if original_dataset.dataset.MD5_checksum != rerun_dataset.dataset.MD5_checksum:
-                changed = "YES"
-            else:
-                changed = "no"
-            return DatasetComparison.from_containerdataset(
-                rerun_dataset,
-                changed=changed,
-            )
-        elif original_dataset and not rerun_dataset:
-            return DatasetComparison.from_containerdataset(
-                original_dataset,
-                changed="MISSING",
-            )
-        elif rerun_dataset and not original_dataset:
-            return DatasetComparison.from_containerdataset(
-                rerun_dataset,
-                changed="NEW",
-            )
-
     if argtype is ContainerArgumentType.OPTIONAL_INPUT:
         original_dataset = original.datasets.filter(argument=argument).first()
         rerun_dataset = rerun.datasets.filter(argument=argument).first()
-        comparison = compare_optional_datasets(original_dataset, rerun_dataset)
+        comparison = DatasetComparison.compare_optional(original_dataset, rerun_dataset)
         if comparison is not None:
             yield comparison
     elif argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
@@ -102,7 +100,7 @@ def _compare_optional_inputs(
             fillvalue=None,
         )
         for orig_dataset, rerun_dataset in dataset_pairs:
-            comparison = compare_optional_datasets(orig_dataset, rerun_dataset)
+            comparison = DatasetComparison.compare_optional(orig_dataset, rerun_dataset)
             if comparison is not None:
                 yield comparison
     else:
