@@ -1094,9 +1094,9 @@ class RunContainerMockTests(TestCase):
 
         mock_rename.assert_has_calls(
             [
-                call(Path("/tmp/runsandbox/datafiles/a.txt"), "/tmp/runsandbox/upload/datafiles_a_9981.txt"),
-                call(Path("/tmp/runsandbox/datafiles/b.txt"), "/tmp/runsandbox/upload/datafiles_b_9981.txt"),
-                call(Path("/tmp/runsandbox/datafiles/subdir/c.txt"), "/tmp/runsandbox/upload/datafiles_subdir_c_9981.txt"),
+                call(Path("/tmp/runsandbox/datafiles/a.txt"), "/tmp/runsandbox/upload/datafiles/a_9981.txt"),
+                call(Path("/tmp/runsandbox/datafiles/b.txt"), "/tmp/runsandbox/upload/datafiles/b_9981.txt"),
+                call(Path("/tmp/runsandbox/datafiles/subdir/c.txt"), "/tmp/runsandbox/upload/datafiles/subdir/c_9981.txt"),
             ],
             any_order=True,
         )

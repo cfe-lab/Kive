@@ -3206,7 +3206,7 @@ Line 3
                 run_output_path,
                 outputpath / "test.csv",
             ),
-            "semi_test_2356.csv",
+            "semi/test_2356.csv",
         )
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
@@ -3214,7 +3214,7 @@ Line 3
                 run_output_path,
                 outputpath / "test.tar.gz",
             ),
-            "semi_test_2356.tar.gz",
+            "semi/test_2356.tar.gz",
         )
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
@@ -3222,13 +3222,13 @@ Line 3
                 run_output_path,
                 outputpath / "test",
             ),
-            "semi_test_2356",
+            "semi/test_2356",
         )
         self.assertEqual(
             runcontainer.Command._build_directory_dataset_name(
                 runid, run_output_path, outputpath / "colon" / "test.png"
             ),
-            "semi_colon_test_2356.png",
+            "semi/colon/test_2356.png",
         )
 
 @skipIfDBFeature('is_mocked')

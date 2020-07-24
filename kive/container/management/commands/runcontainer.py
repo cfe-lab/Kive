@@ -276,36 +276,52 @@ class Command(BaseCommand):
                 raise
 
     @staticmethod
-    def _build_directory_dataset_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
+    def _build_directory_file_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
         # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
         directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
-        directories_part = "_".join(directories)
+        directories_part = "__".join(directories)
         suffixes = ''.join(file_path.suffixes)
         filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
         filename_part = "{name}_{runid}{suffixes}".format(name=filename,
                                                           runid=runid,
                                                           suffixes=suffixes)
-        return "_".join([directories_part, filename_part])
+        return "__".join([directories_part, filename_part])
+
+    @staticmethod
+    def _build_directory_dataset_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
+        # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
+        directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
+        directories_part = os.path.join(*directories)
+        suffixes = ''.join(*file_path.suffixes)
+        filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
+        filename_part = "{name}_{runid}{suffixes}".format(name=filename,
+                                                          runid=runid,
+                                                          suffixes=suffixes)
+        return os.path.join(directories_part, filename_part)
 
     @classmethod
     def _save_output_directory_argument(cls, run: ContainerRun,
                                         argument: ContainerArgument,
                                         output_path: str,
                                         upload_path: str) -> None:
-        output_path = pathlib.Path(output_path)
+        output_path = pathlib.Path(output_path).absolute()
         dirarg_path = output_path / argument.name
         for dirpath, _, filenames in os.walk(dirarg_path):
             dirpath = pathlib.Path(dirpath)
             for filename in filenames:
-                datafile_path: pathlib.Path = dirpath / filename
+                datafile_path: pathlib.Path = (dirpath / filename).absolute()
+                dataset_filename = cls._build_directory_file_name(
+                    run.id, output_path, datafile_path)
+                destination_path = os.path.join(upload_path, dataset_filename)
                 dataset_name = cls._build_directory_dataset_name(
-                    run.id, output_path.absolute(), datafile_path.absolute())
-                destination_path = os.path.join(upload_path, dataset_name)
+                    run.id, output_path, datafile_path)
                 try:
                     os.rename(datafile_path, destination_path)
-                    dataset = Dataset.create_dataset(destination_path,
-                                                     name=dataset_name,
-                                                     user=run.user)
+                    dataset = Dataset.create_dataset(
+                        destination_path,
+                        name=dataset_name,
+                        user=run.user,
+                    )
                     dataset.copy_permissions(run)
                     run.datasets.create(dataset=dataset, argument=argument)
                 except (OSError, IOError) as ex:
