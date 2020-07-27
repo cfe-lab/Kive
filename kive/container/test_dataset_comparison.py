@@ -343,11 +343,8 @@ class TestCompareOptionalInputs(BaseDatasetComparisonTestCase):
             )
             comparison = comparisons[0]
             self.assertEqual(
-                comparison.is_changed,
-                expected,
-                "Expected {} when comparing {} and {}".format(
-                    expected, original, rerun),
-            )
+                comparison.is_changed, expected,
+                f"Expected {expected} when comparing {original} and {rerun}")
 
 
 class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
@@ -421,19 +418,14 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
         comparisons = list(
             runutils._compare_optional_inputs(self.arg, original, rerun))
         self.assertEqual(
-            len(comparisons),
-            len(expected_comparisons),
-            "Mismatched number of comparisons when comparing {} and {}".format(
-                original,
-                rerun,
-            ),
+            len(comparisons), len(expected_comparisons),
+            f"Mismatched number of comparisons when comparing {original} and {rerun}"
         )
         self.assertEqual(
-            [c.is_changed for c in comparisons], expected_comparisons,
-            "Mismatched comparisons when comparing {} and {}".format(
-                original,
-                rerun,
-            ))
+            [c.is_changed for c in comparisons],
+            expected_comparisons,
+            f"Mismatched comparisons when comparing {original} and {rerun}",
+        )
 
     def test_comparing_monovalued_present_inputs(self):
         cases = [
@@ -476,6 +468,129 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
             ("a", "ab", ["no", "NEW"]),
             ("a", "ba", ["YES", "NEW"]),
             ("ba", "a", ["YES", "MISSING"]),
+        ]
+        for case in cases:
+            self.check_case(*case)
+
+
+class TestCompareDirectoryOutputs(BaseDatasetComparisonTestCase):
+    @classmethod
+    def setUpTestData(cls) -> None:
+        super().setUpTestData()
+
+        cls.arg = cls.app.arguments.create(
+            name="directory_output_arg",
+            type=ContainerArgument.OUTPUT,
+            position=1,
+            allow_multiple=True,
+        )
+        assert cls.arg.argtype is ContainerArgumentType.FIXED_DIRECTORY_OUTPUT
+
+        contianerrun_cases = [
+            ("ab", [cls.dataset_a, cls.dataset_b]),
+            ("a_", [cls.dataset_a, None]),
+            ("b_", [cls.dataset_b, None]),
+            ("ba", [cls.dataset_b, cls.dataset_a]),
+            ("_b", [None, cls.dataset_b]),
+            ("_a", [None, cls.dataset_a]),
+            ("__", [None, None]),
+        ]
+
+        for name, datasets in contianerrun_cases:
+            containerrun_name = f"containerrun_{name}"
+            containerrun = cls.app.runs.create(
+                name=containerrun_name,
+                user=cls._kive_user,
+                state=ContainerRun.COMPLETE,
+            )
+            topname, subname = name
+            topdataset, subdataset = datasets
+            if topdataset is not None:
+                containerrun.datasets.create(
+                    dataset=topdataset,
+                    argument=cls.arg,
+                    name=topname,
+                )
+            if subdataset is not None:
+                containerrun.datasets.create(
+                    dataset=subdataset,
+                    argument=cls.arg,
+                    name=f"subdir/{subname}",
+                )
+            setattr(cls, containerrun_name, containerrun)
+
+    def check_case(
+        self,
+        orig_name: str,
+        rerun_name: str,
+        expected_comparisons: ty.List[str],
+    ) -> None:
+        original = getattr(self, f"containerrun_{orig_name}")
+        rerun = getattr(self, f"containerrun_{rerun_name}")
+        comparison = list(
+            runutils._compare_directory_outputs(self.arg, original, rerun))
+        self.assertEqual(
+            len(comparison),
+            len(expected_comparisons),
+            f"Mismatched number of comparisons while comparing {original} and {rerun}",
+        )
+        self.assertEqual(
+            [c.is_changed for c in comparison],
+            expected_comparisons,
+            f"Mismatched comparisons when comparing {original} and {rerun}",
+        )
+
+    def test_comparing_directory_outputs(self):
+        cases = [
+            ('ab', 'ab', ["no", "no"]),
+            ('ab', 'ba', ["YES", "YES"]),
+            ('ab', 'a_', ["no", "MISSING"]),
+            ('ab', 'b_', ["YES", "MISSING"]),
+            ('ab', '_a', ["MISSING", "YES"]),
+            ('ab', '_b', ["MISSING", "no"]),
+            ('ab', '__', ["MISSING", "MISSING"]),
+            ('ba', 'ab', ["YES", "YES"]),
+            ('ba', 'ba', ["no", "no"]),
+            ('ba', 'a_', ["YES", "MISSING"]),
+            ('ba', 'b_', ["no", "MISSING"]),
+            ('ba', '_a', ["MISSING", "no"]),
+            ('ba', '_b', ["MISSING", "YES"]),
+            ('ba', '__', ["MISSING", "MISSING"]),
+            ('a_', 'ab', ["no", "NEW"]),
+            ('a_', 'ba', ["YES", "NEW"]),
+            ('a_', 'a_', ["no"]),
+            ('a_', 'b_', ["YES"]),
+            ('a_', '_a', ["MISSING", "NEW"]),
+            ('a_', '_b', ["MISSING", "NEW"]),
+            ('a_', '__', ["MISSING"]),
+            ('b_', 'ab', ["YES", "NEW"]),
+            ('b_', 'ba', ["no", "NEW"]),
+            ('b_', 'a_', ["YES"]),
+            ('b_', 'b_', ["no"]),
+            ('b_', '_a', ["MISSING", "NEW"]),
+            ('b_', '_b', ["MISSING", "NEW"]),
+            ('b_', '__', ["MISSING"]),
+            ('_a', 'ab', ["NEW", "YES"]),
+            ('_a', 'ba', ["NEW", "no"]),
+            ('_a', 'a_', ["NEW", "MISSING"]),
+            ('_a', 'b_', ["NEW", "MISSING"]),
+            ('_a', '_a', ["no"]),
+            ('_a', '_b', ["YES"]),
+            ('_a', '__', ["MISSING"]),
+            ('_b', 'ab', ["NEW", "no"]),
+            ('_b', 'ba', ["NEW", "YES"]),
+            ('_b', 'a_', ["NEW", "MISSING"]),
+            ('_b', 'b_', ["NEW", "MISSING"]),
+            ('_b', '_a', ["YES"]),
+            ('_b', '_b', ["no"]),
+            ('_b', '__', ["MISSING"]),
+            ('__', 'ab', ["NEW", "NEW"]),
+            ('__', 'ba', ["NEW", "NEW"]),
+            ('__', 'a_', ["NEW"]),
+            ('__', 'b_', ["NEW"]),
+            ('__', '_a', ["NEW"]),
+            ('__', '_b', ["NEW"]),
+            ('__', '__', []),
         ]
         for case in cases:
             self.check_case(*case)
