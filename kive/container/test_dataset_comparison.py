@@ -47,7 +47,7 @@ class TestComparisonStrategy(TestCase):
         arg = mock.Mock()
         arg.argtype = None
         run = mock.Mock()
-        run.app.arguments = [arg]
+        run.app.arguments.all = mock.Mock(return_value=[arg])
         with self.assertRaises(ValueError):
             runutils.compare_rerun_datasets(run, run)
 
@@ -56,7 +56,7 @@ class TestComparisonStrategy(TestCase):
         arg.argtype = "Not none, but not a known value"
         run = mock.Mock()
         run.app = mock.Mock()
-        run.app.arguments = [arg]
+        run.app.arguments.all = mock.Mock(return_value=[arg])
         with self.assertRaises(ValueError):
             runutils.compare_rerun_datasets(run, run)
 
@@ -77,7 +77,8 @@ class TestComparisonStrategy(TestCase):
             arg.argtype = argtype
             run = mock.Mock()
             run.app = mock.Mock()
-            run.app.arguments = [arg]
+            run.app._argument = arg
+            run.app.arguments.all = mock.Mock(return_value=[arg])
             return run
 
         cases = [
@@ -96,8 +97,7 @@ class TestComparisonStrategy(TestCase):
                     compare_mono, compare_optional, compare_dir
             ]:
                 if comparison_mock in expect_called:
-                    comparison_mock.assert_called_with(run.app.arguments[0],
-                                                       run, run)
+                    comparison_mock.assert_called_with(run.app._argument, run, run)
                 else:
                     comparison_mock.assert_not_called()
             reset_mocks()
