@@ -292,7 +292,7 @@ class Command(BaseCommand):
         # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
         directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
         directories_part = os.path.join(*directories)
-        suffixes = ''.join(*file_path.suffixes)
+        suffixes = ''.join(file_path.suffixes)
         filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
         filename_part = "{name}_{runid}{suffixes}".format(name=filename,
                                                           runid=runid,
