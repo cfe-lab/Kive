@@ -158,7 +158,7 @@ def _compare_rerun_datasets(
         raise ValueError(
             "Expect re-runs to have the same App as their original")
     argument: ContainerArgument
-    for argument in original.app.arguments:
+    for argument in original.app.arguments.all():
         argtype = argument.argtype
         if argtype is None:
             raise ValueError(
