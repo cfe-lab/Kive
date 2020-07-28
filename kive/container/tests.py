@@ -1650,7 +1650,7 @@ class ContainerRunTests(TestCase):
                                  type='Log',
                                  url='/container_logs/{}/'.format(log.id)),
                             dict(created=make_aware(datetime(2000, 1, 1), utc),
-                                 is_changed='YES',
+                                 is_changed='NEW',
                                  name='greetings_123.csv',
                                  size='missing',
                                  type='Output',
