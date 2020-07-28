@@ -23,7 +23,7 @@ class DatasetComparison(ty.NamedTuple):
     ) -> "DatasetComparison":
         dataset = containerdataset.dataset
         return DatasetComparison(
-            type=containerdataset.argument.type,
+            type=containerdataset.argument.get_type_display(),
             url=dataset.get_view_url(),
             name=dataset.name,
             size=dataset.get_formatted_filesize(),
@@ -71,9 +71,9 @@ def _compare_monovalent_args(
     rerun: ContainerRun,
 ) -> DatasetComparison:
     "Compare the datasets for a single-valued argument on a re-run and its original."
-    original_dataset = original.datasets.get(argument=argument)
-    rerun_dataset = rerun.datasets.get(argument=argument)
-    return DatasetComparison.compare(original_dataset, rerun_dataset)
+    original_dataset = original.datasets.filter(argument=argument).first()
+    rerun_dataset = rerun.datasets.filter(argument=argument).first()
+    return DatasetComparison.compare_optional(original_dataset, rerun_dataset)
 
 
 def _compare_optional_inputs(
