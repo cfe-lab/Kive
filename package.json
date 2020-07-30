@@ -42,7 +42,7 @@
     "source-map-loader": "^1.0.1",
     "style-loader": "^1.2.1",
     "typescript": "^3.9.7",
-    "webpack": "^4.44.0"
+    "webpack": "^4.44.1"
   },
   "scripts": {
     "postinstall": "grunt pngicons",
