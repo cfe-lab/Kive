@@ -1,10 +1,8 @@
-import datetime
 import io
-import random
 import typing as ty
 from unittest import mock
 
-from django.core.files import File
+from django.core.files.base import ContentFile
 from django.test import TestCase
 
 from librarian.models import Dataset
@@ -20,16 +18,6 @@ from .models import (
     ContainerRun,
 )
 from . import runutils
-
-
-def random_string() -> str:
-    from string import ascii_letters
-    return ''.join(random.sample(ascii_letters, 32))
-
-
-def fake_file(name: str, content: str) -> ty.IO:
-    buffer = io.StringIO(content)
-    return File(name="empty_file.simg", file=buffer)
 
 
 class TestComparisonStrategy(TestCase):
@@ -133,31 +121,29 @@ class BaseDatasetComparisonTestCase(TestCase):
             git="",
             user=cls._kive_user,
         )
-        cls.containerfamily.save()
 
         cls.container = Container.objects.create(
             family=cls.containerfamily,
             user=cls._kive_user,
             tag="",
-            file=fake_file(name="empty.simg", content=""),
+            file=ContentFile(content="", name="empty.simg"),
         )
         cls.container.singularity_validated = True
         cls.container.save()
 
         cls.app = ContainerApp.objects.create(container=cls.container)
-        cls.app.save()
 
         cls.dataset_a = Dataset.objects.create(
             name="dataset_a",
             user=cls._kive_user,
-            dataset_file=fake_file("a.txt", content="a"),
+            dataset_file=ContentFile(content="a", name="a.txt"),
             MD5_checksum=cls.MD5_A,
         )
         cls.dataset_b = Dataset.objects.create(
             name="dataset_b",
             user=cls._kive_user,
             MD5_checksum=cls.MD5_B,
-            dataset_file=fake_file("b.txt", content="b"),
+            dataset_file=ContentFile(content="b", name="b.txt"),
         )
         cls.dataset_empty = Dataset.objects.create(
             name="dataset_empty",
@@ -183,7 +169,6 @@ class TestFixedInputDatasetComparison(BaseDatasetComparisonTestCase):
             type=ContainerArgument.INPUT,
         )
         assert cls.arg.argtype is ContainerArgumentType.FIXED_INPUT
-        cls.arg.save()
 
         cls.containerrun_a = cls.app.runs.create(
             user=cls._kive_user,
@@ -238,7 +223,6 @@ class TestFixedOutputDatasetComparison(BaseDatasetComparisonTestCase):
             type=ContainerArgument.OUTPUT,
         )
         assert cls.arg.argtype is ContainerArgumentType.FIXED_OUTPUT
-        cls.arg.save()
 
         cls.containerrun_a = cls.app.runs.create(
             user=cls._kive_user,
@@ -301,7 +285,6 @@ class TestCompareOptionalInputs(BaseDatasetComparisonTestCase):
             allow_multiple=False,
         )
         assert cls.arg.argtype is ContainerArgumentType.OPTIONAL_INPUT
-        cls.arg.save()
 
         cls.containerrun_a = cls.app.runs.create(
             user=cls._kive_user,
