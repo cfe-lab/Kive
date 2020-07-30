@@ -18,7 +18,7 @@ PARSER.add_argument("output_directory", type=pathlib.Path)
 def main():
     args = PARSER.parse_args()
 
-    output_directory: patlib.Path = args.output_directory
+    output_directory: pathlib.Path = args.output_directory
 
     if not (output_directory.exists() and output_directory.is_dir()):
         output_directory.mkdir()

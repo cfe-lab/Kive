@@ -83,6 +83,11 @@ def _compare_optional_inputs(
 ) -> ty.Iterable[DatasetComparison]:
     argtype = argument.argtype
 
+    errmsg = "_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments"
+    expected_types = (ContainerArgumentType.OPTIONAL_INPUT,
+                      ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT)
+    assert argtype in expected_types, errmsg
+
     if argtype is ContainerArgumentType.OPTIONAL_INPUT:
         original_dataset = original.datasets.filter(argument=argument).first()
         rerun_dataset = rerun.datasets.filter(argument=argument).first()
@@ -105,10 +110,6 @@ def _compare_optional_inputs(
                 orig_dataset, rerun_dataset)
             if comparison is not None:
                 yield comparison
-    else:
-        raise ValueError(
-            "_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments"
-        )
 
 
 def _compare_directory_outputs(
@@ -130,15 +131,15 @@ def _compare_directory_outputs(
         return grouped
 
     grouped_original_datasets = group_by_path(all_original_datasets)
-    grouped_rerun_dadatasets = group_by_path(all_rerun_datasets)
+    grouped_rerun_datasets = group_by_path(all_rerun_datasets)
 
     original_locations = set(grouped_original_datasets.keys())
-    rerun_locations = set(grouped_rerun_dadatasets.keys())
+    rerun_locations = set(grouped_rerun_datasets.keys())
     all_locations = original_locations.union(rerun_locations)
 
     for location in sorted(all_locations):
         original_datasets = grouped_original_datasets.get(location, [])
-        rerun_datasets = grouped_rerun_dadatasets.get(location, [])
+        rerun_datasets = grouped_rerun_datasets.get(location, [])
         dataset_pairs = itertools.zip_longest(
             original_datasets,
             rerun_datasets,
