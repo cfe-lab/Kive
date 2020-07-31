@@ -98,7 +98,7 @@ class BaseDatasetComparisonTestCase(TestCase):
 
     - A ContainerApp (with associated Container and ContainerFamily, which 
       we don't care about but create to satisfy foreign key requirements.)
-    - Datasets containgin 'a', 'b', and ''.
+    - Datasets containing 'a', 'b', and ''.
 
     Test cases that inherit from this class can add their own arguments to
     the app (they'll be dropped when the tests finish) and define their own
@@ -149,8 +149,34 @@ class BaseDatasetComparisonTestCase(TestCase):
             name="dataset_empty",
             user=cls._kive_user,
             MD5_checksum=cls.MD5_EMPTY,
-            dataset_file=fake_file("empty.txt", content=""),
+            dataset_file=ContentFile(content="", name="empty.txt"),
         )
+
+    def check_case(
+        self,
+        orig_name: str,
+        rerun_name: str,
+        expected_comparisons: ty.List[str],
+    ) -> None:
+        original = getattr(self, f"containerrun_{orig_name}")
+        rerun = getattr(self, f"containerrun_{rerun_name}")
+        comparisons = list(self.comparison_function(self.arg, original, rerun))
+        self.assertEqual(
+            len(comparisons), len(expected_comparisons),
+            f"Mismatched number of comparisons when comparing {original} and {rerun}"
+        )
+        self.assertEqual(
+            [c.is_changed for c in comparisons],
+            expected_comparisons,
+            f"Mismatched comparisons when comparing {original} and {rerun}",
+        )
+
+    def check_cases(self, cases):
+        for orig_name, rerun_name, expected_comparsisons in cases:
+            with self.subTest(orig=orig_name,
+                              rerun=rerun_name,
+                              expected=expected_comparsisons):
+                self.check_case(orig_name, rerun_name, expected_comparsisons)
 
 
 class TestFixedInputDatasetComparison(BaseDatasetComparisonTestCase):
@@ -274,6 +300,9 @@ class TestCompareOptionalInputs(BaseDatasetComparisonTestCase):
     The app has three runs, two with dataset values 'a', 'b' and one without
     a dataset value.
     """
+
+    comparison_function = staticmethod(runutils._compare_optional_inputs)
+
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -311,23 +340,12 @@ class TestCompareOptionalInputs(BaseDatasetComparisonTestCase):
 
     def test_comparing_optional_inputs(self):
         cases = [
-            ((self.containerrun_a, self.containerrun_a), "no"),
-            ((self.containerrun_a, self.containerrun_b), "YES"),
-            ((self.containerrun_a, self.containerrun_none), "MISSING"),
-            ((self.containerrun_none, self.containerrun_a), "NEW"),
+            ("a", "a", ["no"]),
+            ("a", "b", ["YES"]),
+            ("a", "none", ["MISSING"]),
+            ("none", "a", ["NEW"]),
         ]
-        for (original, rerun), expected in cases:
-            comparisons = list(
-                runutils._compare_optional_inputs(self.arg, original, rerun))
-            self.assertEqual(
-                len(comparisons),
-                1,
-                "Expected one comparison for single optional args",
-            )
-            comparison = comparisons[0]
-            self.assertEqual(
-                comparison.is_changed, expected,
-                f"Expected {expected} when comparing {original} and {rerun}")
+        self.check_cases(cases)
 
 
 class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
@@ -353,6 +371,9 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
     - Multiply valued and singlue valued runs with and without changes.
     - Multiply valued runs with and without changes.
     """
+
+    comparison_function = staticmethod(runutils._compare_optional_inputs)
+
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -390,34 +411,13 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
                 )
             setattr(cls, containerrun_name, containerrun)
 
-    def check_case(
-        self,
-        orig_name: str,
-        rerun_name: str,
-        expected_comparisons: ty.List[str],
-    ) -> None:
-        original = getattr(self, f"containerrun_{orig_name}")
-        rerun = getattr(self, f"containerrun_{rerun_name}")
-        comparisons = list(
-            runutils._compare_optional_inputs(self.arg, original, rerun))
-        self.assertEqual(
-            len(comparisons), len(expected_comparisons),
-            f"Mismatched number of comparisons when comparing {original} and {rerun}"
-        )
-        self.assertEqual(
-            [c.is_changed for c in comparisons],
-            expected_comparisons,
-            f"Mismatched comparisons when comparing {original} and {rerun}",
-        )
-
     def test_comparing_monovalued_present_inputs(self):
         cases = [
             ("a", "a", ["no"]),
             ("a", "b", ["YES"]),
             ("b", "a", ["YES"]),
         ]
-        for case in cases:
-            self.check_case(*case)
+        self.check_cases(cases)
 
     def test_comparing_against_absent_inputs(self):
         cases = [
@@ -427,8 +427,7 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
             ("empty", "aa", ["NEW", "NEW"]),
             ("aa", "empty", ["MISSING", "MISSING"]),
         ]
-        for case in cases:
-            self.check_case(*case)
+        self.check_cases(cases)
 
     def test_comparing_pairs_of_inputs(self):
         cases = [
@@ -438,8 +437,7 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
             ("ba", "aa", ["YES", "no"]),
             ("aa", "bb", ["YES", "YES"]),
         ]
-        for case in cases:
-            self.check_case(*case)
+        self.check_cases(cases)
 
     def test_comparing_mismatched_numbers_of_inputs(self):
         cases = [
@@ -452,11 +450,12 @@ class TestCompareOptionalMultipleInputs(BaseDatasetComparisonTestCase):
             ("a", "ba", ["YES", "NEW"]),
             ("ba", "a", ["YES", "MISSING"]),
         ]
-        for case in cases:
-            self.check_case(*case)
+        self.check_cases(cases)
 
 
 class TestCompareDirectoryOutputs(BaseDatasetComparisonTestCase):
+    comparison_function = staticmethod(runutils._compare_directory_outputs)
+
     @classmethod
     def setUpTestData(cls) -> None:
         super().setUpTestData()
@@ -501,27 +500,6 @@ class TestCompareDirectoryOutputs(BaseDatasetComparisonTestCase):
                     name=f"subdir/{subname}",
                 )
             setattr(cls, containerrun_name, containerrun)
-
-    def check_case(
-        self,
-        orig_name: str,
-        rerun_name: str,
-        expected_comparisons: ty.List[str],
-    ) -> None:
-        original = getattr(self, f"containerrun_{orig_name}")
-        rerun = getattr(self, f"containerrun_{rerun_name}")
-        comparison = list(
-            runutils._compare_directory_outputs(self.arg, original, rerun))
-        self.assertEqual(
-            len(comparison),
-            len(expected_comparisons),
-            f"Mismatched number of comparisons while comparing {original} and {rerun}",
-        )
-        self.assertEqual(
-            [c.is_changed for c in comparison],
-            expected_comparisons,
-            f"Mismatched comparisons when comparing {original} and {rerun}",
-        )
 
     def test_comparing_directory_outputs(self):
         cases = [
@@ -575,5 +553,4 @@ class TestCompareDirectoryOutputs(BaseDatasetComparisonTestCase):
             ('__', '_b', ["NEW"]),
             ('__', '__', []),
         ]
-        for case in cases:
-            self.check_case(*case)
+        self.check_cases(cases)
