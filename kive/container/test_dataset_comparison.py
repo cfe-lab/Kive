@@ -221,7 +221,7 @@ class TestFixedInputDatasetComparison(BaseDatasetComparisonTestCase):
             self.containerrun_a,
         )
         self.assertEqual(comparison.is_changed, "no",
-                         "Expected idental datasets to reveal no changes")
+                         "Expected identical datasets to reveal no changes")
 
     def test_different_arguments(self):
         comparison = runutils._compare_monovalent_args(
@@ -277,7 +277,7 @@ class TestFixedOutputDatasetComparison(BaseDatasetComparisonTestCase):
         self.assertEqual(
             comparison.is_changed,
             "no",
-            "Expected idental datasets to reveal no changes",
+            "Expected identical datasets to reveal no changes",
         )
 
     def test_different_arguments(self):
