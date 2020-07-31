@@ -1,3 +1,4 @@
+import collections
 import datetime
 import itertools
 import pathlib
@@ -121,13 +122,11 @@ def _compare_directory_outputs(
     def group_by_path(
         datasets: ty.Iterable[ContainerDataset]
     ) -> ty.Dict[ty.Any, ty.List[ContainerDataset]]:
-        grouped = dict()
+        grouped = collections.defaultdict(list)
         for dataset in datasets:
             path = pathlib.Path(dataset.name)
             parents = tuple(path.parents)
-            lst = grouped.get(parents, [])
-            lst.append(dataset)
-            grouped[parents] = lst
+            grouped[parents].append(dataset)
         return grouped
 
     grouped_original_datasets = group_by_path(all_original_datasets)
