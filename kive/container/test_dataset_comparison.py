@@ -1,4 +1,3 @@
-import io
 import typing as ty
 from unittest import mock
 
@@ -11,7 +10,6 @@ import metadata.models
 from .models import (
     Container,
     ContainerApp,
-    ContainerDataset,
     ContainerFamily,
     ContainerArgument,
     ContainerArgumentType,
@@ -96,7 +94,7 @@ class BaseDatasetComparisonTestCase(TestCase):
 
     Test cases that inherit from this class will have:
 
-    - A ContainerApp (with associated Container and ContainerFamily, which 
+    - A ContainerApp (with associated Container and ContainerFamily, which
       we don't care about but create to satisfy foreign key requirements.)
     - Datasets containing 'a', 'b', and ''.
 

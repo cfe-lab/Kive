@@ -18,7 +18,7 @@ import rest_framework.reverse
 from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
-    ContainerRun, ContainerArgument, ContainerLog, Batch, ContainerDataset
+    ContainerRun, ContainerArgument, ContainerLog, Batch
 from container.runutils import compare_rerun_datasets
 from portal.views import developer_check, AdminViewMixin
 

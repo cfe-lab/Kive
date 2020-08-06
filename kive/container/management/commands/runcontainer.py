@@ -259,7 +259,13 @@ class Command(BaseCommand):
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
 
-    def _save_output_argument(self, run: ContainerRun, argument: ContainerArgument, output_path: str, upload_path: str):
+    def _save_output_argument(
+        self,
+        run: ContainerRun,
+        argument: ContainerArgument,
+        output_path: str,
+        upload_path: str,
+    ):
         argument_path = os.path.join(output_path, argument.name)
         dataset_name = self.build_dataset_name(run, argument.name)
         new_argument_path = os.path.join(upload_path, dataset_name)
@@ -269,8 +275,7 @@ class Command(BaseCommand):
                                              name=dataset_name,
                                              user=run.user)
             dataset.copy_permissions(run)
-            run.datasets.create(dataset=dataset,
-                                argument=argument)
+            run.datasets.create(dataset=dataset, argument=argument)
         except (OSError, IOError) as ex:
             if ex.errno != errno.ENOENT:
                 raise

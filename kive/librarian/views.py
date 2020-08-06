@@ -11,7 +11,6 @@ from django.db import transaction
 from django.forms.formsets import formset_factory
 from django.http import HttpResponse, HttpResponseRedirect, Http404
 from django.template import loader
-from django.conf import settings
 from django.utils.encoding import DjangoUnicodeDecodeError
 
 from file_access_utils import build_download_response
@@ -146,7 +145,7 @@ def dataset_view(request, dataset_id):
         c["is_binary"] = False
         try:
             rendered_response = t.render(c, request)
-        except DjangoUnicodeDecodeError as e:
+        except DjangoUnicodeDecodeError:
             c["is_binary"] = True
             del c["sample_content"]
             rendered_response = t.render(c, request)
@@ -318,8 +317,10 @@ def datasets_add_bulk(request):
                     display_result["is_valid"] = True
                 bulk_display_results.append(display_result)
 
-            BulkDatasetUpdateFormSet = formset_factory(form=BulkDatasetUpdateForm, max_num=len(bulk_display_results))
-            bulk_dataset_update_formset = BulkDatasetUpdateFormSet(initial=bulk_display_results)
+            BulkDatasetUpdateFormSet = formset_factory(
+                form=BulkDatasetUpdateForm, max_num=len(bulk_display_results))
+            bulk_dataset_update_formset = BulkDatasetUpdateFormSet(
+                initial=bulk_display_results)
 
             # Fill in the attributes that are not fields in the form
             # These are not set by the BulkDatasetUpdateFormSet(initial=...) parameter
@@ -384,7 +385,7 @@ def datasets_bulk(request):
             else:
                 # All the forms have now been annotated with errors.
                 all_good = False
-        except (Dataset.DoesNotExist, KeyError) as e:
+        except (Dataset.DoesNotExist, KeyError):
             all_good = False
 
         if all_good:
