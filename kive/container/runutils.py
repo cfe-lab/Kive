@@ -84,7 +84,7 @@ def _compare_optional_inputs(
 ) -> ty.Iterable[DatasetComparison]:
     argtype = argument.argtype
 
-    errmsg = "_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT arguments"
+    errmsg = f"_compare_optional_input only handles OPTIONAL_INPUT and OPTIONAL_MULTIPLE_INPUT, not {argtype}"
     expected_types = (ContainerArgumentType.OPTIONAL_INPUT,
                       ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT)
     assert argtype in expected_types, errmsg
