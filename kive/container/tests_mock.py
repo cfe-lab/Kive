@@ -1,5 +1,7 @@
+import datetime
 import os
 from argparse import Namespace
+import random
 import tempfile
 import io
 import zipfile
@@ -12,13 +14,14 @@ from django.core.files.base import File
 from django.test import TestCase
 from django.urls import reverse, resolve
 from django_mock_queries.mocks import mocked_relations
-from mock import patch
+from mock import patch, Mock, call
 from rest_framework.test import force_authenticate
 
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+    ContainerArgument, ContainerArgumentType, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+from container import runutils
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -1048,3 +1051,51 @@ class RunContainerMockTests(TestCase):
             dataset_name = handler.build_dataset_name(run, argument_name)
 
             self.assertEqual(expected_dataset_name, dataset_name)
+
+
+    @patch("container.management.commands.runcontainer.Dataset")
+    @patch("os.rename")
+    @patch("os.walk",
+           return_value=iter([
+               ('/tmp/runsandbox', ['datafiles'], []),
+               ('/tmp/runsandbox/output/datafiles', ['subdir'], ['a.txt', 'b.txt']),
+               ('/tmp/runsandbox/output/datafiles/subdir', [], ['c.txt'])
+           ]))
+    def test_save_output_directory(self, mock_walk, mock_rename, dataset_mock):
+        """Simulate saving a directory output called "datafiles/" with the following structure:
+
+        /tmp/runsandbox/output/
+        └── datafiles/
+            ├── a.txt
+            ├── b.txt
+            └── morefiles/
+                └── c.txt
+        """
+        from pathlib import Path
+
+        run = Mock()
+        run.id = 9981
+        argument = Mock()
+        argument.name = "datafiles"
+        output_path = "/tmp/runsandbox/output/"
+        upload_path = "/tmp/runsandbox/upload"
+
+        dataset_mock.create_dataset = Mock(return_value=Mock())
+
+        runcontainer.Command._save_output_directory_argument(
+            run,
+            argument,
+            output_path,
+            upload_path,
+        )
+
+        mock_walk.assert_called_with(Path("/tmp/runsandbox/output/datafiles"))
+
+        mock_rename.assert_has_calls(
+            [
+                call(Path("/tmp/runsandbox/output/datafiles/a.txt"), "/tmp/runsandbox/upload/datafiles__a_9981.txt"),
+                call(Path("/tmp/runsandbox/output/datafiles/b.txt"), "/tmp/runsandbox/upload/datafiles__b_9981.txt"),
+                call(Path("/tmp/runsandbox/output/datafiles/subdir/c.txt"), "/tmp/runsandbox/upload/datafiles__subdir__c_9981.txt"),
+            ],
+            any_order=True,
+        )

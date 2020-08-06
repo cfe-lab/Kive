@@ -1,12 +1,13 @@
 import errno
+import json
 import logging
 import os
+import pathlib
 import shutil
-import sys
 from subprocess import call
-import typing
-import json
+import sys
 from traceback import format_exception_only
+import typing
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -219,7 +220,8 @@ class Command(BaseCommand):
             datasetfolder = "/mnt/output"
         return os.path.join(datasetfolder, arg.name)
 
-    def build_dataset_name(self, run, argument_name):
+    @staticmethod
+    def build_dataset_name(run, argument_name: str):
         parts = argument_name.split('_')
         extension = parts[-1]
         if extension.lower() in KNOWN_EXTENSIONS:
@@ -240,20 +242,12 @@ class Command(BaseCommand):
         upload_path = os.path.join(run.full_sandbox_path, 'upload')
         os.mkdir(upload_path)
         for argument in run.app.arguments.filter(type=ContainerArgument.OUTPUT):
-            argument_path = os.path.join(output_path, argument.name)
-            dataset_name = self.build_dataset_name(run, argument.name)
-            new_argument_path = os.path.join(upload_path, dataset_name)
-            try:
-                os.rename(argument_path, new_argument_path)
-                dataset = Dataset.create_dataset(new_argument_path,
-                                                 name=dataset_name,
-                                                 user=run.user)
-                dataset.copy_permissions(run)
-                run.datasets.create(dataset=dataset,
-                                    argument=argument)
-            except (OSError, IOError) as ex:
-                if ex.errno != errno.ENOENT:
-                    raise
+            if argument.argtype == ContainerArgumentType.FIXED_OUTPUT:
+                self._save_output_argument(run, argument, output_path, upload_path)
+            elif argument.argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
+                self._save_output_directory_argument(run, argument, output_path, upload_path)
+            else:
+                raise RuntimeError(f"Invalid output argument type in {run}: {argument.argtype}")
         logs_path = os.path.join(run.full_sandbox_path, 'logs')
         for file_name, log_type in (('stdout.txt', ContainerLog.STDOUT),
                                     ('stderr.txt', ContainerLog.STDERR)):
@@ -264,6 +258,75 @@ class Command(BaseCommand):
                      if run.return_code == 0
                      else ContainerRun.FAILED)
         run.end_time = timezone.now()
+
+    def _save_output_argument(self, run: ContainerRun, argument: ContainerArgument, output_path: str, upload_path: str):
+        argument_path = os.path.join(output_path, argument.name)
+        dataset_name = self.build_dataset_name(run, argument.name)
+        new_argument_path = os.path.join(upload_path, dataset_name)
+        try:
+            os.rename(argument_path, new_argument_path)
+            dataset = Dataset.create_dataset(new_argument_path,
+                                             name=dataset_name,
+                                             user=run.user)
+            dataset.copy_permissions(run)
+            run.datasets.create(dataset=dataset,
+                                argument=argument)
+        except (OSError, IOError) as ex:
+            if ex.errno != errno.ENOENT:
+                raise
+
+    @staticmethod
+    def _build_directory_file_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
+        # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
+        directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
+        directories_part = "__".join(directories)
+        suffixes = ''.join(file_path.suffixes)
+        filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
+        filename_part = "{name}_{runid}{suffixes}".format(name=filename,
+                                                          runid=runid,
+                                                          suffixes=suffixes)
+        return "__".join([directories_part, filename_part])
+
+    @staticmethod
+    def _build_directory_dataset_name(runid: int, output_path: pathlib.Path, file_path: pathlib.Path) -> str:
+        # Exclude generic directories (e.g. /var/kive/media_root/...)from the dataset name
+        directories = file_path.parent.parts[len(output_path.parts):]  # Drop 'output_path'
+        directories_part = os.path.join(*directories)
+        suffixes = ''.join(file_path.suffixes)
+        filename = file_path.name[:-len(suffixes)] if suffixes else file_path.name
+        filename_part = "{name}_{runid}{suffixes}".format(name=filename,
+                                                          runid=runid,
+                                                          suffixes=suffixes)
+        return os.path.join(directories_part, filename_part)
+
+    @classmethod
+    def _save_output_directory_argument(cls, run: ContainerRun,
+                                        argument: ContainerArgument,
+                                        output_path: str,
+                                        upload_path: str) -> None:
+        output_path = pathlib.Path(output_path).absolute()
+        dirarg_path = output_path / argument.name
+        for dirpath, _, filenames in os.walk(dirarg_path):
+            dirpath = pathlib.Path(dirpath)
+            for filename in filenames:
+                datafile_path: pathlib.Path = (dirpath / filename).absolute()
+                dataset_filename = cls._build_directory_file_name(
+                    run.id, output_path, datafile_path)
+                destination_path = os.path.join(upload_path, dataset_filename)
+                dataset_name = cls._build_directory_dataset_name(
+                    run.id, output_path, datafile_path)
+                try:
+                    os.rename(datafile_path, destination_path)
+                    dataset = Dataset.create_dataset(
+                        destination_path,
+                        name=dataset_name,
+                        user=run.user,
+                    )
+                    dataset.copy_permissions(run)
+                    run.datasets.create(dataset=dataset, argument=argument)
+                except (OSError, IOError) as ex:
+                    if ex.errno != errno.ENOENT:
+                        raise
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')

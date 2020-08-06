@@ -19,6 +19,7 @@ from container.forms import ContainerFamilyForm, ContainerForm, \
     ContainerUpdateForm, ContainerAppForm, ContainerRunForm, BatchForm
 from container.models import ContainerFamily, Container, ContainerApp, \
     ContainerRun, ContainerArgument, ContainerLog, Batch, ContainerDataset
+from container.runutils import compare_rerun_datasets
 from portal.views import developer_check, AdminViewMixin
 
 dev_decorators = [login_required, user_passes_test(developer_check)]
@@ -293,29 +294,22 @@ class ContainerRunUpdate(UpdateView, AdminViewMixin):
         state_names = dict(ContainerRun.STATES)
         context['state_name'] = state_names.get(self.object.state)
         data_entries = []
-        type_names = dict(ContainerArgument.TYPES)
-        input_count = 0
-        for run_dataset in self.object.datasets.all():
-            data_entry = dict(type=type_names[run_dataset.argument.type],
-                              url=run_dataset.dataset.get_view_url(),
-                              name=run_dataset.dataset.name,
-                              size=run_dataset.dataset.get_formatted_filesize(),
-                              created=run_dataset.dataset.date_created)
-            if self.object.original_run:
-                # noinspection PyUnresolvedReferences
-                try:
-                    original_container_dataset = self.object.original_run.datasets.get(
-                        argument=run_dataset.argument)
-                except ContainerDataset.DoesNotExist:
-                    original_md5 = None
-                else:
-                    original_dataset = original_container_dataset.dataset
-                    original_md5 = original_dataset.MD5_checksum
-                is_changed = original_md5 == run_dataset.dataset.MD5_checksum
-                data_entry['is_changed'] = 'no' if is_changed else 'YES'
-            data_entries.append(data_entry)
-            if run_dataset.argument.type == ContainerArgument.INPUT:
-                input_count += 1
+
+        if self.object.original_run:
+            dataset_comparisons = compare_rerun_datasets(self.object.original_run, self.object)
+            data_entries = [dict(**c._asdict()) for c in dataset_comparisons]
+        else:
+            data_entries = [
+                dict(type=run_dataset.argument.get_type_display(),
+                     url=run_dataset.dataset.get_view_url(),
+                     name=run_dataset.dataset.name,
+                     size=run_dataset.dataset.get_formatted_filesize(),
+                     created=run_dataset.dataset.date_created)
+                for run_dataset in self.object.datasets.all()
+            ]
+        inputtype = dict(ContainerArgument.TYPES)[ContainerArgument.INPUT]
+        input_count = sum(d["type"] == inputtype for d in data_entries)
+
         log_names = dict(ContainerLog.TYPES)
         for log in self.object.logs.order_by('type'):
             data_entries.insert(input_count, dict(

@@ -9,6 +9,7 @@ import subprocess as sp
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from io import BytesIO
+import pathlib
 from tarfile import TarFile, TarInfo
 from tempfile import NamedTemporaryFile, mkstemp
 from time import time
@@ -1649,7 +1650,7 @@ class ContainerRunTests(TestCase):
                                  type='Log',
                                  url='/container_logs/{}/'.format(log.id)),
                             dict(created=make_aware(datetime(2000, 1, 1), utc),
-                                 is_changed='YES',
+                                 is_changed='NEW',
                                  name='greetings_123.csv',
                                  size='missing',
                                  type='Output',
@@ -3194,6 +3195,41 @@ Line 3
             ],
         )
 
+    def test_output_argument_dataset_naming(self):
+        run_output_path = pathlib.Path("/asdf/output")  # Simulates the run's output dir
+        outputpath = run_output_path / "semi/"  # Simulates run's directory output argument
+        runid = 2356
+
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                run_output_path,
+                outputpath / "test.csv",
+            ),
+            "semi/test_2356.csv",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                run_output_path,
+                outputpath / "test.tar.gz",
+            ),
+            "semi/test_2356.tar.gz",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid,
+                run_output_path,
+                outputpath / "test",
+            ),
+            "semi/test_2356",
+        )
+        self.assertEqual(
+            runcontainer.Command._build_directory_dataset_name(
+                runid, run_output_path, outputpath / "colon" / "test.png"
+            ),
+            "semi/colon/test_2356.png",
+        )
 
 @skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):
