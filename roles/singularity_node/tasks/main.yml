@@ -2,48 +2,7 @@
 
 # This role installs Singularity 3.5.3 from source.
 
-- name: build singularity rpm files
+- name: install singularity
   become: true
-  block:
-    - name: install dnf packages
-      dnf:
-        name:
-          - golang
-          - openssl-devel
-          - libuuid-devel
-          - libseccomp-devel
-          - squashfs-tools
-          - cryptsetup
-    # NOTE(nknight): the DNF installed Golang is required to build the RPMs
-    # (singularity depends on it explicitly) but the version in the repository
-    # is old; this installs the new version (though it still has to be added
-    # to the PATH when it's used).
-    - name: install updated version of golang
-      vars:
-        golang_tarball: go1.14.2.linux-amd64.tar.gz
-      block:
-        - name: download new golang release
-          get_url:
-            url: "https://dl.google.com/go/{{ golang_tarball }}"
-            dest: "/tmp/{{ golang_tarball }}"
-        - name: extract golang
-          unarchive:
-            src: "/tmp/{{ golang_tarball }}"
-            dest: "/usr/local/"
-    - name: fetch singularity source code
-      git:
-        dest: /root/singularity
-        repo: https://github.com/singularityware/singularity.git
-        version: "v3.5.3"
-    - name: build singularity rpm file
-      shell: |
-        export PATH="/usr/local/go/bin:$PATH"  # activate newer Golang version
-        ./mconfig
-        make -C builddir rpm
-      args:
-        chdir: /root/singularity
-        creates: /root/rpmbuild/RPMS/x86_64/singularity-3.5.3-1.el8.x86_64.rpm
-    - name: install singularity
-      dnf:
-        name:
-          - /root/rpmbuild/RPMS/x86_64/singularity-3.5.3-1.el8.x86_64.rpm
+  dnf:
+    name: singularity
