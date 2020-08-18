@@ -376,10 +376,12 @@ class DatasetWithFileTests(TestCase):
         self.raw_dataset.dataset_file.close()
         self.raw_dataset.dataset_file.open(mode='w')
         self.raw_dataset.dataset_file.close()
-        self.assertRaisesRegex(ValidationError,
-                               re.escape('File integrity of "{}" lost. Current checksum "{}" does not equal expected '
-                                         'checksum "{}"'.format(self.raw_dataset, new_md5, old_md5)),
-                               self.raw_dataset.clean)
+        self.assertRaisesRegex(
+            ValidationError,
+            re.escape(
+                'File integrity of "{}" lost. Current checksum "{}" does not equal expected '
+                'checksum "{}"'.format(self.raw_dataset, new_md5, old_md5)),
+            self.raw_dataset.clean)
 
     def test_Dataset_filename_MD5_clash(self):
         ds1, ds2 = Dataset.objects.all()[:2]
@@ -607,13 +609,20 @@ class PurgeDataTests(TestCase):
 
     def test_find_orphans(self):
         datasets = {
-            'orphan': self.create_dataset(name='Orphan name', description='Orphan description'),
-            'input_dataset': self.create_dataset(is_uploaded=True, name='Input name', description='Input description'),
-            'output_dataset': self.create_dataset(name='Output name', description='Output description'),
-            'unused_dataset': self.create_dataset(
-                is_uploaded=True,
-                name='Unused name',
-                description='Unused description')
+            'orphan':
+            self.create_dataset(name='Orphan name',
+                                description='Orphan description'),
+            'input_dataset':
+            self.create_dataset(is_uploaded=True,
+                                name='Input name',
+                                description='Input description'),
+            'output_dataset':
+            self.create_dataset(name='Output name',
+                                description='Output description'),
+            'unused_dataset':
+            self.create_dataset(is_uploaded=True,
+                                name='Unused name',
+                                description='Unused description')
         }
         for i in range(20):
             datasets['orphan_{}'.format(i)] = self.create_dataset(

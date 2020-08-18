@@ -180,7 +180,7 @@ def compare_rerun_datasets(
 ) -> ty.Iterable[DatasetComparison]:
     """Return a list of difference in the datasets between a re-run ContainerRun
     and its original.
-    
+
     Datasets can be changed, not-changed, missing, or new.
     """
     return list(_compare_rerun_datasets(original, rerun))

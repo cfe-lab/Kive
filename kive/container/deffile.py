@@ -18,7 +18,8 @@ def chunk_string(instr):
     """
     # treat lines ending in '\' as continuation lines
     instr = instr.replace('\\\n', ' ')
-    ll_lst = [l for l in [l.strip() for l in instr.splitlines() if l] if not l.startswith('#')]
+    nonblank_lines = [ln.strip() for ln in instr.splitlines() if ln]
+    ll_lst = [ln for ln in nonblank_lines if not ln.startswith('#')]
     ndxlst = [ndx for ndx, l in enumerate(ll_lst) if l.startswith('%')] + [len(ll_lst)]
     return [ll_lst[strt:stop] for strt, stop in [(ndxlst[nn], ndxlst[nn+1]) for nn in range(len(ndxlst)-1)]]
 

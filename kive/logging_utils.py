@@ -1,5 +1,6 @@
 import logging
 
+
 def setup_logging():
     logger = logging.getLogger()
 
@@ -11,7 +12,7 @@ def setup_logging():
     logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
     ch.setLevel(logging.DEBUG)
-    #ch.setLevel(logging.WARNING)
+    # ch.setLevel(logging.WARNING)
     formatter = logging.Formatter('%(asctime)s - %(message)s', "%Y-%m-%d %H:%M:%S")
     ch.setFormatter(formatter)
     logger.addHandler(ch)

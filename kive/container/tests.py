@@ -37,9 +37,11 @@ from rest_framework.test import force_authenticate
 
 from container.management.commands import purge, runcontainer
 # import container.models as cm
-from container.models import ContainerFamily, ContainerApp, Container, \
-    ContainerRun, ContainerDataset, ContainerArgument, ContainerArgumentType, Batch, ContainerLog, PipelineCompletionStatus,\
-    ExistingRunsError, multi_check_output
+from container.models import (
+    ContainerFamily, ContainerApp, Container, ContainerRun, ContainerDataset,
+    ContainerArgument, ContainerArgumentType, Batch, ContainerLog,
+    PipelineCompletionStatus, ExistingRunsError, multi_check_output
+)
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
 from librarian.models import Dataset, ExternalFileDirectory, get_upload_path
@@ -3230,6 +3232,7 @@ Line 3
             ),
             "semi/colon/test_2356.png",
         )
+
 
 @skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):

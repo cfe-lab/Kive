@@ -3,6 +3,7 @@ from django.template.defaultfilters import stringfilter
 
 register = template.Library()
 
+
 @register.filter
 @stringfilter
 def get_view_link(download_link):

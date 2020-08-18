@@ -243,7 +243,9 @@ class AccessControl(models.Model):
                 "Instances allow different users access", code="different_users_allowed"
             )
 
-        non_overlapping_groups_allowed = set(self.groups_allowed.all()).symmetric_difference(ac.groups_allowed.all())
+        non_overlapping_groups_allowed = set(
+            self.groups_allowed.all()).symmetric_difference(
+                ac.groups_allowed.all())
         if len(non_overlapping_groups_allowed) > 0:
             raise ValidationError(
                 "Instances allow different groups access", code="different_groups_allowed"

@@ -839,5 +839,6 @@ class Dataset(metadata.models.AccessControl):
             self.name)  # Splitext retains a '.' if it's present
         return "{}_{}{}".format(name, unique_id, extension)
 
+
 # Register signals.
 post_delete.connect(librarian.signals.dataset_post_delete, sender=Dataset)

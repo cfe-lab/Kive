@@ -630,7 +630,11 @@ class Container(AccessControl):
                     help_str = app_dct[deffile.AppInfo.KW_HELP_STRING] or ""
                     # attach the help string of the default app to the container's description
                     if appname == "" and help_str != "":
-                        self.description = help_str if self.description == "" else self.description + "\n" + help_str
+                        self.description = (
+                            help_str
+                            if self.description == ""
+                            else self.description + "\n" + help_str
+                        )
                         self.save()
                     newdb_app = self.apps.create(name=appname,
                                                  description=help_str,
@@ -964,6 +968,7 @@ class ContainerArgument(models.Model):
     def clean(self):
         if self.argtype is None:
             raise ValidationError("Could not assign a ContainerArgumentType to this argument")
+
 
 @receiver(models.signals.post_delete, sender=Container)
 def delete_container_file(instance, **_kwargs):

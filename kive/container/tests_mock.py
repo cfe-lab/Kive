@@ -1,7 +1,5 @@
-import datetime
 import os
 from argparse import Namespace
-import random
 import tempfile
 import io
 import zipfile
@@ -20,8 +18,7 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerArgumentType, ContainerRun, ContainerDataset, ZipHandler, TarHandler
-from container import runutils
+    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -1052,7 +1049,6 @@ class RunContainerMockTests(TestCase):
 
             self.assertEqual(expected_dataset_name, dataset_name)
 
-
     @patch("container.management.commands.runcontainer.Dataset")
     @patch("os.rename")
     @patch("os.walk",
@@ -1093,9 +1089,18 @@ class RunContainerMockTests(TestCase):
 
         mock_rename.assert_has_calls(
             [
-                call(Path("/tmp/runsandbox/output/datafiles/a.txt"), "/tmp/runsandbox/upload/datafiles__a_9981.txt"),
-                call(Path("/tmp/runsandbox/output/datafiles/b.txt"), "/tmp/runsandbox/upload/datafiles__b_9981.txt"),
-                call(Path("/tmp/runsandbox/output/datafiles/subdir/c.txt"), "/tmp/runsandbox/upload/datafiles__subdir__c_9981.txt"),
+                call(
+                    Path("/tmp/runsandbox/output/datafiles/a.txt"),
+                    "/tmp/runsandbox/upload/datafiles__a_9981.txt",
+                ),
+                call(
+                    Path("/tmp/runsandbox/output/datafiles/b.txt"),
+                    "/tmp/runsandbox/upload/datafiles__b_9981.txt",
+                ),
+                call(
+                    Path("/tmp/runsandbox/output/datafiles/subdir/c.txt"),
+                    "/tmp/runsandbox/upload/datafiles__subdir__c_9981.txt",
+                ),
             ],
             any_order=True,
         )

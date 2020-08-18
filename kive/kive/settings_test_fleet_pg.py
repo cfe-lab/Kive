@@ -1,4 +1,5 @@
 # This file is meant for use of the fleet while testing.
+# flake8: noqa
 
 from settings_test_pg import *  # @UnusedWildImport
 

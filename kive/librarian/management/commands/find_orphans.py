@@ -1,24 +1,28 @@
 #! /opt/venv_kive/bin/python
 import logging
 
-import psycopg2
-import argparse
-import os
 from django.core.management.base import BaseCommand
 from librarian.models import Dataset
-from container.models import ContainerDataset
-from django.conf import settings
 import sys
-import itertools
+
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
     def add_arguments(self, parser):
-        parser.add_argument('-f', '--delete_files', action='store_true', help='Delete orphaned files')
-        parser.add_argument('-r', '--delete_records', action='store_true', help='Delete database records for orphaned files')
-        parser.add_argument('-a', '--delete_all', action='store_true', help='Combine options -f and -r')
+        parser.add_argument('-f',
+                            '--delete_files',
+                            action='store_true',
+                            help='Delete orphaned files')
+        parser.add_argument('-r',
+                            '--delete_records',
+                            action='store_true',
+                            help='Delete database records for orphaned files')
+        parser.add_argument('-a',
+                            '--delete_all',
+                            action='store_true',
+                            help='Combine options -f and -r')
 
     def handle(self, *args, **options):
         orphans = self.find_orphans()

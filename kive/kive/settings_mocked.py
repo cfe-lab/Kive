@@ -1,3 +1,5 @@
+# flake8: noqa
+
 from django.db.utils import ConnectionHandler
 from mock import MagicMock
 

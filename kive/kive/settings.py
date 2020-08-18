@@ -118,7 +118,7 @@ STATICFILES_FINDERS = (
     # 'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
 
-# Add hashes to the names of static-files (to enable long cache times and 
+# Add hashes to the names of static-files (to enable long cache times and
 # avoid stale JS/CSS).
 STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
 
