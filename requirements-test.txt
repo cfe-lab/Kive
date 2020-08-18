@@ -3,3 +3,4 @@ django-mock-queries==2.1.5
 pytest==5.3.5
 pytest-django==3.7.0
 flake8==3.8
+pytest-flake8==1.0.6
