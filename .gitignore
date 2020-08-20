@@ -45,9 +45,6 @@ kive/librarian/librarian.tests.js
 kive/container/container.tests.js
 kive/container/tests.js
 kive/container/tests/*.js
-kive/pipeline/pipeline.tests.js
-kive/pipeline/tests.js
-kive/pipeline/tests/*.js
 kive/portal/portal.tests.js
 kive/portal/static/portal/noxss_jq.js
 kive/tests.js

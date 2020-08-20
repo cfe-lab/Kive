@@ -136,8 +136,8 @@ Once you have set up your production server, this is how to deploy a new release
 
          ssh user@server
          cd /usr/local/share/Kive
-         sudo /opt/venv_kive/bin/pip install --upgrade pip
-         sudo /opt/venv_kive/bin/pip install --upgrade -r requirements.txt
+         sudo /opt/venv_kive/bin/python -m pip install --upgrade pip
+         sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
     
 13. Follow any configuration instructions in the release notes.
 14. Migrate the database as described in the Creating Database Tables section

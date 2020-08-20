@@ -64,8 +64,8 @@ command line like this:
 
     /mnt/bin/reticulate_splines /mnt/input/splines.csv /mnt/output/reticulation.csv
 
-You can write your script to expect the absolute file path to each input or
-output file.
+Write your script to expect the absolute file paths to all the input and output
+files.
 
 For example, you might have a script that reads people's names from a file, and
 writes greetings into another file:
