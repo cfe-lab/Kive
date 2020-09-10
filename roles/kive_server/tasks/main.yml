@@ -38,6 +38,7 @@
           Environment=APACHE_RUN_USER=kive
           Environment=APACHE_RUN_GROUP=kive
     - name: update httpd.conf
+      when: item  # don't set empty variables
       loop:
         - from: "Listen 80$"
           to: "Listen {{ kive_listen_port }}"
