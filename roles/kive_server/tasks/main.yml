@@ -34,7 +34,7 @@
           Environment=KIVE_STATIC_ROOT="{{ kive_static_root }}"
           Environment=KIVE_SLURM_PATH="{{ kive_slurm_path }}"
           Environment=KIVE_SECRET_KEY="{{kive_server_secret_key}}"
-          Environment=KIVE_ALLOWED_HOSTS="{{ kive_allowed_hosts | to_json }}"
+          Environment=KIVE_ALLOWED_HOSTS={{ kive_allowed_hosts | to_json }}
           Environment=APACHE_RUN_USER=kive
           Environment=APACHE_RUN_GROUP=kive
     - name: update httpd.conf
