@@ -46,7 +46,9 @@ Vagrant.configure("2") do |config|
   config.vm.provision "shell", path: "./install-ansible.sh"
 
   # Add mapped directory with Kive source code
-  config.vm.synced_folder "..", "/usr/local/share/Kive"
+  config.vm.synced_folder "..", "/usr/local/share/Kive",
+    group: "kive",
+    owner: "kive"
 
   config.vm.provision "shell", inline: <<-EOS
     echo "#{HEAD_IP}\thead" >> /etc/hosts
