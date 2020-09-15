@@ -1,7 +1,9 @@
 Installation Instructions
 =========================
 
-Kive may be installed directly on the host machine, inside of a VM, or within a VM using Vagrant. For instructions on how to install using Vagrant, please see [these instructions for CentOS](/vagrant/README.md) (alternative options: [CentOS with Python3](/vagrant_centos_python3/README.md), [Ubuntu](/vagrant_ubuntu/README.md)).
+Kive may be installed directly on the host machine, inside of a VM, or within a VM using Vagrant. For instructions on how to install using Vagrant, please see [these instructions for CentOS](/vagrant/README.md) ([Ubuntu](/vagrant_ubuntu/README.md),
+[development environment](/dev-env/README.md)). With some effort, Kive can be installed using [Ansible](https://www.ansible.com/)
+but you should expect to do some configuration and debugging in the process.
 
 Prerequisites
 -------------
