@@ -1,9 +1,9 @@
 ---
 
-# This role installs Singularity 3.5.3 from source.
+# This role installs Singularity 3.6.2 from dnf.
 
 - name: install singularity
   become: true
   dnf:
-    name: singularity-3.6.*  # accept bugfix releases
+    name: singularity-3.6.2
     state: present

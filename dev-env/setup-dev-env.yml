@@ -30,7 +30,7 @@
           export KIVE_SLURM_PATH="{{ kive_slurm_path }}"
 
           export KIVE_SECRET_KEY="{{kive_server_secret_key}}"
-          export KIVE_ALLOWED_HOSTS="{{ kive_allowed_hosts | to_json }}"
+          export KIVE_ALLOWED_HOSTS={{ kive_allowed_hosts | quote }}
     - name: add vagrant to kive group
       become: true
       user:
