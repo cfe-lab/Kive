@@ -18,6 +18,20 @@
       copy:
         src: 001-kive.conf
         dest: /etc/httpd/conf.d/
+    - name: kive config directory
+      file:
+        path: /etc/kive
+        state: directory
+        owner: kive
+        group: kive
+        mode: "750"
+    - name: kive web conf file
+      template:
+        src: kive_apache.conf.j2
+        dest: /etc/kive/kive_apache.conf
+        owner: kive
+        group: kive
+        mode: "640"
     - name: server environment variables via systemd
       blockinfile:
         path: /etc/systemd/system/httpd.service.d/override.conf
@@ -26,15 +40,7 @@
         mode: "644"
         block: |
           [Service]
-          Environment=KIVE_DB_NAME="{{ kive_db_name }}"
-          Environment=KIVE_DB_USER="{{ kive_db_user }}"
-          Environment=KIVE_DB_HOST="{{kive_db_host }}"
-          Environment=KIVE_DB_PASSWORD="{{ kive_db_password}}"
-          Environment=KIVE_MEDIA_ROOT="{{ kive_media_root }}"
-          Environment=KIVE_STATIC_ROOT="{{ kive_static_root }}"
-          Environment=KIVE_SLURM_PATH="{{ kive_slurm_path }}"
-          Environment=KIVE_SECRET_KEY="{{kive_server_secret_key}}"
-          Environment=KIVE_ALLOWED_HOSTS={{ kive_allowed_hosts | quote }}
+          EnvironmentFile=/etc/kive/kive_apache.conf
           Environment=APACHE_RUN_USER=kive
           Environment=APACHE_RUN_GROUP=kive
     - name: update httpd.conf
@@ -64,6 +70,21 @@
         name: httpd
         state: started
         enabled: true
+    - name: ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: true
+    - name: permit https service through firewall
+      firewalld:
+        service: https
+        permanent: yes
+        state: enabled
+    - name: permit http service through firewall
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
 
 
 - name: configure postgres server
@@ -155,11 +176,12 @@
         src: "{{ item }}"
         dest: /etc/systemd/system
     - name: purge config file
-      copy:
-        src: kive_purge.conf
+      template:
+        src: kive_purge.conf.j2
         dest: /etc/kive
         owner: kive
         group: kive
+        mode: "640"
     - name: enable kive_purge units
       loop:
         - kive_purge.service
