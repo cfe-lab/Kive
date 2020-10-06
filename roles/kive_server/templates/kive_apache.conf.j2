@@ -1,9 +1,17 @@
-KIVE_DB_NAME="{{ kive_db_name }}"
-KIVE_DB_USER="{{ kive_db_user }}"
-KIVE_DB_HOST="{{kive_db_host }}"
-KIVE_DB_PASSWORD="{{ kive_db_password}}"
-KIVE_MEDIA_ROOT="{{ kive_media_root }}"
-KIVE_STATIC_ROOT="{{ kive_static_root }}"
-KIVE_SLURM_PATH="{{ kive_slurm_path }}"
-KIVE_SECRET_KEY="{{kive_server_secret_key}}"
+KIVE_DB_NAME={{ kive_db_name | quote }}
+KIVE_DB_USER={{ kive_db_user | quote }}
+KIVE_DB_HOST={{ kive_db_host | quote }}
+KIVE_DB_PASSWORD={{ kive_db_password | quote }}
+KIVE_MEDIA_ROOT={{ kive_media_root | quote }}
+KIVE_STATIC_ROOT={{ kive_static_root | quote }}
+KIVE_SLURM_PATH={{ kive_slurm_path | quote }}
+KIVE_SECRET_KEY={{ kive_server_secret_key | quote }}
 KIVE_ALLOWED_HOSTS={{ kive_allowed_hosts | quote }}
+
+KIVE_SERVER_EMAIL={{ kive_server_email | quote }}
+KIVE_ADMINS={{ kive_admins | quote }}
+KIVE_SUBJECT_PREFIX={{ kive_subject_prefix | quote }}
+
+{% if kive_log_level is defined %}
+KIVE_LOG_LEVEL={{ kive_log_level }}
+{% endif %}
