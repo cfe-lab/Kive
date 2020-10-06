@@ -18,13 +18,6 @@
       copy:
         src: 001-kive.conf
         dest: /etc/httpd/conf.d/
-    - name: kive config directory
-      file:
-        path: /etc/kive
-        state: directory
-        owner: kive
-        group: kive
-        mode: "750"
     - name: kive web conf file
       template:
         src: kive_apache.conf.j2

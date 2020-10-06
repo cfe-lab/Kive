@@ -116,3 +116,9 @@
             service: postgresql
             state: enabled
             permanent: true
+
+- name: configure mail service for error logging
+  systemd:
+    name: postfix
+    state: started
+    enabled: true
