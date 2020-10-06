@@ -178,7 +178,7 @@
     - name: purge config file
       template:
         src: kive_purge.conf.j2
-        dest: /etc/kive
+        dest: /etc/kive/kive_purge.conf
         owner: kive
         group: kive
         mode: "640"
