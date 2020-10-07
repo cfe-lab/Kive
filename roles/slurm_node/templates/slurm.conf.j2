@@ -159,14 +159,14 @@ SlurmdLogFile=/var/log/slurm/slurmd.log
 #
 # To change the settings in this file, see the template at
 #
-#     roles/slurm_node/tmplates/slurm.conf.j2
+#     roles/slurm_node/templates/slurm.conf.j2
 #
-# To change the list of nodes, edit the `slurmnodes` setting in this cluster's
-# configuration variables file.
+# To change the list of nodes, edit the `slurm_nodes` setting in this cluster's
+# environment variables file.
 
 # COMPUTE NODES
-{% for node in slurmnodes %}
-NodeName={{ node.name }} CPUs=4 Sockets=1 CoresPerSocket=4 ThreadsPerCore=1 RealMemory={{ node.memory }} State=UNKNOWN
+{% for node in slurm_nodes %}
+NodeName={{ node.name }} CPUs={{ node.cpus | default('1') }} Sockets={{ node.sockets | default('1') }} CoresPerSocket={{ node.cores_per_socket | default('1') }} ThreadsPerCore={{ node.threads_per_core | default('1') }} RealMemory={{ node.memory }} State=UNKNOWN
 {% endfor %}
 
 PartitionName=debug       Priority=3500 Nodes=ALL Default=YES MaxTime=INFINITE State=UP Shared=YES:4
