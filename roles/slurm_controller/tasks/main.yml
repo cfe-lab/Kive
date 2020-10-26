@@ -27,13 +27,6 @@
             priv: "slurm_acct_db.*:all"
 
 
-- name: generate and copy slurm config file
-  template:
-    src: slurm.conf.j2
-    dest: /etc/slurm/slurm.conf
-    owner: slurm
-    group: slurm
-    mode: "644"
 - name: copy slurmdbd configuration
   become: true
   copy:
