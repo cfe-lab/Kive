@@ -5,7 +5,6 @@
   block:
     - name: install development tools
       dnf:
-        update_cache: yes
         name: "@Development Tools"
     - name: install slurm build requirements
       dnf:
