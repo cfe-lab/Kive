@@ -3,8 +3,8 @@ Description=Timer that launches the kive_purge service
 
 [Timer]
 # https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
-# Hourly means at the top of every hour.
-OnCalendar=hourly
+# We run this every hour except midnight, to avoid conflicts with backup tasks.
+OnCalendar=*-*-* 01,02,03,04,05,06,07,08,09,10,11,12,13,14,15,16,17,18,19,20,21,22,23:00:00
 
 # This activates the timer on (multi-user) startup.
 [Install]
