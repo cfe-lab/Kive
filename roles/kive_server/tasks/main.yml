@@ -119,7 +119,7 @@
             dest: "/var/lib/pgsql/12/data/pg_hba.conf"
             databases: all
             users: kive
-            source: "{{kive_db_host}}/32"
+            source: "{{kive_db_host}}/24"
             method: "scram-sha-256"
     - name: restart database service
       become: true
