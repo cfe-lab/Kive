@@ -5,5 +5,5 @@
 - name: install singularity
   become: true
   dnf:
-    name: singularity-3.6.2
+    name: singularity-3.6.3
     state: present
