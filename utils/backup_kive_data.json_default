@@ -1,6 +1,4 @@
 {
-    "smtp_user": "[YOUR USER]",
-    "smtp_password": "[YOUR PASSWORD]",
     "smtp_server": "[YOUR SERVER]",
     "email_author": "[YOUR EMAIL AUTHOR]",
     "email_recipients": ["YOUR FIRST RECIPIENT", "YOUR NTH RECIPIENT"],
