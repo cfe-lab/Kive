@@ -42,3 +42,17 @@
         fstype: nfs
         state: mounted
         opts: ro
+
+    - name: check if original /home has been renamed
+      stat: path=/original_home
+      register: home_backed_up
+
+    - name: rename original /home
+      command: mv /home /original_home
+      when: not home_backed_up.stat.exists
+
+    - name: symbolic link for /home
+      file:
+        path: /home
+        src: /data/home
+        state: link
