@@ -19,3 +19,26 @@
         name: slurmd
         state: started
         enabled: true
+
+    - name: mount /data
+      ansible.posix.mount:
+        path: /data
+        src: {{kive_db_host}}:/data
+        fstype: nfs
+        state: mounted
+
+    - name: mount /opt
+      ansible.posix.mount:
+        path: /opt
+        src: {{kive_db_host}}:/opt
+        fstype: nfs
+        state: mounted
+        opts: ro
+
+    - name: mount /usr/local
+      ansible.posix.mount:
+        path: /usr/local
+        src: {{kive_db_host}}:/usr/local
+        fstype: nfs
+        state: mounted
+        opts: ro
