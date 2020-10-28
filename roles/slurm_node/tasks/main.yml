@@ -59,6 +59,8 @@
         immediate: true
 
 - name: network drive mounts
+  become: true
+  block:
   - loop: "{{ network_mounts }}"
     name: "{{ item.name }}"
     ansible.posix.mount:
