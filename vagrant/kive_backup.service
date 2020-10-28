@@ -1,0 +1,14 @@
+[Unit]
+Description=Back up Kive data.
+
+[Service]
+WorkingDirectory=/usr/local/share/Kive/utils
+
+User=kive
+
+# Copy and fill in /usr/local/share/Kive/utils/backup_kive_data.json_default, and
+# place your settings file at "/etc/kive/backup_kive_data.json".
+ExecStart=/opt/venv_kive/bin/python backup_kive_data.py -c /etc/kive/backup_kive_data.json
+
+# Allow the process to log its exit.
+KillSignal=SIGINT

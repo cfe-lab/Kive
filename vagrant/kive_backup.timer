@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer that launches the kive_backup service
+
+[Timer]
+# https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
+# This runs every night at midnight.
+OnCalendar=daily
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target
