@@ -3,4 +3,3 @@
 dependencies:
   - kive_node
   - slurm_controller
-  - slurm_worker
