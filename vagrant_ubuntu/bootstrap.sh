@@ -95,12 +95,18 @@ cp /usr/local/share/Kive/vagrant/kive_purge.timer .
 cp /usr/local/share/Kive/vagrant/kive_purge_synch.service .
 cp /usr/local/share/Kive/vagrant/kive_purge_synch.timer .
 cp /usr/local/share/Kive/vagrant/kive_purge.conf /etc/kive/
+cp /usr/local/share/Kive/vagrant/kive_backup.service .
+cp /usr/local/share/Kive/vagrant/kive_backup.timer .
+cp /usr/local/share/Kive/vagrant/kive_backup.conf /etc/kive/
 systemctl enable kive_purge.service
 systemctl enable kive_purge.timer
 systemctl start kive_purge.timer
 systemctl enable kive_purge_synch.service
 systemctl enable kive_purge_synch.timer
 systemctl start kive_purge_synch.timer
+systemctl enable kive_backup.service
+systemctl enable kive_backup.timer
+systemctl start kive_backup.timer
 
 echo ========== Creating Kive database ==========
 cd /usr/local/share/Kive/vagrant_ubuntu

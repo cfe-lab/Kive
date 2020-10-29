@@ -24,16 +24,22 @@ cd kive
 ./manage.py collectstatic
 systemctl restart httpd
 
-echo ========== Installing Kive purge tasks ==========
+echo ========== Installing Kive purge and backup tasks ==========
 cd /etc/systemd/system
 cp /usr/local/share/Kive/vagrant/kive_purge.service .
 cp /usr/local/share/Kive/vagrant/kive_purge.timer .
 cp /usr/local/share/Kive/vagrant/kive_purge_synch.service .
 cp /usr/local/share/Kive/vagrant/kive_purge_synch.timer .
 cp /usr/local/share/Kive/vagrant/kive_purge.conf /etc/kive/
+cp /usr/local/share/Kive/vagrant/kive_backup.service .
+cp /usr/local/share/Kive/vagrant/kive_backup.timer .
+cp /usr/local/share/Kive/vagrant/kive_backup.conf /etc/kive/
 systemctl enable kive_purge.service
 systemctl enable kive_purge.timer
 systemctl start kive_purge.timer
 systemctl enable kive_purge_synch.service
 systemctl enable kive_purge_synch.timer
 systemctl start kive_purge_synch.timer
+systemctl enable kive_backup.service
+systemctl enable kive_backup.timer
+systemctl start kive_backup.timer
