@@ -10,8 +10,6 @@ EnvironmentFile=/etc/kive/kive_backup.conf
 
 User=kive
 
-# Copy and fill in /usr/local/share/Kive/utils/backup_kive_data.json_default, and
-# place your settings file at "/etc/kive/backup_kive_data.json".
 ExecStart=/opt/venv_kive/bin/python backup_kive_data.py
 
 # Allow the process to log its exit.
