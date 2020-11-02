@@ -36,7 +36,7 @@
     "grunt-cli": "^1.2.0",
     "grunt-regex-replace": "^0.4.0",
     "jquery": "~3.5",
-    "node-sass": "^4.14.1",
+    "node-sass": "^5.0.0",
     "sass-loader": "^10.0.4",
     "script-loader": "^0.7.1",
     "source-map-loader": "^1.1.2",
