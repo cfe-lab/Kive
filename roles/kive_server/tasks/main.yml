@@ -71,13 +71,13 @@
     - name: firewall's internal interface
       firewalld:
         zone: internal
-        interface: {{ kive_internal_interface }}
+        interface: "{{ kive_internal_interface }}"
         permanent: yes
         immediate: yes
     - name: firewall's external interface
       firewalld:
         zone: external
-        interface: {{ kive_external_interface }}
+        interface: "{{ kive_external_interface }}"
         permanent: yes
         immediate: yes
     - name: permit https service through firewall
