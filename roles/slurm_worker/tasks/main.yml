@@ -2,6 +2,21 @@
 
 - become: true
   block:
+    - name: ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: true
+    - name: open slurm ports
+      loop:
+        - 6817-6819/tcp
+        - 6817-6819/udp
+        - 7321/tcp
+      firewalld:
+        port: "{{ item }}"
+        state: enabled
+        permanent: true
+        immediate: true
     - name: mount /data
       ansible.posix.mount:
         path: /data

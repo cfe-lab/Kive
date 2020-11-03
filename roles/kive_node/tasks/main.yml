@@ -104,18 +104,6 @@
       dnf:
         update_cache: true
         name: postgresql12
-    - name: enable postgres network traffic
-      block:
-        - name: ensure firewalld is running
-          systemd:
-            name: firewalld
-            state: started
-            enabled: true
-        - name: add postgres exceptions to firewall
-          firewalld:
-            service: postgresql
-            state: enabled
-            permanent: true
 
 - name: configure mail service for error logging
   systemd:
