@@ -11,7 +11,6 @@
   become: true
   loop:
     - /var/log/slurm
-    - /var/run/slurm
     - /var/lib/slurm
     - /etc/slurm
   file:
@@ -71,7 +70,7 @@
   become: true
   block:
   - loop: "{{ network_mounts }}"
-    name: "{{ item.name }}"
+    name: Load network drive mounts from env_vars.yml
     ansible.posix.mount:
       path: "{{ item.path }}"
       src: "{{ item.src }}"

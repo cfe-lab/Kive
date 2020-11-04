@@ -80,11 +80,17 @@
 - name: install kive python dependencies
   become: true
   block:
-    - name: create virtualenv
-      command:
-        cmd: python3 -m venv {{ kive_venv }}
-        creates: "{{ kive_venv }}"
+    - name: create directory for virtualenv
+      file:
+        path: "{{ kive_venv }}"
+        state: directory
+    - name: copy requirements file to track changes
+      register: kive_requirements
+      copy:
+        dest: "{{ kive_venv }}/requirements.txt"
+        src: "{{ kive_root }}/requirements.txt"
     - name: kive python dependencies
+      when: kive_requirements.changed
       pip:
         requirements: "{{ kive_root }}/requirements.txt"
         virtualenv: "{{ kive_venv }}"
@@ -96,7 +102,15 @@
     - name: add postgresl package repository
       dnf:
         name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    - name: check if postgres is disabled
+      register: is_builtin_postgresql_disabled
+      # Check mode means this never writes the line, just checks if it's there.
+      check_mode: yes
+      lineinfile:
+        name: /etc/dnf/modules.d/postgresql.module
+        line: state=disabled
     - name: disable built-in postgres module
+      when: (is_builtin_postgresql_disabled is changed) or (is_builtin_postgresql is failed)
       command:
         cmd: dnf -qy module disable postgresql
         warn: false  # dnf module doesn't include this sub-command, so have to use command directly
