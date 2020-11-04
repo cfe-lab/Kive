@@ -110,7 +110,7 @@
         name: /etc/dnf/modules.d/postgresql.module
         line: state=disabled
     - name: disable built-in postgres module
-      when: (is_builtin_postgresql_disabled is changed) or (is_builtin_postgresql is failed)
+      when: (is_builtin_postgresql_disabled is changed) or (is_builtin_postgresql_disabled is failed)
       command:
         cmd: dnf -qy module disable postgresql
         warn: false  # dnf module doesn't include this sub-command, so have to use command directly
