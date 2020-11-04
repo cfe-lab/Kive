@@ -74,12 +74,14 @@
         interface: "{{ kive_internal_interface }}"
         permanent: yes
         immediate: yes
+        state: enabled
     - name: firewall's external interface
       firewalld:
         zone: external
         interface: "{{ kive_external_interface }}"
         permanent: yes
         immediate: yes
+        state: enabled
     - name: permit https service through firewall
       firewalld:
         zone: external
