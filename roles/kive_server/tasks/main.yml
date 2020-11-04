@@ -69,28 +69,28 @@
         state: started
         enabled: true
     - name: firewall's internal interface
-      firewalld:
+      ansible.posix.firewalld:
         zone: internal
         interface: "{{ kive_internal_interface }}"
         permanent: yes
         immediate: yes
         state: enabled
     - name: firewall's external interface
-      firewalld:
+      ansible.posix.firewalld:
         zone: external
         interface: "{{ kive_external_interface }}"
         permanent: yes
         immediate: yes
         state: enabled
     - name: permit https service through firewall
-      firewalld:
+      ansible.posix.firewalld:
         zone: external
         service: https
         permanent: yes
         immediate: yes
         state: enabled
     - name: permit http service through firewall
-      firewalld:
+      ansible.posix.firewalld:
         zone: external
         service: http
         permanent: yes
@@ -116,6 +116,7 @@
         state: started
         enabled: true
     - name: local database settings
+      notify: Restart postgresql service
       loop:
         - name: listen_addresses
           value: "*"
@@ -126,25 +127,23 @@
         value: "{{ item.value }}"
     - name: add kive entries to pg_hba.conf
       block:
-        - postgresql_pg_hba:
+        - name: local connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
             contype: local
             dest: "/var/lib/pgsql/12/data/pg_hba.conf"
             databases: all
             users: kive
             method: "scram-sha-256"
-        - postgresql_pg_hba:
+        - name: host connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
             contype: host
             dest: "/var/lib/pgsql/12/data/pg_hba.conf"
             databases: all
             users: kive
             source: "{{kive_db_host}}/24"
             method: "scram-sha-256"
-    - name: restart database service
-      become: true
-      become_user: root
-      systemd:
-        name: "postgresql-12"
-        state: restarted
 
 
 - name: kive installation
@@ -156,17 +155,13 @@
         chdir: "{{ kive_root }}/api/"
         creates: "{{ kive_root }}/api/build/"
     - name: collect kive's static files
-      become: true
+      notify: restart http server
       environment:
         KIVE_STATIC_ROOT: "{{ kive_static_root }}"
-      command:
-        cmd: "{{ kive_venv }}/bin/python manage.py collectstatic --no-input"
-        chdir: "{{ kive_root }}/kive"
-    - name: restart http server
-      become: true
-      systemd:
-        name: httpd
-        state: restarted
+      community.general.django_manage:
+        command: collectstatic
+        app_path: "{{ kive_root }}/kive"
+        virtualenv: "{{ kive_venv }}"
 
 
 - name: set up log purging
@@ -222,6 +217,8 @@
     - name: create kive database user
       become: true
       become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
       postgresql_user:
         name: kive
         password: "{{ kive_db_password }}"
@@ -235,6 +232,7 @@
           KIVE_DB_PASSWORD: "{{ kive_db_password}}"
       become: true
       become_user: kive
-      command:
-        cmd: "{{ kive_venv }}/bin/python manage.py migrate"
-        chdir: "{{ kive_root }}/kive"
+      community.general.django_manage:
+        command: migrate
+        app_path: "{{ kive_root }}/kive"
+        virtualenv: "{{ kive_venv }}"

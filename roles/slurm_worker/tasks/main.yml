@@ -12,7 +12,7 @@
         - 6817-6819/tcp
         - 6817-6819/udp
         - 7321/tcp
-      firewalld:
+      ansible.posix.firewalld:
         port: "{{ item }}"
         state: enabled
         permanent: true
