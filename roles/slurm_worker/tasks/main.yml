@@ -53,3 +53,26 @@
         path: /home
         src: /data/home
         state: link
+
+    - name: read system users
+      register: shadow_list
+      community.general.read_csv:
+        path: /etc/shadow
+        delimiter: ":"
+        fieldnames:
+          - name
+          - passwd
+          - lastchanged
+          - min
+          - max
+          - warn
+          - inactive
+          - expire
+    - name: copy system users
+      loop: "{{ shadow_list.list }}"
+      when: item.passwd.startswith("$")
+      user:
+        append: yes
+        create_home: no
+        name: "{{ item.name }}"
+        password: "{{ item.passwd }}"
