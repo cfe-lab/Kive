@@ -55,6 +55,7 @@
         state: link
 
     - name: read system users
+      delegate_to: localhost
       register: shadow_list
       community.general.read_csv:
         path: /etc/shadow
