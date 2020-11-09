@@ -113,8 +113,8 @@
       loop: "{{ group_list.list }}"
       when: item.name in copied_groups
       group:
-        gid: item.gid
-        name: item.name
+        gid: "{{ item.gid }}"
+        name: "{{ item.name }}"
     - name: copy system users
       loop: "{{ user_list.list }}"
       when: shadow_dict.dict[item.name]['passwd'].startswith("$")
