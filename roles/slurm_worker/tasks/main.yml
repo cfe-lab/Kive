@@ -111,7 +111,9 @@
           - expire
     - name: copy system groups
       loop: "{{ group_list.list }}"
-      when: item.name in copied_groups or shadow_dict.dict[item.name]['passwd'].startswith("$")
+      when: >
+        (item.name in copied_groups) or
+        (item.name in shadow_dict.dict and shadow_dict.dict[item.name]['passwd'].startswith("$"))
       group:
         gid: "{{ item.gid }}"
         name: "{{ item.name }}"
