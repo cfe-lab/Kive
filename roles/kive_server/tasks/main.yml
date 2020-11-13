@@ -147,20 +147,21 @@
     - name: add barman entries to postgresql.conf
       loop:
         - option: archiver
-          value: on
+          value: "on"
         # First, setting up a streaming backup.
         - option: wal_level
-          value: 'replica'
+          value: "'replica'"
         - option: max_wal_senders
           value: 10
         - option: max_replication_slots
           value: 10
           # Additionally, setting up standard WAL archiving.
         - option: archive_mode
-          value: on
+          value: "on"
         - option: archive_command
-          value: 'barman-wal-archive localhost kive %p'
+          value: "'barman-wal-archive localhost kive %p'"
       community.general.ini_file:
+        backup: yes
         path: /var/lib/pgsql/12/data/postgresql.conf
         create: no
         section: null
@@ -210,21 +211,13 @@
         owner: kive
         group: kive
         mode: "640"
-    - name: enable kive_purge units
+    - name: enable and start kive_purge timers
       loop:
-        - kive_purge.service
         - kive_purge.timer
-        - kive_purge_synch.service
         - kive_purge_synch.timer
       systemd:
         name: "{{ item }}"
         enabled: true
-    - name: start kive_purge timers
-      loop:
-        - kive_purge.timer
-        - kive_purge_synch.timer
-      systemd:
-        name: "{{ item }}"
         state: started
 
 
@@ -264,8 +257,9 @@
     - option: path_prefix
       value: /usr/pgsql-12/bin/
     - option: archiver
-      value: on
+      value: "on"
   community.general.ini_file:
+    backup: yes
     path: /etc/barman.conf
     create: no
     section: barman
@@ -288,11 +282,11 @@
     # PostgreSQL's archive_command setting in postgresql.conf (which we have
     # configured to use barman-wal-archive
     - option: archiver
-      value: on
+      value: "on"
     - option: streaming_conninfo
       value: host=localhost user=streaming_barman dbname=kive
     - option: streaming_archiver
-      value: on
+      value: "on"
     - option: slot_name
       value: barman
     - option: minimum_redundancy
@@ -304,3 +298,26 @@
     section: kive
     option: "{{ item.option }}"
     value: "{{ item.value }}"
+
+- name: parse admin e-mails from json
+  set_fact:
+    mail_admins_list: "{{ mail_admins | from_json }}"
+
+- name: build admin e-mails list
+  loop: "{{ mail_admins_list }}"
+  set_fact:
+    mail_admins_emails: "{{ (mail_admins_emails | default([])) + [item.1] }}"
+
+- name: barman service file
+  template:
+    src: barman_backup.service.j2
+    dest: /etc/systemd/system/barman_backup.service
+- name: barman timer file
+  copy:
+    src: barman_backup.timer
+    dest: /etc/systemd/system
+- name: enable and start barman timer
+  systemd:
+    name: barman_backup.timer
+    enabled: true
+    state: started

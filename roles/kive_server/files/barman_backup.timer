@@ -1,0 +1,11 @@
+[Unit]
+Description=Timer that launches the barman_backup service
+
+[Timer]
+# https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
+# Every Wednesday at midnight
+OnCalendar=Wed *-*-* 00:00:00
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target

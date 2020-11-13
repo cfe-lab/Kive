@@ -1,0 +1,9 @@
+[Unit]
+Description=Run barman weekly backup.
+
+[Service]
+Environment=MAILTO={{ mail_admins_emails | join(',') }}
+
+User=barman
+
+ExecStart=/bin/barman backup kive
