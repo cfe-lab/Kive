@@ -301,7 +301,7 @@
 
 - name: parse admin e-mails from json
   set_fact:
-    mail_admins_list: "{{ mail_admins | from_json }}"
+    mail_admins_list: "{{ kive_admins | from_json }}"
 
 - name: build admin e-mails list
   loop: "{{ mail_admins_list }}"
