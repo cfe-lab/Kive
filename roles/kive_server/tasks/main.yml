@@ -144,6 +144,28 @@
             users: kive
             source: "{{kive_db_host}}/24"
             method: "scram-sha-256"
+    - name: add barman entries to postgresql.conf
+      loop:
+        - option: archiver
+          value: on
+        # First, setting up a streaming backup.
+        - option: wal_level
+          value: 'replica'
+        - option: max_wal_senders
+          value: 10
+        - option: max_replication_slots
+          value: 10
+          # Additionally, setting up standard WAL archiving.
+        - option: archive_mode
+          value: on
+        - option: archive_command
+          value: 'barman-wal-archive localhost kive %p'
+      community.general.ini_file:
+        path: /var/lib/pgsql/12/data/postgresql.conf
+        create: no
+        section: null
+        option: "{{ item.option }}"
+        value: "{{ item.value }}"
 
 
 - name: kive installation
@@ -236,3 +258,49 @@
         command: migrate
         app_path: "{{ kive_root }}/kive"
         virtualenv: "{{ kive_venv }}"
+
+- name: database backup global config
+  loop:
+    - option: path_prefix
+      value: /usr/pgsql-12/bin/
+    - option: archiver
+      value: on
+  community.general.ini_file:
+    path: /etc/barman.conf
+    create: no
+    section: barman
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+
+- name: database backup kive config
+  loop:
+    - option: description
+      value: Kive database
+    - option: conninfo
+      value: host=localhost user=barman dbname=kive
+    - option: backup_method
+      value: postgres
+    - option: backup_directory
+      value: "{{ kive_backup_path }}/BarmanDBBackup"
+    - option: compression
+      value: bzip2
+    # archiver = on is necessary for the "fallback" WAL backup that happens via
+    # PostgreSQL's archive_command setting in postgresql.conf (which we have
+    # configured to use barman-wal-archive
+    - option: archiver
+      value: on
+    - option: streaming_conninfo
+      value: host=localhost user=streaming_barman dbname=kive
+    - option: streaming_archiver
+      value: on
+    - option: slot_name
+      value: barman
+    - option: minimum_redundancy
+      value: 2
+    - option: retention_policy
+      value: REDUNDANCY 2
+  community.general.ini_file:
+    path: /etc/barman.d/kive.conf
+    section: kive
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
