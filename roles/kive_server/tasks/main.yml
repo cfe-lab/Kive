@@ -212,6 +212,7 @@
         group: kive
         mode: "640"
     - name: enable and start kive_purge timers
+      ignore_errors: "{{ ansible_check_mode }}"  # Unit files not copied yet
       loop:
         - kive_purge.timer
         - kive_purge_synch.timer
@@ -317,6 +318,7 @@
     src: barman_backup.timer
     dest: /etc/systemd/system
 - name: enable and start barman timer
+  ignore_errors: "{{ ansible_check_mode }}"  # Unit file not copied yet
   systemd:
     name: barman_backup.timer
     enabled: true
