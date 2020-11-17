@@ -151,7 +151,7 @@
             dest: "/var/lib/pgsql/12/data/pg_hba.conf"
             databases: all
             users: barman
-            source: localhost
+            source: 127.0.0.1/32
             method: "scram-sha-256"
         - name: streaming_barman connections
           notify: Restart postgresql service
@@ -160,7 +160,7 @@
             dest: "/var/lib/pgsql/12/data/pg_hba.conf"
             databases: replication
             users: streaming_barman
-            source: localhost
+            source: 127.0.0.1/32
             method: "scram-sha-256"
     - name: add barman entries to postgresql.conf
       notify: Restart postgresql service
