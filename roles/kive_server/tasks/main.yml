@@ -153,6 +153,15 @@
             users: barman
             source: 127.0.0.1/32
             method: "scram-sha-256"
+        - name: barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: all
+            users: barman
+            source: "::1/128"
+            method: "scram-sha-256"
         - name: streaming_barman connections
           notify: Restart postgresql service
           postgresql_pg_hba:
@@ -161,6 +170,15 @@
             databases: replication
             users: streaming_barman
             source: 127.0.0.1/32
+            method: "scram-sha-256"
+        - name: streaming_barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: "::1/128"
             method: "scram-sha-256"
     - name: add barman entries to postgresql.conf
       notify: Restart postgresql service
@@ -348,8 +366,8 @@
     group: barman
     mode: u=rw,g=,o=
     block: |
-      127.0.0.1:*:*:barman:{{ barman_password }}
-      127.0.0.1:*:*:streaming_barman:{{ streaming_barman_password }}
+      localhost:*:*:barman:{{ barman_password }}
+      localhost:*:*:streaming_barman:{{ streaming_barman_password }}
 
 - name: parse admin e-mails from json
   set_fact:
