@@ -163,9 +163,8 @@
             source: localhost
             method: "scram-sha-256"
     - name: add barman entries to postgresql.conf
+      notify: Restart postgresql service
       loop:
-        - option: archiver
-          value: "on"
         # First, setting up a streaming backup.
         - option: wal_level
           value: "'replica'"
@@ -178,13 +177,16 @@
           value: "on"
         - option: archive_command
           value: "'barman-wal-archive localhost kive %p'"
+        # Remove old option that was accidentally added.
+        - option: archiver
       community.general.ini_file:
         backup: yes
         path: /var/lib/pgsql/12/data/postgresql.conf
         create: no
         section: null
         option: "{{ item.option }}"
-        value: "{{ item.value }}"
+        value: "{{ item.value | default }}"
+        state: "{{ 'present' if item.value is defined else 'absent' }}"
 
 
 - name: kive installation
