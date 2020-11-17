@@ -358,6 +358,23 @@
     option: "{{ item.option }}"
     value: "{{ item.value }}"
 
+- name: SSH keys
+  block:
+    - name: Generate a key for postgres user
+      community.crypto.openssh_keypair:
+        path: /var/lib/pgsql/.ssh/id_rsa
+    - name: Generate a key for barman user
+      community.crypto.openssh_keypair:
+        path: /var/lib/barman/.ssh/id_rsa
+    - name: Allow postgres user to access barman user
+      ansible.posix.authorized_key:
+        user: barman
+        key: "{{ lookup('file', '/var/lib/pgsql/.ssh/id_rsa.pub') }}"
+    - name: Allow barman user to access postgres user
+      ansible.posix.authorized_key:
+        user: postgres
+        key: "{{ lookup('file', '/var/lib/barman/.ssh/id_rsa.pub') }}"
+
 - name: barman passwords file
   blockinfile:
     path: /var/lib/barman/.pgpass
