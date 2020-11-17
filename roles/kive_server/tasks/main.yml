@@ -240,6 +240,20 @@
         password: "{{ kive_db_password }}"
         db: kive
         priv: ALL
+    - name: create barman database user
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: barman
+        db: kive
+        role_attr_flags: SUPERUSER,CREATEROLE,CREATEDB
+    - name: create streaming_barman database user
+      become: true
+      become_user: postgres
+      postgresql_user:
+        name: streaming_barman
+        db: kive
+        role_attr_flags: REPLICATION
     - name: run django migrations
       environment:
           KIVE_DB_NAME: "{{ kive_db_name }}"
