@@ -243,15 +243,21 @@
     - name: create barman database user
       become: true
       become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
       postgresql_user:
         name: barman
+        password: "{{ barman_password }}"
         db: kive
         role_attr_flags: SUPERUSER,CREATEROLE,CREATEDB
     - name: create streaming_barman database user
       become: true
       become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
       postgresql_user:
         name: streaming_barman
+        password: "{{ streaming_barman_password }}"
         db: kive
         role_attr_flags: REPLICATION
     - name: run django migrations
@@ -313,6 +319,17 @@
     section: kive
     option: "{{ item.option }}"
     value: "{{ item.value }}"
+
+- name: barman passwords file
+  blockinfile:
+    path: /var/lib/barman/.pgpass
+    create: yes
+    owner: barman
+    group: barman
+    mode: u=rw,g=,o=
+    block: |
+      127.0.0.1:*:*:barman:{{ barman_password }}
+      127.0.0.1:*:*:streaming_barman:{{ streaming_barman_password }}
 
 - name: parse admin e-mails from json
   set_fact:

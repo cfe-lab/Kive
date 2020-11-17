@@ -5,7 +5,7 @@ Description=Run barman weekly backup.
 User=barman
 
 ExecStart=/opt/venv_kive/bin/python /usr/local/share/Kive/utils/crontab_mail.py \
-    --log /var/log/kive/barman.log \
+    --log /var/log/barman/kive.log \
     --level ERROR \
     --subject {{ (kive_subject_prefix + "barman") | quote }} \
     --from {{ kive_server_email | quote }} \
