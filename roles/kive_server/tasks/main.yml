@@ -144,6 +144,24 @@
             users: kive
             source: "{{kive_db_host}}/24"
             method: "scram-sha-256"
+        - name: barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: all
+            users: barman
+            source: localhost
+            method: "scram-sha-256"
+        - name: streaming_barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: localhost
+            method: "scram-sha-256"
     - name: add barman entries to postgresql.conf
       loop:
         - option: archiver
