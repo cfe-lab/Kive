@@ -377,16 +377,19 @@
         mode: u=rwx,g=,o=
     - name: Generate SSH keys
       with_items: "{{ ssh_key_locations }}"
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
       community.crypto.openssh_keypair:
         path: "{{ item.path }}/id_rsa"
         owner: "{{ item.owner }}"
         group: "{{ item.owner }}"
         mode: u=rwx,g=,o=
     - name: Allow postgres user to access barman user
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
       ansible.posix.authorized_key:
         user: barman
         key: "{{ lookup('file', '/var/lib/pgsql/.ssh/id_rsa.pub') }}"
     - name: Allow barman user to access postgres user
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
       ansible.posix.authorized_key:
         user: postgres
         key: "{{ lookup('file', '/var/lib/barman/.ssh/id_rsa.pub') }}"
