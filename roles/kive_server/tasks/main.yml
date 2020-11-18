@@ -370,11 +370,11 @@
     - name: Create .ssh folders
       with_items: "{{ ssh_key_locations }}"
       file:
-        - path: "{{ item.path }}"
-          state: directory
-          owner: "{{ item.owner }}"
-          group: "{{ item.owner }}"
-          mode: u=rwx,g=,o=
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: u=rwx,g=,o=
     - name: Generate SSH keys
       with_items: "{{ ssh_key_locations }}"
       community.crypto.openssh_keypair:
