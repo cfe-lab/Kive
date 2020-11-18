@@ -348,6 +348,8 @@
       value: "on"
     - option: slot_name
       value: barman
+    - option: create_slot
+      value: auto
     - option: minimum_redundancy
       value: 2
     - option: retention_policy
