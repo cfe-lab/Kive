@@ -360,12 +360,28 @@
 
 - name: SSH keys
   block:
-    - name: Generate a key for postgres user
+    - name: Set key locations
+      set_fact:
+        ssh_key_locations:
+          - path: /var/lib/pgsql/.ssh
+            owner: postgres
+          - path: /var/lib/barman/.ssh
+            owner: barman
+    - name: Create .ssh folders
+      with_items: "{{ ssh_key_locations }}"
+      file:
+        - path: "{{ item.path }}"
+          state: directory
+          owner: "{{ item.owner }}"
+          group: "{{ item.owner }}"
+          mode: u=rwx,g=,o=
+    - name: Generate SSH keys
+      with_items: "{{ ssh_key_locations }}"
       community.crypto.openssh_keypair:
-        path: /var/lib/pgsql/.ssh/id_rsa
-    - name: Generate a key for barman user
-      community.crypto.openssh_keypair:
-        path: /var/lib/barman/.ssh/id_rsa
+        path: "{{ item.path }}/id_rsa"
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: u=rwx,g=,o=
     - name: Allow postgres user to access barman user
       ansible.posix.authorized_key:
         user: barman
