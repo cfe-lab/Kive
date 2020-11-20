@@ -1,0 +1,12 @@
+[Unit]
+Description=Timer that launches the rsnapshot_beta (daily) service
+
+[Timer]
+# https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
+# Every day, 11pm, rolls over the oldest 4 hour alpha (yesterday morning at
+# midnight) to the beta queue.
+OnCalendar=*-*-* 23:00:00
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target

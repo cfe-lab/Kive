@@ -1,0 +1,12 @@
+[Unit]
+Description=Timer that launches the rsnapshot_gamma (weekly) service
+
+[Timer]
+# https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
+# Every Wednesday, 10pm, rolls over the oldest daily beta (last Wednesday morning
+# at midnight) to the gamma queue.
+OnCalendar=Wed *-*-* 22:00:00
+
+# This activates the timer on (multi-user) startup.
+[Install]
+WantedBy=multi-user.target

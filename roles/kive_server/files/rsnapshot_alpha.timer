@@ -1,10 +1,10 @@
 [Unit]
-Description=Launches the kive_purge_synch service to purge Kive files that have no matching records in the database.
+Description=Timer that launches the rsnapshot_alpha (4 hour) service
 
 [Timer]
 # https://www.freedesktop.org/software/systemd/man/systemd.time.html#Calendar%20Events
-# Every Monday at 2am
-OnCalendar=Mon *-*-* 02:00:00
+# Every four hours, starting at midnight
+OnCalendar=*-*-* 00/4:00:00
 
 # This activates the timer on (multi-user) startup.
 [Install]

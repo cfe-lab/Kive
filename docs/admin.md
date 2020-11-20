@@ -69,3 +69,21 @@ Put the node back into the Slurm pool.
 If there are jobs running in Kive, check that some of them get allocated to the node.
 
     watch squeue -wn1
+
+## Scheduled Tasks
+There are several tasks that run in the background to keep Kive's data safe.
+They are all launched using SystemD unit files and timers, installed by the
+ansible playbooks under the `roles` folder. Here's a list of the tasks, and a
+typical schedule.
+
+* database streaming backup runs constantly, sending write-ahead logs from
+  PostgreSQL to barman
+* database weekly backup with barman on Wednesday morning at midnight
+* rsnapshot alpha backs up the Kive data folders and home folders every four
+  hours, starting at midnight
+* rsnapshot beta daily at 11pm, copies that morning's midnight alpha
+* rsnapshot gamma weekly Wed at 10pm, copies the previous Wednesday morning's
+  midnight beta
+* Kive purge every four hours, starting at 1:00 deletes old files
+* Kive purge_synch every Monday morning at 2:00 deletes files that don't match
+  any entries in the database

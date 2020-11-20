@@ -7,6 +7,10 @@
 # This file requires tabs between elements      #
 #                                               #
 #################################################
+#                                               #
+# This file is maintained by Ansible.           #
+#                                               #
+#################################################
 
 #######################
 # CONFIG FILE VERSION #
@@ -20,13 +24,13 @@ config_version	1.2
 
 # All snapshots will be stored under this root directory.
 #
-snapshot_root	/.snapshots/
+snapshot_root	{{ kive_backup_path }}/rsnapshot
 
 # If no_create_root is enabled, rsnapshot will not automatically create the
 # snapshot_root directory. This is particularly useful if you are backing
 # up to removable media, such as a FireWire or USB drive.
 #
-#no_create_root	1
+no_create_root	1
 
 #################################
 # EXTERNAL PROGRAM DEPENDENCIES #
@@ -37,7 +41,7 @@ snapshot_root	/.snapshots/
 #
 # See the README file or the man page for more details.
 #
-#cmd_cp		/usr/bin/cp
+cmd_cp		/usr/bin/cp
 
 # uncomment this to use the rm program instead of the built-in perl routine.
 #
@@ -60,7 +64,7 @@ cmd_logger	/usr/bin/logger
 # If you have an older version of "du", you may also want to check the
 # "du_args" parameter below.
 #
-#cmd_du		/usr/bin/du
+cmd_du		/usr/bin/du
 
 # Uncomment this to specify the path to rsnapshot-diff.
 #
@@ -117,7 +121,7 @@ loglevel	3
 # If you enable this, data will be written to the file you specify. The
 # amount of data written is controlled by the "loglevel" parameter.
 #
-#logfile	/var/log/rsnapshot
+logfile	/var/log/rsnapshot.log
 
 # If enabled, rsnapshot will write a lockfile to prevent two instances
 # from running simultaneously (and messing up the snapshot_root).
@@ -134,7 +138,7 @@ lockfile	/var/run/rsnapshot.pid
 
 # Default rsync args. All rsync commands have at least these options set.
 #
-#rsync_short_args	-a
+rsync_short_args	-a
 #rsync_long_args	--delete --numeric-ids --relative --delete-excluded
 
 # ssh has no args passed by default, but you can specify some here.
@@ -160,8 +164,18 @@ lockfile	/var/run/rsnapshot.pid
 #
 #include	???
 #include	???
-#exclude	???
-#exclude	???
+exclude	/boot
+exclude	/media
+exclude	/data
+include /data/home
+include /data/kive
+exclude /data/kive/ContainerRuns
+exclude	/tmp
+exclude	/proc
+exclude	/dev
+exclude	/sys
+exclude	/var
+exclude	/run
 
 # The include_file and exclude_file parameters, if enabled, simply get
 # passed directly to rsync. Please look up the --include-from and
@@ -223,9 +237,10 @@ lockfile	/var/run/rsnapshot.pid
 ###############################
 
 # LOCALHOST
-backup	/home/		localhost/
-backup	/etc/		localhost/
-backup	/usr/local/	localhost/
+backup  /       main/
+#backup	/home/		localhost/
+#backup	/etc/		localhost/
+#backup	/usr/local/	localhost/
 #backup	/var/log/rsnapshot		localhost/
 #backup	/etc/passwd	localhost/
 #backup	/home/foo/My Documents/		localhost/

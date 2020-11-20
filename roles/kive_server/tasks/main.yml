@@ -416,17 +416,40 @@
   set_fact:
     mail_admins_emails: "{{ (mail_admins_emails | default([])) + [item.1] }}"
 
-- name: barman service file
-  template:
-    src: barman_backup.service.j2
-    dest: /etc/systemd/system/barman_backup.service
-- name: barman timer file
+# Copy crontab_mail.py out of the Kive source code, because it gets run by root.
+# This way, it can be locked down more than the Kive source code.
+- name: crontab_mail script
   copy:
-    src: barman_backup.timer
+    src: crontab_mail.py
+    dest: /opt/crontab_mail.py
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+- name: rsnapshot config file
+  template:
+    src: rsnapshot.conf.j2
+    dest: /etc/rsnapshot.conf
+- name: list of scheduled services
+  set_fact:
+    scheduled_service_names:
+      - barman_backup
+      - rsnapshot_alpha
+      - rsnapshot_beta
+      - rsnapshot_gamma
+- name: scheduled service files
+  loop: "{{ scheduled_service_names }}"
+  template:
+    src: "{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+- name: timer files
+  loop: "{{ scheduled_service_names }}"
+  copy:
+    src: "{{ item }}".timer
     dest: /etc/systemd/system
-- name: enable and start barman timer
+- name: enable and start timers
+  loop: "{{ scheduled_service_names }}"
   ignore_errors: "{{ ansible_check_mode }}"  # Unit file not copied yet
   systemd:
-    name: barman_backup.timer
+    name: "{{ item }}.timer"
     enabled: true
     state: started
