@@ -444,7 +444,7 @@
 - name: timer files
   loop: "{{ scheduled_service_names }}"
   copy:
-    src: "{{ item }}".timer
+    src: "{{ item }}.timer"
     dest: /etc/systemd/system
 - name: enable and start timers
   loop: "{{ scheduled_service_names }}"
