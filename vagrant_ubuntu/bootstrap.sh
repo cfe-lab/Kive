@@ -11,15 +11,30 @@ apt-get update -qq --fix-missing
 echo ========== Installing PostgreSQL ==========
 apt-get install -qq postgresql postgresql-contrib postgresql-client libpq-dev
 
+echo  ========== Installing Go ==========
+export GO_VERSION=1.15.6 OS=linux ARCH=amd64
+wget -q https://dl.google.com/go/go$GO_VERSION.$OS-$ARCH.tar.gz
+tar -C /usr/local -xzf go$GO_VERSION.$OS-$ARCH.tar.gz
+rm go$GO_VERSION.$OS-$ARCH.tar.gz
+
+echo 'export GOPATH=${HOME}/go' >> ~/.bashrc
+echo 'export PATH=/usr/local/go/bin:${PATH}:${GOPATH}/bin' >> ~/.bashrc
+export GOPATH=${HOME}/go
+export PATH=/usr/local/go/bin:${PATH}:${GOPATH}/bin
+
+echo 'export GOPATH=${HOME}/go' >> ~vagrant/.bashrc
+echo 'export PATH=/usr/local/go/bin:${PATH}:${GOPATH}/bin' >> ~vagrant/.bashrc
+
 echo  ========== Installing Singularity ==========
-apt-get install -qq python3-venv python3-dev dh-autoreconf build-essential libarchive-dev squashfs-tools
+apt-get install -qq python3-venv python3-dev build-essential uuid-dev libgpgme-dev squashfs-tools libseccomp-dev \
+    wget pkg-config git cryptsetup-bin
+
 git clone https://github.com/singularityware/singularity.git
 cd singularity
-git checkout -q tags/2.5.2
-./autogen.sh
-./configure --prefix=/usr/local
-make
-make install
+git checkout -q tags/v3.6.4
+./mconfig
+make -C ./builddir
+make -C ./builddir install
 cd ..
 rm -rf singularity
 
