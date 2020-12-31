@@ -32,6 +32,7 @@ jobs:
       - name: Install apt packages
         run: sudo apt-get install -y -q dh-autoreconf build-essential libarchive-dev squashfs-tools
       - name: Install node
+        shell: bash -l {0}
         run: |
           nvm install 12.13.1
           nvm use 12.13.1
