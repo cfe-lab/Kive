@@ -83,4 +83,7 @@ jobs:
       - name: Report code coverage
         run: |
           python -m pip install codecov
+          cd kive
+          codecov
+          cd ../api
           codecov
