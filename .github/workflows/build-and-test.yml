@@ -74,7 +74,7 @@ jobs:
         run: |
           cd kive
           python manage.py collectstatic --no-input
-          coverage run -m pytest --flake8 --ds kive.settings_test_pg
+          coverage run -m pytest --flake8
       - name: Test API with pytest
         run: |
           cd api

@@ -1380,7 +1380,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         other_run = self.test_run.app.runs.create(user=self.test_run.user,
                                                   slurm_job_id=43)
         end_time = (datetime.now() -
-                    timedelta(minutes=15, seconds=1)).strftime('%y-%m-%dT%H:%M:%S')
+                    timedelta(minutes=15, seconds=1)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
 42|<end-time>
 42.batch|<end-time>
