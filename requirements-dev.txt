@@ -1,5 +1,4 @@
 -r requirements-test.txt
-requests==2.22.0
 matplotlib==2.2.4
 seaborn==0.10.0
 pandas==1.0.0
