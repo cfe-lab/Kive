@@ -45,19 +45,30 @@ jobs:
           python -m pip install -r requirements-test.txt
       - run: npm install
 
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '^1.15.6'
       - name: Install Singularity
         run: |
-          sudo apt-get install -qq python dh-autoreconf build-essential libarchive-dev squashfs-tools
-          touch real_file
+          sudo apt-get install -qq \
+              build-essential \
+              uuid-dev \
+              libgpgme-dev \
+              squashfs-tools \
+              libseccomp-dev \
+              wget \
+              pkg-config \
+              git \
+              cryptsetup-bin
           git clone https://github.com/singularityware/singularity.git
           cd singularity
-          git checkout -q tags/2.5.2
-          ./autogen.sh
-          ./configure --prefix=/usr/local
-          make
-          sudo make install
+          git checkout -q tags/v3.6.3
+          ./mconfig && \
+              make -C ./builddir && \
+              sudo make -C ./builddir install
           cd ..
           rm -rf singularity
+          singularity --version
       - run: npm run test:travis
       - name: Test with pytest
         run: |
