@@ -40,7 +40,9 @@ def dataset_download(request, dataset_id):
     Retrieve the file associated with the dataset for client download.
     """
     try:
-        dataset = librarian.models.Dataset.filter_by_user(request.user).get(pk=dataset_id)
+        is_admin = admin_check(request.user)
+        dataset = librarian.models.Dataset.filter_by_user(
+            request.user, is_admin=is_admin).get(pk=dataset_id)
     except ObjectDoesNotExist:
         raise Http404("ID {} cannot be accessed".format(dataset_id))
 
