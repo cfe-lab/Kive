@@ -1,6 +1,6 @@
 ---
 
-# This role installs Singularity 3.6.2 from dnf.
+# This role installs Singularity from dnf.
 
 - name: install singularity
   become: true
