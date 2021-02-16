@@ -38,7 +38,7 @@
   become: true
   become_user: kive
   block:
-    - name: set kive environment varialbes
+    - name: set kive environment variables
       blockinfile:
         path: /home/kive/.bash_profile
         block: |
