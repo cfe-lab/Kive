@@ -99,7 +99,11 @@
 - name: install postgres database libraries
   become: true
   block:
-    - name: add postgresl package repository
+    - name: add postgresql GPG key
+      rpm_key:
+        state: present
+        key: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+    - name: add postgresql package repository
       dnf:
         name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
     - name: check if postgres is disabled
