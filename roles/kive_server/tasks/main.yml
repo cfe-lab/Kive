@@ -175,7 +175,7 @@
       loop:
         # General settings
         - option: listen_addresses
-          value: "*"
+          value: "'*'"
         - option: password_encryption
           value: scram-sha-256
         - option: max_connections
