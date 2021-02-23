@@ -117,11 +117,15 @@
         enabled: true
     - name: local database settings
       notify: Restart postgresql service
+      become: true
+      become_user: postgres
       loop:
         - name: listen_addresses
           value: "*"
         - name: password_encryption
           value: scram-sha-256
+        - name: max_connections
+          value: 200
       postgresql_set:
         name: "{{ item.name }}"
         value: "{{ item.value }}"

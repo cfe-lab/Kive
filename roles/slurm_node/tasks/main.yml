@@ -4,7 +4,8 @@
   become: true
   user:
     name: slurm
-    system: true
+    system: yes
+    create_home: no
     uid: 9634
 
 - name: create slurm data directories
