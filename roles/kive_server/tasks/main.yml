@@ -115,20 +115,6 @@
         name: "postgresql-12"
         state: started
         enabled: true
-    - name: local database settings
-      notify: Restart postgresql service
-      become: true
-      become_user: postgres
-      loop:
-        - name: listen_addresses
-          value: "*"
-        - name: password_encryption
-          value: scram-sha-256
-        - name: max_connections
-          value: 200
-      postgresql_set:
-        name: "{{ item.name }}"
-        value: "{{ item.value }}"
     - name: add kive entries to pg_hba.conf
       block:
         - name: local connections
@@ -184,10 +170,17 @@
             users: streaming_barman
             source: "::1/128"
             method: "scram-sha-256"
-    - name: add barman entries to postgresql.conf
+    - name: local database settings in postgresql.conf
       notify: Restart postgresql service
       loop:
-        # First, setting up a streaming backup.
+        # General settings
+        - option: listen_addresses
+          value: "*"
+        - option: password_encryption
+          value: scram-sha-256
+        - option: max_connections
+          value: 200
+        # Setting up a streaming backup.
         - option: wal_level
           value: "'replica'"
         - option: max_wal_senders
