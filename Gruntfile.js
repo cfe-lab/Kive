@@ -5,16 +5,6 @@ module.exports = function (grunt) {
     // Project configuration.
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
-        tslint: {
-            options: {
-                configuration: "tslint.json"
-            },
-            files: {
-                src: [
-                    "kive/**/*.ts"
-                ]
-            }
-        },
         jshint: {
             files: [
                 "kive/*.js",
@@ -85,9 +75,8 @@ module.exports = function (grunt) {
     // Load plugins
     grunt.loadNpmTasks('grunt-contrib-jshint');
     grunt.loadNpmTasks('grunt-regex-replace');
-    grunt.loadNpmTasks('grunt-tslint');
-    
+
     // Default task(s).
-    grunt.registerTask('default', ['jshint', 'tslint']);
+    grunt.registerTask('default', ['jshint']);
     grunt.registerTask('pngicons', ['regex-replace']);
 };

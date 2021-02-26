@@ -286,9 +286,6 @@ re-created by running `update_test_fixtures` again.
 Kive uses Webpack to bundle Javascript files. These bundles are generated on
 install, and should not be committed to the repository.
 
-Be sure to adhere to Kive's TypeScript style by running `grunt tslint` on your 
-contributions.
-
 Run both the Webpack and Sass watchers simultaneously with `npm run watch:all`.
 
 To debug TypeScript code in the browser, change the `devtool` setting in
