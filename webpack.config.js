@@ -41,7 +41,8 @@ module.exports = {
     resolve: {
         // Add '.ts' and '.tsx' as resolvable extensions.
         extensions: [".webpack.js", ".web.js", ".ts", ".tsx", ".js", ".css"],
-        plugins: [ new TsConfigPathsPlugin() ]
+        plugins: [ new TsConfigPathsPlugin() ],
+        fallback: {fs: false}
     },
 
     module: {

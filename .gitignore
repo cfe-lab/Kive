@@ -40,6 +40,7 @@ TEST-*
 .sass-cache/
 
 # Specific generated JS files
+/build
 *.bundle.js
 kive/librarian/librarian.tests.js
 kive/container/container.tests.js

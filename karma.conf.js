@@ -10,7 +10,7 @@ module.exports = function(config) {
             name: 'Set-Cookie',
             value: 'csrftoken=csrfdummytoken'
         }],
-        frameworks: ['jasmine-ajax', 'jasmine-jquery', 'jasmine'],
+        frameworks: ['jasmine-ajax', 'jasmine-jquery', 'jasmine', 'webpack'],
         files: [ 'tests.ts' ],
         logLevel: config.LOG_INFO, // karma log level
         mime: { 'text/x-typescript': ['ts','tsx'] }, // required for typescript
@@ -24,7 +24,14 @@ module.exports = function(config) {
         reporters: ['progress', /* 'spec', */'kjhtml'],
         webpack: Object.assign({},
             webpackConfig,
-            { entry: undefined, node: { fs: 'empty' } } // remove entry points for bundling
+            {
+                entry: undefined,  // remove entry points for bundling
+                output: {
+                    // filename: "[name].bundle.js",
+                    path: __dirname + "/build"
+                },
+
+            }
         ),
         webpackMiddleware: { quiet: true } // webpack-dev-middleware configuration
     };
