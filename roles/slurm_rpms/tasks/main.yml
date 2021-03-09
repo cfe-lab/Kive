@@ -33,10 +33,15 @@
       file:
         path: "{{ slurmbuilddir }}"
         state: directory
+    - name: check if slurm source files are already downloaded
+      stat:
+        path: "{{ slurmbuilddir }}/slurm-20.02.2.tar.bz2"
+      register: slurm_download
     - name: fetch slurm source files
       get_url:
         url: "https://download.schedmd.com/slurm/slurm-20.02.2.tar.bz2"
         dest: "{{ slurmbuilddir }}/slurm-20.02.2.tar.bz2"
+      when: not slurm_download.stat.exists
     - name: build slurm rpm file
       command:
         cmd: rpmbuild -ta slurm-20.02.2.tar.bz2
