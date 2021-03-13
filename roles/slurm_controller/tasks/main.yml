@@ -3,7 +3,7 @@
 - name: open firewall for compute nodes
   ansible.posix.firewalld:
     zone: internal
-    service: nfs
+    target: ACCEPT
     state: enabled
     permanent: true
     immediate: true
