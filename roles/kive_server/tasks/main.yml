@@ -82,6 +82,16 @@
         permanent: yes
         immediate: yes
         state: enabled
+    - name: firewall's internal interface should ACCEPT
+      register: internal_accept
+      ansible.posix.firewalld:
+        zone: internal
+        target: ACCEPT
+        permanent: yes
+        state: enabled
+    - name: reload firewall config
+      when: internal_accept.changed
+      command: firewall-cmd --reload
     - name: permit https service through firewall
       ansible.posix.firewalld:
         zone: external

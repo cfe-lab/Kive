@@ -1,12 +1,5 @@
 ---
 
-- name: open firewall for compute nodes
-  ansible.posix.firewalld:
-    zone: internal
-    target: ACCEPT
-    state: enabled
-    permanent: true
-
 - name: NFS exports file
   register: nfs_exports_file
   blockinfile:
