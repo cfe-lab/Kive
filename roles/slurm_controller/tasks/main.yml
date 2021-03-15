@@ -6,7 +6,6 @@
     target: ACCEPT
     state: enabled
     permanent: true
-    immediate: true
 
 - name: NFS exports file
   register: nfs_exports_file
