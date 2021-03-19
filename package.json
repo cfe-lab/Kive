@@ -9,7 +9,7 @@
     "grunt-contrib-jshint": "^3.0.0",
     "imagediff": "jamesnakagawa/js-imagediff.git#upgrade-canvas-and-jasmine",
     "jasmine-ajax": "^4.0.0",
-    "jasmine-core": "3.7.0",
+    "jasmine-core": "3.7.1",
     "jasmine-jquery": "^2.1.1",
     "jshint": "^2.12.0",
     "karma": "^6.2.0",
