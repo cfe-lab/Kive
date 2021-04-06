@@ -30,7 +30,7 @@ from django.utils import timezone
 from django.utils.timezone import make_aware, utc
 from django.core.files.uploadedfile import InMemoryUploadedFile, TemporaryUploadedFile
 from django.core.exceptions import NON_FIELD_ERRORS
-from mock import patch
+from unittest.mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
 from rest_framework.test import force_authenticate

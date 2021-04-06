@@ -205,7 +205,7 @@ class ContainerViewSet(CleanCreateModelMixin,
     * filters[n][key]=user&filters[n][val]=match - username of creator contains
         the value (case insensitive)
     """
-    queryset = Container.objects.annotate(
+    queryset = Container.objects.order_by('family__name', '-created').annotate(
         num_apps=Count('apps'))
     serializer_class = ContainerSerializer
     permission_classes = (permissions.IsAuthenticated, IsDeveloperOrGrantedReadOnly)

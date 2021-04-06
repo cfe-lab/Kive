@@ -1,6 +1,6 @@
 -r requirements-test.txt
-matplotlib==2.2.4
-seaborn==0.10.0
+matplotlib==3.4.1
+seaborn==0.11.1
 pandas==1.0.0
 django-extensions==2.2.5
 
