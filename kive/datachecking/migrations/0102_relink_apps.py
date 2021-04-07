@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('datachecking', '0101_squashed'),
         ('archive', '0101_squashed'),
-        ('librarian', '0101_squashed'),
+        # ('librarian', '0101_squashed'),
         ('metadata', '0101_squashed'),
     ]
 

@@ -8,8 +8,8 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('librarian', '0112_remove_dataset_file_source'),
-        ('datachecking', '0106_baddata_file_not_stable'),
+        # ('librarian', '0112_remove_dataset_file_source'),
+        # ('datachecking', '0106_baddata_file_not_stable'),
         ('archive', '0107_runinput_ordering_priority_help_text_20170403_1547'),
     ]
 

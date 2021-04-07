@@ -8,7 +8,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('transformation', '0103_no_default_user'),
+        # ('transformation', '0103_no_default_user'),
         ('method', '0110_drop_dockerimage'),
     ]
 

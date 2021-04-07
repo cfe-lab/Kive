@@ -9,7 +9,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('archive', '0101_squashed'),
+        # ('archive', '0101_squashed'),
         ('datachecking', '0102_relink_apps'),
     ]
 

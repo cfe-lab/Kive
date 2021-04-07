@@ -9,7 +9,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('transformation', '0103_no_default_user'),
+        # ('transformation', '0103_no_default_user'),
         ('pipeline', '0101_squashed2'),
     ]
 

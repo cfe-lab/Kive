@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('metadata', '0104_drop_datatype'),
-        ('transformation', '0104_drop_all'),
+        # ('transformation', '0104_drop_all'),
     ]
 
     operations = [

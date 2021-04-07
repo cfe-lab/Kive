@@ -256,8 +256,8 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('contenttypes', '0002_remove_content_type_name'),
-        ('method', '__first__'),
-        ('archive', '0101_squashed'),
+        # ('method', '__first__'),
+        # ('archive', '0101_squashed'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('auth', '0001_initial'),
         # ('librarian', '0005_merge_dataset_SD_20151116_1012'),

@@ -9,11 +9,11 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('archive', '0101_squashed'),
+        # ('archive', '0101_squashed'),
         ('pipeline', '0101_squashed2'),
         ('fleet', '0101_squashed'),
-        ('librarian', '0101_squashed'),
-        ('metadata', '0101_squashed'),
+        # ('librarian', '0101_squashed'),
+        # ('metadata', '0101_squashed'),
     ]
 
     operations = [

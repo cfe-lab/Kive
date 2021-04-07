@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('metadata', '0101_squashed'),
-        ('librarian', '0101_squashed'),
+        # ('librarian', '0101_squashed'),
     ]
 
     operations = [

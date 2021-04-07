@@ -17,13 +17,13 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('transformation', '__first__'),
-        ('metadata', '__first__'),
+        # ('metadata', '__first__'),
         # ('archive', '0001_initial'),
         # ('archive', '0019_prepare_merge_dataset_SD_20151116_1012'),
-        ('datachecking', '0101_squashed'),
+        # ('datachecking', '0101_squashed'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('auth', '0001_initial'),
-        ('metadata', '0101_squashed'),
+        # ('metadata', '0101_squashed'),
         # ('archive', '0020_date_created_default_20151116_1040'),
     ]
 
