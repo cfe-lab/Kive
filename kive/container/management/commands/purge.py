@@ -11,6 +11,7 @@ from django.contrib.humanize.templatetags.humanize import naturaltime
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import models
+from django.db.models import ExpressionWrapper, FloatField, DurationField
 from django.db.models.expressions import Value, F
 from django.db.models.fields.files import FieldFile
 from django.db.models.functions import Now
@@ -145,21 +146,24 @@ class Command(BaseCommand):
 
         sandbox_ages = ContainerRun.find_unneeded().annotate(
             entry_type=Value('r', models.CharField()),
-            age=sandbox_aging * (Now() - F('end_time'))).values_list(
+            age=ExpressionWrapper(sandbox_aging * (Now() - F('end_time')),
+                                  output_field=DurationField())).values_list(
             'entry_type',
             'id',
             'age').order_by()
 
         log_ages = ContainerLog.find_unneeded().annotate(
             entry_type=Value('l', models.CharField()),
-            age=log_aging * (Now() - F('run__end_time'))).values_list(
+            age=ExpressionWrapper(log_aging * (Now() - F('run__end_time')),
+                                  output_field=DurationField())).values_list(
             'entry_type',
             'id',
             'age').order_by()
 
         dataset_ages = Dataset.find_unneeded().annotate(
             entry_type=Value('d', models.CharField()),
-            age=dataset_aging * (Now() - F('date_created'))).values_list(
+            age=ExpressionWrapper(dataset_aging * (Now() - F('date_created')),
+                                  output_field=FloatField())).values_list(
             'entry_type',
             'id',
             'age').order_by()

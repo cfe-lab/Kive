@@ -1,8 +1,8 @@
 wheel==0.36.2
 binaryornot==0.4.4
 chardet==3.0.4
-Django==2.2.18
-djangorestframework==3.11.2
+Django==3.2
+djangorestframework==3.12.4
 funcsigs==1.0.2
 pbr==5.5.1
 psycopg2-binary==2.8.4
