@@ -34,7 +34,6 @@ from django.dispatch import receiver
 from django.template.defaultfilters import filesizeformat
 from django.urls import reverse
 from django.utils import timezone
-import django.utils.six as dsix
 
 from constants import maxlengths
 from file_access_utils import compute_md5, use_field_file
@@ -252,9 +251,7 @@ class Container(AccessControl):
     INCOMPLETE = "incomplete"
     VALID = "valid"
 
-    accepted_extensions = ACCEPTED_FILE_EXTENSIONS.keys()
-    if dsix.PY3:
-        accepted_extensions = list(accepted_extensions)
+    accepted_extensions = list(ACCEPTED_FILE_EXTENSIONS.keys())
     accepted_extension_str = ", ".join(accepted_extensions[:-1])
     accepted_extension_str += ", or {}".format(accepted_extensions[-1])
 

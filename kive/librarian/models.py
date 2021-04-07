@@ -18,7 +18,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.core.files import File
 from django.db.models.functions import Now
-from django.utils.encoding import python_2_unicode_compatible
 from django.utils import timezone
 from django.conf import settings
 from django.template.defaultfilters import filesizeformat, pluralize
@@ -52,7 +51,6 @@ def get_upload_path(instance, filename):
     return instance.UPLOAD_DIR + os.sep + time.strftime('%Y_%m') + os.sep + filename
 
 
-@python_2_unicode_compatible
 class ExternalFileDirectory(models.Model):
     """
     A database table storing directories whose contents we can make Datasets out of.
@@ -93,7 +91,6 @@ class ExternalFileDirectory(models.Model):
         super(ExternalFileDirectory, self).save(*args, **kwargs)
 
 
-@python_2_unicode_compatible
 class Dataset(metadata.models.AccessControl):
     """
     A (possibly temporary) data file.

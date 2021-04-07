@@ -14,8 +14,6 @@ import stat
 from io import BytesIO
 from zipfile import ZipFile
 
-import django.utils.six as dsix
-
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import User, Group
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -918,8 +916,6 @@ baz
             f.write(self.raw_file_contents)
 
         self.csv_file_temp_open_mode = "w+t"
-        if dsix.PY2:
-            self.csv_file_temp_open_mode = "w+b"
 
     def tearDown(self):
         shutil.rmtree(self.working_dir)

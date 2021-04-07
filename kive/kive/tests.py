@@ -4,8 +4,8 @@ import os
 import shutil
 from contextlib import contextmanager
 
-from django.utils.six import StringIO
 from datetime import timedelta
+from io import StringIO
 
 from django.conf import settings
 from django.contrib.auth import SESSION_KEY, HASH_SESSION_KEY, BACKEND_SESSION_KEY
