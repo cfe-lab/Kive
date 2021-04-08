@@ -3,7 +3,7 @@ Generate an HTML form to create a new DataSet object
 """
 from django import forms
 from django.forms.widgets import ClearableFileInput
-from django.utils.translation import ugettext_lazy as _, ungettext_lazy
+from django.utils.translation import gettext_lazy as _, ngettext_lazy
 
 import logging
 from datetime import datetime
@@ -89,7 +89,7 @@ class MultiFileField(forms.Field):
         'invalid': _("No file was submitted. Check the encoding type on the form."),
         'missing': _("No file was submitted."),
         'empty': _("The submitted file is empty."),
-        'max_length': ungettext_lazy(
+        'max_length': ngettext_lazy(
             'Ensure this filename has at most %(max)d character (it has %(length)d).',
             'Ensure this filename has at most %(max)d characters (it has %(length)d).',
             'max'),

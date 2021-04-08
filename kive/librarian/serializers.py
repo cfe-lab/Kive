@@ -48,7 +48,9 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
     removal_plan = serializers.HyperlinkedIdentityField(view_name='dataset-removal-plan')
     redaction_plan = serializers.HyperlinkedIdentityField(view_name='dataset-redaction-plan')
 
-    save_in_db = serializers.NullBooleanField(write_only=True, required=False)
+    save_in_db = serializers.BooleanField(write_only=True,
+                                          required=False,
+                                          allow_null=True)
     externalfiledirectory = serializers.SlugRelatedField(
         slug_field="name",
         queryset=ExternalFileDirectory.objects.all(),

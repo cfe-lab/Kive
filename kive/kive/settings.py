@@ -306,3 +306,4 @@ SLURM_PATH = os.environ.get('KIVE_SLURM_PATH')
 
 # Container file in Containers folder
 DEFAULT_CONTAINER = os.environ.get('KIVE_DEFAULT_CONTAINER', 'kive-default.simg')
+DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
