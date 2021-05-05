@@ -3,7 +3,7 @@
   "version": "0.8.4",
   "devDependencies": {
     "@metahub/karma-jasmine-jquery": "^4.0.1",
-    "@types/jasmine": "^3.6.10",
+    "@types/jasmine": "^3.6.11",
     "@types/jasmine-ajax": "^3.3.2",
     "@types/jasmine-jquery": "^1.5.28",
     "grunt-contrib-jshint": "^3.0.0",
