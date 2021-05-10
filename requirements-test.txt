@@ -3,6 +3,6 @@ django-mock-queries==2.1.6
 pytest==6.2.4
 coverage==5.5
 pytest-django==4.2.0
-flake8==3.9.1
+flake8==3.9.2
 pytest-flake8==1.0.7
 requests==2.25.1
