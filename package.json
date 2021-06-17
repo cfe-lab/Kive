@@ -40,7 +40,7 @@
     "script-loader": "^0.7.1",
     "source-map-loader": "^3.0.0",
     "style-loader": "^2.0.0",
-    "typescript": "^3.9.9"
+    "typescript": "^3.9.10"
   },
   "scripts": {
     "postinstall": "grunt pngicons",
