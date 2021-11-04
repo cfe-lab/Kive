@@ -30,7 +30,7 @@
     "@types/node": "^16.11.6",
     "awesome-typescript-loader": "^5.2.1",
     "core-js": "^3.19.1",
-    "css-loader": "^6.5.0",
+    "css-loader": "^6.5.1",
     "grunt": "^1.4.1",
     "grunt-cli": "^1.4.3",
     "grunt-regex-replace": "^0.4.0",
