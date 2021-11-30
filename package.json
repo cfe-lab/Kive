@@ -29,7 +29,7 @@
     "@types/jquery": "^3.5.9",
     "@types/node": "^16.11.11",
     "awesome-typescript-loader": "^5.2.1",
-    "core-js": "^3.19.1",
+    "core-js": "^3.19.2",
     "css-loader": "^6.5.1",
     "grunt": "^1.4.1",
     "grunt-cli": "^1.4.3",
