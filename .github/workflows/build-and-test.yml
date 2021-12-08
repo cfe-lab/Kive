@@ -30,7 +30,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: 3.6
+          python-version: 3.9
       - name: Update apt index
         run: sudo apt-get update
       - name: Install apt packages

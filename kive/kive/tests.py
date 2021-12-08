@@ -220,7 +220,7 @@ def capture_log_stream(log_level, *logger_names):
         logger = logging.getLogger(logger_name)
         logger.addHandler(stream_handler)
         old_levels[logger_name] = logger.level
-        logger.level = log_level
+        logger.setLevel(log_level)
     try:
         yield mocked_stderr
     finally:
