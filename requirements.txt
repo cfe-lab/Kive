@@ -1,7 +1,7 @@
 wheel==0.37.0
 binaryornot==0.4.4
 chardet==4.0.0
-Django==3.2.9
+Django==4.0
 djangorestframework==3.12.4
 funcsigs==1.0.2
 pbr==5.8.0
