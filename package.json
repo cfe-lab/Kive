@@ -6,7 +6,7 @@
     "@types/jasmine": "^3.10.3",
     "@types/jasmine-ajax": "^3.3.3",
     "@types/jasmine-jquery": "^1.5.34",
-    "grunt-contrib-jshint": "^3.1.1",
+    "grunt-contrib-jshint": "^3.2.0",
     "imagediff": "jamesnakagawa/js-imagediff.git#upgrade-canvas-and-jasmine",
     "jasmine-ajax": "^4.0.0",
     "jasmine-core": "4.0.0",
