@@ -4,5 +4,5 @@ pytest==7.0.1
 coverage==6.3.2
 pytest-django==4.5.2
 flake8==4.0.1
-pytest-flake8==1.0.7
+pytest-flake8==1.1.0
 requests==2.27.1
