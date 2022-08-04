@@ -6,21 +6,12 @@ updates:
     interval: daily
   open-pull-requests-limit: 10
   ignore:
-  - dependency-name: pygraphviz
+  - dependency-name: flake8
     versions:
-    - "1.7"
-  - dependency-name: matplotlib
+    - ">=5.0.0"  # Waiting for https://github.com/tholo/pytest-flake8/issues/87
+  - dependency-name: Django
     versions:
-    - 3.4.1
-  - dependency-name: pandas
-    versions:
-    - 1.2.3
-  - dependency-name: ansible
-    versions:
-    - 2.10.0
-  - dependency-name: django
-    versions:
-    - "3.2"
+    - ">=4.1.0"  # Waiting for https://github.com/encode/django-rest-framework/issues/8587
 - package-ecosystem: npm
   directory: "/"
   schedule:
