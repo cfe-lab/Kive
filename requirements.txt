@@ -1,7 +1,7 @@
 wheel==0.37.1
 binaryornot==0.4.4
 chardet==5.0.0
-Django==4.0.6
+Django<4.1  # Waiting for https://github.com/encode/django-rest-framework/issues/8587
 djangorestframework==3.13.1
 funcsigs==1.0.2
 pbr==5.9.0
