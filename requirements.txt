@@ -4,7 +4,7 @@ chardet==5.0.0
 Django==4.0.7  # Waiting for https://github.com/encode/django-rest-framework/issues/8587
 djangorestframework==3.13.1
 funcsigs==1.0.2
-pbr==5.9.0
+pbr==5.10.0
 psycopg2-binary==2.9.3
 pytz==2022.2
 six==1.16.0
