@@ -2,7 +2,7 @@
 matplotlib<3.4  # matplotlib 3.4 no longer supports Python 3.6.
 seaborn==0.12.0
 pandas<1.5  # pandas 1.2 no longer supports Python 3.6.
-django-extensions==3.2.0
+django-extensions==3.2.1
 
 # First, run apt install graphviz libgraphviz-dev
 pygraphviz<1.11  # pygraphviz 1.7 no longer supports Python 3.6.
