@@ -1,4 +1,4 @@
-wheel==0.38.2
+wheel==0.38.3
 binaryornot==0.4.4
 chardet==5.0.0
 Django==4.0.8  # Waiting for https://github.com/encode/django-rest-framework/issues/8587
