@@ -36,16 +36,16 @@ jobs:
       - name: Install apt packages
         run: sudo apt-get install -y -q dh-autoreconf build-essential libarchive-dev squashfs-tools
       - name: Install node
-        shell: bash -l {0}
-        run: |
-          nvm install 12.13.1
-          nvm use 12.13.1
+        uses: actions/setup-node@v2
+        with:
+          node-version: '12.13.1'
 
       - name: Install Kive's Python dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements-test.txt
-      - run: npm install
+      - name: Install node dependencies
+        run: npm install
 
       - uses: actions/setup-go@v2
         with:
