@@ -1,5 +1,5 @@
 -r requirements-test.txt
-matplotlib<3.7  # matplotlib 3.4 no longer supports Python 3.6.
+matplotlib<3.8  # matplotlib 3.4 no longer supports Python 3.6.
 seaborn==0.12.2
 pandas<1.6  # pandas 1.2 no longer supports Python 3.6.
 django-extensions==3.2.1
