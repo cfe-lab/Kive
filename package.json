@@ -27,7 +27,7 @@
   },
   "dependencies": {
     "@types/jquery": "^3.5.16",
-    "@types/node": "^18.15.10",
+    "@types/node": "^18.15.11",
     "awesome-typescript-loader": "^5.2.1",
     "core-js": "^3.29.1",
     "css-loader": "^6.7.3",
