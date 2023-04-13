@@ -81,11 +81,11 @@ jobs:
         run: |
           cd api
           coverage run --source=kiveapi -m pytest
-
-      - name: Report code coverage
-        run: |
-          python -m pip install codecov
-          cd kive
-          codecov
-          cd ../api
-          codecov
+      - name: Upload main coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          directory: kive
+      - name: Upload API coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          directory: api
