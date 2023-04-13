@@ -65,12 +65,12 @@ Client requirements
 
 The following browsers are supported
 
-Browser            | Basic Support | Bulk Upload Feature
--------------------|---------------|--------------------
-Google Chrome      | version 4     | version 5
-Firefox            | version 3.6   | version 3.6
-Safari             | version 3.1   | version 7
-Internet Explorer  | version 9     | version 10
+| Browser           | Basic Support | Bulk Upload Feature |
+|-------------------|---------------|---------------------|
+| Google Chrome     | version 4     | version 5           |
+| Firefox           | version 4     | version 4           |
+| Safari            | version 3.1   | version 7           |
+| Internet Explorer | version 10    | version 10          |
 
 RESTful API
 -----------
@@ -97,8 +97,8 @@ To work on Kive itself, read about [installation], [contributing], and
 look at the [model classes]. To look after a Kive server, follow the
 [admin guide].
 
-[developer documentation]: http://cfe-lab.github.io/Kive/dev_docs
+[developer documentation]: https://cfe-lab.github.io/Kive/dev_docs
 [installation]: https://github.com/cfe-lab/Kive/blob/master/INSTALL.md
 [contributing]: https://github.com/cfe-lab/Kive/blob/master/CONTRIBUTING.md
-[model classes]: http://cfe-lab.github.io/Kive/models/README
-[admin guide]: http://cfe-lab.github.io/Kive/admin
+[model classes]: https://cfe-lab.github.io/Kive/models/README
+[admin guide]: https://cfe-lab.github.io/Kive/admin

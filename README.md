@@ -6,8 +6,8 @@ Kive
 [![DOI]][zenodo]
 
 
-[Build Status]: https://travis-ci.org/cfe-lab/Kive.svg?branch=master
-[travis]: https://travis-ci.org/cfe-lab/Kive
+[Build Status]: https://github.com/cfe-lab/Kive/actions/workflows/build-and-test.yml/badge.svg?branch=master
+[travis]: https://github.com/cfe-lab/Kive/actions
 [Code Coverage]: https://codecov.io/github/cfe-lab/Kive/coverage.svg?branch=master
 [codecov]: https://codecov.io/github/cfe-lab/Kive?branch=master
 [DOI]: https://zenodo.org/badge/14132839.svg
@@ -75,12 +75,12 @@ Client requirements
 
 The following browsers are supported
 
-Browser            | Basic Support | Bulk Upload Feature
--------------------|---------------|--------------------
-Google Chrome      | version 4     | version 5
-Firefox            | version 4     | version 4
-Safari             | version 3.1   | version 7
-Internet Explorer  | version 10    | version 10
+| Browser           | Basic Support | Bulk Upload Feature |
+|-------------------|---------------|---------------------|
+| Google Chrome     | version 4     | version 5           |
+| Firefox           | version 4     | version 4           |
+| Safari            | version 3.1   | version 7           |
+| Internet Explorer | version 10    | version 10          |
 
 RESTful API
 -----------
@@ -88,12 +88,27 @@ You can upload data, launch pipelines, and update pipelines all through Kive's
 API. You can also use our [Python library][kive-api] to script calls to the
 API.
 
-[kive-api]: https://github.com/cfe-lab/py-kive-api
+[kive-api]: https://github.com/cfe-lab/Kive/tree/master/api
 
 
 What are we working on?
 -----------------------
 
-You can see the active tasks in our [milestones].
+You can see active tasks on our [GitHub project].
 
-[milestones]: https://github.com/cfe-lab/Kive/milestones
+[GitHub project]: https://github.com/cfe-lab/Kive/issues
+
+Development
+-----------
+
+To upload a pipeline to Kive, read the [developer documentation].
+
+To work on Kive itself, read about [installation], [contributing], and
+look at the [model classes]. To look after a Kive server, follow the
+[admin guide].
+
+[developer documentation]: https://cfe-lab.github.io/Kive/dev_docs
+[installation]: https://github.com/cfe-lab/Kive/blob/master/INSTALL.md
+[contributing]: https://github.com/cfe-lab/Kive/blob/master/CONTRIBUTING.md
+[model classes]: https://cfe-lab.github.io/Kive/models/README
+[admin guide]: https://cfe-lab.github.io/Kive/admin
