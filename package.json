@@ -23,7 +23,7 @@
     "shelljs": "^0.8.5",
     "terser-webpack-plugin": "^5.3.7",
     "webpack": "^5.80.0",
-    "webpack-cli": "^5.0.1"
+    "webpack-cli": "^5.0.2"
   },
   "dependencies": {
     "@types/jquery": "^3.5.16",
