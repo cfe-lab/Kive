@@ -5,4 +5,4 @@ coverage==7.2.5
 pytest-django==4.5.2
 flake8==4.0.1  # Waiting for https://github.com/tholo/pytest-flake8/issues/87
 pytest-flake8==1.1.1
-requests==2.29.0
+requests==2.30.0
