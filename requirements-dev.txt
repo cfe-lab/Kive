@@ -5,4 +5,4 @@ pandas<2.1  # pandas 1.2 no longer supports Python 3.6.
 django-extensions==3.2.1
 
 # First, run apt install graphviz libgraphviz-dev
-pygraphviz<1.11  # pygraphviz 1.7 no longer supports Python 3.6.
+pygraphviz<1.12  # pygraphviz 1.7 no longer supports Python 3.6.
