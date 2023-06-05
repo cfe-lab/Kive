@@ -6,3 +6,4 @@ pytest-django==4.5.2
 flake8==4.0.1  # Waiting for https://github.com/tholo/pytest-flake8/issues/87
 pytest-flake8==1.1.1
 requests==2.31.0
+mock==5.0.2
