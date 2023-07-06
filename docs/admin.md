@@ -70,6 +70,26 @@ If there are jobs running in Kive, check that some of them get allocated to the 
 
     watch squeue -wn1
 
+## Updating SSL Certificates
+You'll need the certificate and the key, and the certificate should not be
+chained. Use `scp` to copy the two files to your home directory on the head
+node, then install them like this:
+
+    chown root:root star_cfe_YYYY.crt star_cfe_YYYY.key
+    chmod 644 star_cfe_YYYY.crt
+    chmod 600 star_cfe_YYYY.key
+    mv star_cfe_YYYY.crt /etc/pki/tls/certs
+    mv star_cfe_YYYY.key /etc/pki/tls/private
+    cd /etc/pki/tls/certs
+    mv star_cfe.crt star_cfe_YYYX.crt
+    mv star_cfe_YYYY.crt star_cfe.crt
+    cd /etc/pki/tls/private
+    mv star_cfe.key star_cfe_YYYX.key
+    mv star_cfe_YYYY.key star_cfe.key
+    systemctl restart httpd
+
+Check that the kive server still works, and then remove last year's certificate and key files.
+
 ## Scheduled Tasks
 There are several tasks that run in the background to keep Kive's data safe.
 They are all launched using SystemD unit files and timers, installed by the
