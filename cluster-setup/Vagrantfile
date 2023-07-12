@@ -35,7 +35,7 @@ def add_data_dir(vm)
 end
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "geerlingguy/centos8"
+  config.vm.box = "ubuntu/jammy64"
   
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
@@ -46,6 +46,7 @@ Vagrant.configure("2") do |config|
   config.vm.define :head do |head|
     head.vm.hostname = "head"
     head.vm.network "private_network", ip: HEAD_IP
+    # head.vm.network "private_network", type: "dhcp"
     add_keys(head.vm)
     add_key_access(head.vm)
     add_data_dir(head.vm)
@@ -55,10 +56,10 @@ Vagrant.configure("2") do |config|
   config.vm.define :worker do |worker|
     worker.vm.hostname = "worker"
     worker.vm.network "private_network", ip: WORKER_IP
+    # worker.vm.network "private_network", type: "dhcp"
     add_key_access(worker.vm)
     worker.vm.provision "shell", inline: <<-EOS
-      dnf install -q -y python3 epel-release
-      dnf config-manager --set-enabled PowerTools
+      apt install -y python3
     EOS
     add_data_dir(worker.vm)
   end
