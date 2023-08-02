@@ -1,0 +1,188 @@
+---
+
+#- become: true
+#
+#  block:
+
+- name: install NFS client software
+  become: true
+  apt:
+    name:
+      - nfs-common
+    state: present
+
+- name: ensure ufw is running
+  become: true
+  systemd:
+    name: ufw
+    state: started
+    enabled: true
+
+- name: open port for SSH access
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: ssh
+    protocol: tcp
+
+# Originally this task opened ports:
+# - 6817-6819/tcp
+# - 6817-6819/udp
+# - 7321/tcp
+- name: open port for slurmctld to communicate with slurmd
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: 6818
+    protocol: tcp
+
+- name: mount /data
+  become: true
+  block:
+    - name: create the mount point
+      file:
+        path: /data
+        state: directory
+    - name: mount the drive
+      ansible.posix.mount:
+        path: /data
+        src: "{{ kive_db_host }}:/data"
+        fstype: nfs
+        state: mounted
+
+- name: mount /opt
+  become: true
+  ansible.posix.mount:
+    path: /opt
+    src: "{{ kive_db_host }}:/opt"
+    fstype: nfs
+    state: mounted
+    opts: ro
+
+- name: mount /usr/local
+  become: true
+  ansible.posix.mount:
+    path: /usr/local
+    src: "{{ kive_db_host }}:/usr/local"
+    fstype: nfs
+    state: mounted
+    opts: ro
+
+- name: use /data/home as the home directory
+  block:
+    - name: check if /data/home exists
+      stat: path=/data/home
+      register: data_home
+
+    - name: fail if /data/home isn't prepared
+      fail:
+        msg: "/data/home is not in place."
+      when: not data_home.stat.exists
+
+    - name: check if SSH configuration is in place
+      stat: path=/data/home/vagrant/.ssh
+      register: ssh_configuration
+
+    - name: fail if SSH configuration isn't prepared
+      fail:
+        msg: "SSH configuration is not present in the shared home directory."
+      when: not ssh_configuration.stat.exists
+
+  rescue:
+    - name: inform user to set up the head node first and propagate failure to stop the playbook
+      fail:
+        msg: "Before setting up this node, make sure the head node is configured first!"
+
+- name: check if original /home has been renamed
+  stat: path=/original_home
+  register: home_backed_up
+
+- name: rename original /home
+  become: true
+  command: mv /home /original_home
+  when: not home_backed_up.stat.exists
+
+- name: symbolic link for /home
+  become: true
+  file:
+    path: /home
+    src: /data/home
+    state: link
+
+#    - name: read system users
+#      delegate_to: localhost
+#      register: user_list
+#      community.general.read_csv:
+#        path: /etc/passwd
+#        delimiter: ":"
+#        fieldnames:
+#          - name
+#          - passwdx
+#          - uid
+#          - gid
+#          - info
+#          - home
+#          - shell
+#
+#    - name: read system groups
+#      delegate_to: localhost
+#      register: group_list
+#      community.general.read_csv:
+#        path: /etc/group
+#        delimiter: ":"
+#        fieldnames:
+#          - name
+#          - passwdx
+#          - gid
+#          - users
+#
+#    - name: record group members
+#      loop: "{{ group_list.list }}"
+#      when: item.name in copied_groups
+#      set_fact:
+#        group_name: "{{ item.name }}"
+#        group_members: "{{ item.users.split(',') }}"
+#      register: system_groups
+#
+#    - name: build user groups
+#      with_subelements:
+#        - "{{ system_groups.results }}"
+#        - ansible_facts.group_members
+#      when: item.1 != ''
+#      set_fact:
+#        user_groups: "{{ user_groups | default({}) | combine({ item.1: [item.0.ansible_facts.group_name] }, list_merge='append') }}"
+#
+#    - name: read system passwords
+#      delegate_to: localhost
+#      register: shadow_dict
+#      community.general.read_csv:
+#        path: /etc/shadow
+#        delimiter: ":"
+#        key: name
+#        fieldnames:
+#          - name
+#          - passwd
+#          - lastchanged
+#          - min
+#          - max
+#          - warn
+#          - inactive
+#          - expire
+#          -
+#    - name: copy system groups
+#      loop: "{{ group_list.list }}"
+#      when: >
+#        (item.name in copied_groups) or
+#        (item.name in shadow_dict.dict and shadow_dict.dict[item.name]['passwd'].startswith("$"))
+#      group:
+#        gid: "{{ item.gid }}"
+#        name: "{{ item.name }}"
+#
+#    - name: copy system users
+#      loop: "{{ user_list.list }}"
+#      when: shadow_dict.dict[item.name]['passwd'].startswith("$")
+#      user:
+#        uid: "{{ item.uid }}"
+#        create_home: no
+#        name: "{{ item.name }}"
+#        password: "{{ shadow_dict.dict[item.name]['passwd'] }}"

@@ -1,5 +1,5 @@
-HEAD_IP = "192.168.45.10"
-WORKER_IP = "192.168.45.11"
+HEAD_IP = "192.168.56.10"
+WORKER_IP = "192.168.56.11"
 
 # Copy the test SSH keys into `/home/vagrant/.ssh/`. Keys are copied manually
 # to allow easy SSH traffic between VMs.
@@ -31,16 +31,16 @@ end
 # Add a synced folder to emulate the cluster's network drive.
 def add_data_dir(vm)
   Dir.mkdir("./data") if not Dir.exists?("./data")
-  vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
+  # vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
 end
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "ubuntu/jammy64"
+  config.vm.box = "bento/ubuntu-22.04"
   
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
     vb.memory = 8 * 1024
-    vb.cpus = 4
+    vb.cpus = 2
   end
 
   config.vm.define :head do |head|
@@ -59,9 +59,10 @@ Vagrant.configure("2") do |config|
     # worker.vm.network "private_network", type: "dhcp"
     add_key_access(worker.vm)
     worker.vm.provision "shell", inline: <<-EOS
+      apt update
       apt install -y python3
     EOS
-    add_data_dir(worker.vm)
+    # add_data_dir(worker.vm)
   end
 
   config.vm.provision "shell", inline: <<-EOS

@@ -1,0 +1,40 @@
+---
+
+- name: install slurmd using apt
+  become: true
+  apt:
+    name:
+      - slurmd
+    state: present
+
+- name: add slurm config files
+  become: true
+  block:
+    - name: copy cgroup config file
+      notify: reconfigure slurm
+      copy:
+        src: cgroup.conf
+        dest: /etc/slurm/
+        owner: slurm
+        group: slurm
+        mode: "644"
+    - name: generate and copy slurm config file
+      notify: reconfigure slurm
+      template:
+        src: slurm.conf.j2
+        dest: /etc/slurm/slurm.conf
+        owner: slurm
+        group: slurm
+        mode: "644"
+
+#- name: network drive mounts
+#  become: true
+#  block:
+#  - loop: "{{ network_mounts }}"
+#    name: Load network drive mounts from env_vars.yml
+#    ansible.posix.mount:
+#      path: "{{ item.path }}"
+#      src: "{{ item.src }}"
+#      fstype: "{{ item.fstype }}"
+#      state: "{{ item.state }}"
+#      opts: "{{ item.opts }}"

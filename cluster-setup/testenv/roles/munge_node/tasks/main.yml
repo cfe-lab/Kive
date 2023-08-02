@@ -2,10 +2,10 @@
   become: true
   block:
     - name: install munge
-      dnf:
+      apt:
         name:
           - munge
-          - munge-libs
+          - libmunge2
         state: present
     - name: deploy munge testing key
       copy:

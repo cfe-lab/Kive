@@ -23,4 +23,3 @@ kive_httpd_user: kive
 kive_httpd_group: kive
 # - package variables
 slurmbuilddir: "/root"
-

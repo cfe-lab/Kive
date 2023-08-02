@@ -1,9 +1,0 @@
----
-
-# This role installs Singularity from dnf.
-
-- name: install singularity
-  become: true
-  dnf:
-    name: singularity-3.7.1
-    state: present

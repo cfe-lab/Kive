@@ -1,4 +1,3 @@
 ---
 dependencies:
-  - role: slurm_rpms
   - role: slurm_node

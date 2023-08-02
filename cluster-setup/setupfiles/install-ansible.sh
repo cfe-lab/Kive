@@ -8,7 +8,8 @@ IFS=$'\t\n'
 
 # Install Python3
 # dnf install -q -y python3
-apt install -y python3
+apt update
+apt install -y python3 python3-pip
 
 # Install Python packages
 python3 -m pip install -r /vagrant/requirements.txt
