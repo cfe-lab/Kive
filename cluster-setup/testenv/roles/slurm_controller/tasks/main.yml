@@ -124,14 +124,15 @@
       block:
         - mysql_db:
             name: slurm_acct_db
-            # check_implicit_admin: true
-            # config_file: ''
-            login_host: localhost
-            login_user: root
-            login_password: ""
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+            check_implicit_admin: true
+            config_file: ''
             state: present
         - mysql_user:
             name: slurm
+            login_unix_socket: /var/run/mysqld/mysqld.sock
+            check_implicit_admin: true
+            config_file: ''
             priv: "slurm_acct_db.*:all"
 
 #- name: install slurm

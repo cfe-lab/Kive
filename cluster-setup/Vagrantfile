@@ -43,9 +43,15 @@ Vagrant.configure("2") do |config|
     vb.cpus = 2
   end
 
+  config.vm.provider "vmware_desktop" do |vmw|
+    vmw.gui = false
+    vmw.memory = 8 * 1024
+    vmw.cpus = 2
+  end
+
   config.vm.define :head do |head|
     head.vm.hostname = "head"
-    head.vm.network "private_network", ip: HEAD_IP
+    head.vm.network "private_network"  #, ip: HEAD_IP
     # head.vm.network "private_network", type: "dhcp"
     add_keys(head.vm)
     add_key_access(head.vm)
@@ -55,7 +61,7 @@ Vagrant.configure("2") do |config|
 
   config.vm.define :worker do |worker|
     worker.vm.hostname = "worker"
-    worker.vm.network "private_network", ip: WORKER_IP
+    worker.vm.network "private_network"  #, ip: WORKER_IP
     # worker.vm.network "private_network", type: "dhcp"
     add_key_access(worker.vm)
     worker.vm.provision "shell", inline: <<-EOS
