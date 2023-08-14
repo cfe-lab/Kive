@@ -1,7 +1,7 @@
 -r requirements.txt
 django-mock-queries==2.2.0
 pytest==7.3.2
-coverage==7.2.7
+coverage==7.3.0
 pytest-django==4.5.2
 flake8==4.0.1  # Waiting for https://github.com/tholo/pytest-flake8/issues/87
 pytest-flake8==1.1.1
