@@ -67,14 +67,15 @@
 
 - name: kive package dependencies
   become: true
-  dnf:
+  apt:
     name:
-      - platform-python-devel
-      - sqlite-devel
-      - words
+      - python3-dev
+      - python3-venv
+      - libsqlite3-dev
+      - wcanadian
       - lsof
       - graphviz
-      - graphviz-devel
+      - libgraphviz-dev
 
 
 - name: install kive python dependencies
@@ -98,33 +99,48 @@
 
 - name: install postgres database libraries
   become: true
-  block:
-    - name: add postgresql GPG key
-      rpm_key:
-        state: present
-        key: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
-    - name: add postgresql package repository
-      dnf:
-        name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
-    - name: check if postgres is disabled
-      register: is_builtin_postgresql_disabled
-      # Check mode means this never writes the line, just checks if it's there.
-      check_mode: yes
-      lineinfile:
-        name: /etc/dnf/modules.d/postgresql.module
-        line: state=disabled
-    - name: disable built-in postgres module
-      when: (is_builtin_postgresql_disabled is changed) or (is_builtin_postgresql_disabled is failed)
-      command:
-        cmd: dnf -qy module disable postgresql
-        warn: false  # dnf module doesn't include this sub-command, so have to use command directly
-    - name: install client libraries
-      dnf:
-        update_cache: true
-        name: postgresql12
+  apt:
+    name:
+      - postgresql
+
 
 - name: configure mail service for error logging
-  systemd:
-    name: postfix
-    state: started
-    enabled: true
+  block:
+    - name: install postfix
+      become: true
+      apt:
+        name:
+          - postfix
+    - name: start postfix daemon
+      systemd:
+        name: postfix
+        state: started
+        enabled: true
+
+
+#- name: install postgres database libraries
+#  become: true
+#  block:
+#    - name: add postgresql GPG key
+#      rpm_key:
+#        state: present
+#        key: https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG
+#    - name: add postgresql package repository
+#      dnf:
+#        name: https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+#    - name: check if postgres is disabled
+#      register: is_builtin_postgresql_disabled
+#      # Check mode means this never writes the line, just checks if it's there.
+#      check_mode: yes
+#      lineinfile:
+#        name: /etc/dnf/modules.d/postgresql.module
+#        line: state=disabled
+#    - name: disable built-in postgres module
+#      when: (is_builtin_postgresql_disabled is changed) or (is_builtin_postgresql_disabled is failed)
+#      command:
+#        cmd: dnf -qy module disable postgresql
+#        warn: false  # dnf module doesn't include this sub-command, so have to use command directly
+#    - name: install client libraries
+#      dnf:
+#        update_cache: true
+#        name: postgresql12

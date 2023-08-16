@@ -78,9 +78,9 @@
   blockinfile:
     path: /etc/exports
     block: |
-      /data              192.168.56.0/255.255.255.0(rw,sync,no_all_squash,no_root_squash)
-      /usr/local         192.168.56.0/255.255.255.0(ro,sync,no_root_squash)
-      /opt               192.168.56.0/255.255.255.0(ro,sync,no_root_squash)
+      /data              {{ nfs_export_to_hosts }}(rw,sync,no_all_squash,no_root_squash)
+      /usr/local         {{ nfs_export_to_hosts }}(ro,sync,no_root_squash)
+      /opt               {{ nfs_export_to_hosts }}(ro,sync,no_root_squash)
 
 - name: reload NFS exports
   become: true
@@ -101,7 +101,7 @@
     dest: /etc/slurm/
     owner: slurm
     group: slurm
-    mode: "644"
+    mode: "600"
 
 - name: install and start mariadb
   become: true
@@ -135,51 +135,13 @@
             config_file: ''
             priv: "slurm_acct_db.*:all"
 
-#- name: install slurm
-#  become: true
-#  block:
-#    - name: install slurm runtime requirements
-#      dnf:
-#        name:
-#          - hwloc
-#          - libibmad
-#          - libibumad
-#          - lua
-#          - man2html
-#          - numactl
-#          - openssl
-#          - pam-devel
-#          - perl-devel
-#          - rpm-build
-#          - rrdtool-devel
-#    - name: install slurm from rpm files
-#      dnf:
-#        name:
-#          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-20.02.2-1.el8.x86_64.rpm"
-#          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-example-configs-20.02.2-1.el8.x86_64.rpm"
-#          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-slurmctld-20.02.2-1.el8.x86_64.rpm"
-#          - "{{ slurmbuilddir }}/rpmbuild/RPMS/x86_64/slurm-slurmdbd-20.02.2-1.el8.x86_64.rpm"
-#    - name: configure slurm tmpfiles
-#      copy:
-#        content: "d /var/run/slurm 0755 slurm slurm"
-#        dest: /usr/lib/tmpfiles.d/slurm.conf
-#    - block:
-#        - name: fix slurmdbd pidfile path in systemd unit
-#          replace:
-#            path: /usr/lib/systemd/system/slurmdbd.service
-#            regexp: /var/run/slurmdbd.pid
-#            replace: /var/run/slurm/slurmdbd.pid
-#        - name: fix slurmctld pidfile path in systemd unit
-#          replace:
-#            path: /usr/lib/systemd/system/slurmctld.service
-#            regexp: /var/run/slurmctld.pid
-#            replace: /var/run/slurm/slurmctld.pid
-#    - name: enable slurm services
-#      loop:
-#        - slurmdbd
-#        - slurmctld
-#      systemd:
-#        daemon_reload: true  # necessary because we've edited the unit file
-#        name: "{{ item }}"
-#        state: started
-#        enabled: true
+- name: enable slurm services
+  become: true
+  loop:
+    - slurmdbd
+    - slurmctld
+    - slurmd
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
