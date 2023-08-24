@@ -2,10 +2,10 @@
   become: true
   become_user: root
   systemd:
-    name: "postgresql-12"
+    name: "postgresql"
     state: restarted
-- name: restart http server
+- name: restart web server
   become: true
   systemd:
-    name: httpd
+    name: apache2
     state: restarted

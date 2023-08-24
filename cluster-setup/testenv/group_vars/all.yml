@@ -3,18 +3,27 @@
 kive_allowed_hosts: "[\"*\"]"
 kive_listen_port: 8080
 update_kive_source: yes
+kive_server_email: kive-noreply@bccfe.ca
+kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
+kive_subject_prefix: "Kive server"
+kive_backup_path: /data/kive_db_backup
+
+kive_internal_interface: 172.16.131.132
+kive_external_interface: 172.16.234.133
 
 # The following are sensitive, and should be kept secret for a production system.
 kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
 kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
+barman_password: fixme-barman
+streaming_barman_password: fixme-streaming-barman
 
 # The following are defaults, and probably don't need to be changed.
-# - DJango app settings
+# - Django app settings
 kive_venv: /opt/venv_kive
 kive_slurm_path: "{{ kive_venv }}/bin"
 kive_db_name: kive
 kive_db_user: kive
-kive_db_host: head
+kive_db_host: 172.16.131.132
 kive_media_root: /data/kive/media_root
 kive_static_root: /var/www/html/kive/static
 kive_root: /usr/local/share/Kive

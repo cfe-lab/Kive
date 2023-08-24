@@ -94,6 +94,7 @@
       when: kive_requirements.changed
       pip:
         requirements: "{{ kive_root }}/requirements.txt"
+        virtualenv_command: "python3 -m venv"
         virtualenv: "{{ kive_venv }}"
 
 
@@ -101,7 +102,7 @@
   become: true
   apt:
     name:
-      - postgresql
+      - postgresql-client
 
 
 - name: configure mail service for error logging

@@ -2,234 +2,13 @@
 
 - name: install package dependencies
   become: true
-  block:
-    - name: install postgresql
-      dnf:
-        name:
-          - postgresql12-server
-          - httpd
-          - python3-mod_wsgi
-
-
-- name: httpd configuration
-  become: true
-  block:
-    - name: httpd conf file
-      copy:
-        src: 001-kive.conf
-        dest: /etc/httpd/conf.d/
-    - name: kive web conf file
-      template:
-        src: kive_apache.conf.j2
-        dest: /etc/kive/kive_apache.conf
-        owner: kive
-        group: kive
-        mode: "640"
-    - name: server environment variables via systemd
-      blockinfile:
-        path: /etc/systemd/system/httpd.service.d/override.conf
-        create: true
-        backup: true
-        mode: "644"
-        block: |
-          [Service]
-          EnvironmentFile=/etc/kive/kive_apache.conf
-          Environment=APACHE_RUN_USER=kive
-          Environment=APACHE_RUN_GROUP=kive
-    - name: update httpd.conf
-      loop:
-        - from: "Listen 80$"
-          to: "Listen {{ kive_listen_port }}"
-        - from: "User apache$"
-          to: "User {{ kive_httpd_user }}"
-        - from: "Group apache$"
-          to: "Group {{kive_httpd_group }}"
-      replace:
-        path: /etc/httpd/conf/httpd.conf
-        regexp: "{{ item.from }}"
-        replace: "{{ item.to }}"
-    - name: apache log purge settings
-      loop:
-        - from: 'ErrorLog "logs/error_log"'
-          to: ErrorLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/error_log.%Y-%m-%d-%H%M%S 15M
-        - from: 'CustomLog "logs/access_log" combined'
-          to: CustomLog "|/usr/sbin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/httpd/access_log.%Y-%m-%d-%H%M%S 15M" combined
-      replace:
-        path: /etc/httpd/conf/httpd.conf
-        regexp: "{{ item.from }}"
-        replace: "{{ item.to }}"
-    - name: enable httpd
-      systemd:
-        name: httpd
-        state: started
-        enabled: true
-    - name: ensure firewalld is running
-      systemd:
-        name: firewalld
-        state: started
-        enabled: true
-    - name: firewall's internal interface
-      ansible.posix.firewalld:
-        zone: internal
-        interface: "{{ kive_internal_interface }}"
-        permanent: yes
-        immediate: yes
-        state: enabled
-    - name: firewall's external interface
-      ansible.posix.firewalld:
-        zone: external
-        interface: "{{ kive_external_interface }}"
-        permanent: yes
-        immediate: yes
-        state: enabled
-    - name: firewall's internal interface should ACCEPT
-      register: internal_accept
-      ansible.posix.firewalld:
-        zone: internal
-        target: ACCEPT
-        permanent: yes
-        state: enabled
-    - name: reload firewall config
-      when: internal_accept.changed
-      command: firewall-cmd --reload
-    - name: permit https service through firewall
-      ansible.posix.firewalld:
-        zone: external
-        service: https
-        permanent: yes
-        immediate: yes
-        state: enabled
-    - name: permit http service through firewall
-      ansible.posix.firewalld:
-        zone: external
-        service: http
-        permanent: yes
-        immediate: yes
-        state: enabled
-
-
-- name: configure postgres server
-  become: true
-  become_user: postgres
-  block:
-    - name: ensure database is initialized
-      become: true
-      become_user: root
-      command:
-        cmd: "/usr/pgsql-12/bin/postgresql-12-setup initdb"
-        creates: "/var/lib/pgsql/12/data/PG_VERSION"
-    - name: start database service
-      become: true
-      become_user: root
-      systemd:
-        name: "postgresql-12"
-        state: started
-        enabled: true
-    - name: add kive entries to pg_hba.conf
-      block:
-        - name: local connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: local
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: all
-            users: kive
-            method: "scram-sha-256"
-        - name: host connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: host
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: all
-            users: kive
-            source: "{{kive_db_host}}/24"
-            method: "scram-sha-256"
-        - name: barman connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: host
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: all
-            users: barman
-            source: 127.0.0.1/32
-            method: "scram-sha-256"
-        - name: barman IPv6 connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: host
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: all
-            users: barman
-            source: "::1/128"
-            method: "scram-sha-256"
-        - name: streaming_barman connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: host
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: replication
-            users: streaming_barman
-            source: 127.0.0.1/32
-            method: "scram-sha-256"
-        - name: streaming_barman IPv6 connections
-          notify: Restart postgresql service
-          postgresql_pg_hba:
-            contype: host
-            dest: "/var/lib/pgsql/12/data/pg_hba.conf"
-            databases: replication
-            users: streaming_barman
-            source: "::1/128"
-            method: "scram-sha-256"
-    - name: local database settings in postgresql.conf
-      notify: Restart postgresql service
-      loop:
-        # General settings
-        - option: listen_addresses
-          value: "'*'"
-        - option: password_encryption
-          value: scram-sha-256
-        - option: max_connections
-          value: 200
-        # Setting up a streaming backup.
-        - option: wal_level
-          value: "'replica'"
-        - option: max_wal_senders
-          value: 10
-        - option: max_replication_slots
-          value: 10
-          # Additionally, setting up standard WAL archiving.
-        - option: archive_mode
-          value: "on"
-        - option: archive_command
-          value: "'barman-wal-archive localhost kive %p'"
-        # Remove old option that was accidentally added.
-        - option: archiver
-      community.general.ini_file:
-        backup: yes
-        path: /var/lib/pgsql/12/data/postgresql.conf
-        create: no
-        section: null
-        option: "{{ item.option }}"
-        value: "{{ item.value | default }}"
-        state: "{{ 'present' if item.value is defined else 'absent' }}"
-
-
-- name: kive installation
-  block:
-    - name: build kive API
-      become: true
-      command:
-        cmd: "{{ kive_venv }}/bin/python setup.py install"
-        chdir: "{{ kive_root }}/api/"
-        creates: "{{ kive_root }}/api/build/"
-    - name: collect kive's static files
-      notify: restart http server
-      environment:
-        KIVE_STATIC_ROOT: "{{ kive_static_root }}"
-      community.general.django_manage:
-        command: collectstatic
-        app_path: "{{ kive_root }}/kive"
-        virtualenv: "{{ kive_venv }}"
+  apt:
+    name:
+      - postgresql
+      - apache2
+      - apache2-utils
+      - libapache2-mod-wsgi-py3
+      - barman
 
 
 - name: set up log purging
@@ -267,6 +46,257 @@
         state: started
 
 
+- name: web server configuration
+  become: true
+  block:
+    - name: Kive-specific configuration
+      block:
+        - name: install Kive-specific config file
+          copy:
+            src: 001-kive.conf
+            dest: /etc/apache2/conf-available
+        - name: enable Kive-specific configuration
+          command:
+            cmd: "a2enconf 001-kive"
+
+    - name: kive web conf file
+      template:
+        src: kive_apache.conf.j2
+        dest: /etc/kive/kive_apache.conf
+        owner: kive
+        group: kive
+        mode: "640"
+
+    - name: server environment variables via systemd
+      blockinfile:
+        path: /etc/systemd/system/httpd.service.d/override.conf
+        create: true
+        backup: true
+        mode: "644"
+        block: |
+          [Service]
+          EnvironmentFile=/etc/kive/kive_apache.conf
+
+    - name: update apache2 envvars
+      blockinfile:
+        path: /etc/apache2/envvars
+        backup: true
+        block: |
+          export APACHE_RUN_USER=kive
+          export APACHE_RUN_GROUP=kive
+
+    - name: update apache2 port
+      blockinfile:
+        path: /etc/apache2/ports.conf
+        backup: true
+        block: |
+          Listen {{ kive_listen_port }}
+
+    - name: set up rotating apache logs
+      block:
+        - name: add rotating logs configuration file
+          blockinfile:
+            path: /etc/apache2/conf-available/rotate-kive-logs.conf
+            create: true
+            backup: true
+            mode: "644"
+            block: |
+              ErrorLog "|/usr/bin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/apache2/error_log.%Y-%m-%d-%H%M%S 15M"
+              CustomLog "|/usr/bin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/apache2/access_log.%Y-%m-%d-%H%M%S 15M" combined
+        - name: activate rotating logs configuration
+          command:
+            cmd: "a2enconf rotate-kive-logs"
+
+    - name: enable apache2
+      systemd:
+        name: apache2
+        state: started
+        enabled: true
+
+    - name: ensure ufw (the firewall) is running
+      systemd:
+        name: ufw
+        state: started
+        enabled: true
+
+#    - name: firewall's internal interface should ACCEPT
+#      register: internal_accept
+#      community.general.ufw:
+#        default: allow
+#        interface: "{{ kive_internal_interface }}"
+#        direction: incoming
+#        state: enabled
+#
+#    - name: reload internal interface firewall config
+#      when: internal_accept.changed
+#      community.general.ufw:
+#        interface: "{{ kive_internal_interface }}"
+#        state: reloaded
+
+    - name: permit access to Postgres on the internal interface
+      community.general.ufw:
+        interface: "{{ kive_internal_interface }}"
+        direction: in
+        port: 5432
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+    - name: permit https service through firewall
+      community.general.ufw:
+        interface: "{{ kive_external_interface }}"
+        direction: in
+        port: https
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+    - name: permit http service through firewall
+      community.general.ufw:
+        interface: "{{ kive_external_interface }}"
+        direction: in
+        port: http
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+- name: configure postgres server
+  become: true
+  become_user: postgres
+  block:
+#    - name: create data directory
+#      become: true
+#      become_user: root
+#      file:
+#        path: /var/lib/pgsql/data
+#        state: directory
+#        mode: "0755"
+#        owner: postgres
+#        group: postgres
+#
+#    - name: ensure database is initialized
+#      command:
+#        cmd: "/usr/lib/postgresql/14/bin/initdb -D /var/lib/pgsql/data"
+#        creates: "/var/lib/pgsql/data/PG_VERSION"
+
+    - name: start database service
+      systemd:
+        name: "postgresql"
+        state: started
+        enabled: true
+
+    - name: add kive entries to pg_hba.conf
+      block:
+        - name: local connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: local
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: kive
+            method: "scram-sha-256"
+
+        - name: host connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: kive
+            source: "{{ kive_db_host }}/24"
+            method: "scram-sha-256"
+
+        - name: barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: barman
+            source: 127.0.0.1/32
+            method: "scram-sha-256"
+
+        - name: barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: barman
+            source: "::1/128"
+            method: "scram-sha-256"
+
+        - name: streaming_barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: 127.0.0.1/32
+            method: "scram-sha-256"
+
+        - name: streaming_barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: "::1/128"
+            method: "scram-sha-256"
+
+    - name: local database settings in postgresql.conf
+      notify: Restart postgresql service
+      loop:
+        # General settings
+        - option: listen_addresses
+          value: "'*'"
+        - option: password_encryption
+          value: scram-sha-256
+        - option: max_connections
+          value: 200
+        # Setting up a streaming backup.
+        - option: wal_level
+          value: "'replica'"
+        - option: max_wal_senders
+          value: 10
+        - option: max_replication_slots
+          value: 10
+          # Additionally, setting up standard WAL archiving.
+        - option: archive_mode
+          value: "on"
+        - option: archive_command
+          value: "'barman-wal-archive localhost kive %p'"
+        # Remove old option that was accidentally added.
+        - option: archiver
+      community.general.ini_file:
+        backup: yes
+        path: "/etc/postgresql/14/main/postgresql.conf"
+        create: no
+        section: null
+        option: "{{ item.option }}"
+        value: "{{ item.value | default }}"
+        state: "{{ 'present' if item.value is defined else 'absent' }}"
+
+
+- name: kive installation
+  block:
+    - name: build kive API
+      become: true
+      command:
+        cmd: "{{ kive_venv }}/bin/python setup.py install"
+        chdir: "{{ kive_root }}/api/"
+        creates: "{{ kive_root }}/api/build/"
+    - name: collect kive's static files
+      notify: restart http server
+      environment:
+        KIVE_STATIC_ROOT: "{{ kive_static_root }}"
+      community.general.django_manage:
+        command: collectstatic
+        app_path: "{{ kive_root }}/kive"
+        virtualenv: "{{ kive_venv }}"
+
 
 - name: set up kive database
   block:
@@ -284,6 +314,13 @@
         name: kive
         password: "{{ kive_db_password }}"
         db: kive
+    - name: grant kive database user all privileges
+      become: true
+      become_user: postgres
+      postgresql_privs:
+        role: kive
+        db: kive
+        type: database
         priv: ALL
     - name: create barman database user
       become: true
@@ -309,8 +346,8 @@
       environment:
           KIVE_DB_NAME: "{{ kive_db_name }}"
           KIVE_DB_USER: "{{ kive_db_user }}"
-          KIVE_DB_HOST: "{{kive_db_host }}"
-          KIVE_DB_PASSWORD: "{{ kive_db_password}}"
+          KIVE_DB_HOST: "{{ kive_db_host }}"
+          KIVE_DB_PASSWORD: "{{ kive_db_password }}"
       become: true
       become_user: kive
       community.general.django_manage:
@@ -318,22 +355,24 @@
         app_path: "{{ kive_root }}/kive"
         virtualenv: "{{ kive_venv }}"
 
-- name: database backup global config
-  loop:
-    - option: path_prefix
-      value: /usr/pgsql-12/bin/
-    - option: archiver
-      value: "on"
-  community.general.ini_file:
-    backup: yes
-    path: /etc/barman.conf
-    create: no
-    section: barman
-    option: "{{ item.option }}"
-    value: "{{ item.value }}"
+#- name: database backup global config
+#  loop:
+#    - option: path_prefix
+#      value: /usr/pgsql-12/bin/
+#    - option: archiver
+#      value: "on"
+#  community.general.ini_file:
+#    backup: yes
+#    path: /etc/barman.conf
+#    create: no
+#    section: barman
+#    option: "{{ item.option }}"
+#    value: "{{ item.value }}"
 
 - name: database backup kive config
   loop:
+    - option: path_prefix
+      value: /usr/lib/postgresql/14/bin
     - option: description
       value: Kive database
     - option: conninfo
@@ -346,7 +385,7 @@
       value: bzip2
     # archiver = on is necessary for the "fallback" WAL backup that happens via
     # PostgreSQL's archive_command setting in postgresql.conf (which we have
-    # configured to use barman-wal-archive
+    # configured to use barman-wal-archive)
     - option: archiver
       value: "on"
     - option: streaming_conninfo
@@ -414,6 +453,8 @@
       localhost:*:*:barman:{{ barman_password }}
       localhost:*:*:streaming_barman:{{ streaming_barman_password }}
 
+# This variable should be a JSON-formatted list of 2-lists, like
+# [["User One", "userone@bccfe.ca"], ..., ["User N", "userN@bccfe.ca"]]
 - name: parse admin e-mails from json
   set_fact:
     mail_admins_list: "{{ kive_admins | from_json }}"
@@ -421,7 +462,7 @@
 - name: build admin e-mails list
   loop: "{{ mail_admins_list }}"
   set_fact:
-    mail_admins_emails: "{{ (mail_admins_emails | default([])) + [item.1] }}"
+    mail_admins_emails: "{{ (mail_admins_emails | default([])) + [item[1]] }}"
 
 # Copy crontab_mail.py out of the Kive source code, because it gets run by root.
 # This way, it can be locked down more than the Kive source code.
