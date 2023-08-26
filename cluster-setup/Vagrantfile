@@ -85,9 +85,9 @@ Vagrant.configure("2") do |config|
     EOS
   end
 
-  # Note: when using a VMware provider, these IP addresses won't be meaningful
-  # and you'll have to manually configure /etc/hosts.
-  config.vm.provision "shell", inline: <<-EOS
-    echo "#{HEAD_IP}\thead\n#{WORKER_IP}\tworker" >> /etc/hosts
-  EOS
+  # # Note: when using a VMware provider, these IP addresses won't be meaningful
+  # # and you'll have to manually configure /etc/hosts.
+  # config.vm.provision "shell", inline: <<-EOS
+  #   echo "#{HEAD_IP}\thead\n#{WORKER_IP}\tworker" >> /etc/hosts
+  # EOS
 end
