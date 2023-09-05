@@ -6,6 +6,6 @@ djangorestframework==3.14.0
 funcsigs==1.0.2
 pbr==5.11.1
 psycopg2-binary==2.9.6
-pytz==2023.3
+pytz==2023.3.post1
 six==1.16.0
 scandir==1.10.0
