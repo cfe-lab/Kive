@@ -46,7 +46,7 @@
     - name: mount the drive
       ansible.posix.mount:
         path: /data
-        src: "{{ kive_db_host }}:/data"
+        src: "{{ kive_internal_interface }}:/data"
         fstype: nfs
         state: mounted
 
@@ -54,7 +54,7 @@
   become: true
   ansible.posix.mount:
     path: /opt
-    src: "{{ kive_db_host }}:/opt"
+    src: "{{ kive_internal_interface }}:/opt"
     fstype: nfs
     state: mounted
     opts: ro
@@ -63,7 +63,7 @@
   become: true
   ansible.posix.mount:
     path: /usr/local
-    src: "{{ kive_db_host }}:/usr/local"
+    src: "{{ kive_internal_interface }}:/usr/local"
     fstype: nfs
     state: mounted
     opts: ro

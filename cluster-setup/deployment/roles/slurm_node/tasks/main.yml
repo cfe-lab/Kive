@@ -7,6 +7,12 @@
       - slurmd
     state: present
 
+- name: install slurm-client using apt
+  become: true
+  apt:
+    name:
+      - slurm-client
+
 - name: add slurm config files
   become: true
   block:

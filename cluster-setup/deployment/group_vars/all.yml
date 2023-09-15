@@ -8,8 +8,13 @@ kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
 kive_subject_prefix: "Kive server"
 kive_backup_path: /data/kive_db_backup
 
-kive_internal_interface: 172.16.131.137
-kive_external_interface: 172.16.234.138
+# Settings for network services running on the head node,
+# e.g. firewall, NFS, and PostgreSQL.
+kive_internal_interface: 172.16.131.153
+kive_external_interface: 172.16.234.154
+nfs_export_to_hosts: 172.16.131.0/255.255.255.0
+kive_db_host: 172.16.131.153
+kive_db_subnet: 172.16.131.0/24
 
 # The following are sensitive, and should be kept secret for a production system.
 kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
@@ -22,7 +27,6 @@ kive_venv: /opt/venv_kive
 kive_slurm_path: "{{ kive_venv }}/bin"
 kive_db_name: kive
 kive_db_user: kive
-kive_db_host: 172.16.131.137
 kive_media_root: /data/kive/media_root
 kive_static_root: /var/www/html/kive/static
 kive_root: /usr/local/share/Kive

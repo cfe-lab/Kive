@@ -10,6 +10,9 @@
   - name: create /data
     file:
       path: /data
+      owner: root
+      group: root
+      mode: '0755'
       state: directory
 
   - name: move /home to /data/home

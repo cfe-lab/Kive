@@ -164,20 +164,6 @@
   become: true
   become_user: postgres
   block:
-#    - name: create data directory
-#      become: true
-#      become_user: root
-#      file:
-#        path: /var/lib/pgsql/data
-#        state: directory
-#        mode: "0755"
-#        owner: postgres
-#        group: postgres
-#
-#    - name: ensure database is initialized
-#      command:
-#        cmd: "/usr/lib/postgresql/14/bin/initdb -D /var/lib/pgsql/data"
-#        creates: "/var/lib/pgsql/data/PG_VERSION"
 
     - name: start database service
       systemd:
@@ -203,7 +189,7 @@
             dest: "/etc/postgresql/14/main/pg_hba.conf"
             databases: all
             users: kive
-            source: "{{ kive_db_host }}/24"
+            source: "{{ kive_db_subnet }}"
             method: "scram-sha-256"
 
         - name: barman connections
@@ -279,6 +265,9 @@
         value: "{{ item.value | default }}"
         state: "{{ 'present' if item.value is defined else 'absent' }}"
 
+
+- name: Flush handlers
+  meta: flush_handlers
 
 - name: kive installation
   block:

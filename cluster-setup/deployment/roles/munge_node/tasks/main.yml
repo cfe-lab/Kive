@@ -17,5 +17,5 @@
     - name: start munge service
       systemd:
         name: munge
-        state: started
+        state: restarted
         enabled: true
