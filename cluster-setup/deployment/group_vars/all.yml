@@ -10,10 +10,10 @@ kive_backup_path: /data/kive_db_backup
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
-kive_internal_interface: 172.16.131.153
-kive_external_interface: 172.16.234.154
+kive_internal_interface: 172.16.131.157
+kive_external_interface: 172.16.234.158
 nfs_export_to_hosts: 172.16.131.0/255.255.255.0
-kive_db_host: 172.16.131.153
+kive_db_host: 172.16.131.157
 kive_db_subnet: 172.16.131.0/24
 
 # The following are sensitive, and should be kept secret for a production system.
@@ -21,6 +21,12 @@ kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
 kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
 barman_password: fixme-barman
 streaming_barman_password: fixme-streaming-barman
+
+# Slurm installation:
+slurm_src_basename: "slurm-23.02.5"
+slurm_tarball: "slurm-23.02.5.tar.bz2"
+slurm_source_url: "https://download.schedmd.com/slurm/slurm-23.02.5.tar.bz2"
+slurm_sha1_checksum: b3f06d7030bd771a3a94be06e3c0d58a2630a21e
 
 # The following are defaults, and probably don't need to be changed.
 kive_venv: /opt/venv_kive
@@ -33,5 +39,3 @@ kive_root: /usr/local/share/Kive
 # - httpd configuration
 kive_httpd_user: kive
 kive_httpd_group: kive
-# - package variables
-slurmbuilddir: "/root"

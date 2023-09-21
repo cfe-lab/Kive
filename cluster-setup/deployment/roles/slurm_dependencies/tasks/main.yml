@@ -1,0 +1,56 @@
+---
+
+# Installing packages used in the building and running of Slurm, as per
+# https://slurm.schedmd.com/quickstart_admin.html
+# Certain packages need to be installed when Slurm is compiled to enable
+# support for certain features.  In the first play we indicate with
+# comments which packages are used for which features.
+
+- name: install Slurm dependencies
+  become: true
+  apt:
+    name:
+      # cgroups:
+      - libdbus-1-dev
+      - hwloc
+      - libhwloc-dev
+      # AMD GPU support:
+      # FIXME this does not compile correctly; can we find a proper dev package?
+      - rocm-device-libs
+      # HDF5 job profiling:
+      - libhdf5-dev
+      # To generate HTML man pages:
+      - man2html
+      # InfiniBand accounting:
+      - libibmad-dev
+      - libibumad-dev
+      # Intel GPU support:
+      - libvpl-dev
+      # IPMI energy consumption:
+      # FIXME this does not compile correctly; are all the required headers in place?
+      - libfreeipmi-dev
+      # lua support:
+      - liblua5.4-dev
+      # MUNGE support:
+      - libmunge-dev
+      # MariaDB support:
+      - libmariadb-dev
+      # NUMA affinity:
+      - libnuma-dev
+      # NVIDIA GPU support:
+      - libnvidia-ml-dev
+      # PAM support:
+      - libpam0g-dev
+      # PMIx support:
+      - libpmix-dev
+      # Readline support:
+      - libreadline-dev
+      # REST API:
+      - libhttp-parser-dev
+      - libjson-c-dev
+      - libyaml-dev
+      - libjwt-dev
+      # RRD external sensor data collection:
+      - librrd-dev
+      # sview:
+      - libgtk2.0-dev

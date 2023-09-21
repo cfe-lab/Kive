@@ -1,0 +1,80 @@
+---
+
+- name: copy users and groups from head node to workers
+  hosts: workers
+  roles:
+    - copy_users_and_groups
+
+- name: install Slurm dependencies on all hosts
+  hosts: all
+  roles:
+    - slurm_dependencies
+
+- name: create slurm user on all hosts
+  hosts: all
+  become: true
+  tasks:
+    - user:
+        name: slurm
+        system: yes
+        create_home: no
+        uid: 9634
+
+- name: create directory for slurmctld spooling
+  hosts: head
+  become: true
+  tasks:
+    - file:
+        path: /var/spool/slurmctld
+        owner: slurm
+        group: slurm
+        mode: '0755'
+        state: directory
+
+- name: create directories for Slurm config, logging, etc.
+  hosts: all
+  become: true
+  tasks:
+    - loop:
+        - /usr/local/etc/slurm
+        - /var/spool/slurmd
+        - /var/log/slurm
+      file:
+        path: "{{ item }}"
+        owner: slurm
+        group: slurm
+        mode: '0755'
+        state: directory
+
+- name: build Slurm on the head node
+  hosts: head
+  roles:
+    - slurm_builder
+
+- name: set up head node networking
+  hosts: head
+  roles:
+    - head_node_networking
+
+- name: install, configure, and start MUNGE
+  hosts: all
+  roles:
+    - munge_node
+
+- name: install, configure, and start slurmctld (and friends) on the head node
+  hosts: head
+  roles:
+    - slurm_controller
+
+- name: set up worker node networking
+  hosts: workers
+  roles:
+    - worker_node_networking
+
+- name: enable slurmd service
+  hosts: all
+  tasks:
+    - systemd:
+        name: slurmd
+        state: started
+        enabled: true

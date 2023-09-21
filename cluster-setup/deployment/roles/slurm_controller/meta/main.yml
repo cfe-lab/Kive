@@ -1,3 +1,4 @@
 ---
+
 dependencies:
-  - role: slurm_node
+  - slurm_builder

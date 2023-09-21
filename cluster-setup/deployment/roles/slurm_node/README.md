@@ -4,7 +4,7 @@ the Munge authentication service
 
 [munge node]: ../munge_node
 [Slurm Controller]: ../slurm_controller
-[SLurm Workers]: ../slurm_worker
+[SLurm Workers]: ../worker_node_networking
 
 It will:
 

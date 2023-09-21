@@ -1,0 +1,91 @@
+---
+
+- name: check if original /home has been renamed
+  stat: path=/data/home
+  register: data_home
+
+- name: move /home to /data to make it accessible to workers
+  become: true
+  block:
+  - name: create /data
+    file:
+      path: /data
+      owner: root
+      group: root
+      mode: '0755'
+      state: directory
+
+  - name: move /home to /data/home
+    command: mv /home /data/home
+
+  when: not data_home.stat.exists
+
+- name: symbolic link for /home
+  become: true
+  file:
+    path: /home
+    src: /data/home
+    state: link
+
+- name: ensure ufw is running
+  become: true
+  systemd:
+    name: ufw
+    state: started
+    enabled: true
+
+- name: open port for SSH access
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: ssh
+    protocol: tcp
+
+- name: open NFS ports
+  become: true
+  block:
+    - name: open TCP port
+      community.general.ufw:
+        rule: allow
+        port: nfs
+        proto: tcp
+    - name: open UDP port
+      community.general.ufw:
+        rule: allow
+        port: nfs
+        proto: udp
+
+- name: open port for workers to communicate with slurmctld
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: 6817
+    protocol: tcp
+
+- name: install NFS server
+  become: true
+  apt:
+    name:
+      - nfs-kernel-server
+    state: present
+
+- name: start NFS service
+  systemd:
+    name: nfs-server
+    state: started
+    enabled: true
+
+- name: set up NFS exports
+  become: true
+  register: nfs_exports_file
+  blockinfile:
+    path: /etc/exports
+    block: |
+      /data              {{ nfs_export_to_hosts }}(rw,sync,no_all_squash,no_root_squash)
+      /usr/local         {{ nfs_export_to_hosts }}(ro,sync,no_root_squash)
+      /opt               {{ nfs_export_to_hosts }}(ro,sync,no_root_squash)
+
+- name: reload NFS exports
+  become: true
+  when: nfs_exports_file.changed
+  command: exportfs -r

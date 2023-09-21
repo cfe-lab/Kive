@@ -3,7 +3,7 @@ server. It also applies the [Slurm controller] and [Slurm worker] roles.
 
 [Kive node]: ../kive_node
 [Slurm controller]: ../slurm_controller
-[Slurm worker]: ../slurm_worker
+[Slurm worker]: ../worker_node_networking
 
 It includes:
 
