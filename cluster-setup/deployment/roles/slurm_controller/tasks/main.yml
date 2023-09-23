@@ -32,7 +32,7 @@
             config_file: ''
             priv: "slurm_acct_db.*:all"
 
-- name: add slurm config files
+- name: add slurmctld config files
   become: true
   block:
     - name: copy cgroup config file
@@ -61,12 +61,40 @@
     group: slurm
     mode: "600"
 
-- name: enable slurm services
+- name: create directory for slurmctld spooling
   become: true
-  loop:
-    - slurmdbd
-    - slurmctld
-  systemd:
-    name: "{{ item }}"
-    state: started
-    enabled: true
+  file:
+    path: /var/spool/slurmctld
+    owner: slurm
+    group: slurm
+    mode: '0755'
+    state: directory
+
+- name: enable Slurm head-node-only services
+  become: true
+  block:
+    - name: check if the slurmctld service is in place
+      stat: path=/usr/local/lib/systemd/system/slurmctld.service
+      register: slurmctld_service
+
+    - name: fail if the slurmctld service isn't there
+      fail:
+        msg: "slurmctld service is not installed."
+      when: not slurmctld_service.stat.exists
+
+    - name: check if the slurmdbd service is in place
+      stat: path=/usr/local/lib/systemd/system/slurmdbd.service
+      register: slurmdbd_service
+
+    - name: fail if the slurmdbd service isn't there
+      fail:
+        msg: "slurmdbd service is not installed."
+      when: not slurmdbd_service.stat.exists
+
+    - loop:
+      - slurmdbd
+      - slurmctld
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: true

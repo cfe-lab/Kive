@@ -1,4 +1,6 @@
 ---
 
 dependencies:
-  - slurm_builder
+  - munge_node
+  - slurm_dependencies
+  - slurm_configuration

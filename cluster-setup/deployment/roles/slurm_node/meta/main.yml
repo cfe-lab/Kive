@@ -2,3 +2,5 @@
 
 dependencies:
   - munge_node
+  - slurm_dependencies
+  - slurm_configuration

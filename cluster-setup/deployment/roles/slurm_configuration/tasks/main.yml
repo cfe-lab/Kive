@@ -1,0 +1,22 @@
+---
+
+- name: create slurm user on all hosts
+  become: true
+  user:
+    name: slurm
+    system: yes
+    create_home: no
+    uid: 9634
+  register: slurm_user
+
+- name: create directories used by both slurmd and slurmctld
+  become: true
+  loop:
+    - /usr/local/etc/slurm
+    - /var/log/slurm
+  file:
+    path: "{{ item }}"
+    owner: slurm
+    group: slurm
+    mode: '0755'
+    state: directory

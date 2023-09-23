@@ -14,10 +14,8 @@
       group: root
       mode: '0755'
       state: directory
-
   - name: move /home to /data/home
     command: mv /home /data/home
-
   when: not data_home.stat.exists
 
 - name: symbolic link for /home

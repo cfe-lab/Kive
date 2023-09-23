@@ -1,7 +1,6 @@
 ---
 
-- name: check if Slurm is present and has been built
-  # Here, we'll use the systemd service as a proxy.
+- name: check if Slurm is ready to go
   block:
     - name: check if the Slurm systemd service exists
       stat: path=/usr/local/lib/systemd/system/slurmd.service
@@ -12,66 +11,35 @@
         msg: "slurmd systemd service is not in place."
       when: not slurmd_service.stat.exists
 
-  rescue:
-    - name: inform user to build Slurm first and propagate failure to stop the playbook
-      fail:
-        msg: "Before setting up this node, build Slurm using the slurm_builder task on the head node!"
+    - name: check if slurm.conf exists
+      stat: path=/usr/local/etc/slurm/slurm.conf
+      register: slurm_conf
 
-#- name: create slurm user
-#  become: true
-#  user:
-#    name: slurm
-#    system: yes
-#    create_home: no
-#    uid: 9634
+    - name: fail if the conf file isn't there
+      fail:
+        msg: "slurm.conf is not in place."
+      when: not slurm_conf.stat.exists
+
+    - name: check if cgroup.conf exists
+      stat: path=/usr/local/etc/slurm/cgroup.conf
+      register: cgroup_conf
+
+    - name: fail if cgroup.conf file isn't there
+      fail:
+        msg: "cgroup.conf is not in place."
+      when: not cgroup_conf.stat.exists
+
+- name: create directory for Slurm spooling
+  become: true
+  file:
+    path: /var/spool/slurmd
+    owner: slurm
+    group: slurm
+    mode: '0755'
+    state: directory
 
 - name: enable slurmd service
   systemd:
     name: slurmd
     state: started
     enabled: true
-
-#- name: install slurmd using apt
-#  become: true
-#  apt:
-#    name:
-#      - slurmd
-#    state: present
-#
-#- name: install slurm-client using apt
-#  become: true
-#  apt:
-#    name:
-#      - slurm-client
-
-#- name: add slurm config files
-#  become: true
-#  block:
-#    - name: copy cgroup config file
-#      notify: reconfigure slurm
-#      copy:
-#        src: cgroup.conf
-#        dest: /usr/local/etc
-#        owner: slurm
-#        group: slurm
-#        mode: "644"
-#    - name: generate and copy slurm config file
-#      notify: reconfigure slurm
-#      template:
-#        src: slurm.conf.j2
-#        dest: /usr/local/etc/slurm.conf
-#        owner: slurm
-#        group: slurm
-#        mode: "644"
-
-#- name: network drive mounts
-#  become: true
-#  block:
-#  - loop: "{{ network_mounts }}"
-#    name: Load network drive mounts from env_vars.yml
-#    ansible.posix.mount:
-#      path: "{{ item.path }}"
-#      src: "{{ item.src }}"
-#      fstype: "{{ item.fstype }}"
-#      state: "{{ item.state }}"
-#      opts: "{{ item.opts }}"

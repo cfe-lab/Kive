@@ -10,10 +10,10 @@ kive_backup_path: /data/kive_db_backup
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
-kive_internal_interface: 172.16.131.157
-kive_external_interface: 172.16.234.158
+kive_internal_interface: 172.16.131.159
+kive_external_interface: 172.16.234.160
 nfs_export_to_hosts: 172.16.131.0/255.255.255.0
-kive_db_host: 172.16.131.157
+kive_db_host: 172.16.131.159
 kive_db_subnet: 172.16.131.0/24
 
 # The following are sensitive, and should be kept secret for a production system.
@@ -29,8 +29,13 @@ slurm_source_url: "https://download.schedmd.com/slurm/slurm-23.02.5.tar.bz2"
 slurm_sha1_checksum: b3f06d7030bd771a3a94be06e3c0d58a2630a21e
 
 # The following are defaults, and probably don't need to be changed.
+# In a typical deployment, Kive, its virtualenv, and slurm are only "installed"
+# by the head node and shared to the compute nodes via NFS, so kive_venv,
+# kive_slurm_path, and kive_root should be paths that are on the shared partitions
+# (typically /opt and /usr/local).  If one would rather install Kive and slurm
+# locally to each node, then these paths and/or the NFS shares should be reworked.
 kive_venv: /opt/venv_kive
-kive_slurm_path: "{{ kive_venv }}/bin"
+kive_slurm_path: /usr/local/bin
 kive_db_name: kive
 kive_db_user: kive
 kive_media_root: /data/kive/media_root
