@@ -1,0 +1,11 @@
+#cloud-config
+
+package_update: true
+
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEUNanzV3k0NPiCaVCPR9lf/JYVhvH+iLn3DzK0fNbX nknight@apgar
+
+packages:
+  - python3

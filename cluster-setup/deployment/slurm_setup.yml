@@ -1,26 +1,30 @@
 ---
 
-- name: build Slurm on the head node
+- name: configure head node
   hosts: head
-  roles:
-    - slurm_builder
+  tasks:
+    - name: set up head node networking
+      include_role:
+        name: head_node_networking
+    - name: build Slurm
+      include_role:
+        name: slurm_builder
+    - name: configure and start slurmctld and supporting services
+      include_role:
+        name: slurm_controller
+    - name: configure and start slurmd
+      include_role:
+        name: slurm_node
 
-- name: set up head node networking
-  hosts: head
-  roles:
-    - head_node_networking
-
-- name: configure and start slurmctld (and friends) on the head node
-  hosts: head
-  roles:
-    - slurm_controller
-
-- name: set up worker node networking
+- name: configure workers
   hosts: workers
-  roles:
-    - worker_node_networking
-
-- name: configure and start slurmd on all nodes
-  hosts: all
-  roles:
-    - slurm_node
+  tasks:
+    - name: synchronize users and groups from the head node
+      include_role:
+        name: copy_users_and_groups
+    - name: set up worker node networking
+      include_role:
+        name: worker_node_networking
+    - name: configure and start slurmd
+      include_role:
+        name: slurm_node
