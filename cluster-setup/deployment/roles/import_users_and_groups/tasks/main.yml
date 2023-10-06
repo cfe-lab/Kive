@@ -1,0 +1,97 @@
+---
+
+- name: prepare dict of users
+  register: user_dict
+  community.general.read_csv:
+    path: passwd
+    delimiter: ":"
+    key: name
+    fieldnames:
+      - name
+      - passwdx
+      - uid
+      - gid
+      - info
+      - home
+      - shell
+
+- name: parse shadow file to get hashed passwords
+  register: shadow_dict
+  community.general.read_csv:
+    path: shadow
+    delimiter: ":"
+    key: name
+    fieldnames:
+      - name
+      - passwd
+      - lastchanged
+      - min
+      - max
+      - warn
+      - inactive
+      - expire
+
+- name: read system groups
+  register: group_dict
+  community.general.read_csv:
+    path: group
+    delimiter: ":"
+    key: gid
+    fieldnames:
+      - name
+      - passwdx
+      - gid
+      - users
+
+- name: collate groups by member
+  block:
+    - name: get users' primary groups
+      loop: "{{ user_dict.list }}"
+      when: item.name in imported_users
+      set_fact:
+        primary_groups: "{{ primary_groups | default([]) }} + FIXME how do you append to a list"
+    - name: organize groups by name
+      loop: "{{ group_dict.list }}"
+      when: (item.name in imported_groups) or (item.name in imported_users)
+      set_fact:
+        group_name: "{{ item.name }}"
+        group_members: "{{ item.users.split(',') }}"
+      register: groups_by_name
+
+    - name: create mapping of member to groups that the member belongs to
+      with_subelements:
+        - "{{ groups_by_name.results }}"
+        - ansible_facts.group_members
+      when: item.1 != ''
+      set_fact:
+        user_groups: "{{ user_groups | default({}) | combine({ item.1: [item.0.ansible_facts.group_name] }, list_merge='append') }}"
+
+- name: create groups
+  become: true
+  block:
+    - name: create imported users' primary groups
+      loop: "{{ user_dict.list }}"
+      when: item.name in imported_users
+      group:
+        gid: "{{ item.gid }}"
+        name: "{{ group_dict[item.gid].name }}"
+    - name: create all other imported groups
+      loop: "{{ group_dict.list }}"
+      when: (item.name in imported_groups) and (item.name not in imported_users)
+      group:
+        gid: "{{ item.gid }}"
+        name: "{{ item.name }}"
+
+- name: create users
+  become: true
+  loop: "{{ user_list.list }}"
+  when: item.name in imported_users
+  user:
+    uid: "{{ item.uid }}"
+    create_home: yes
+    home: "{{ item.home }}"
+    name: "{{ item.name }}"
+    password: "{{ shadow_dict.dict[item.name]['passwd'] }}"
+    group: "{{ group_dict[item.gid].name }}"
+    groups: "{{ ansible_facts['user_groups'][item.name] }}"
+    append: true

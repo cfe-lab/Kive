@@ -10,11 +10,24 @@ kive_backup_path: /data/kive_db_backup
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
-kive_internal_interface: 172.16.131.159
-kive_external_interface: 172.16.234.160
+kive_internal_interface: 172.16.131.161
+kive_external_interface: 172.16.234.162
 nfs_export_to_hosts: 172.16.131.0/255.255.255.0
-kive_db_host: 172.16.131.159
+kive_db_host: 172.16.131.161
 kive_db_subnet: 172.16.131.0/24
+
+# DHCP configuration.
+dhcp_subnet: 192.168.1.0
+dhcp_netmask: 255.255.255.0
+dhcp_broadcast: 192.168.1.255
+dhcp_router: 192.168.1.1
+dhcp_range: [192.168.1.100, 192.168.1.200]
+dhcpd_interface: eth1
+# This creates DHCP reservations for the compute nodes.
+compute_nodes:
+  - name: worker
+    ip: 192.168.1.2
+    mac: "ab:cd:ef:01:23:45"
 
 # The following are sensitive, and should be kept secret for a production system.
 kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo

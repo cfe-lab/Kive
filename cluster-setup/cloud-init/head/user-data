@@ -14,13 +14,7 @@ write_files:
     path: /usr/local/src/requirements.txt
     owner: root
     permissions: '0644'
-
-users:
-  - name: root
-  - name: vagrant
-
-ssh_keys:
-  - ed25519_private: |
+  - content: |
       -----BEGIN OPENSSH PRIVATE KEY-----
       b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
       QyNTUxOQAAACDRFDWp81d5NDT4gmlQj0fZX/yWFYbx/oi59w8ytHzW1wAAAJDnSvuM50r7
@@ -28,9 +22,18 @@ ssh_keys:
       AAAECdC7/YFOM3wPov21YaLaa0qBXAImV6F2xvUml2Q6+bUtEUNanzV3k0NPiCaVCPR9lf
       /JYVhvH+iLn3DzK0fNbXAAAADW5rbmlnaHRAYXBnYXI=
       -----END OPENSSH PRIVATE KEY-----
-  - ed25519_public: |
+    path: /root/.ssh/id_ed25519
+    owner: root
+    permissions: '0600'
+  - content: |
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEUNanzV3k0NPiCaVCPR9lf/JYVhvH+iLn3DzK0fNbX nknight@apgar
-  - ssh_authorized_keys: |
+    path: /root/.ssh/id_ed25519.pub
+    owner: root
+    permissions: '0644'
+
+users:
+  - name: root
+    ssh_authorized_keys: |
       ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINEUNanzV3k0NPiCaVCPR9lf/JYVhvH+iLn3DzK0fNbX nknight@apgar
 
 runcmd:

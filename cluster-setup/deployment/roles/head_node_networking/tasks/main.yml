@@ -87,3 +87,36 @@
   become: true
   when: nfs_exports_file.changed
   command: exportfs -r
+
+- name: install DHCP server
+  become: true
+  apt:
+    name:
+      - isc-dhcp-server
+
+- name: configure DHCP server
+  become: true
+  block:
+    - name: write conf file
+      template:
+        src: dhcpd.conf.j2
+        dest: /etc/dhcp/dhcpd.conf
+        owner: root
+        group: root
+        mode: "644"
+        backup: true
+    - name: tell dhcpd which interface to serve DHCP requests on
+      template:
+        src: isc-dhcp-server.j2
+        dest: /etc/default/isc-dhcp-server
+        owner: root
+        group: root
+        mode: "644"
+        backup: true
+
+- name: (re)start DHCP server
+  become: true
+  systemd:
+    name: isc-dhcp-server
+    state: restarted
+    enabled: true

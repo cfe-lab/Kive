@@ -1,0 +1,18 @@
+# This dhcpd configuration managed by Ansible.  Changes to this file will not be
+# persisted if the Ansible playbooks used to set up this machine are rerun!
+
+default-lease-time 600;
+max-lease-time 7200;
+
+subnet {{ dhcp_subnet }} netmask {{ dhcp_netmask }} {
+  range {{ dhcp_range[0] }} {{ dhcp_range [1] }};
+  option routers {{ dhcp_router }};
+  option broadcast-address {{ dhcp_broadcast }};
+}
+
+{% for node in compute_nodes %}
+host {{ node.name }} {
+  hardware ethernet {{ node.mac }}
+  fixed-address {{ node.ip }}
+}
+{% endfor %}
