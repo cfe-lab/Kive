@@ -1,9 +1,9 @@
 #! /usr/bin/env python
 
 import csv
-from typing import Iterable, Mapping
+from typing import Optional, Iterable, Mapping
 from collections.abc import Container
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from io import TextIOBase
 
 import argparse
@@ -14,27 +14,33 @@ import yaml
 class ShadowEntry:
     name: str
     hashed_password: str
-    last_changed: str
-    min: int
-    max: int
-    warn: int
-    inactive: int
-    expire: int
+    last_changed: Optional[int]
+    min: Optional[int]
+    max: Optional[int]
+    warn: Optional[int]
+    inactive: Optional[int]
+    expire: Optional[int]
+
+def int_or_none(possible_int_string: str) -> Optional[int]:
+    try:
+        return int(possible_int_string)
+    except ValueError:
+        return None
 
 def parse_shadow(shadow_file: TextIOBase) -> dict[str, ShadowEntry]:
-    shadow_csv = csv.reader(shadow_file, csv.Dialect(delimiter=":"))
+    shadow_csv = csv.reader(shadow_file, delimiter=":")
     shadow_entries: dict[str, ShadowEntry] = {}
     for row in shadow_csv:
         name: str = row[0]
         shadow_entries[name] = ShadowEntry(
             name=name,
             hashed_password=row[1],
-            last_changed=int(row[2]),
-            min=int(row[3]),
-            max=int(row[4]),
-            warn=int(row[5]),
-            inactive=int(row[6]),
-            expire=int(row[7]),
+            last_changed=int_or_none(row[2]),
+            min=int_or_none(row[3]),
+            max=int_or_none(row[4]),
+            warn=int_or_none(row[5]),
+            inactive=int_or_none(row[6]),
+            expire=int_or_none(row[7]),
         )
     return shadow_entries
 
@@ -49,7 +55,7 @@ class PasswdEntry:
     shell: str
 
 def parse_passwd(passwd_file: TextIOBase) -> dict[str, PasswdEntry]:
-    passwd_csv = csv.reader(passwd_file, csv.Dialect(delimiter=":"))
+    passwd_csv = csv.reader(passwd_file, delimiter=":")
     passwd_entries: dict[str, PasswdEntry] = {}
     for row in passwd_csv:
         name: str = row[0]
@@ -71,13 +77,22 @@ class GroupEntry:
     gid: int
     users: list[str]
 
-def parse_group(group_file: TextIOBase) -> dict[int, GroupEntry]:
-    group_csv = csv.reader(group_file, csv.Dialect(delimiter=":"))
+def parse_group(
+    group_file: TextIOBase,
+    sudo_original_name: str,
+    sudo_new_gid: int,
+    sudo_new_name: str,
+) -> dict[int, GroupEntry]:
+    group_csv = csv.reader(group_file, delimiter=":")
     group_entries: dict[GroupEntry] = {}
     for row in group_csv:
         gid: int = int(row[2])
+        name: str = row[0]
+        if name == sudo_original_name:
+            gid = sudo_new_gid
+            name = sudo_new_name
         group_entries[gid] = GroupEntry(
-            name=row[0],
+            name=name,
             passwdx=row[1],
             gid=gid,
             users=row[3].split(","),
@@ -142,8 +157,11 @@ def get_user_primary_groups(
     group_entries: dict[int, GroupEntry],
 ) -> dict[str, GroupEntry]:
     primary_groups: dict[str, GroupEntry] = {}
+    groups_by_name: dict[str, GroupEntry] = {}
+    for group_entry in group_entries.values():
+        groups_by_name[group_entry.name] = group_entry
     for user in users:
-        primary_groups[user.name] = group_entries[user.gid]
+        primary_groups[user.name] = groups_by_name[user.primary_group]
     return primary_groups
 
 
@@ -224,10 +242,22 @@ def main():
         "users_and_groups",
         help="YAML file with `users` (list of usernames to export) and `groups` (list of group names to export)",
     )
+    parser.add_argument(
+        "sudo_original_name",
+        help="Name of the wheel/sudo group on the exporting machine",
+    )
+    parser.add_argument(
+        "sudo_new_gid",
+        help="GID of the wheel/sudo group on the importing machine",
+    )
+    parser.add_argument(
+        "sudo_new_name",
+        help="Name of the wheel/sudo group on the importing machine",
+    )
     args = parser.parse_args()
 
     with open(args.users_and_groups, "r") as f:
-        users_and_groups = yaml.load(f)
+        users_and_groups = yaml.safe_load(f)
 
     users_to_export: list[str] = users_and_groups["users"]
     groups_to_export: list[str] = users_and_groups["groups"]
@@ -239,7 +269,12 @@ def main():
         shadow_entries: dict[str, ShadowEntry] = parse_shadow(f)
 
     with open(args.group, "r") as f:
-        group_entries: dict[str, GroupEntry] = parse_group(f)
+        group_entries: dict[str, GroupEntry] = parse_group(
+            f,
+            args.sudo_original_name,
+            int(args.sudo_new_gid),
+            args.sudo_new_name,
+        )
 
     for_export: ExportedUsersAndGroups = exported_users_and_groups(
         users_to_export,
@@ -249,9 +284,9 @@ def main():
         group_entries=group_entries,
     )
     serialized = {
-        "users": [x.asdict() for x in for_export.users],
-        "primary_groups": [x.asdict() for x in for_export.primary_groups],
-        "other_groups": [x.asdict() for x in for_export.other_groups],
+        "users": [asdict(x) for x in for_export.users],
+        "primary_groups": [asdict(x) for x in for_export.primary_groups],
+        "other_groups": [asdict(x) for x in for_export.other_groups],
     }
     with open(args.out, "w") as f:
         yaml.dump(serialized, f)
