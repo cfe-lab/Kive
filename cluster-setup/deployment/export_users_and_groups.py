@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import csv
-from typing import Optional, Iterable, Mapping
+from typing import Optional, Iterable, Mapping, TypedDict
 from collections.abc import Container
 from dataclasses import dataclass, field, asdict
 from io import TextIOBase
@@ -77,22 +77,13 @@ class GroupEntry:
     gid: int
     users: list[str]
 
-def parse_group(
-    group_file: TextIOBase,
-    sudo_original_name: str,
-    sudo_new_gid: int,
-    sudo_new_name: str,
-) -> dict[int, GroupEntry]:
+def parse_group(group_file: TextIOBase) -> dict[int, GroupEntry]:
     group_csv = csv.reader(group_file, delimiter=":")
     group_entries: dict[GroupEntry] = {}
     for row in group_csv:
         gid: int = int(row[2])
-        name: str = row[0]
-        if name == sudo_original_name:
-            gid = sudo_new_gid
-            name = sudo_new_name
         group_entries[gid] = GroupEntry(
-            name=name,
+            name=row[0],
             passwdx=row[1],
             gid=gid,
             users=row[3].split(","),
@@ -104,23 +95,33 @@ def get_other_groups_by_user(
     groups_to_export: Container[str],
     passwd_entries: dict[int, PasswdEntry],
     group_entries: dict[int, GroupEntry],
+    old_sudo: Optional[str],
+    new_sudo: Optional[str],
 ) -> dict[str, list[str]]:
     """
     Assemble a mapping of username to the (non-primary) groups that this user belongs to.
     """
+    if old_sudo is not None:
+        assert new_sudo is not None, "Either both old and new sudo group names must be specified or neither"
+
     groups_by_user: dict[str, list[str]] = {}
     for user in users_to_export:
         groups_by_user[user] = []
 
     for gid, group_entry in group_entries.items():
         group_name: str = group_entry.name
-        if group_name not in groups_to_export:
-            continue
-        for user in group_entry.users:
-            if user in groups_by_user:
-                passwd_entry: PasswdEntry = passwd_entries[user]
-                if gid != passwd_entry.gid:  # check if this is the primary group
-                    groups_by_user[user].append(group_name)
+
+        if old_sudo is not None and group_name == old_sudo:
+            for user in group_entry.users:
+                if user in groups_by_user:
+                    groups_by_user[user].append(new_sudo)
+
+        elif group_name in groups_to_export:
+            for user in group_entry.users:
+                if user in groups_by_user:
+                    passwd_entry: PasswdEntry = passwd_entries[user]
+                    if gid != passwd_entry.gid:  # check if this is the primary group
+                        groups_by_user[user].append(group_name)
 
     return groups_by_user
 
@@ -178,6 +179,8 @@ def exported_users_and_groups(
     passwd_entries: Mapping[str, PasswdEntry],
     shadow_entries: Mapping[str, ShadowEntry],
     group_entries: Mapping[int, GroupEntry],
+    old_sudo: Optional[str],
+    new_sudo: Optional[str],
 ) -> ExportedUsersAndGroups:
 
     other_groups_by_user: dict[str, list[str]] = get_other_groups_by_user(
@@ -185,6 +188,8 @@ def exported_users_and_groups(
         groups_to_export,
         passwd_entries,
         group_entries,
+        old_sudo,
+        new_sudo,
     )
 
     users: dict[str, User] = {}
@@ -214,6 +219,10 @@ def exported_users_and_groups(
     )
 
 
+class SudoGroup(TypedDict):
+    old: Optional[str] = None
+    new: Optional[str] = None
+
 def main():
     parser = argparse.ArgumentParser(
         "Collate user and group information for recreating them on a new server"
@@ -242,18 +251,6 @@ def main():
         "users_and_groups",
         help="YAML file with `users` (list of usernames to export) and `groups` (list of group names to export)",
     )
-    parser.add_argument(
-        "sudo_original_name",
-        help="Name of the wheel/sudo group on the exporting machine",
-    )
-    parser.add_argument(
-        "sudo_new_gid",
-        help="GID of the wheel/sudo group on the importing machine",
-    )
-    parser.add_argument(
-        "sudo_new_name",
-        help="Name of the wheel/sudo group on the importing machine",
-    )
     args = parser.parse_args()
 
     with open(args.users_and_groups, "r") as f:
@@ -261,6 +258,10 @@ def main():
 
     users_to_export: list[str] = users_and_groups["users"]
     groups_to_export: list[str] = users_and_groups["groups"]
+    sudo_group: SudoGroup = SudoGroup()
+    if users_and_groups.get("sudo_group") is not None:
+        sudo_group["old"] = users_and_groups["sudo_group"]["old"]
+        sudo_group["new"] = users_and_groups["sudo_group"]["new"]
 
     with open(args.passwd, "r") as f:
         passwd_entries: dict[str, PasswdEntry] = parse_passwd(f)
@@ -269,12 +270,7 @@ def main():
         shadow_entries: dict[str, ShadowEntry] = parse_shadow(f)
 
     with open(args.group, "r") as f:
-        group_entries: dict[str, GroupEntry] = parse_group(
-            f,
-            args.sudo_original_name,
-            int(args.sudo_new_gid),
-            args.sudo_new_name,
-        )
+        group_entries: dict[str, GroupEntry] = parse_group(f)
 
     for_export: ExportedUsersAndGroups = exported_users_and_groups(
         users_to_export,
@@ -282,6 +278,8 @@ def main():
         passwd_entries=passwd_entries,
         shadow_entries=shadow_entries,
         group_entries=group_entries,
+        old_sudo=sudo_group["old"],
+        new_sudo=sudo_group["new"],
     )
     serialized = {
         "users": [asdict(x) for x in for_export.users],

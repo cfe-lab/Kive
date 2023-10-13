@@ -25,12 +25,38 @@
     src: /data/home
     state: link
 
-- name: ensure ufw is running
+- name: enable packet forwarding
+  become: true
+  blockinfile:
+    path: /etc/ufw/sysctl.conf
+    block: |
+      net/ipv4/ip_forward=1
+
+- name: configure IP masquerading
+  become: true
+  blockinfile:
+    path: /etc/ufw/before.rules
+    block: |
+       *nat
+       :POSTROUTING ACCEPT [0:0]
+       -A POSTROUTING -s {{ nat_internal_subnet }} --protocol ! 41 -o {{ nat_external_interface }} -j MASQUERADE
+       COMMIT
+
+- name: restart ufw to allow the new rules to take effect
   become: true
   systemd:
     name: ufw
-    state: started
+    state: restarted
     enabled: true
+
+- name: allow forwarded packets from the compute nodes to traverse the firewall
+  become: true
+  community.general.ufw:
+    rule: allow
+    route: true
+    interface_in: {{ nat_internal_interface }}
+    interface_out: {{ nat_external_interface }}
+    from: {{ nat_internal_subnet }}
 
 - name: open port for SSH access
   become: true
