@@ -4,15 +4,15 @@
 default-lease-time 600;
 max-lease-time 7200;
 
-subnet {{ dhcp_subnet }} netmask {{ dhcp_netmask }} {
-  range {{ dhcp_range[0] }} {{ dhcp_range [1] }};
-  option routers {{ dhcp_router }};
-  option broadcast-address {{ dhcp_broadcast }};
+subnet {{ internal_subnet }} netmask {{ internal_netmask }} {
+  range {{ internal_dhcp_range[0] }} {{ internal_dhcp_range [1] }};
+  option routers {{ head_internal_address }};
+  option broadcast-address {{ internal_broadcast }};
 }
 
 {% for node in compute_nodes %}
 host {{ node.name }} {
-  hardware ethernet {{ node.mac }}
-  fixed-address {{ node.ip }}
+  hardware ethernet {{ node.mac }};
+  fixed-address {{ node.ip }};
 }
 {% endfor %}

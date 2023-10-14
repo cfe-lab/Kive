@@ -1,0 +1,10 @@
+network:
+    ethernets:
+        internal0:
+            dhcp4: false
+            addresses:
+              - "{{ head_internal_address }}/{{ head_internal_mask_bits }}"
+            match:
+                macaddress: "{{ head_internal_interface_mac }}"
+            set-name: {{ head_internal_interface }}
+    version: 2

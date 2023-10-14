@@ -39,7 +39,7 @@
     block: |
        *nat
        :POSTROUTING ACCEPT [0:0]
-       -A POSTROUTING -s {{ nat_internal_subnet }} --protocol ! 41 -o {{ nat_external_interface }} -j MASQUERADE
+       -A POSTROUTING -s {{ internal_subnet }}/{{ internal_mask_bits }} -o {{ head_external_interface }} -j MASQUERADE
        COMMIT
 
 - name: restart ufw to allow the new rules to take effect

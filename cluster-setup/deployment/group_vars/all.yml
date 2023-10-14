@@ -16,23 +16,25 @@ nfs_export_to_hosts: 192.168.64.0/255.255.255.0
 kive_db_host: 192.168.64.9
 kive_db_subnet: 192.168.64.0/24
 
-# DHCP configuration.
-dhcp_subnet: 192.168.1.0
-dhcp_netmask: 255.255.255.0
-dhcp_broadcast: 192.168.1.255
-dhcp_router: 192.168.1.1
-dhcp_range: [192.168.1.100, 192.168.1.200]
-dhcpd_interface: eth1
+# Internal network (i.e. the network that connects the head node and compute nodes)
+# configuration.
+internal_subnet: 192.168.1.0
+internal_netmask: 255.255.255.0
+internal_mask_bits: 24
+internal_broadcast: 192.168.1.255
+internal_dhcp_range: [192.168.1.100, 192.168.1.200]
+
+head_internal_interface: eth1
+head_internal_interface_mac: "52:54:00:b9:01:14"
+head_external_interface: eth0
+head_internal_address: 192.168.1.1
+head_internal_mask_bits: 24
+
 # This creates DHCP reservations for the compute nodes.
 compute_nodes:
   - name: worker
     ip: 192.168.1.2
     mac: "ab:cd:ef:01:23:45"
-
-# NAT settings for the compute nodes.
-nat_external_interface: eth0
-nat_internal_interface: eth1
-nat_internal_subnet: 192.168.1.0/24
 
 # The following are sensitive, and should be kept secret for a production system.
 kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
