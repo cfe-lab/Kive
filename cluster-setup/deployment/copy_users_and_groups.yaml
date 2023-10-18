@@ -1,0 +1,6 @@
+---
+
+- name: copy users and groups from head to workers
+  hosts: workers
+  roles:
+    - copy_users_and_groups

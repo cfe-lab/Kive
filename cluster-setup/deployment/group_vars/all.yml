@@ -64,3 +64,7 @@ kive_root: /usr/local/share/Kive
 # - httpd configuration
 kive_httpd_user: kive
 kive_httpd_group: kive
+
+copied_groups:
+  - kive
+  - sudo
