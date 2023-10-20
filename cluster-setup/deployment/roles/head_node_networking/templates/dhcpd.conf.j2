@@ -12,6 +12,7 @@ subnet {{ internal_subnet }} netmask {{ internal_netmask }} {
 
 {% for node in compute_nodes %}
 host {{ node.name }} {
+  option host-name {{ node.name }};
   hardware ethernet {{ node.mac }};
   fixed-address {{ node.ip }};
 }

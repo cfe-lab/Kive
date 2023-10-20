@@ -1,14 +1,13 @@
-This role creates users and deploys files that are common to the [Slurm
-Controller] and [Slurm Workers]. It uses the [munge node] role to set up
-the Munge authentication service
+This role confirms that configuration files required by slurmd are in place
+and then spins up the slurmd service.  It depends on:
+- the [munge node] role to set up the MUNGE authentication service;
+- the [slurm dependencies] role to install slurmd's dependencies; and
+- the [slurm configuration] role to create the `slurm` user and system directories
+  used by slurmd.
+
+In a typical cluster configuration, the configuration files required will be mounted
+via NFS, so we don't actually install them in this role or in the dependencies.
 
 [munge node]: ../munge_node
-[Slurm Controller]: ../slurm_controller
-[SLurm Workers]: ../worker_node_networking
-
-It will:
-
-- Create a user called `slurm` with a consistent UID
-- Creates the directories that Slurm requires
-- Put copies of the shared configuration files (that `slurmd` and
-  `slurmctld` both use) in the appropriate places
+[slurm dependencies]: ../slurm_dependencies
+[slurm configuration]: ../slurm_configuration
