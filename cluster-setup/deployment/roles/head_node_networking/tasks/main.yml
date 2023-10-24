@@ -54,9 +54,9 @@
   community.general.ufw:
     rule: allow
     route: true
-    interface_in: {{ nat_internal_interface }}
-    interface_out: {{ nat_external_interface }}
-    from: {{ nat_internal_subnet }}
+    interface_in: "{{ head_internal_interface }}"
+    interface_out: "{{ head_external_interface }}"
+    from: "{{ internal_subnet }}/{{ internal_mask_bits }}"
 
 - name: open port for SSH access
   become: true
@@ -85,6 +85,11 @@
     rule: allow
     port: 6817
     protocol: tcp
+
+- name: enable ufw
+  become: true
+  community.general.ufw:
+    state: enabled
 
 - name: install NFS server
   become: true

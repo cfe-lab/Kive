@@ -1,0 +1,50 @@
+---
+
+- name: create a single partition on each of the physical volumes
+  loop: "{{ data_physical_volumes }}"
+  community.general.parted:
+    device: "{{ item }}"
+    number: 1
+    state: present
+    label: gpt
+
+- name: construct a list of the partition names
+  block:
+    - name: initialize the list as empty
+      set_fact:
+        data_partition_names: []
+    - name: append names to the list
+      loop: "{{ data_physical_volumes }}"
+      set_fact:
+        data_partition_names: "{{ data_partition_names + [item ~ '1'] }}"
+
+- name: create a volume group out of the data partitions
+  lvg:
+      vg: data-vg
+      pvs: "{{ data_partition_names | join(',') }}"
+
+- name: create a logical volume from the volume group
+  community.general.lvol:
+    vg: data-vg
+    lv: data-lv
+    size: 100%FREE
+
+- name: create the filesystem
+  community.general.filesystem:
+    fstype: ext4
+    dev: /dev/data-vg/data-lv
+
+- name: create the /data mount point
+  file:
+    path: /data
+    owner: root
+    group: root
+    mode: '0755'
+    state: directory
+
+- name: mount the filesystem
+  mount:
+    path: /data
+    src: /dev/data-vg/data-lv
+    fstype: ext4
+    state: mounted

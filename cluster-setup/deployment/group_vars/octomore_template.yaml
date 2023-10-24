@@ -1,20 +1,24 @@
 ---
+# These are settings appropriate for Octomore.  Copy this file to
+# "all.yml" and fill in the required passwords when deploying.
+# Most of the network information should be already set appropriately.
+
 # Variables needed to set up Kive.
 kive_allowed_hosts: "[\"*\"]"
-kive_listen_port: 8080
+kive_listen_port: 80
 update_kive_source: yes
 kive_server_email: kive-noreply@bccfe.ca
 kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
 kive_subject_prefix: "Kive server"
-kive_backup_path: /data/kive_db_backup
+kive_backup_path: /media/backup/
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
-kive_internal_interface: 192.168.64.9
-kive_external_interface: 192.168.64.9
-nfs_export_to_hosts: 192.168.64.0/255.255.255.0
-kive_db_host: 192.168.64.9
-kive_db_subnet: 192.168.64.0/24
+kive_internal_interface: 192.168.1.1
+kive_external_interface: 192.168.69.86
+nfs_export_to_hosts: 192.168.1.0/255.255.255.0
+kive_db_host: 192.168.1.1
+kive_db_subnet: 192.168.1.0/24
 
 # Internal network (i.e. the network that connects the head node and compute nodes)
 # configuration.
@@ -25,8 +29,8 @@ internal_broadcast: 192.168.1.255
 internal_dhcp_range: [192.168.1.100, 192.168.1.200]
 
 head_internal_interface: eth1
-head_internal_interface_mac: "52:54:00:b9:01:14"
-head_external_interface: eth0
+head_internal_interface_mac: "00:1e:67:fe:fb:76"
+head_external_interface: eno0
 head_internal_address: 192.168.1.1
 head_internal_mask_bits: 24
 
@@ -34,9 +38,6 @@ head_internal_mask_bits: 24
 # Slow nodes: b01 through B03.  The rest are "fast nodes".
 # As of August 2020, b01 is broken and not spun up.
 compute_nodes:
-#  - name: worker
-#    ip: 192.168.1.2
-#    mac: "ab:cd:ef:01:23:45"
   - name: b01
     ip: 192.168.1.2
     mac: "06:B3:ED:E6:A2:66"
@@ -110,3 +111,6 @@ kive_httpd_group: kive
 copied_groups:
   - kive
   - sudo
+
+data_physical_volumes:
+  - /dev/sdb
