@@ -83,7 +83,7 @@
       when: kive_requirements.changed
       pip:
         requirements: "{{ kive_root }}/requirements.txt"
-        virtualenv_command: "python3 -m venv"
+        virtualenv_command: "{{ kive_python_executable }} -m venv"
         virtualenv: "{{ kive_venv }}"
 
 
@@ -128,9 +128,12 @@
     - name: Kive-specific configuration
       block:
         - name: install Kive-specific config file
-          copy:
-            src: 001-kive.conf
-            dest: /etc/apache2/conf-available
+          template:
+            src: 001-kive.conf.j2
+            dest: /etc/apache2/conf-available/001-kive.conf
+            owner: root
+            group: root
+            mode: "644"
         - name: enable Kive-specific configuration
           command:
             cmd: "a2enconf 001-kive"
@@ -145,7 +148,7 @@
 
     - name: server environment variables via systemd
       blockinfile:
-        path: /etc/systemd/system/httpd.service.d/override.conf
+        path: /etc/systemd/system/apache2.service.d/override.conf
         create: true
         backup: true
         mode: "644"
@@ -161,12 +164,12 @@
           export APACHE_RUN_USER=kive
           export APACHE_RUN_GROUP=kive
 
-    - name: update apache2 port
-      blockinfile:
-        path: /etc/apache2/ports.conf
-        backup: true
-        block: |
-          Listen {{ kive_listen_port }}
+#    - name: update apache2 port
+#      blockinfile:
+#        path: /etc/apache2/ports.conf
+#        backup: true
+#        block: |
+#          Listen {{ kive_listen_port }}
 
     - name: set up rotating apache logs
       block:
@@ -186,32 +189,33 @@
     - name: enable apache2
       systemd:
         name: apache2
-        state: started
+        state: restarted
         enabled: true
+        daemon_reload: true
 
     - name: ensure ufw (the firewall) is running
       systemd:
         name: ufw
-        state: started
+        state: restarted
         enabled: true
 
 #    - name: firewall's internal interface should ACCEPT
 #      register: internal_accept
 #      community.general.ufw:
 #        default: allow
-#        interface: "{{ kive_internal_interface }}"
+#        interface: "{{ head_internal_interface }}"
 #        direction: incoming
 #        state: enabled
 #
 #    - name: reload internal interface firewall config
 #      when: internal_accept.changed
 #      community.general.ufw:
-#        interface: "{{ kive_internal_interface }}"
+#        interface: "{{ head_internal_interface }}"
 #        state: reloaded
 
     - name: permit access to Postgres on the internal interface
       community.general.ufw:
-        interface: "{{ kive_internal_interface }}"
+        interface: "{{ head_internal_interface }}"
         direction: in
         port: 5432
         protocol: tcp
@@ -220,7 +224,7 @@
 
     - name: permit https service through firewall
       community.general.ufw:
-        interface: "{{ kive_external_interface }}"
+        interface: "{{ head_external_interface }}"
         direction: in
         port: https
         protocol: tcp
@@ -229,7 +233,7 @@
 
     - name: permit http service through firewall
       community.general.ufw:
-        interface: "{{ kive_external_interface }}"
+        interface: "{{ head_external_interface }}"
         direction: in
         port: http
         protocol: tcp
@@ -355,7 +359,7 @@
         chdir: "{{ kive_root }}/api/"
         creates: "{{ kive_root }}/api/build/"
     - name: collect kive's static files
-      notify: restart http server
+      notify: restart web server
       environment:
         KIVE_STATIC_ROOT: "{{ kive_static_root }}"
       community.general.django_manage:

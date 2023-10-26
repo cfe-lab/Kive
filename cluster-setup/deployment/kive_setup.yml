@@ -3,9 +3,6 @@
 - name: configure head node
   hosts: head
   tasks:
-    - name: set up head node networking
-      include_role:
-        name: head_node_networking
     - name: build Slurm
       include_role:
         name: slurm_builder

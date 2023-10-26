@@ -5,9 +5,9 @@
   vars:
     data_physical_volumes:
       - /dev/sdb
-#  roles:
-#    - create_data_filesystem
-#    - head_node_internal_interface
+  roles:
+    - create_data_filesystem
+    - head_node_internal_interface
   tasks:
     - name: create /opt
       file:

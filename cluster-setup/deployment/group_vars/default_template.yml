@@ -11,11 +11,11 @@ kive_server_email: kive-noreply@bccfe.ca
 kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
 kive_subject_prefix: "Kive server"
 kive_backup_path: /data/kive_db_backup
+kive_python_package: python3.7
+kive_python_executable: python3.7
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
-kive_internal_interface: 192.168.64.9
-kive_external_interface: 192.168.64.9
 nfs_export_to_hosts: 192.168.64.0/255.255.255.0
 kive_db_host: 192.168.64.9
 kive_db_subnet: 192.168.64.0/24

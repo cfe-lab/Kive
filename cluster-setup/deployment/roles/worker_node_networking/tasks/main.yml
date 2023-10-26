@@ -42,7 +42,7 @@
     - name: mount the drive
       ansible.posix.mount:
         path: /data
-        src: "{{ kive_internal_interface }}:/data"
+        src: "{{ head_internal_address }}:/data"
         fstype: nfs
         state: mounted
 
@@ -50,7 +50,7 @@
   become: true
   ansible.posix.mount:
     path: /opt
-    src: "{{ kive_internal_interface }}:/opt"
+    src: "{{ head_internal_address }}:/opt"
     fstype: nfs
     state: mounted
     opts: ro
@@ -59,7 +59,7 @@
   become: true
   ansible.posix.mount:
     path: /usr/local
-    src: "{{ kive_internal_interface }}:/usr/local"
+    src: "{{ head_internal_address }}:/usr/local"
     fstype: nfs
     state: mounted
     opts: ro
@@ -74,15 +74,6 @@
       fail:
         msg: "/data/home is not in place."
       when: not data_home.stat.exists
-
-    - name: check if SSH configuration is in place
-      stat: path=/data/home/vagrant/.ssh
-      register: ssh_configuration
-
-    - name: fail if SSH configuration isn't prepared
-      fail:
-        msg: "SSH configuration is not present in the shared home directory."
-      when: not ssh_configuration.stat.exists
 
   rescue:
     - name: inform user to set up the head node first and propagate failure to stop the playbook

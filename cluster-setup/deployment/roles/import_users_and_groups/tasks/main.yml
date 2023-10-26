@@ -26,3 +26,4 @@
     group: "{{ item.primary_group }}"
     groups: "{{ item.groups }}"
     append: true
+    shell: "{{ default_shell }}"
