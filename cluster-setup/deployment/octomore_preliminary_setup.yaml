@@ -2,9 +2,6 @@
 
 - name: preliminary setup to run on the Octomore head node
   hosts: head
-  vars:
-    data_physical_volumes:
-      - /dev/sdb
   roles:
     - create_data_filesystem
     - head_node_internal_interface
