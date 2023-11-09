@@ -58,6 +58,88 @@
       # - libapache2-mod-wsgi-py3
       - barman
 
+- name: install mod_wsgi from source
+  become: true
+  block:
+    - name: check if mod_wsgi slurm source files are already downloaded
+      stat:
+        path: "/usr/local/src/{{ mod_wsgi_tarball }}"
+      register: mod_wsgi_download
+
+    - name: fetch mod_wsgi source files
+      become: true
+      get_url:
+        url: "{{ mod_wsgi_source_url }}"
+        dest: "/usr/local/src/{{ mod_wsgi_tarball }}"
+        checksum: "sha256:{{ mod_wsgi_sha256_checksum }}"
+      when: not mod_wsgi_download.stat.exists
+
+    - name: decompress mod_wsgi tarball
+      unarchive:
+        remote_src: true
+        src: "/usr/local/src/{{ mod_wsgi_tarball }}"
+        dest: "/usr/local/src"
+        owner: root
+        group: root
+
+    - name: make a link to the mod_wsgi source code directory
+      file:
+        src: "/usr/local/src/{{ mod_wsgi_basename }}"
+        dest: "/usr/local/src/mod_wsgi"
+        state: link
+
+    - name: configure mod_wsgi build
+      command:
+        argv:
+          - "/usr/local/src/mod_wsgi/configure"
+          - "--with-python={{ kive_venv }}/bin/python"
+        chdir: "/usr/local/src/mod_wsgi"
+        creates: "/usr/local/src/mod_wsgi/Makefile"
+
+    - name: build and install mod_wsgi
+      make:
+        chdir: "/usr/local/src/mod_wsgi"
+        target: install
+
+    - name: enable the wsgi module in apache
+      community.general.apache2_module:
+        state: present
+        name: wsgi
+
+# This is following the general instructions for Ubuntu SSL support
+# in `/usr/share/doc/apache2/README.Debian.gz`.
+# For the certificates to be installed, they should be placed in the
+# directory you're running Ansible in, with the desired names.
+- name: enable Apache SSL support
+  become: true
+  block:
+    - name: enable the SSL module
+      community.general.apache2_module:
+        state: present
+        name: ssl
+
+    - name: install SSL certificate
+      copy:
+        src: star_cfe.crt
+        dest: /etc/ssl/certs/star_cfe.crt
+        owner: root
+        group: root
+
+    - name: install SSL key
+      copy:
+        src: star_cfe.key
+        dest: /etc/ssl/private/star_cfe.key
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: install SSL certificate chain file
+      copy:
+        src: DigiCertCA.crt
+        dest: /etc/ssl/certs/DigiCertCA.crt
+        owner: root
+        group: root
+
 
 - name: fetch kive source code
   become: true
@@ -186,6 +268,17 @@
         - name: activate rotating logs configuration
           command:
             cmd: "a2enconf rotate-kive-logs"
+
+    - name: install the httpd site configuration for Kive
+      copy:
+        src: 001-kive-ssl.conf
+        dest: /etc/apache2/sites-available
+        owner: root
+        group: root
+
+    - name: enable the httpd site configuration for Kive
+      command:
+        cmd: "a2ensite 001-kive-ssl"
 
     - name: enable apache2
       systemd:
