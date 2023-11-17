@@ -15,6 +15,22 @@ kive_version: v0.16.2
 kive_python_package: python3.7
 kive_python_executable: python3.7
 
+# Slurm configuration.
+slurmctlnode: octomore
+slurm_nodes:
+  - name: octomore
+    memory: 96000
+    cpus: 48
+    sockets: 2
+    cores_per_socket: 12
+    threads_per_core: 2
+  - name: b05
+    memory: 80000
+    cpus: 40
+    sockets: 2
+    cores_per_socket: 10
+    threads_per_core: 2
+
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
 nfs_export_to_hosts: 192.168.1.0/255.255.255.0
@@ -105,7 +121,7 @@ mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac92
 # (typically /opt and /usr/local).  If one would rather install Kive and slurm
 # locally to each node, then these paths and/or the NFS shares should be reworked.
 kive_venv: /opt/venv_kive
-kive_slurm_path: /usr/local/bin
+kive_slurm_path: /opt/venv_kive/bin
 kive_db_name: kive
 kive_db_user: kive
 kive_media_root: /data/kive/media_root

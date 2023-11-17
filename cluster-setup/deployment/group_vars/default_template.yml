@@ -64,7 +64,7 @@ mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac92
 # (typically /opt and /usr/local).  If one would rather install Kive and slurm
 # locally to each node, then these paths and/or the NFS shares should be reworked.
 kive_venv: /opt/venv_kive
-kive_slurm_path: /usr/local/bin
+kive_slurm_path: /opt/venv_kive/bin
 kive_db_name: kive
 kive_db_user: kive
 kive_media_root: /data/kive/media_root

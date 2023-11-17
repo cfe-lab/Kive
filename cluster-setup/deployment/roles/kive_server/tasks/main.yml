@@ -30,7 +30,7 @@
   become: true
   become_user: kive
   block:
-    - name: set kive environment variables
+    - name: set kive environment variables and activate the virtualenv
       blockinfile:
         path: /home/kive/.bash_profile
         block: |
@@ -42,6 +42,7 @@
           export KIVE_MEDIA_ROOT={{ kive_media_root }}
           export KIVE_STATIC_ROOT={{ kive_static_root }}
           export KIVE_SLURM_PATH={{ kive_slurm_path }}
+          source {{ kive_venv }}/bin/activate
         create: true  # create the file if it doesn't exist
         backup: true
         owner: kive
@@ -563,7 +564,7 @@
     - option: minimum_redundancy
       value: 2
     - option: retention_policy
-      value: REDUNDANCY 2
+      value: REDUNDANCY 2q
   community.general.ini_file:
     path: /etc/barman.d/kive.conf
     section: kive
