@@ -27,7 +27,7 @@
   community.general.lvol:
     vg: data-vg
     lv: data-lv
-    size: 100%FREE
+    size: 100%VG
 
 - name: create the filesystem
   community.general.filesystem:

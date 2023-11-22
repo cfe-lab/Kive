@@ -10,7 +10,7 @@ update_kive_source: yes
 kive_server_email: kive-noreply@bccfe.ca
 kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
 kive_subject_prefix: "Kive server"
-kive_backup_path: /media/backup/
+kive_backup_path: /media/backup
 kive_version: v0.16.2
 kive_python_package: python3.7
 kive_python_executable: python3.7

@@ -1,0 +1,58 @@
+---
+
+- name: create backup filesystem
+  hosts: head
+  vars:
+    drive_identifiers:
+      - "ata-ST8000AS0002-1NA17Z_Z840VBQ5"
+      - "scsi-0ATA_WDC_WD2000FYYZ-0_WD-WMC1P0H2KH10"
+      - "scsi-0ATA_WDC_WD2000FYYZ-0_WD-WMC1P0H3J8XT"
+  tasks:
+    - name: create a single partition on each of the physical volumes
+      loop: "{{ drive_identifiers }}"
+      community.general.parted:
+        device: "/dev/disk/by-id/{{ item }}"
+        number: 1
+        state: present
+        label: gpt
+
+    - name: construct a list of the partition names
+      block:
+        - name: initialize the list as empty
+          set_fact:
+            partition_names: [ ]
+        - name: append names to the list
+          loop: "{{ drive_identifiers }}"
+          set_fact:
+            partition_names: "{{ partition_names + ['/dev/disk/by-id/' ~ item ~ '-part1'] }}"
+
+    - name: create a volume group out of the partitions
+      lvg:
+        vg: backup-vg
+        pvs: "{{ partition_names | join(',') }}"
+
+    - name: create a logical volume from the volume group
+      community.general.lvol:
+        vg: backup-vg
+        lv: backup-lv
+        size: 100%VG
+
+    - name: create the filesystem
+      community.general.filesystem:
+        fstype: ext4
+        dev: /dev/backup-vg/backup-lv
+
+    - name: create the /media/backup mount point
+      file:
+        path: /media/backup
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    - name: mount the filesystem
+      mount:
+        path: /media/backup
+        src: /dev/backup-vg/backup-lv
+        fstype: ext4
+        state: mounted

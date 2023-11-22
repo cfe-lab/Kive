@@ -8,4 +8,4 @@ ExecStart=/opt/venv_kive/bin/python /opt/crontab_mail.py \
     --subject {{ (kive_subject_prefix + "rsnapshot beta") | quote }} \
     --from {{ kive_server_email | quote }} \
     {{ mail_admins_emails | join(',') | quote }} \
-    /bin/rsnapshot beta
+    /usr/bin/rsnapshot beta

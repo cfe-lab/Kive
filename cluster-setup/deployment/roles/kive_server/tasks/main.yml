@@ -51,6 +51,7 @@
 - name: install package dependencies
   become: true
   apt:
+    update_cache: true
     name:
       - postgresql
       - apache2
@@ -58,6 +59,7 @@
       - apache2-dev
       # - libapache2-mod-wsgi-py3
       - barman
+      - rsnapshot
 
 - name: install mod_wsgi from source
   become: true
@@ -534,6 +536,13 @@
 #    option: "{{ item.option }}"
 #    value: "{{ item.value }}"
 
+- name: create the Barman backup directory
+  file:
+    path: "{{ kive_backup_path }}/BarmanDBBackup"
+    state: directory
+    owner: barman
+    group: barman
+
 - name: database backup kive config
   loop:
     - option: path_prefix
@@ -564,12 +573,17 @@
     - option: minimum_redundancy
       value: 2
     - option: retention_policy
-      value: REDUNDANCY 2q
+      value: REDUNDANCY 2
   community.general.ini_file:
     path: /etc/barman.d/kive.conf
     section: kive
     option: "{{ item.option }}"
     value: "{{ item.value }}"
+
+- name: force a WAL switch to verify the WAL archiving process
+  become: true
+  become_user: barman
+  command: barman switch-wal --force --archive kive
 
 - name: SSH keys
   block:
@@ -638,10 +652,17 @@
     owner: root
     group: root
     mode: u=rw,g=r,o=r
+
+- name: create the rsnapshot backup directory
+  file:
+    path: "{{ kive_backup_path }}/rsnapshot"
+    state: directory
+
 - name: rsnapshot config file
   template:
     src: rsnapshot.conf.j2
     dest: /etc/rsnapshot.conf
+
 - name: list of scheduled services
   set_fact:
     scheduled_service_names:
@@ -649,6 +670,7 @@
       - rsnapshot_alpha
       - rsnapshot_beta
       - rsnapshot_gamma
+
 - name: scheduled service files
   loop: "{{ scheduled_service_names }}"
   template:
