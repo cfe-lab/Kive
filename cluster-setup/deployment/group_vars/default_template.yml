@@ -77,3 +77,5 @@ kive_httpd_group: kive
 copied_groups:
   - kive
   - sudo
+
+default_shell: /usr/bin/bash
