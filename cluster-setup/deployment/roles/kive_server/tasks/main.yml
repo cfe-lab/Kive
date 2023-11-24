@@ -59,6 +59,7 @@
       - apache2-dev
       # - libapache2-mod-wsgi-py3
       - barman
+      - barman-cli
       - rsnapshot
 
 - name: install mod_wsgi from source
@@ -426,11 +427,11 @@
           value: 10
         - option: max_replication_slots
           value: 10
-          # Additionally, setting up standard WAL archiving.
-        - option: archive_mode
-          value: "on"
-        - option: archive_command
-          value: "'barman-wal-archive localhost kive %p'"
+#          # Additionally, setting up standard WAL archiving.
+#        - option: archive_mode
+#          value: "on"
+#        - option: archive_command
+#          value: "'barman-wal-archive localhost kive %p'"
         # Remove old option that was accidentally added.
         - option: archiver
       community.general.ini_file:
@@ -560,8 +561,8 @@
     # archiver = on is necessary for the "fallback" WAL backup that happens via
     # PostgreSQL's archive_command setting in postgresql.conf (which we have
     # configured to use barman-wal-archive)
-    - option: archiver
-      value: "on"
+#    - option: archiver
+#      value: "on"
     - option: streaming_conninfo
       value: host=localhost user=streaming_barman dbname=kive
     - option: streaming_archiver

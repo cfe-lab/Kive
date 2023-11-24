@@ -7,7 +7,7 @@ User=barman
 ExecStart=/opt/venv_kive/bin/python /opt/crontab_mail.py \
     --log /var/log/barman/kive.log \
     --level ERROR \
-    --subject {{ (kive_subject_prefix + "barman") | quote }} \
+    --subject {{ (kive_subject_prefix + " barman") | quote }} \
     --from {{ kive_server_email | quote }} \
     {{ mail_admins_emails | join(',') | quote }} \
     /bin/barman backup kive
