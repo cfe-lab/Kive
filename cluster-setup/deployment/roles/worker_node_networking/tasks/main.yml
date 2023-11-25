@@ -1,5 +1,8 @@
 ---
 
+- name: set timezone
+  community.general.timezone: America/Vancouver
+
 - name: install NFS client software
   become: true
   apt:

@@ -25,12 +25,18 @@ password used by Kive (via `apache2`) to access PostgreSQL.  (You can also just 
 this password and discard the file; the file should be present in the old system's
 `rsnapshot` backups anyway if needed later.)
 
+Preserve a copy of the `barman` user's `.pgpass` file.  This contains the passwords
+used by the `barman` and `streaming_barman` users when connecting to PostgreSQL,
+and keeping these makes it easier to get the database set back up after importing
+the database from the old system.
+
 ### Install Ubuntu and do basic network setup on the head node
 
 First, manually install Ubuntu Jammy on the head node using an Ubuntu live USB drive.
 - Create a user with username `ubuntu` when prompted during installation.  This will be
   our "bootstrap" user. 
-- Choose the 120GB SSD as the root drive.
+- Choose a root drive.  As of the time of writing, there is a 120GB SSD on the system; this
+  is an appropriate choice for the root drive.
 - Manually set up the LAN-facing interface (probably `eno0`) with IP address and subnet 192.168.69.86/23,
   with gateway 192.168.68.1 and DHCP server 192.168.168.101.
 Once this is done, you can interact with the head node via SSH.
@@ -45,10 +51,13 @@ using Ansible playbooks defined in the [deployment] directory.
 Go to the `deployment/group_vars` directory and create an `all.yaml` file from the
 `octomore_template.yaml` file by copying and filling in some details.
 
-> For the passwords, it probably makes sense to use a password generator of some form.
-> However, for `kive_db_password` it makes sense to plug in the password you preserved
-> from the old system, as this is the password that will be used when we restore
-> the database from old backups.
+For the passwords, you can use a password generator to generate new passwords and secret keys; 
+however, it makes sense to use the same PostgreSQL passwords as on the old system.  
+These passwords are:
+
+* `kive_db_password`: this is the one preserved from `/etc/kive/kive_apache.conf`.
+* `barman_password`: this is in the `barman` user's `.pgpass` file.
+* `streaming_barman_password`: this is also in the `barman` user's `.pgpass` file.
 
 Then go to `deployment/` and create an `ansible.cfg` from one of the provided templates, 
 probably `ansible_octomore.cfg`.  These files will be necessary for Ansible to work.
@@ -78,7 +87,7 @@ is to have a backup drive mounted at `/media/backup`.
 
 At this point, go back into the server room and install Ubuntu Jammy on the compute nodes.
 These machines only have one hard drive, and their ethernet should automatically be set up
-by default (the head node provides NAT and DHCP), so this should be a very straighforward
+by default (the head node provides NAT and DHCP), so this should be a very straightforward
 installation.  Again, create a user with username `ubuntu` to be the bootstrap user.
 
 Now, upload the contents of [cloud-init/worker] to each compute node, along with the SSH
@@ -117,7 +126,8 @@ from the database dump you made earlier on the old system.
 
 First, restore the Kive data folders from the old backups.  On our prod and dev 
 clusters this folder was `/data/kive`; use `rsync -avz` to copy this information 
-into place on your new server.
+into place on your new server.  Assuming all has gone correctly with importing users and groups,
+the ownership of the files should be as they were on the old system.
 
 With these in place, you can now restore the PostgreSQL database.  First,
 shut down `apache2` and `postgresql`:
@@ -134,13 +144,14 @@ sudo su -l postgres
 psql -f [dumped file from the old system] postgres
 ```
 
-(In the `psql` command, we specified the database `postgres`.  This will actually 
-be ignored but should still be specified or else `psql` will complain.)
+Note that in the `psql` command, we specified the database `postgres`.  This will actually 
+be ignored but should still be specified or else `psql` will complain.
 
 At this point, the database will have been restored to the old settings.  If you didn't
 use it before in your Ansible configuration (i.e. in `group_vars/all.yaml`), you should
-now specify the PostgreSQL password preserved from the old system in 
-`/etc/kive/kive_apache.conf`.
+now either specify the PostgreSQL passwords preserved from the old system in 
+`/etc/kive/kive_apache.conf` and the `barman` user's `.pgpass`, or reset the passwords
+using `psql` to the ones you used in your Ansible settings.
 
 [cloud-init/head]: ./cloud-init/head
 [cloud-init/worker]: ./cloud-init/worker
