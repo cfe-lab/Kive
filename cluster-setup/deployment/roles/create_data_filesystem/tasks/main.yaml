@@ -3,7 +3,7 @@
 - name: create a single partition on each of the physical volumes
   loop: "{{ data_physical_volumes }}"
   community.general.parted:
-    device: "{{ item }}"
+    device: "/dev/disk/by-id/{{ item }}"
     number: 1
     state: present
     label: gpt
@@ -16,7 +16,7 @@
     - name: append names to the list
       loop: "{{ data_physical_volumes }}"
       set_fact:
-        data_partition_names: "{{ data_partition_names + [item ~ '1'] }}"
+        data_partition_names: "{{ data_partition_names + ['/dev/disk/by-id/' ~ item ~ '-part1'] }}"
 
 - name: create a volume group out of the data partitions
   lvg:
