@@ -79,3 +79,5 @@
     password: "{{ shadow_dict.dict[item.name]['passwd'] }}"
     group: "{{ item.name }}"
     groups: "{{ user_groups[item.name] | default([]) }}"
+    append: true
+    shell: "{{ default_shell }}"

@@ -1,7 +1,14 @@
 ---
 
 - name: set timezone
-  community.general.timezone: America/Vancouver
+  block:
+    - name: change the timezone
+      community.general.timezone:
+        name: America/Vancouver
+    - name: restart cron to reflect the new timezone
+      systemd:
+        name: cron
+        state: restarted
 
 - name: check if original /home has been renamed
   stat: path=/data/home

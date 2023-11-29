@@ -62,6 +62,33 @@
       - barman-cli
       - rsnapshot
 
+- name: fetch kive source code
+  become: true
+  git:
+    dest: "{{ kive_root }}"
+    repo: https://github.com/cfe-lab/Kive.git
+    version: "{{ kive_version | default('master') }}"
+    update: "{{ update_kive_source | default('no') }}"
+
+- name: set up the Kive Python virtualenv
+  become: true
+  block:
+    - name: create directory for virtualenv
+      file:
+        path: "{{ kive_venv }}"
+        state: directory
+    - name: copy requirements file to track changes
+      register: kive_requirements
+      copy:
+        dest: "{{ kive_venv }}/requirements.txt"
+        src: "{{ kive_root }}/requirements.txt"
+    - name: kive python dependencies
+      when: kive_requirements.changed
+      pip:
+        requirements: "{{ kive_root }}/requirements.txt"
+        virtualenv_command: "{{ kive_python_executable }} -m venv"
+        virtualenv: "{{ kive_venv }}"
+
 - name: install mod_wsgi from source
   become: true
   block:
@@ -96,7 +123,7 @@
       command:
         argv:
           - "/usr/local/src/mod_wsgi/configure"
-          - "--with-python={{ kive_venv }}/bin/python"
+          - "--with-python=/usr/bin/python3.7"
         chdir: "/usr/local/src/mod_wsgi"
         creates: "/usr/local/src/mod_wsgi/Makefile"
 
@@ -104,6 +131,11 @@
       make:
         chdir: "/usr/local/src/mod_wsgi"
         target: install
+
+    - name: add wsgi to the "modules available"
+      copy:
+        src: wsgi.load
+        dest: /etc/apache2/mods-available
 
     - name: enable the wsgi module in apache
       community.general.apache2_module:
@@ -143,35 +175,6 @@
         dest: /etc/ssl/certs/DigiCertCA.crt
         owner: root
         group: root
-
-
-- name: fetch kive source code
-  become: true
-  git:
-    dest: "{{ kive_root }}"
-    repo: https://github.com/cfe-lab/Kive.git
-    version: "{{ kive_version | default('master') }}"
-    update: "{{ update_kive_source | default('no') }}"
-
-
-- name: install kive python dependencies
-  become: true
-  block:
-    - name: create directory for virtualenv
-      file:
-        path: "{{ kive_venv }}"
-        state: directory
-    - name: copy requirements file to track changes
-      register: kive_requirements
-      copy:
-        dest: "{{ kive_venv }}/requirements.txt"
-        src: "{{ kive_root }}/requirements.txt"
-    - name: kive python dependencies
-      when: kive_requirements.changed
-      pip:
-        requirements: "{{ kive_root }}/requirements.txt"
-        virtualenv_command: "{{ kive_python_executable }} -m venv"
-        virtualenv: "{{ kive_venv }}"
 
 
 - name: set up log purging
@@ -284,7 +287,7 @@
       command:
         cmd: "a2ensite 001-kive-ssl"
 
-    - name: enable apache2
+    - name: enable and (re)start apache2
       systemd:
         name: apache2
         state: restarted
@@ -338,16 +341,17 @@
         rule: allow
         state: enabled
 
+- name: enable and start database service
+  become: true
+  systemd:
+    name: "postgresql@14-main"
+    state: started
+    enabled: true
+
 - name: configure postgres server
   become: true
   become_user: postgres
   block:
-
-    - name: start database service
-      systemd:
-        name: "postgresql"
-        state: started
-        enabled: true
 
     - name: add kive entries to pg_hba.conf
       block:
@@ -457,7 +461,7 @@
         chdir: "{{ kive_root }}/api/"
         creates: "{{ kive_root }}/api/build/"
     - name: collect kive's static files
-      notify: restart web server
+      # notify: restart web server
       environment:
         KIVE_STATIC_ROOT: "{{ kive_static_root }}"
       community.general.django_manage:
@@ -544,6 +548,17 @@
     owner: barman
     group: barman
 
+- name: barman passwords file
+  blockinfile:
+    path: /var/lib/barman/.pgpass
+    create: yes
+    owner: barman
+    group: barman
+    mode: u=rw,g=,o=
+    block: |
+      localhost:*:*:barman:{{ barman_password }}
+      localhost:*:*:streaming_barman:{{ streaming_barman_password }}
+
 - name: database backup kive config
   loop:
     - option: path_prefix
@@ -581,10 +596,10 @@
     option: "{{ item.option }}"
     value: "{{ item.value }}"
 
-- name: force a WAL switch to verify the WAL archiving process
-  become: true
-  become_user: barman
-  command: barman switch-wal --force --archive kive
+#- name: force a WAL switch to verify the WAL archiving process
+#  become: true
+#  become_user: barman
+#  command: barman switch-wal --force --archive kive
 
 - name: SSH keys
   block:
@@ -621,17 +636,6 @@
       ansible.posix.authorized_key:
         user: postgres
         key: "{{ lookup('file', '/var/lib/barman/.ssh/id_rsa.pub') }}"
-
-- name: barman passwords file
-  blockinfile:
-    path: /var/lib/barman/.pgpass
-    create: yes
-    owner: barman
-    group: barman
-    mode: u=rw,g=,o=
-    block: |
-      localhost:*:*:barman:{{ barman_password }}
-      localhost:*:*:streaming_barman:{{ streaming_barman_password }}
 
 # This variable should be a JSON-formatted list of 2-lists, like
 # [["User One", "userone@bccfe.ca"], ..., ["User N", "userN@bccfe.ca"]]

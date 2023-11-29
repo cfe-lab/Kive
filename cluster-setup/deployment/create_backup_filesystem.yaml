@@ -4,9 +4,7 @@
   hosts: head
   vars:
     drive_identifiers:
-      - "ata-ST8000AS0002-1NA17Z_Z840VBQ5"
-      - "scsi-0ATA_WDC_WD2000FYYZ-0_WD-WMC1P0H2KH10"
-      - "scsi-0ATA_WDC_WD2000FYYZ-0_WD-WMC1P0H3J8XT"
+      - "ata-ST10000NM001G-2MW103_ZS51H7QX"
   tasks:
     - name: create a single partition on each of the physical volumes
       loop: "{{ drive_identifiers }}"

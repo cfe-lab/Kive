@@ -13,6 +13,7 @@
       - "{{ kive_python_package }}-distutils"
       - "{{ kive_python_package }}-venv"
       - "{{ kive_python_package }}-dev"
+      - "lib{{ kive_python_package }}-dev"
 
 - name: install pip for this version of Python
   become: true
