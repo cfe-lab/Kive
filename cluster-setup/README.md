@@ -4,7 +4,7 @@ This directory contains code and instructions for setting up a multi-host comput
 
 ## Deployment to Octomore
 
-This procedure, as of November 22, 2023, looks like the following.
+This procedure, as of November 29, 2023, looks like the following.
 
 ### Before you wipe the old machine
 
@@ -17,35 +17,44 @@ There a few files that are worth preserving in particular and having available t
 during the deployment process:
 
 * Preserve copies of your system's `/etc/passwd`, `/etc/group`, and `/etc/shadow`.  This 
-information will be used to populate the new system with the same users and groups
-from the old system.
+  information will be used to populate the new system with the same users and groups
+  from the old system.
 * Create a dump of the Kive PostgreSQL database using `pg_dumpall`.  As the upgrade may
-involve moving to a newer version of PostgreSQL, we likely can't use the Barman
-backups to migrate from; thus we must do it the "old-fashioned" way.
-* Preserve a copy of `/etc/kive/kive_apache.conf`.  This file contains the database
-password used by Kive (via `apache2`) to access PostgreSQL.  (You can also just preserve
-this password and discard the file; the file should be present in the old system's
-`rsnapshot` backups anyway if needed later.)
+  involve moving to a newer version of PostgreSQL, we likely can't use the Barman
+  backups to migrate from; thus we must do it the "old-fashioned" way.
+* Preserve a copy of `/etc/kive/kive_apache.conf` and/or `/etc/kive/kive_purge.conf`.  
+  These files contain the database password used by Kive (via `apache2`) to access PostgreSQL.  
+  You can also just preserve this password and discard the files, as the files will be 
+  recreated by Ansible.
 * Preserve a copy of the `barman` user's `.pgpass` file.  This contains the passwords
-used by the `barman` and `streaming_barman` users when connecting to PostgreSQL,
-and keeping these makes it easier to get the database set back up after importing
-the database from the old system.
+  used by the `barman` and `streaming_barman` users when connecting to PostgreSQL,
+  and keeping these makes it easier to get the database set back up after importing
+  the database from the old system.  Likewise here you can also just preserve the passwords
+  and discard the file.  (Note that this file will typically *not* be present in the `rsnapshot`
+  backups, as the Barman user's home directory is in `/var`, which is not backed up.)
 
 ### Install Ubuntu and do basic network setup on the head node
 
 First, manually install Ubuntu Jammy on the head node using an Ubuntu live USB drive.
+At most points, follow the defaults.  Some places where you need to fill in some details:
+
 - Create a user with username `ubuntu` when prompted during installation.  This will be
-  our "bootstrap" user. 
+  our "bootstrap" user.
+- Choose an appropriate system name for the computer, e.g. "octomore".
 - Choose a root drive.  As of the time of writing, there is a 120GB SSD on the system; this
   is an appropriate choice for the root drive.
-- Manually set up the LAN-facing interface (probably `eno0`) with IP address and subnet 192.168.69.86/23,
-  with gateway 192.168.68.1 and DHCP server 192.168.168.101.
-Once this is done, you can interact with the head node via SSH.
+- Manually set up the LAN-facing interface (probably `eno0`) with IP address 192.168.69.86,
+  subnet 192.168.68.0/23, gateway 192.168.68.1, and DHCP server 192.168.168.101.
+- Enable SSH when prompted.  You don't need to import any identity at this point.
+
+Note that the completion screen isn't super obvious, so keep an eye for a completion message 
+at the top left of the screen at the end of the process.  Once this is done, you can interact 
+with the head node via SSH.  
 
 Next, upload the contents of [initialization/head] to the server and run `head_configuration.bash`
 using `sudo`.
 This sets up the root user's SSH key and `/etc/hosts`, and installs Ansible on the head node.  
-Accept the defaults when it asks which services should be restarted whenever it asks.
+Accept the defaults whenever it asks which services should be restarted.
 Now that Ansible is available on the root node, most of the rest of the procedure will be done
 using Ansible playbooks defined in the [deployment] directory.  Copy the `cluster-setup` directory 
 to the head node, e.g. using `rsync -avz`, placing it in a sensible location with the appropriate 
@@ -61,7 +70,8 @@ For the passwords, you can use a password generator to generate new passwords an
 however, it makes sense to use the same PostgreSQL passwords as on the old system.  
 These passwords are:
 
-* `kive_db_password`: this is the one preserved from `/etc/kive/kive_apache.conf`.
+* `kive_db_password`: this is the one preserved from `/etc/kive/kive_apache.conf` 
+or `/etc/kive/kive_purge.conf`.
 * `barman_password`: this is in the `barman` user's `.pgpass` file.
 * `streaming_barman_password`: this is also in the `barman` user's `.pgpass` file.
 
@@ -89,7 +99,8 @@ you specified.
 Next, set up a backup drive for your system.  A sample of how this was done for Octomore
 using all the leftover drives from the old system is detailed in `create_backup_filesystem.yaml`.
 On another server you might use a NAS-based backup solution instead.  The goal in the end 
-is to have a backup drive mounted at `/media/backup`.
+is to have a backup drive mounted at the path specified in your `group_vars` as
+`kive_backup_path`; by default this would be `/media/backup`.
 
 ### Install Ubuntu on the compute nodes
 
@@ -99,18 +110,18 @@ by default (the head node provides NAT and DHCP), so this should be a very strai
 installation.  Again, create a user with username `ubuntu` to be the bootstrap user.
 
 Fetch the SSH public key generated by the root user on the head node during the running of
-`head_configuration.bash` and place it in the [initialization/worker] directory as 
-`head_node_root_id_ed25519.pub` (don't commit
-this file to source control; it isn't a security risk, but it isn't needed and might
-cause confusion later).  Now, upload the contents of [initialization/worker] to each compute node, 
-along with the aforementioned SSH public key.  Then, run `worker_configuration.bash` using `sudo`, 
-which will install
-the necessary packages and set up the necessary SSH access for the node to be used with Ansible.
+`head_configuration.bash` and place it in the [initialization/worker] directory on the 
+head node as `head_node_root_id_ed25519.pub` (don't commit this file to source control;
+it isn't a security risk, but it isn't needed and might cause confusion later).  Now, 
+copy the contents of the [initialization/worker] directory to each compute node, 
+including the aforementioned SSH public key.  Then, run `worker_configuration.bash` using 
+`sudo`, which will install the necessary packages and set up the necessary SSH access for 
+the node to be used with Ansible.
 
 ### Annoying detour: reassign the bootstrap user's UID and GID
 
-At this point, your `ubuntu` user on all the machines may have a UID and GID of 1000.
-Unfortunately, this likely conflicts with one of the user accounts that will later be
+At this point, your `ubuntu` user on all the machines likely have a UID and GID of 1000.
+This may conflict with one of the user accounts that will later be
 imported into this machine.  If this is the case, you can run `reassign_bootstrap_user_uid.yaml`.  
 You may need to create a *second* bootstrap user to do this, as running the playbook as `ubuntu` 
 may fail because the user is currently being used (even if you use `sudo`).  This second bootstrap
@@ -154,8 +165,10 @@ These will then be used in the next step to configure Apache.
 With all of that table-setting in place, the main playbook to run is `kive_setup.yml`.  This is
 the "main" playbook, and will take longer to run.
 
-At this point, you should have a fresh, "empty" server.  If that's your goal, then
-you can stop here.  The next steps restore data from an old server.
+At this point, you should have a fresh, "empty" server, with Kive running.  Several 
+`systemd`-based background tasks that perform Kive cleanup and backups should also be 
+in place.  If that's your goal, then you can stop here.  The next steps restore data 
+from an old server.
 
 ## Restore from an old system
 
@@ -164,7 +177,12 @@ your system; e.g. at `/media/old_data` or a similar mount point.
 
 ### Shut down Kive and backup services
 
-First, shut down the backup tasks that were created in the previous step:
+First, shut down the Kive purge tasks created in the previous step:
+
+    sudo systemctl stop kive_purge.timer
+    sudo systemctl stop kive_purge_synch.timer
+
+Next, shut down the backup tasks that were created in the previous step:
 
     sudo systemctl stop barman_backup.timer
     sudo systemctl stop rsnapshot_alpha.timer
@@ -174,7 +192,8 @@ First, shut down the backup tasks that were created in the previous step:
 Barman installs a cron job by default at the system level.  For now, disable this
 by commenting out the entry in `/etc/cron.d/barman`.
 
-Shut down the PostgreSQL database and `apache2` as well:
+Finally, shut down Kive itself by shutting down the PostgreSQL database and 
+webserver:
 
     sudo systemctl stop apache2
     sudo systemctl stop postgresql@14-main
@@ -183,8 +202,10 @@ Shut down the PostgreSQL database and `apache2` as well:
 
 Now, restore the Kive data folders from the old backups.  On our prod and dev 
 clusters this folder was `/data/kive`; use `rsync -avz` to copy this information 
-into place on your new server.  Assuming all has gone correctly with importing users and groups,
-the ownership of the files should be as they were on the old system.
+into place on your new server at wherever you set `kive_media_root` to in your
+`group-vars` (by default, `/data/kive/media_root`).  Assuming all has gone correctly 
+with importing users and groups, the ownership of the files should be as they were 
+on the old system.
 
 Next, move the just-created PostgreSQL "cluster" to a backup location (or simply
 delete it if you're very confident).  On a fresh install, the cluster is at
@@ -192,6 +213,15 @@ delete it if you're very confident).  On a fresh install, the cluster is at
 Create a fresh empty cluster in the original location using `initdb`:
 
     sudo -u postgres /usr/lib/postgresql/14/bin/initdb /var/lib/postgresql/14/main
+
+At the same time, we should also move (or delete) the Barman backups created to this point, 
+as they are inconsistent with the database that we are about to restore.  Move the Barman 
+backup folder to a backup location, and create a fresh backup folder in the same location.  
+For example, if the backup folder was at `/media/backup/BarmanDBBackup`:
+
+    sudo mv /media/backup/BarmanDBBackup /media/backup/BarmanDBBackup_original
+    sudo mkdir /media/backup/BarmanDBBackup
+    sudo chown barman:barman /media/backup/BarmanDBBackup
 
 Next you can restore the database using `psql` as the `postgres` user.  Bring up the database
 again (this time with the fresh empty cluster) and use `psql` to load the data:
@@ -202,35 +232,44 @@ sudo -u postgres psql -f [dumped file from the old system] postgres
 ```
 
 Note that in the `psql` command, we specified the database `postgres`.  This must be 
-specified (it's a mandatory parameter to `psql`) but will actually 
-be ignored.
+specified (it's a mandatory parameter to `psql`) but will actually be ignored.
 
 At this point, the database will have been restored to the old settings.  If you didn't
 use it before in your Ansible configuration (i.e. in `group_vars/all.yaml`), you should
 now either specify the PostgreSQL passwords preserved from the old system in 
-`/etc/kive/kive_apache.conf` and the `barman` user's `.pgpass`, or reset the passwords
-using `psql` to the ones you used in your Ansible settings.
+`/etc/kive/kive_apache.conf`, `/etc/kive/kive_purge.conf`, and the `barman` user's 
+`.pgpass`, or reset the passwords using `psql` as the `postgres` user to the ones you 
+used in your Ansible settings.
+
+With the database running and restored, bring Apache back up with `sudo systemctl start apache2`.
+If the test Kive website doesn't work, check the PostgreSQL logs for clues, and make sure
+that Apache is able to reach the database.  Make sure that the password in `/etc/kive/kive_apache.conf`
+and `/etc/kive/kive_purge.conf` is correct and working.
 
 ### Restore other old user data
 
 This can be done at the leisure of each user, so long as the old backups are mounted.
 Use `rsync -avz` to move whatever user data back into place you like.
 
-### Start the backup tasks
+### Finish setting up Barman
 
-With everything in place, we're almost ready to start the regularly-scheduled
-backup `systemd` tasks.  First, reactivate the Barman cron job by uncommenting
+At this point we can manually verify the last details that Barman needs to 
+run correctly.  First, reactivate the Barman cron job by uncommenting
 the entry you commented out before in `/etc/cron.d/barman`.  Then check on the 
 `barman` configuration by running, as the `barman` user,
 
     barman check kive
 
-There may be problems with the configuration still.  If so, the log at `/var/log/barman/barman.log`
+There may be problems with the configuration still.  If so, the Barman log at 
+`/var/log/barman/barman.log` and the PostgreSQL logs at `/var/log/
 may be helpful in diagnosing the problems.  Some that I experienced
 while I was going through the process:
 
-* The `barman` and `streaming_barman` PostgreSQL user passwords may be incorrect.  This happened
-  because I didn't preserve these passwords from before I wiped out the database.
+* The `barman` and `streaming_barman` PostgreSQL user passwords may be incorrect,
+  resulting in the check showing failures for "PostgreSQL", "pg_basebackup compatible", 
+  and "pg_receivexlog compatible".  This happened because I didn't preserve these 
+  passwords from before I wiped out the database, so I couldn't use the same passwords 
+  for `barman` and `streaming_barman` in my Ansible configuration.
   This can easily be remedied by changing these users' PostgreSQL passwords 
   in `psql` (as the `postgres` system user) with the command `\password [username]`;
   use the passwords in the `barman` system user's `.pgpass` file.
@@ -238,29 +277,42 @@ while I was going through the process:
   One possible reason for this is that `barman cron` has not run successfully yet,
   as in the previous steps we had disabled the system-level cron job that runs this
   every minute.  This task is what invokes `barman receive-wal`.  If this appears to
-  be the problem, you can manually invoke `barman cron` as the `barman` user.  (It's
-  worth trying this anyway, as it won't do any harm.)  Or, you can wait one minute for 
-  the cron job to run it and see if this error clears up.
-* 
+  be the problem, you can manually invoke `barman cron` as the `barman` user.  Or, 
+  you can wait one minute for the cron job to run and see if this error clears up.
+* The output will also indicate that there are not enough backups in place, which is 
+  normal and expected at this point.  These backups will be created by the
+  `barman_backup` systemd service.
+* The check may still report a failure for "WAL archive".  This is normal, as the WAL
+  archiving must be verified for a fresh install, and will be handled below.
 
-This may not be ready to go yet as the WAL archiving must first be verified.  
-To do this, as the `barman` user, run
+Next, verify the WAL archiving.  To do this, as the `barman` user, run
 
     barman switch-wal --force --archive kive
 
-This may fail at first due to a timeout, but try again; it's likely to succeed
+This may fail at first due to a timeout, but try again if so; it's likely to succeed
 eventually if all is configured well.  Check the configuration again to confirm
-that things are ready to go.
+that things are ready to go.  (Ignore the error caused by there not being enough 
+backups in place.)
 
-With everything in place, restart the regularly-scheduled backup `systemd` tasks:
+### Restart Kive and backup services
+
+With everything in place, restart the regularly-scheduled backup `systemd` tasks
+and Kive purge tasks using `systemctl start` as the root user:
 
 * `barman_backup`
 * `rsnapshot_alpha`
 * `rsnapshot_beta`
 * `rsnapshot_gamma`
+* `kive_purge`
+* `kive_purge_synch`
 
 For example, run `sudo systemctl start barman_backup.timer` to start `barman_backup`, and
 similarly for the others.
+
+Lastly, bring Kive itself back up by bringing up:
+
+* `postgresql@14-main`
+* `apache2`
 
 [initialization/head]: initialization/head
 [initialization/worker]: initialization/worker
