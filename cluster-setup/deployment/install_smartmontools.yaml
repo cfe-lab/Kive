@@ -1,0 +1,9 @@
+---
+
+- hosts: head
+  become: true
+  tasks:
+    - name: install smartmontools
+      apt:
+        name:
+          - smartmontools

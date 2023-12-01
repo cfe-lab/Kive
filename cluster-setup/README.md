@@ -167,8 +167,27 @@ the "main" playbook, and will take longer to run.
 
 At this point, you should have a fresh, "empty" server, with Kive running.  Several 
 `systemd`-based background tasks that perform Kive cleanup and backups should also be 
-in place.  If that's your goal, then you can stop here.  The next steps restore data 
-from an old server.
+in place.  If that's your goal, then you can stop here.
+
+### Install FastTree
+
+Our Phylowatch service requires [FastTree] 2.1.9 to be installed on the cluster (at the time
+of writing).  This is an older version so the binaries are not directly available on the
+FastTree website; rather, we must compile it from [the source code][FastTreeSourceCode].  
+At the time of writing, the source code is available on their website, but if this ever
+disappears, we maintain a vendored copy on macdatafile in the `Phylowatch` directory
+as `FastTree-2.1.9.c`.
+
+[FastTree]: https://microbesonline.org/fasttree/
+[FastTreeSourceCode]: https://microbesonline.org/fasttree/FastTree-2.1.9.c
+
+Put this file into the `deployment` directory on the head node, and run the 
+`install_fasttree.yaml` playbook to compile and install FastTree.
+
+### Optional (but recommended): install smartmontools
+
+To install the `smartmontools` package, which provides `smartctl`, use the
+`install_smartmontools.yaml` playbook (or simply install it using `apt`).
 
 ## Restore from an old system
 
