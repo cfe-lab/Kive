@@ -13,6 +13,10 @@ make sure your backups are in order.  System backups are typically kept using `r
 and a backup of the Kive PostgreSQL database is kept using `barman`.  For example,
 on our production server, these are kept on a NAS mounted at `/media/dragonite`.
 
+Optionally, if your backups are on a physical drive connected to the machine, to avoid
+accidentally damaging or altering the backups, you could physically remove them until the 
+setup is complete and you're ready to restore data from them.
+
 There a few files that are worth preserving in particular and having available to you
 during the deployment process:
 
@@ -89,6 +93,15 @@ and put the *basename* (i.e. the name of the soft link in the directory without 
 `data_physical_volumes` list.  (Or, if you wish to use several volumes combined into 
 one logical volume, put all their names in this list.)  
 
+> If any drives are already recognized by LVM from a previous system, you should 
+> delete the logical volumes, volume groups, and physical volumes associated with them.  
+> Details of how to do so may be found in [the LVM documentation][UbuntuLVMDocs].
+> If there are any [mdadm][https://raid.wiki.kernel.org/index.php/A_guide_to_mdadm]
+> RAID arrays on these drives, you may also need to shut those down first using
+> `mdadm --stop [array device]`.
+
+[UbuntuLVMDocs]: https://manpages.ubuntu.com/manpages/jammy/en/man8/lvm.8.html
+
 Now we can run the playbook `octomore_preliminary_setup.yaml`.  This sets up the `/data` partition,
 prepares some other system stuff on the head node, and configures the internal-facing networking.
 With this in place, the playbook should set up an `ext4` volume at `/data` on the drive 
@@ -97,10 +110,10 @@ you specified.
 #### Set up your backup drive
 
 Next, set up a backup drive for your system.  A sample of how this was done for Octomore
-using all the leftover drives from the old system is detailed in `create_backup_filesystem.yaml`.
-On another server you might use a NAS-based backup solution instead.  The goal in the end 
-is to have a backup drive mounted at the path specified in your `group_vars` as
-`kive_backup_path`; by default this would be `/media/backup`.
+is detailed in `create_backup_filesystem.yaml`.  On another server you might use a 
+NAS-based backup solution instead.  The goal in the end is to have a backup drive mounted 
+at the path specified in your `group_vars` as `kive_backup_path`; by default this would 
+be `/media/backup`.
 
 ### Install Ubuntu on the compute nodes
 
