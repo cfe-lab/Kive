@@ -1,0 +1,12 @@
+---
+
+- name: lock and expire the bootstrap user
+  hosts: all
+  vars:
+    user_name: ubuntu
+  tasks:
+    - name: lock and expire the user
+      user:
+        name: "{{ user_name }}"
+        password_lock: true
+        expires: 1

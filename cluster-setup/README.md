@@ -155,7 +155,8 @@ compute node as part of a subsequent playbook.)
 
 From here, you can lock and expire the `ubuntu` user and start using one of the just-imported accounts,
 if you have one.  Make sure that your uploaded `cluster-setup` directory is accessible by
-the account you're using if you do so.
+the account you're using if you do so.  The `lock_bootstrap_user.yaml` playbook can do this;
+modify the `user_name` variable if necessary.
 
 ### Get SSL credentials for the webserver
 
