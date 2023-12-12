@@ -231,6 +231,17 @@ webserver:
     sudo systemctl stop apache2
     sudo systemctl stop postgresql@14-main
 
+### Annoying detour 2: set the system locale to "Canada English"
+
+At this point in the Octomore migration, it was discovered that the old database
+contents would not properly restore to the new database due to problems with the 
+database locale.  The old database had as its locale `en_CA.UTF-8`, which was not
+available on the newly-upgraded Octomore.
+
+To this end, the `set_locale_to_canada.yml` playbook was used to enable this 
+locale on all nodes, and the database then restored without issue.  If this comes
+up again, use this same playbook to correct the issue.
+
 ### Restoring the database
 
 Now, restore the Kive data folders from the old backups.  On our prod and dev 
@@ -351,6 +362,13 @@ Lastly, bring Kive itself back up by bringing up:
 [initialization/worker]: initialization/worker
 [initialization]: initialization
 [deployment]: ./deployment
+
+### Set up network drives
+
+Our compute server also requires two network mounts, for `macdatafile` and `RAW_DATA`, in
+order for MiCall to run.  The playbook `mount_network_drives.yaml` sets these up; fill
+in the required variables in `group_vars/all.yaml`; their names and dummy values are in
+`group_vars/octomore_template.yaml`.
 
 ## Test Environment
 

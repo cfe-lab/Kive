@@ -138,4 +138,19 @@ copied_groups:
 default_shell: /usr/bin/bash
 
 data_physical_volumes:
-  - /dev/sdb
+  - ata-ST10000NM001G-2MW103_ZS51H7QX
+
+backup_physical_volumes:
+  - ata-ST10000NM0016-1TT101_ZA286TWE
+
+macdatafile_username: "[fill this in]"
+macdatafile_password: "[fill this in]"
+macdatafile_domain: "[fill this in]"
+macdatafile_read_only: false
+macdatafile_network_share: "[fill this in]"
+
+raw_data_username: "[fill this in]"
+raw_data_password: "[fill this in]"
+raw_data_domain: "[fill this in]"
+raw_data_read_only: false  # set to true for a dev/test system
+raw_data_network_share: "[fill this in]"

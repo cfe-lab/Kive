@@ -2,12 +2,13 @@
 
 - name: create backup filesystem
   hosts: head
-  vars:
-    drive_identifiers:
-      - "ata-ST10000NM001G-2MW103_ZS51H7QX"
+#  vars:
+#    backup_physical_volumes:
+#      - "ata-ST10000NM001G-2MW103_ZS51H7QX"
+  # Replaced the above with the `backup_physical_volumes` variable in group_vars.
   tasks:
     - name: create a single partition on each of the physical volumes
-      loop: "{{ drive_identifiers }}"
+      loop: "{{ backup_physical_volumes }}"
       community.general.parted:
         device: "/dev/disk/by-id/{{ item }}"
         number: 1
@@ -20,7 +21,7 @@
           set_fact:
             partition_names: [ ]
         - name: append names to the list
-          loop: "{{ drive_identifiers }}"
+          loop: "{{ backup_physical_volumes }}"
           set_fact:
             partition_names: "{{ partition_names + ['/dev/disk/by-id/' ~ item ~ '-part1'] }}"
 

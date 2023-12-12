@@ -1,0 +1,14 @@
+---
+
+- name: change the default locale to Canada English
+  hosts: all
+  tasks:
+    - name: make the locale available
+      become: true
+      community.general.locale_gen:
+        name: "en_CA.UTF-8"
+        state: present
+
+    - name: set the default locale
+      become: true
+      command: update-locale LANG=en_CA.UTF-8
