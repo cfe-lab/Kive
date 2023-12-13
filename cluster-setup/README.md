@@ -4,7 +4,7 @@ This directory contains code and instructions for setting up a multi-host comput
 
 ## Deployment to Octomore
 
-This procedure, as of November 29, 2023, looks like the following.
+This procedure, as of December 12, 2023, looks like the following.
 
 ### Before you wipe the old machine
 
