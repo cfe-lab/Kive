@@ -8,7 +8,9 @@ KIVE_SERVER_EMAIL={{ kive_server_email | quote }}
 KIVE_ADMINS={{ kive_admins | quote }}
 KIVE_SUBJECT_PREFIX={{ kive_subject_prefix | quote }}
 
-# Set these in /root/ansible-rundir/env_vars.yml if you don't like the defaults in settings.py
+# The KIVE_PURGE_START, KIVE_PURGE_STOP, and KIVE_LOG_LEVEL variables
+# can be set in Ansible prior to deployment if you don't like the defaults
+# in settings.py.
 # KIVE_PURGE_START=20GB
 # KIVE_PURGE_STOP=15GB
 # KIVE_PURGE_DATASET_AGING=1.0
@@ -16,15 +18,15 @@ KIVE_SUBJECT_PREFIX={{ kive_subject_prefix | quote }}
 # KIVE_PURGE_CONTAINER_AGING=10.0
 # KIVE_PURGE_WAIT='0 days, 1:00:00'
 # KIVE_PURGE_BATCH_SIZE=100
-# KIVE_LOG_LEVEL=WARN
+# KIVE_LOG_LEVEL=WARNING
 {% if kive_purge_start is defined %}
-KIVE_PURGE_START={{kive_purge_start}}
+KIVE_PURGE_START={{ kive_purge_start }}
 {% endif %}
 {% if kive_purge_stop is defined %}
-KIVE_PURGE_STOP={{kive_purge_stop}}
+KIVE_PURGE_STOP={{ kive_purge_stop }}
 {% endif %}
 {% if kive_log_level is defined %}
-KIVE_LOG_LEVEL={{kive_log_level}}
+KIVE_LOG_LEVEL={{ kive_log_level }}
 {% endif %}
 
 # KIVE_LOG is set separately for each service in the .service files.

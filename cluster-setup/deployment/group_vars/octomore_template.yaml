@@ -4,16 +4,21 @@
 # Most of the network information should be already set appropriately.
 
 # Variables needed to set up Kive.
-kive_allowed_hosts: "[\"*\"]"
+kive_allowed_hosts: "[\"192.168.69.179\", \"kive-int.cfenet.ubc.ca\"]"
 kive_listen_port: 80
 update_kive_source: yes
 kive_server_email: kive-noreply@bccfe.ca
 kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
-kive_subject_prefix: "Kive server"
+kive_subject_prefix: "Kive server on Octomore"
 kive_backup_path: /media/backup
 kive_version: v0.16.2
 kive_python_package: python3.7
 kive_python_executable: python3.7
+
+# Settings used by the Kive purge tasks.
+kive_purge_start: "4TB"
+kive_purge_stop: "3.5TB"
+kive_log_level: INFO
 
 # Slurm configuration.
 slurmctlnode: octomore

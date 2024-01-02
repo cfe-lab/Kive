@@ -79,10 +79,25 @@ or `/etc/kive/kive_purge.conf`.
 * `barman_password`: this is in the `barman` user's `.pgpass` file.
 * `streaming_barman_password`: this is also in the `barman` user's `.pgpass` file.
 
+Some other notable settings that you may need to adjust:
+
+* `kive_allowed_hosts`: this is a JSON-formatted list of IP addresses/URLs that the
+web server will respond to requests on.
+* `kive_subject_prefix`: this will be prepended to the emails sent by the Kive system.
+It's a good idea to include some details on this system, e.g. "Kive server on Octomore",
+or "Kive server on developer workstation".
+* `kive_purge_start`: sets the threshold for the Kive purge task to perform file cleanup.
+* `kive_purge_stop`: sets the stopping threshold for this Kive purge task; that is, a 
+purge will stop when the remaining files' total size is under this threshold.
+* `kive_log_level`: the logging level, as understood by [Django's logging utilities][DjangoLogging],
+used by the purge task.
+
 Then go to `deployment/` and create an `ansible.cfg` from one of the provided templates, 
 probably `ansible_octomore.cfg`.  These files will be necessary for Ansible to work.
 
 > Note: all playbooks should be run using `sudo`!
+
+[DjangoLogging]: https://docs.djangoproject.com/en/4.0/topics/logging/
 
 #### General preliminary setup
 

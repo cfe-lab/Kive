@@ -212,7 +212,7 @@ else:
     LOG_HANDLER_NAMES.append('console')
 if ADMINS:
     LOG_HANDLER_NAMES.append('mail_admins')
-LOG_LEVEL = os.environ.get('KIVE_LOG_LEVEL', 'WARN')
+LOG_LEVEL = os.environ.get('KIVE_LOG_LEVEL', 'WARNING')
 
 # See http://docs.djangoproject.com/en/dev/topics/logging for
 # more details on how to customize your logging configuration.

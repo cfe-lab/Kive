@@ -9,10 +9,16 @@ kive_listen_port: 8080
 update_kive_source: yes
 kive_server_email: kive-noreply@bccfe.ca
 kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
-kive_subject_prefix: "Kive server"
+kive_subject_prefix: "Kive (development) server"
 kive_backup_path: /data/kive_db_backup
 kive_python_package: python3.7
 kive_python_executable: python3.7
+
+# Settings used by the Kive purge tasks; uncomment if you need to customize
+# for your system (the defaults are likely good for a development system).
+# kive_purge_start: "20GB"
+# kive_purge_stop: "15GB"
+# kive_log_level: WARN
 
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
