@@ -24,7 +24,7 @@ kive_log_level: INFO
 slurmctlnode: bulbasaur
 slurm_nodes:
   - name: bulbasaur
-    memory: 32000
+    memory: 80000
     cpus: 24
     sockets: 2
     cores_per_socket: 6
