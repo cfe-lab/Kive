@@ -1,0 +1,53 @@
+---
+
+- name: "mount macdatafile and RAW_DATA read-write on the head node"
+  hosts: head
+  become: true
+  tasks:
+    - name: do the mounts on the head node
+      loop:
+        - mount_point: /media/macdatafile
+          network_share: "{{ macdatafile_network_share }}"
+          cifs_credentials: /opt/smbcredentials
+          cifs_credentials_volume: /opt
+          read_only: false
+
+        - mount_point: /media/RAW_DATA
+          network_share: "{{ raw_data_network_share }}"
+          cifs_credentials: /opt/smbcredentials-nextgen
+          cifs_credentials_volume: /opt
+          read_only: false
+      include_role:
+        name: mount_network_drives
+      vars:
+        mount_point: "{{ item.mount_point }}"
+        network_share: "{{ item.network_share }}"
+        cifs_credentials: "{{ item.cifs_credentials }}"
+        cifs_credentials_volume: "{{ item.cifs_credentials_volume }}"
+        read_only: "{{ item.read_only }}"
+
+- name: "mount macdatafile and RAW_DATA read-only on the worker nodes"
+  hosts: workers
+  become: true
+  tasks:
+    - name: do the mounts on the worker nodes
+      loop:
+        - mount_point: /media/macdatafile
+          network_share: "{{ macdatafile_network_share }}"
+          cifs_credentials: /opt/smbcredentials
+          cifs_credentials_volume: /opt
+          read_only: true
+
+        - mount_point: /media/RAW_DATA
+          network_share: "{{ raw_data_network_share }}"
+          cifs_credentials: /opt/smbcredentials-nextgen
+          cifs_credentials_volume: /opt
+          read_only: true
+      include_role:
+        name: mount_network_drives
+      vars:
+        mount_point: "{{ item.mount_point }}"
+        network_share: "{{ item.network_share }}"
+        cifs_credentials: "{{ item.cifs_credentials }}"
+        cifs_credentials_volume: "{{ item.cifs_credentials_volume }}"
+        read_only: "{{ item.read_only }}"
