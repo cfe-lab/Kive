@@ -201,6 +201,27 @@ order for MiCall to run.  The playbook `mount_network_drives.yaml` sets these up
 in the required variables in `group_vars/all.yaml`; their names and dummy values are in
 `group_vars/octomore_template.yaml`.
 
+*TO DO*: this playbook can be updated to use the `mount_network_drives` role.
+
+#### Changing network drive permissions
+
+Originally Octomore's network drives were mounted read-write on all nodes, and 
+Bulbasaur's network drives were mounted read-only.  However, after discussion,
+we decided it was likely best to mount them read-write only on Octomore's head node
+and read-only on its compute nodes, as we believe only the head node needs to write to 
+these drives when it runs MiCall Watcher.
+
+It also makes sense to restrict all of Bulbasaur's nodes to read-only access, but if 
+Bulbasaur ever needs to be used for clinical work, we would need to change the permissions 
+(and install MiCall Watcher).
+
+If it turns out that we were incorrect, we would need to restore all of Octomore's
+nodes to having read-write permissions on both network drives.
+
+The playbooks `network_drives_standard.yaml`, `network_drives_read_only.yaml`, 
+and `network_drives_read_write.yaml` were written to make these configuration changes
+whenever necessary.
+
 ### Install Kive
 
 With all of that table-setting in place, the main playbook to run is `kive_setup.yml`.  This is
