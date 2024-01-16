@@ -61,9 +61,9 @@ This sets up the root user's SSH key and `/etc/hosts`, and installs Ansible on t
 Accept the defaults whenever it asks which services should be restarted.
 Now that Ansible is available on the root node, most of the rest of the procedure will be done
 using Ansible playbooks defined in the [deployment] directory.  Copy the `cluster-setup` directory 
-to the head node, e.g. using `rsync -avz`, placing it in a sensible location with the appropriate 
-permissions.  If you make changes, you can also use `rsync -avz` to keep them synchronized between
-your workstation and the head node.
+to the head node using the `deploy_cluster_setup.bash` script, placing it in a sensible location 
+with the appropriate permissions.  If you make changes, you can also use the same script
+to keep them synchronized between your workstation and the head node.
 
 #### Prepare Ansible configuration
 
