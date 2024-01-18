@@ -353,7 +353,7 @@ the entry you commented out before in `/etc/cron.d/barman`.  Then check on the
     barman check kive
 
 There may be problems with the configuration still.  If so, the Barman log at 
-`/var/log/barman/barman.log` and the PostgreSQL logs at `/var/log/
+`/var/log/barman/barman.log` and the PostgreSQL logs at `/var/log/postgresql`
 may be helpful in diagnosing the problems.  Some that I experienced
 while I was going through the process:
 
