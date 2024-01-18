@@ -143,10 +143,10 @@ copied_groups:
 default_shell: /usr/bin/bash
 
 data_physical_volumes:
-  - ata-ST10000NM001G-2MW103_ZS51H7QX
+  - ata-ST10000VN0008-2PJ103_ZLW0388G
 
 backup_physical_volumes:
-  - ata-ST10000NM0016-1TT101_ZA286TWE
+  - ata-ST10000VN000-3AK101_WP015CNV
 
 macdatafile_username: "[fill this in]"
 macdatafile_password: "[fill this in]"
