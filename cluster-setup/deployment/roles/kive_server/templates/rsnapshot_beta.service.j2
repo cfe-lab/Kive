@@ -1,0 +1,11 @@
+[Unit]
+Description=Run rsnapshot beta (daily) backup.
+
+[Service]
+ExecStart=/opt/venv_kive/bin/python /opt/crontab_mail.py \
+    --log /var/log/rsnapshot.log \
+    --level ERROR \
+    --subject {{ (kive_subject_prefix + "rsnapshot beta") | quote }} \
+    --from {{ kive_server_email | quote }} \
+    {{ mail_admins_emails | join(',') | quote }} \
+    /usr/bin/rsnapshot beta

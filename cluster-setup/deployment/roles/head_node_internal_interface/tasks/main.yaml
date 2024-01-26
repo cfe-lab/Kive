@@ -1,0 +1,15 @@
+---
+
+- name: generate and install netplan configuration for the internal-facing interface
+  become: true
+  template:
+    src: 60-internal-interface.yaml.j2
+    dest: /etc/netplan/60-internal-interface.yaml
+    owner: root
+    group: root
+    mode: "644"
+
+- name: apply the configuration
+  become: true
+  command:
+    argv: [netplan, apply]

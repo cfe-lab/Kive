@@ -1,0 +1,19 @@
+---
+
+- name: set mount options for the network drive
+  set_fact:
+    mount_options: "credentials={{ cifs_credentials }},x-systemd.requires-mounts-for={{ cifs_credentials_volume }},noperm,file_mode=0777,dir_mode=0777"
+
+- name: set read-only if configured
+  when: read_only | bool
+  set_fact:
+    mount_options: "{{ mount_options }},ro"
+
+- name: mount macdatafile with the appropriate options
+  become: true
+  mount:
+    path: "{{ mount_point }}"
+    src: "{{ network_share }}"
+    opts: "{{ mount_options }}"
+    fstype: cifs
+    state: mounted

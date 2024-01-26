@@ -1,0 +1,100 @@
+---
+
+- name: install CIFS utilities
+  hosts: all
+  tasks:
+    - name: install cifs-utils
+      become: true
+      apt:
+        name:
+          - cifs-utils
+
+- name: create CIFS credentials for the mounts
+  hosts: head
+  tasks:
+    - name: prepare credentials for macdatafile
+      become: true
+      vars:
+        cifs_username: "{{ macdatafile_username }}"
+        cifs_password: "{{ macdatafile_password }}"
+        cifs_domain: "{{ macdatafile_domain }}"
+      template:
+        src: templates/cifs_credentials.j2
+        dest: /opt/smbcredentials
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: prepare credentials for RAW_DATA
+      become: true
+      vars:
+        cifs_username: "{{ raw_data_username }}"
+        cifs_password: "{{ raw_data_password }}"
+        cifs_domain: "{{ raw_data_domain }}"
+      template:
+        src: templates/cifs_credentials.j2
+        dest: /opt/smbcredentials-nextgen
+        owner: root
+        group: root
+        mode: "0600"
+
+
+- name: mount the macdatafile CIFS network volume
+  hosts: all
+  tasks:
+    - name: create the macdatafile mount point
+      become: true
+      file:
+        path: /media/macdatafile
+        owner: root
+        group: root
+        mode: '0777'
+        state: directory
+
+    - name: set mount options
+      set_fact:
+        macdatafile_mount_options: credentials=/opt/smbcredentials,x-systemd.requires-mounts-for=/opt,noperm,file_mode=0777,dir_mode=0777
+
+    - name: set read-only if configured
+      when: macdatafile_read_only | bool
+      set_fact:
+        macdatafile_mount_options: "{{ macdatafile_mount_options }},ro"
+
+    - name: mount the macdatafile CIFS volume
+      become: true
+      mount:
+        path: /media/macdatafile
+        src: "{{ macdatafile_network_share }}"
+        opts: "{{ macdatafile_mount_options }}"
+        fstype: cifs
+        state: mounted
+
+- name: mount the RAW_DATA CIFS network volume
+  hosts: all
+  tasks:
+    - name: create the RAW_DATA mount point
+      become: true
+      file:
+        path: /media/RAW_DATA
+        owner: root
+        group: root
+        mode: '0777'
+        state: directory
+
+    - name: set mount options
+      set_fact:
+        raw_data_mount_options: credentials=/opt/smbcredentials-nextgen,x-systemd.requires-mounts-for=/opt,noperm,file_mode=0777,dir_mode=0777
+
+    - name: set read-only if configured
+      when: raw_data_read_only | bool
+      set_fact:
+        raw_data_mount_options: "{{ raw_data_mount_options }},ro"
+
+    - name: mount the RAW_DATA CIFS volume
+      become: true
+      mount:
+        path: /media/RAW_DATA
+        src: "{{ raw_data_network_share }}"
+        opts: "{{ raw_data_mount_options }}"
+        fstype: cifs
+        state: mounted

@@ -1,0 +1,45 @@
+---
+
+- name: check if Slurm is ready to go
+  block:
+    - name: check if the Slurm systemd service exists
+      stat: path=/usr/local/lib/systemd/system/slurmd.service
+      register: slurmd_service
+
+    - name: fail if the systemd service isn't there
+      fail:
+        msg: "slurmd systemd service is not in place."
+      when: not slurmd_service.stat.exists
+
+    - name: check if slurm.conf exists
+      stat: path=/usr/local/etc/slurm/slurm.conf
+      register: slurm_conf
+
+    - name: fail if the conf file isn't there
+      fail:
+        msg: "slurm.conf is not in place."
+      when: not slurm_conf.stat.exists
+
+    - name: check if cgroup.conf exists
+      stat: path=/usr/local/etc/slurm/cgroup.conf
+      register: cgroup_conf
+
+    - name: fail if cgroup.conf file isn't there
+      fail:
+        msg: "cgroup.conf is not in place."
+      when: not cgroup_conf.stat.exists
+
+- name: create directory for Slurm spooling
+  become: true
+  file:
+    path: /var/spool/slurmd
+    owner: slurm
+    group: slurm
+    mode: '0755'
+    state: directory
+
+- name: enable slurmd service
+  systemd:
+    name: slurmd
+    state: started
+    enabled: true

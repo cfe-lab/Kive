@@ -1,0 +1,18 @@
+---
+
+- name: preliminary setup to run on the Octomore head node
+  hosts: head
+  roles:
+    - create_data_filesystem
+    - head_node_internal_interface
+  tasks:
+    - name: create /opt
+      file:
+        path: /opt
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+    - name: set up head node networking
+      include_role:
+        name: head_node_networking

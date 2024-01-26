@@ -1,69 +1,93 @@
-HEAD_IP = "192.168.45.10"
-WORKER_IP = "192.168.45.11"
+HEAD_IP = "192.168.56.10"
+WORKER_IP = "192.168.56.11"
 
 # Copy the test SSH keys into `/home/vagrant/.ssh/`. Keys are copied manually
 # to allow easy SSH traffic between VMs.
-def add_keys(vm)
+def add_keys(vm, home_dir="/home/vagrant")
   vm.provision "file",
     source: "./setupfiles/vagrant_testkey",
-    destination: "/home/vagrant/.ssh/id_ed25519"
+    destination: "#{home_dir}/.ssh/id_ed25519"
   vm.provision "file",
     source: "./setupfiles/vagrant_testkey.pub",
-    destination: "/home/vagrant/.ssh/id_ed25519.pub"
+    destination: "#{home_dir}/.ssh/id_ed25519.pub"
   vm.provision "shell", inline: <<-EOS
-    chmod 600 /home/vagrant/.ssh/id_ed25519
-    chmod 644 /home/vagrant/.ssh/id_ed25519.pub
+    chmod 600 "#{home_dir}/.ssh/id_ed25519"
+    chmod 644 "#{home_dir}/.ssh/id_ed25519.pub"
   EOS
 end
 
 # Enable SSH access by copying the test SSH public key into
 # `/home/vagrant/.ssh/authorized_keys`
-def add_key_access(vm)
+def add_key_access(vm, home_dir="/home/vagrant")
   vm.provision "file",
     source: "./setupfiles/vagrant_testkey.pub",
     destination: "/tmp/vagrant_testkey.pub"
   vm.provision "shell", inline: <<-EOS
-    cat /tmp/vagrant_testkey.pub >> /home/vagrant/.ssh/authorized_keys
-    chmod 600 /home/vagrant/.ssh/authorized_keys
+    cat /tmp/vagrant_testkey.pub >> "#{home_dir}/.ssh/authorized_keys"
+    chmod 600 "#{home_dir}/.ssh/authorized_keys"
   EOS
 end
 
 # Add a synced folder to emulate the cluster's network drive.
 def add_data_dir(vm)
   Dir.mkdir("./data") if not Dir.exists?("./data")
-  vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
+  # vm.synced_folder "./data", "/data", mount_options: ["dmode=777", "fmode=664"]
 end
 
 Vagrant.configure("2") do |config|
-  config.vm.box = "geerlingguy/centos8"
+  config.vm.box = "bento/ubuntu-22.04"
+
+  # Give preference to VMware when it's available.
+  config.vm.provider "vmware_desktop" do |vmw|
+    vmw.gui = false
+    vmw.memory = 8 * 1024
+    vmw.cpus = 2
+  end
   
   config.vm.provider "virtualbox" do |vb|
     vb.gui = false
     vb.memory = 8 * 1024
-    vb.cpus = 4
+    vb.cpus = 2
   end
 
   config.vm.define :head do |head|
     head.vm.hostname = "head"
-    head.vm.network "private_network", ip: HEAD_IP
+
+    # Static IPs are not supported by the VMware provider,
+    # but we can use them when using Virtualbox.
+    head.vm.network "private_network"
+    # head.vm.provider "virtualbox" do |vb, override|
+    #   head.vm.network "private_network", ip: HEAD_IP
+    # end
+
     add_keys(head.vm)
     add_key_access(head.vm)
+    # add_keys(head.vm, home_dir="/root")
+    # add_key_access(head.vm, home_dir="/root")
     add_data_dir(head.vm)
     head.vm.provision "shell", path: "./setupfiles/install-ansible.sh"
   end
 
   config.vm.define :worker do |worker|
     worker.vm.hostname = "worker"
-    worker.vm.network "private_network", ip: WORKER_IP
+
+    # As for the head node we set up Virtualbox and VMware providers differently.
+    worker.vm.network "private_network"
+    # worker.vm.provider "virtualbox" do |vb, override|
+    #   override.vm.network "private_network", ip: WORKER_IP
+    # end
+
     add_key_access(worker.vm)
+    # add_key_access(worker.vm, home_dir="/root")
     worker.vm.provision "shell", inline: <<-EOS
-      dnf install -q -y python3 epel-release
-      dnf config-manager --set-enabled PowerTools
+      apt update
+      apt install -y python3
     EOS
-    add_data_dir(worker.vm)
   end
 
-  config.vm.provision "shell", inline: <<-EOS
-    echo "#{HEAD_IP}\thead\n#{WORKER_IP}\tworker" >> /etc/hosts
-  EOS
+  # # Note: when using a VMware provider, these IP addresses won't be meaningful
+  # # and you'll have to manually configure /etc/hosts.
+  # config.vm.provision "shell", inline: <<-EOS
+  #   echo "#{HEAD_IP}\thead\n#{WORKER_IP}\tworker" >> /etc/hosts
+  # EOS
 end

@@ -1,0 +1,65 @@
+---
+
+- name: add the deadsnakes PPA to get old versions of Python
+  become: true
+  apt_repository:
+    repo: ppa:deadsnakes/ppa
+
+- name: install the version of Python required by kive
+  become: true
+  apt:
+    name:
+      - "{{ kive_python_package }}"
+      - "{{ kive_python_package }}-distutils"
+      - "{{ kive_python_package }}-venv"
+      - "{{ kive_python_package }}-dev"
+      - "lib{{ kive_python_package }}-dev"
+
+- name: install pip for this version of Python
+  become: true
+  shell: "curl https://bootstrap.pypa.io/get-pip.py | sudo {{ kive_python_executable }}"
+
+- name: kive package dependencies
+  become: true
+  apt:
+    name:
+#      - python3-dev
+#      - python3-venv
+      - libsqlite3-dev
+      - wcanadian
+      - lsof
+      - graphviz
+      - libgraphviz-dev
+
+- name: install postgres database libraries
+  become: true
+  apt:
+    name:
+      - postgresql-client
+
+- name: configure mail service for error logging
+  block:
+    - name: install postfix
+      become: true
+      apt:
+        name:
+          - postfix
+    - name: start postfix daemon
+      systemd:
+        name: postfix
+        state: started
+        enabled: true
+
+- name: create kive group
+  become: true
+  group:
+    name: kive
+    gid: 762  # random gid in system uid range (200, 999); hard-coded for consistency across hosts
+
+- name: create kive user
+  become: true
+  user:
+    name: kive
+    system: yes
+    uid: 762  # random uid in system uid range (200, 999); hard-coded for consistency across hosts
+    group: kive

@@ -1,0 +1,15 @@
+WSGIScriptAlias / {{ kive_root }}/kive/kive/wsgi.py
+WSGIPythonPath {{ kive_root }}/kive:{{ kive_venv }}/lib/{{ kive_python_executable }}/site-packages
+
+<Directory {{ kive_root }}/kive/kive>
+<Files wsgi.py>
+Require all granted
+</Files>
+</Directory>
+
+Alias /static {{ kive_static_root }}
+
+<Directory {{ kive_static_root }}>
+Order deny,allow
+Allow from all
+</Directory>

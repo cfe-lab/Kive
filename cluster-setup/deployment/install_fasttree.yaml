@@ -1,0 +1,49 @@
+---
+
+- hosts: head
+  become: true
+  tasks:
+    - name: make a directory to hold the source code
+      file:
+        path: /usr/local/src/FastTree-2.1.9
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    - name: copy FastTree source code to the host
+      copy:
+        src: FastTree-2.1.9.c
+        dest: /usr/local/src/FastTree-2.1.9/FastTree.c
+        owner: root
+        group: root
+
+    - name: compile single-precision FastTree
+      command:
+        chdir: /usr/local/src/FastTree-2.1.9
+        cmd: gcc -O3 -finline-functions -funroll-loops -Wall -o FastTree.single FastTree.c -lm
+        creates: FastTree.single
+
+    - name: compile double-precision FastTree
+      command:
+        chdir: /usr/local/src/FastTree-2.1.9
+        cmd: gcc -DUSE_DOUBLE -O3 -finline-functions -funroll-loops -Wall -o FastTree.double FastTree.c -lm
+        creates: FastTree.double
+
+    - name: install FastTree.single
+      copy:
+        src: /usr/local/src/FastTree-2.1.9/FastTree.single
+        dest: /usr/local/bin/FastTree.single
+        mode: "0755"
+
+    - name: install FastTree.double
+      copy:
+        src: /usr/local/src/FastTree-2.1.9/FastTree.double
+        dest: /usr/local/bin/FastTree.double
+        mode: "0755"
+
+    - name: make an alias to FastTree.single
+      file:
+        src: /usr/local/bin/FastTree.single
+        path: /usr/local/bin/FastTree
+        state: link

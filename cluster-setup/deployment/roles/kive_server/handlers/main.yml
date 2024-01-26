@@ -1,0 +1,11 @@
+- name: Restart postgresql service
+  become: true
+  become_user: root
+  systemd:
+    name: "postgresql"
+    state: restarted
+- name: restart web server
+  become: true
+  systemd:
+    name: apache2
+    state: restarted

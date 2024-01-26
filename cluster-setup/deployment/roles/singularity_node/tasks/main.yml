@@ -1,0 +1,9 @@
+---
+
+# This role installs Singularity from the released .deb file.
+
+- name: install singularity
+  become: true
+  apt:
+    deb: https://github.com/sylabs/singularity/releases/download/v3.11.4/singularity-ce_3.11.4-jammy_amd64.deb
+    state: present

@@ -1,0 +1,6 @@
+# FIXME we may not need this
+- name: reconfigure slurm
+  become: true
+  become_user: root
+  command: scontrol reconfigure
+  throttle: 1

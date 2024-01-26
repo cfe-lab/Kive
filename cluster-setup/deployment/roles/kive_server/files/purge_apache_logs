@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+# This removes all but the 10 most recent error_log files.
+ls -r /var/log/apache2/error_log*|tail -n+11|xargs rm -f
+# This removes all but the 10 most recent access_log files.
+ls -r /var/log/apache2/access_log*|tail -n+11|xargs rm -f

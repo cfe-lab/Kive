@@ -1,0 +1,87 @@
+---
+# These are default settings for a "testing" environment, e.g. using
+# VMs to simulate the procedure.  Copy this to "all.yml" and fill in
+# appropriate values for networking and passwords etc.
+
+# Variables needed to set up Kive.
+kive_allowed_hosts: "[\"*\"]"
+kive_listen_port: 8080
+update_kive_source: yes
+kive_server_email: kive-noreply@bccfe.ca
+kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
+kive_subject_prefix: "Kive (development) server"
+kive_backup_path: /data/kive_db_backup
+kive_python_package: python3.7
+kive_python_executable: python3.7
+
+# Settings used by the Kive purge tasks; uncomment if you need to customize
+# for your system (the defaults are likely good for a development system).
+# kive_purge_start: "20GB"
+# kive_purge_stop: "15GB"
+# kive_log_level: WARN
+
+# Settings for network services running on the head node,
+# e.g. firewall, NFS, and PostgreSQL.
+nfs_export_to_hosts: 192.168.64.0/255.255.255.0
+kive_db_host: 192.168.64.9
+kive_db_subnet: 192.168.64.0/24
+
+# Internal network (i.e. the network that connects the head node and compute nodes)
+# configuration.
+internal_subnet: 192.168.1.0
+internal_netmask: 255.255.255.0
+internal_mask_bits: 24
+internal_broadcast: 192.168.1.255
+internal_dhcp_range: [192.168.1.100, 192.168.1.200]
+
+head_internal_interface: eth1
+head_internal_interface_mac: "00:1e:67:fe:fb:76"
+head_external_interface: eth0
+head_internal_address: 192.168.1.1
+head_internal_mask_bits: 24
+
+compute_nodes:
+  - name: worker
+    ip: 192.168.1.2
+    mac: "ab:cd:ef:01:23:45"
+
+# The following are sensitive, and should be kept secret for a production system.
+kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
+kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
+barman_password: fixme-barman
+streaming_barman_password: fixme-streaming-barman
+
+# Slurm installation:
+slurm_src_basename: "slurm-23.02.5"
+slurm_tarball: "slurm-23.02.5.tar.bz2"
+slurm_source_url: "https://download.schedmd.com/slurm/slurm-23.02.5.tar.bz2"
+slurm_sha1_checksum: b3f06d7030bd771a3a94be06e3c0d58a2630a21e
+
+# mod_wsgi installation:
+mod_wsgi_source_url: "https://files.pythonhosted.org/packages/fe/12/b3756f3b72ae3410a83a9b98862925aea64e854c93ef16c1e46b11e32d59/mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_tarball: "mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_basename: "mod_wsgi-4.9.4"
+mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac9237f5666cfc9"
+
+# The following are defaults, and probably don't need to be changed.
+# In a typical deployment, Kive, its virtualenv, and slurm are only "installed"
+# by the head node and shared to the compute nodes via NFS, so kive_venv,
+# kive_slurm_path, and kive_root should be paths that are on the shared partitions
+# (typically /opt and /usr/local).  If one would rather install Kive and slurm
+# locally to each node, then these paths and/or the NFS shares should be reworked.
+kive_venv: /opt/venv_kive
+kive_slurm_path: /opt/venv_kive/bin
+kive_db_name: kive
+kive_db_user: kive
+kive_media_root: /data/kive/media_root
+kive_static_root: /var/www/html/kive/static
+kive_root: /usr/local/share/Kive
+# - httpd configuration
+kive_httpd_user: kive
+kive_httpd_group: kive
+
+copied_groups:
+  - kive
+  - sudo
+
+default_shell: /usr/bin/bash

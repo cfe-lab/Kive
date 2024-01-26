@@ -1,0 +1,161 @@
+---
+# These are settings appropriate for Octomore.  Copy this file to
+# "all.yml" and fill in the required passwords when deploying.
+# Most of the network information should be already set appropriately.
+
+# Variables needed to set up Kive.
+kive_allowed_hosts: "[\"192.168.69.179\", \"kive-int.cfenet.ubc.ca\"]"
+kive_listen_port: 80
+update_kive_source: yes
+kive_server_email: kive-noreply@bccfe.ca
+kive_admins: "[[\"kive\", \"kive@bccfe.ca\"]]"
+kive_subject_prefix: "Kive server on Octomore"
+kive_backup_path: /media/backup
+kive_version: v0.16.2
+kive_python_package: python3.7
+kive_python_executable: python3.7
+
+# Settings used by the Kive purge tasks.
+kive_purge_start: "4TB"
+kive_purge_stop: "3.5TB"
+kive_log_level: INFO
+
+# Slurm configuration.
+slurmctlnode: octomore
+slurm_nodes:
+  - name: octomore
+    memory: 96000
+    cpus: 48
+    sockets: 2
+    cores_per_socket: 12
+    threads_per_core: 2
+  - name: b05
+    memory: 80000
+    cpus: 40
+    sockets: 2
+    cores_per_socket: 10
+    threads_per_core: 2
+
+# Settings for network services running on the head node,
+# e.g. firewall, NFS, and PostgreSQL.
+nfs_export_to_hosts: 192.168.1.0/255.255.255.0
+kive_db_host: 192.168.1.1
+kive_db_subnet: 192.168.1.0/24
+
+# Internal network (i.e. the network that connects the head node and compute nodes)
+# configuration.
+internal_subnet: 192.168.1.0
+internal_netmask: 255.255.255.0
+internal_mask_bits: 24
+internal_broadcast: 192.168.1.255
+internal_dhcp_range: [192.168.1.100, 192.168.1.200]
+
+head_internal_interface: eth1
+head_internal_interface_mac: "00:1e:67:fe:fb:76"
+head_external_interface: eno0
+head_internal_address: 192.168.1.1
+head_internal_mask_bits: 24
+
+# This creates DHCP reservations for the compute nodes.
+# Slow nodes: b01 through B03.  The rest are "fast nodes".
+# As of August 2020, b01 is broken and not spun up.
+compute_nodes:
+  - name: b01
+    ip: 192.168.1.2
+    mac: "06:B3:ED:E6:A2:66"
+    # Alternative MACs: 00:1E:67:54:9B:(E4-E7)
+  - name: b02
+    ip: 192.168.1.3
+    mac: "00:1E:67:80:3C:B1"
+    # Alternative MACs: 00:1E:67:80:3C:(B2-B4)
+  - name: b03
+    ip: 192.168.1.4
+    mac: "00:1E:67:92:D5:2A"
+    # Alternative MACs: 00:1E:67:92:D5:(2B-2D)
+  - name: b04
+    ip: 192.168.1.5
+    mac: "5A:83:62:41:FD:14"
+    # Alternative MACs: 00:1E:67:A9:14:(8D-90)
+  - name: b05
+    ip: 192.168.1.6
+    mac: "00:1E:67:BC:32:F3"
+    # Alternative MACs: 00:1E:67:BC:32:(F4-F6)
+  - name: b06
+    ip: 192.168.1.7
+    mac: "A4:BF:01:02:4A:A2"
+    # Alternative MAC: A4:BF:01:02:4A:A3
+  - name: b07a
+    ip: 192.168.1.8
+    mac: "00:0A:CD:2D:2A:FB"
+    # Alternative MACs: AC:1F:6B:91:C3:(FE-FF)
+  - name: b07b
+    ip: 192.168.1.9
+    mac: "00:0A:CD:2D:2B:F4"
+    # Alternative MACs: AC:1F:6B:91:C3:(E8-E9)
+  - name: b08a
+    ip: 192.168.1.10
+    mac: "00:0A:CD:2D:2A:FE"
+    # Alternative MACs: AC:1F:6B:91:C4:(24-25)
+  - name: b08b
+    ip: 192.168.1.11
+    mac: "00:0A:CD:2D:2A:EC"
+    # Alternative MACs: AC:1F:6B:91:C3:(F2-F3)
+
+# The following are sensitive, and should be kept secret for a production system.
+kive_db_password: fixme-14mPdzu5vTOQG2DgtDG1inghQpMX0TBdUqEK6nVNHVo
+kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
+barman_password: fixme-barman
+streaming_barman_password: fixme-streaming-barman
+
+# Slurm installation:
+slurm_src_basename: "slurm-23.02.5"
+slurm_tarball: "slurm-23.02.5.tar.bz2"
+slurm_source_url: "https://download.schedmd.com/slurm/slurm-23.02.5.tar.bz2"
+slurm_sha1_checksum: b3f06d7030bd771a3a94be06e3c0d58a2630a21e
+
+# mod_wsgi installation:
+mod_wsgi_source_url: "https://files.pythonhosted.org/packages/fe/12/b3756f3b72ae3410a83a9b98862925aea64e854c93ef16c1e46b11e32d59/mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_tarball: "mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_basename: "mod_wsgi-4.9.4"
+mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac9237f5666cfc9"
+
+# The following are defaults, and probably don't need to be changed.
+# In a typical deployment, Kive, its virtualenv, and slurm are only "installed"
+# by the head node and shared to the compute nodes via NFS, so kive_venv,
+# kive_slurm_path, and kive_root should be paths that are on the shared partitions
+# (typically /opt and /usr/local).  If one would rather install Kive and slurm
+# locally to each node, then these paths and/or the NFS shares should be reworked.
+kive_venv: /opt/venv_kive
+kive_slurm_path: /opt/venv_kive/bin
+kive_db_name: kive
+kive_db_user: kive
+kive_media_root: /data/kive/media_root
+kive_static_root: /var/www/html/kive/static
+kive_root: /usr/local/share/Kive
+# - httpd configuration
+kive_httpd_user: kive
+kive_httpd_group: kive
+
+copied_groups:
+  - kive
+  - sudo
+
+default_shell: /usr/bin/bash
+
+data_physical_volumes:
+  - ata-ST10000NM001G-2MW103_ZS51H7QX
+
+backup_physical_volumes:
+  - ata-ST10000NM0016-1TT101_ZA286TWE
+
+macdatafile_username: "[fill this in]"
+macdatafile_password: "[fill this in]"
+macdatafile_domain: "[fill this in]"
+macdatafile_read_only: false
+macdatafile_network_share: "[fill this in]"
+
+raw_data_username: "[fill this in]"
+raw_data_password: "[fill this in]"
+raw_data_domain: "[fill this in]"
+raw_data_read_only: false  # set to true for a dev/test system
+raw_data_network_share: "[fill this in]"

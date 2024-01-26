@@ -1,0 +1,6 @@
+---
+
+cifs_credentials: /opt/smbcredentials
+cifs_credentials_volume: /opt
+mount_point: /media/macdatafile
+network_share: //localhost/macdatafile  # this won't work, you have to customize this

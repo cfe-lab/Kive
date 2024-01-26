@@ -1,0 +1,23 @@
+---
+
+- name: install PostgreSQL 12 on the head node
+  hosts: head
+  tasks:
+    - name: add the apt signing key for the PostgreSQL apt repository
+      ansible.builtin.apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: add PostgreSQL apt repository
+      become: true
+      ansible.builtin.apt_repository:
+        repo: deb https://apt.postgresql.org/pub/repos/apt jammy-pgdg main
+        state: present
+
+    - name: install PostgreSQL 12
+      become: true
+      apt:
+        name:
+          - postgresql-12
+          - postgresql-client-12
+

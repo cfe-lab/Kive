@@ -1,0 +1,22 @@
+---
+
+- name: assign a different UID and GID to the bootstrap user
+  hosts: all
+  vars:
+    user_name: ubuntu
+    group_name: ubuntu
+    old_gid: 1000
+    new_uid: 1020
+    new_gid: 1020
+  tasks:
+    - name: change UID
+      user:
+        name: "{{ user_name }}"
+        uid: "{{ new_uid }}"
+    - name: change GID
+      group:
+        name: "{{ group_name }}"
+        gid: "{{ new_gid }}"
+    - name: change group perms of the home folders
+      become: true
+      command: find /home/{{ user_name }} -group {{ old_gid }} -exec chgrp -h {{ group_name }} {} \;

@@ -1,0 +1,58 @@
+---
+
+# Installing packages used in the building of Slurm, as per
+# https://slurm.schedmd.com/quickstart_admin.html
+# Certain packages need to be installed when Slurm is compiled to enable
+# support for certain features.  In the first play we indicate with
+# comments which packages are used for which features.
+
+- name: check if slurm source files are already downloaded
+  stat:
+    path: "/usr/local/src/{{ slurm_tarball }}"
+  register: slurm_download
+
+- name: fetch slurm source files
+  become: true
+  get_url:
+    url: "{{ slurm_source_url }}"
+    dest: "/usr/local/src/{{ slurm_tarball }}"
+    checksum: "sha1:{{ slurm_sha1_checksum }}"
+  when: not slurm_download.stat.exists
+
+- name: decompress Slurm tarball
+  become: true
+  unarchive:
+    remote_src: true
+    src: "/usr/local/src/{{ slurm_tarball }}"
+    dest: "/usr/local/src"
+    owner: root
+    group: root
+
+- name: make a link to the Slurm source code directory
+  become: true
+  file:
+    src: "/usr/local/src/{{ slurm_src_basename }}"
+    dest: "/usr/local/src/slurm"
+    state: link
+
+- name: configure Slurm build
+  become: true
+  command:
+    argv:
+      - "/usr/local/src/slurm/configure"
+      - "--sysconfdir=/usr/local/etc/slurm"
+      - "--with-systemdsystemunitdir=/usr/local/lib/systemd/system"
+    chdir: "/usr/local/src/slurm"
+    creates: "/usr/local/src/slurm/Makefile"
+
+- name: build and install Slurm
+  become: true
+  make:
+    chdir: "/usr/local/src/slurm"
+    target: install
+
+- name: make Slurm libraries accessible to the system
+  become: true
+  command:
+    cmd: "ldconfig -n /usr/local/lib"
+

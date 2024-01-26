@@ -1,0 +1,8 @@
+version: '3.9'
+
+services:
+  kive_export_clusters:
+    image: ${KIVE_EXPORT_USERS_IMAGE:-kive_export_users:latest}
+    restart: unless-stopped
+    volumes:
+      - ${KIVE_CLUSTER_SETUP_PATH:-/usr/local/share/Kive/cluster_setup}:/app

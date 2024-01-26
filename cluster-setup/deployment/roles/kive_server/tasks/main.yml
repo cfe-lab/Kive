@@ -1,0 +1,695 @@
+---
+
+# NOTE(nknight): this is done with `file` instead of during user creation so that we
+# can set the permissions explicitly.
+- name: create kive home directory
+  file:
+    path: /home/kive/
+    state: directory
+    mode: "go-rx"
+    group: kive
+    owner: kive
+
+
+- name: create kive app directories
+  become: true
+  loop:
+    - /etc/kive/
+    - /var/kive/
+    - /var/log/kive/
+    - "{{ kive_media_root }}"
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "2770"
+    owner: kive
+    group: kive
+
+
+- name: kive environment configuration
+  become: true
+  become_user: kive
+  block:
+    - name: set kive environment variables and activate the virtualenv
+      blockinfile:
+        path: /home/kive/.bash_profile
+        block: |
+          export KIVE_DB_NAME={{ kive_db_name }}
+          export KIVE_DB_USER={{ kive_db_user }}
+          export KIVE_DB_HOST={{ kive_db_host }}
+          export KIVE_DB_PASSWORD={{ kive_db_password }}
+
+          export KIVE_MEDIA_ROOT={{ kive_media_root }}
+          export KIVE_STATIC_ROOT={{ kive_static_root }}
+          export KIVE_SLURM_PATH={{ kive_slurm_path }}
+          source {{ kive_venv }}/bin/activate
+        create: true  # create the file if it doesn't exist
+        backup: true
+        owner: kive
+        group: kive
+
+- name: install package dependencies
+  become: true
+  apt:
+    update_cache: true
+    name:
+      - postgresql
+      - apache2
+      - apache2-utils
+      - apache2-dev
+      # - libapache2-mod-wsgi-py3
+      - barman
+      - barman-cli
+      - rsnapshot
+
+- name: fetch kive source code
+  become: true
+  git:
+    dest: "{{ kive_root }}"
+    repo: https://github.com/cfe-lab/Kive.git
+    version: "{{ kive_version | default('master') }}"
+    update: "{{ update_kive_source | default('no') }}"
+
+- name: set up the Kive Python virtualenv
+  become: true
+  block:
+    - name: create directory for virtualenv
+      file:
+        path: "{{ kive_venv }}"
+        state: directory
+    - name: copy requirements file to track changes
+      register: kive_requirements
+      copy:
+        dest: "{{ kive_venv }}/requirements.txt"
+        src: "{{ kive_root }}/requirements.txt"
+    - name: kive python dependencies
+      when: kive_requirements.changed
+      pip:
+        requirements: "{{ kive_root }}/requirements.txt"
+        virtualenv_command: "{{ kive_python_executable }} -m venv"
+        virtualenv: "{{ kive_venv }}"
+
+- name: install mod_wsgi from source
+  become: true
+  block:
+    - name: check if mod_wsgi slurm source files are already downloaded
+      stat:
+        path: "/usr/local/src/{{ mod_wsgi_tarball }}"
+      register: mod_wsgi_download
+
+    - name: fetch mod_wsgi source files
+      become: true
+      get_url:
+        url: "{{ mod_wsgi_source_url }}"
+        dest: "/usr/local/src/{{ mod_wsgi_tarball }}"
+        checksum: "sha256:{{ mod_wsgi_sha256_checksum }}"
+      when: not mod_wsgi_download.stat.exists
+
+    - name: decompress mod_wsgi tarball
+      unarchive:
+        remote_src: true
+        src: "/usr/local/src/{{ mod_wsgi_tarball }}"
+        dest: "/usr/local/src"
+        owner: root
+        group: root
+
+    - name: make a link to the mod_wsgi source code directory
+      file:
+        src: "/usr/local/src/{{ mod_wsgi_basename }}"
+        dest: "/usr/local/src/mod_wsgi"
+        state: link
+
+    - name: configure mod_wsgi build
+      command:
+        argv:
+          - "/usr/local/src/mod_wsgi/configure"
+          - "--with-python=/usr/bin/python3.7"
+        chdir: "/usr/local/src/mod_wsgi"
+        creates: "/usr/local/src/mod_wsgi/Makefile"
+
+    - name: build and install mod_wsgi
+      make:
+        chdir: "/usr/local/src/mod_wsgi"
+        target: install
+
+    - name: add wsgi to the "modules available"
+      copy:
+        src: wsgi.load
+        dest: /etc/apache2/mods-available
+
+    - name: enable the wsgi module in apache
+      community.general.apache2_module:
+        state: present
+        name: wsgi
+
+# This is following the general instructions for Ubuntu SSL support
+# in `/usr/share/doc/apache2/README.Debian.gz`.
+# For the certificates to be installed, they should be placed in the
+# directory you're running Ansible in, with the desired names.
+- name: enable Apache SSL support
+  become: true
+  block:
+    - name: enable the SSL module
+      community.general.apache2_module:
+        state: present
+        name: ssl
+
+    - name: install SSL certificate
+      copy:
+        src: star_cfe.crt
+        dest: /etc/ssl/certs/star_cfe.crt
+        owner: root
+        group: root
+
+    - name: install SSL key
+      copy:
+        src: star_cfe.key
+        dest: /etc/ssl/private/star_cfe.key
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: install SSL certificate chain file
+      copy:
+        src: DigiCertCA.crt
+        dest: /etc/ssl/certs/DigiCertCA.crt
+        owner: root
+        group: root
+
+
+- name: set up log purging
+  become: true
+  block:
+    - name: apache log purge script
+      copy:
+        src: purge_apache_logs
+        dest: /usr/sbin
+        mode: "755"
+    - name: purge service files
+      loop:
+        - kive_purge.service
+        - kive_purge.timer
+        - kive_purge_synch.service
+        - kive_purge_synch.timer
+      copy:
+        src: "{{ item }}"
+        dest: /etc/systemd/system
+    - name: purge config file
+      template:
+        src: kive_purge.conf.j2
+        dest: /etc/kive/kive_purge.conf
+        owner: kive
+        group: kive
+        mode: "640"
+    - name: enable and start kive_purge timers
+      ignore_errors: "{{ ansible_check_mode }}"  # Unit files not copied yet
+      loop:
+        - kive_purge.timer
+        - kive_purge_synch.timer
+      systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+
+
+- name: web server configuration
+  become: true
+  block:
+    - name: Kive-specific configuration
+      block:
+        - name: install Kive-specific config file
+          template:
+            src: 001-kive.conf.j2
+            dest: /etc/apache2/conf-available/001-kive.conf
+            owner: root
+            group: root
+            mode: "644"
+        - name: enable Kive-specific configuration
+          command:
+            cmd: "a2enconf 001-kive"
+
+    - name: kive web conf file
+      template:
+        src: kive_apache.conf.j2
+        dest: /etc/kive/kive_apache.conf
+        owner: kive
+        group: kive
+        mode: "640"
+
+    - name: server environment variables via systemd
+      blockinfile:
+        path: /etc/systemd/system/apache2.service.d/override.conf
+        create: true
+        backup: true
+        mode: "644"
+        block: |
+          [Service]
+          EnvironmentFile=/etc/kive/kive_apache.conf
+
+    - name: update apache2 envvars
+      blockinfile:
+        path: /etc/apache2/envvars
+        backup: true
+        block: |
+          export APACHE_RUN_USER=kive
+          export APACHE_RUN_GROUP=kive
+
+#    - name: update apache2 port
+#      blockinfile:
+#        path: /etc/apache2/ports.conf
+#        backup: true
+#        block: |
+#          Listen {{ kive_listen_port }}
+
+    - name: set up rotating apache logs
+      block:
+        - name: add rotating logs configuration file
+          blockinfile:
+            path: /etc/apache2/conf-available/rotate-kive-logs.conf
+            create: true
+            backup: true
+            mode: "644"
+            block: |
+              ErrorLog "|/usr/bin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/apache2/error_log.%Y-%m-%d-%H%M%S 15M"
+              CustomLog "|/usr/bin/rotatelogs -l -p /usr/sbin/purge_apache_logs /var/log/apache2/access_log.%Y-%m-%d-%H%M%S 15M" combined
+        - name: activate rotating logs configuration
+          command:
+            cmd: "a2enconf rotate-kive-logs"
+
+    - name: install the httpd site configuration for Kive
+      copy:
+        src: 001-kive-ssl.conf
+        dest: /etc/apache2/sites-available
+        owner: root
+        group: root
+
+    - name: enable the httpd site configuration for Kive
+      command:
+        cmd: "a2ensite 001-kive-ssl"
+
+    - name: enable and (re)start apache2
+      systemd:
+        name: apache2
+        state: restarted
+        enabled: true
+        daemon_reload: true
+
+    - name: ensure ufw (the firewall) is running
+      systemd:
+        name: ufw
+        state: restarted
+        enabled: true
+
+#    - name: firewall's internal interface should ACCEPT
+#      register: internal_accept
+#      community.general.ufw:
+#        default: allow
+#        interface: "{{ head_internal_interface }}"
+#        direction: incoming
+#        state: enabled
+#
+#    - name: reload internal interface firewall config
+#      when: internal_accept.changed
+#      community.general.ufw:
+#        interface: "{{ head_internal_interface }}"
+#        state: reloaded
+
+    - name: permit access to Postgres on the internal interface
+      community.general.ufw:
+        interface: "{{ head_internal_interface }}"
+        direction: in
+        port: 5432
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+    - name: permit https service through firewall
+      community.general.ufw:
+        interface: "{{ head_external_interface }}"
+        direction: in
+        port: https
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+    - name: permit http service through firewall
+      community.general.ufw:
+        interface: "{{ head_external_interface }}"
+        direction: in
+        port: http
+        protocol: tcp
+        rule: allow
+        state: enabled
+
+- name: enable and start database service
+  become: true
+  systemd:
+    name: "postgresql@14-main"
+    state: started
+    enabled: true
+
+- name: configure postgres server
+  become: true
+  become_user: postgres
+  block:
+
+    - name: add kive entries to pg_hba.conf
+      block:
+        - name: local connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: local
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: kive
+            method: "scram-sha-256"
+
+        - name: host connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: kive
+            source: "{{ kive_db_subnet }}"
+            method: "scram-sha-256"
+
+        - name: barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: barman
+            source: 127.0.0.1/32
+            method: "scram-sha-256"
+
+        - name: barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: all
+            users: barman
+            source: "::1/128"
+            method: "scram-sha-256"
+
+        - name: streaming_barman connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: 127.0.0.1/32
+            method: "scram-sha-256"
+
+        - name: streaming_barman IPv6 connections
+          notify: Restart postgresql service
+          postgresql_pg_hba:
+            contype: host
+            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            databases: replication
+            users: streaming_barman
+            source: "::1/128"
+            method: "scram-sha-256"
+
+    - name: local database settings in postgresql.conf
+      notify: Restart postgresql service
+      loop:
+        # General settings
+        - option: listen_addresses
+          value: "'*'"
+        - option: password_encryption
+          value: scram-sha-256
+        - option: max_connections
+          value: 200
+        # Setting up a streaming backup.
+        - option: wal_level
+          value: "'replica'"
+        - option: max_wal_senders
+          value: 10
+        - option: max_replication_slots
+          value: 10
+#          # Additionally, setting up standard WAL archiving.
+#        - option: archive_mode
+#          value: "on"
+#        - option: archive_command
+#          value: "'barman-wal-archive localhost kive %p'"
+        # Remove old option that was accidentally added.
+        - option: archiver
+      community.general.ini_file:
+        backup: yes
+        path: "/etc/postgresql/14/main/postgresql.conf"
+        create: no
+        section: null
+        option: "{{ item.option }}"
+        value: "{{ item.value | default }}"
+        state: "{{ 'present' if item.value is defined else 'absent' }}"
+
+
+- name: Flush handlers
+  meta: flush_handlers
+
+
+- name: kive installation
+  block:
+    - name: build kive API
+      become: true
+      command:
+        cmd: "{{ kive_venv }}/bin/python setup.py install"
+        chdir: "{{ kive_root }}/api/"
+        creates: "{{ kive_root }}/api/build/"
+    - name: collect kive's static files
+      # notify: restart web server
+      environment:
+        KIVE_STATIC_ROOT: "{{ kive_static_root }}"
+      community.general.django_manage:
+        command: collectstatic
+        app_path: "{{ kive_root }}/kive"
+        virtualenv: "{{ kive_venv }}"
+
+
+- name: set up kive database
+  block:
+    - name: create kive database
+      become: true
+      become_user: postgres
+      postgresql_db:
+        name: kive
+    - name: create kive database user
+      become: true
+      become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
+      postgresql_user:
+        name: kive
+        password: "{{ kive_db_password }}"
+        db: kive
+    - name: grant kive database user all privileges
+      become: true
+      become_user: postgres
+      postgresql_privs:
+        role: kive
+        db: kive
+        type: database
+        priv: ALL
+    - name: create barman database user
+      become: true
+      become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
+      postgresql_user:
+        name: barman
+        password: "{{ barman_password }}"
+        db: kive
+        role_attr_flags: SUPERUSER,CREATEROLE,CREATEDB
+    - name: create streaming_barman database user
+      become: true
+      become_user: postgres
+      environment:
+        PGOPTIONS: "-c password_encryption=scram-sha-256"
+      postgresql_user:
+        name: streaming_barman
+        password: "{{ streaming_barman_password }}"
+        db: kive
+        role_attr_flags: REPLICATION
+    - name: run django migrations
+      environment:
+          KIVE_DB_NAME: "{{ kive_db_name }}"
+          KIVE_DB_USER: "{{ kive_db_user }}"
+          KIVE_DB_HOST: "{{ kive_db_host }}"
+          KIVE_DB_PASSWORD: "{{ kive_db_password }}"
+      become: true
+      become_user: kive
+      community.general.django_manage:
+        command: migrate
+        app_path: "{{ kive_root }}/kive"
+        virtualenv: "{{ kive_venv }}"
+
+#- name: database backup global config
+#  loop:
+#    - option: path_prefix
+#      value: /usr/pgsql-12/bin/
+#    - option: archiver
+#      value: "on"
+#  community.general.ini_file:
+#    backup: yes
+#    path: /etc/barman.conf
+#    create: no
+#    section: barman
+#    option: "{{ item.option }}"
+#    value: "{{ item.value }}"
+
+- name: create the Barman backup directory
+  file:
+    path: "{{ kive_backup_path }}/BarmanDBBackup"
+    state: directory
+    owner: barman
+    group: barman
+
+- name: barman passwords file
+  blockinfile:
+    path: /var/lib/barman/.pgpass
+    create: yes
+    owner: barman
+    group: barman
+    mode: u=rw,g=,o=
+    block: |
+      localhost:*:*:barman:{{ barman_password }}
+      localhost:*:*:streaming_barman:{{ streaming_barman_password }}
+
+- name: database backup kive config
+  loop:
+    - option: path_prefix
+      value: /usr/lib/postgresql/14/bin
+    - option: description
+      value: Kive database
+    - option: conninfo
+      value: host=localhost user=barman dbname=kive
+    - option: backup_method
+      value: postgres
+    - option: backup_directory
+      value: "{{ kive_backup_path }}/BarmanDBBackup"
+    - option: compression
+      value: bzip2
+    # archiver = on is necessary for the "fallback" WAL backup that happens via
+    # PostgreSQL's archive_command setting in postgresql.conf (which we have
+    # configured to use barman-wal-archive)
+#    - option: archiver
+#      value: "on"
+    - option: streaming_conninfo
+      value: host=localhost user=streaming_barman dbname=kive
+    - option: streaming_archiver
+      value: "on"
+    - option: slot_name
+      value: barman
+    - option: create_slot
+      value: auto
+    - option: minimum_redundancy
+      value: 2
+    - option: retention_policy
+      value: REDUNDANCY 2
+  community.general.ini_file:
+    path: /etc/barman.d/kive.conf
+    section: kive
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+
+#- name: force a WAL switch to verify the WAL archiving process
+#  become: true
+#  become_user: barman
+#  command: barman switch-wal --force --archive kive
+
+- name: SSH keys
+  block:
+    - name: Set key locations
+      set_fact:
+        ssh_key_locations:
+          - path: /var/lib/pgsql/.ssh
+            owner: postgres
+          - path: /var/lib/barman/.ssh
+            owner: barman
+    - name: Create .ssh folders
+      with_items: "{{ ssh_key_locations }}"
+      file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: u=rwx,g=,o=
+    - name: Generate SSH keys
+      with_items: "{{ ssh_key_locations }}"
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
+      community.crypto.openssh_keypair:
+        path: "{{ item.path }}/id_rsa"
+        owner: "{{ item.owner }}"
+        group: "{{ item.owner }}"
+        mode: u=rwx,g=,o=
+    - name: Allow postgres user to access barman user
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
+      ansible.posix.authorized_key:
+        user: barman
+        key: "{{ lookup('file', '/var/lib/pgsql/.ssh/id_rsa.pub') }}"
+    - name: Allow barman user to access postgres user
+      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
+      ansible.posix.authorized_key:
+        user: postgres
+        key: "{{ lookup('file', '/var/lib/barman/.ssh/id_rsa.pub') }}"
+
+# This variable should be a JSON-formatted list of 2-lists, like
+# [["User One", "userone@bccfe.ca"], ..., ["User N", "userN@bccfe.ca"]]
+- name: parse admin e-mails from json
+  set_fact:
+    mail_admins_list: "{{ kive_admins | from_json }}"
+
+- name: build admin e-mails list
+  loop: "{{ mail_admins_list }}"
+  set_fact:
+    mail_admins_emails: "{{ (mail_admins_emails | default([])) + [item[1]] }}"
+
+# Copy crontab_mail.py out of the Kive source code, because it gets run by root.
+# This way, it can be locked down more than the Kive source code.
+- name: crontab_mail script
+  copy:
+    src: crontab_mail.py
+    dest: /opt/crontab_mail.py
+    owner: root
+    group: root
+    mode: u=rw,g=r,o=r
+
+- name: create the rsnapshot backup directory
+  file:
+    path: "{{ kive_backup_path }}/rsnapshot"
+    state: directory
+
+- name: rsnapshot config file
+  template:
+    src: rsnapshot.conf.j2
+    dest: /etc/rsnapshot.conf
+
+- name: list of scheduled services
+  set_fact:
+    scheduled_service_names:
+      - barman_backup
+      - rsnapshot_alpha
+      - rsnapshot_beta
+      - rsnapshot_gamma
+
+- name: scheduled service files
+  loop: "{{ scheduled_service_names }}"
+  template:
+    src: "{{ item }}.service.j2"
+    dest: "/etc/systemd/system/{{ item }}.service"
+- name: timer files
+  loop: "{{ scheduled_service_names }}"
+  copy:
+    src: "{{ item }}.timer"
+    dest: /etc/systemd/system
+- name: enable and start timers
+  loop: "{{ scheduled_service_names }}"
+  ignore_errors: "{{ ansible_check_mode }}"  # Unit file not copied yet
+  systemd:
+    name: "{{ item }}.timer"
+    enabled: true
+    state: started

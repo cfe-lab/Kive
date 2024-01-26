@@ -1,0 +1,12 @@
+---
+
+slurmctlnode: head
+slurm_nodes:
+  - name: head
+    memory: 4000
+    cpus: 2
+    sockets: 2
+  - name: worker
+    memory: 4000
+    cpus: 2
+    sockets: 2

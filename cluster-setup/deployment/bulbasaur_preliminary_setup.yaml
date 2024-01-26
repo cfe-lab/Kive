@@ -1,0 +1,46 @@
+---
+
+- name: preliminary setup to run on the Octomore head node
+  hosts: head
+  become: true
+  roles:
+    - head_node_internal_interface
+  tasks:
+    - name: create /opt
+      file:
+        path: /opt
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    - name: create the /data mount point
+      file:
+        path: /data
+        owner: root
+        group: root
+        mode: '0755'
+        state: directory
+
+    - name: mount the already-existing filesystem
+      mount:
+        path: /data
+        src: /dev/data-vg/data-lv
+        fstype: ext4
+        state: mounted
+
+    - name: move the existing home folder to the side
+      command: mv /data/home /data/home_old
+      args:
+        creates: /data/home_old
+        removes: /data/home
+
+    - name: move the existing Kive folder to the side
+      command: mv /data/kive /data/kive_old
+      args:
+        creates: /data/kive_old
+        removes: /data/kive
+
+    - name: set up head node networking
+      include_role:
+        name: head_node_networking

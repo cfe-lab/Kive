@@ -1,0 +1,6 @@
+---
+
+- name: import users
+  hosts: head
+  roles:
+    - import_users_and_groups

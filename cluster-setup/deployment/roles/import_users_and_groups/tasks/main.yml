@@ -1,0 +1,29 @@
+---
+
+- name: create groups
+  become: true
+  block:
+    - name: create imported users' primary groups
+      loop: "{{ primary_groups }}"
+      group:
+        gid: "{{ item.gid }}"
+        name: "{{ item.name }}"
+    - name: create all other imported groups
+      loop: "{{ other_groups }}"
+      group:
+        gid: "{{ item.gid }}"
+        name: "{{ item.name }}"
+
+- name: create users
+  become: true
+  loop: "{{ users }}"
+  user:
+    uid: "{{ item.uid }}"
+    create_home: yes
+    home: "{{ item.home }}"
+    name: "{{ item.name }}"
+    password: "{{ item.hashed_password }}"
+    group: "{{ item.primary_group }}"
+    groups: "{{ item.groups }}"
+    append: true
+    shell: "{{ default_shell }}"

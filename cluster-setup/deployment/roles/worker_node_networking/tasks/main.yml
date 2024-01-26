@@ -1,0 +1,107 @@
+---
+
+- name: set timezone
+  block:
+    - name: change the timezone
+      community.general.timezone:
+        name: America/Vancouver
+    - name: restart cron to reflect the new timezone
+      systemd:
+        name: cron
+        state: restarted
+
+- name: install NFS client software
+  become: true
+  apt:
+    name:
+      - nfs-common
+    state: present
+
+- name: ensure ufw is running
+  become: true
+  systemd:
+    name: ufw
+    state: started
+    enabled: true
+
+- name: open port for SSH access
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: ssh
+    protocol: tcp
+
+# Originally this task opened ports:
+# - 6817-6819/tcp
+# - 6817-6819/udp
+# - 7321/tcp
+- name: open port for slurmctld to communicate with slurmd
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: 6818
+    protocol: tcp
+
+- name: mount /data
+  become: true
+  block:
+    - name: create the mount point
+      file:
+        path: /data
+        state: directory
+    - name: mount the drive
+      ansible.posix.mount:
+        path: /data
+        src: "{{ head_internal_address }}:/data"
+        fstype: nfs
+        state: mounted
+
+- name: mount /opt
+  become: true
+  ansible.posix.mount:
+    path: /opt
+    src: "{{ head_internal_address }}:/opt"
+    fstype: nfs
+    state: mounted
+    opts: ro
+
+- name: mount /usr/local
+  become: true
+  ansible.posix.mount:
+    path: /usr/local
+    src: "{{ head_internal_address }}:/usr/local"
+    fstype: nfs
+    state: mounted
+    opts: ro
+
+- name: use /data/home as the home directory
+  block:
+    - name: check if /data/home exists
+      stat: path=/data/home
+      register: data_home
+
+    - name: fail if /data/home isn't prepared
+      fail:
+        msg: "/data/home is not in place."
+      when: not data_home.stat.exists
+
+  rescue:
+    - name: inform user to set up the head node first and propagate failure to stop the playbook
+      fail:
+        msg: "Before setting up this node, make sure the head node is configured first!"
+
+- name: check if original /home has been renamed
+  stat: path=/original_home
+  register: home_backed_up
+
+- name: rename original /home
+  become: true
+  command: mv /home /original_home
+  when: not home_backed_up.stat.exists
+
+- name: symbolic link for /home
+  become: true
+  file:
+    path: /home
+    src: /data/home
+    state: link

@@ -1,0 +1,4 @@
+deployment/group_vars/all.yml
+deployment/group_vars/all.yaml
+deployment/ansible.cfg
+initialization/worker/head_node_root_id_ed25519.pub

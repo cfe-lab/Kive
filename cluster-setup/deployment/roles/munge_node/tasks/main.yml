@@ -1,0 +1,21 @@
+- name: install and start munge
+  become: true
+  block:
+    - name: install munge
+      apt:
+        name:
+          - munge
+          - libmunge2
+        state: present
+    - name: deploy munge testing key
+      copy:
+        src: munge-test.key
+        dest: /etc/munge/munge.key
+        mode: "600"
+        owner: munge
+        group: munge
+    - name: start munge service
+      systemd:
+        name: munge
+        state: restarted
+        enabled: true
