@@ -23,7 +23,7 @@ inputargs = {a["name"]: a["url"] for a in appargs if a["type"] == "I"}
 runspec = {
     "name": "API Example 5",
     "app": kwsalutationsapp["url"],
-    "datasets": [
+    "dataset_list": [
         {
             "argument": inputargs["names"],
             "dataset": names_dataset.raw["url"],

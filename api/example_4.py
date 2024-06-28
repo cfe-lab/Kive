@@ -49,7 +49,7 @@ runspec1 = {
     "name": "API Example 4 App 1",
     "app": app["url"],
     "batch": containerbatch["url"],
-    "datasets": [
+    "dataset_list": [
         {
             "argument": inputarg["url"],
             "dataset": names1.raw["url"],
@@ -60,7 +60,7 @@ runspec2 = {
     "name": "API Example 4 App 2",
     "app": app["url"],
     "batch": containerbatch["url"],
-    "datasets": [
+    "dataset_list": [
         {
             "argument": inputarg["url"],
             "dataset": names2.raw["url"],

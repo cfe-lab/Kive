@@ -31,7 +31,7 @@ inputarg = next(a for a in appargs if a["type"] == "I")
 runspec = {
     "name": "directory-output-example",
     "app": app["url"],
-    "datasets": [{
+    "dataset_list": [{
         "argument": inputarg["url"],
         "dataset": input_dataset.raw["url"],
     }],

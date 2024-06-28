@@ -21,7 +21,7 @@ inputarg = next(a for a in appargs if a["type"] == "I")
 runspec = {
     "name": "API Example 6",
     "app": collationapp["url"],
-    "datasets": [
+    "dataset_list": [
         {
             "argument": inputarg["url"],
             "dataset": names_dataset.raw["url"],
