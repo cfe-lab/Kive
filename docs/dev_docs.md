@@ -257,8 +257,13 @@ to make them run on Kive.
 3. Put all of the scripts, helper scripts, and data files, into a zip file or
     a tar file. For example, you could use a command like one of these:
 
+    ```shell
     tar cvf greetings.tar greetings.py translations.txt
+    ```
+
+    ```shell
     zip greetings.zip greetings.py translations.txt
+    ```
 
 ### Upload the Archive
 Now that you have a zip file or a tar file, log in to Kive and create a new
