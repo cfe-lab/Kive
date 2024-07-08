@@ -3,7 +3,7 @@
 - name: update the Apache SSL configuration file
   hosts: head
   tasks:
-    - name: install the httpd site configuration for Kive
+    - name: install the Apache SSL site configuration for Kive
       copy:
         src: deployment/roles/kive_server/files/001-kive-ssl.conf
         dest: /etc/apache2/sites-available

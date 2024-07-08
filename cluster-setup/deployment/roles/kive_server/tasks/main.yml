@@ -276,14 +276,14 @@
           command:
             cmd: "a2enconf rotate-kive-logs"
 
-    - name: install the httpd site configuration for Kive
+    - name: install the Apache SSL site configuration for Kive
       copy:
         src: 001-kive-ssl.conf
         dest: /etc/apache2/sites-available
         owner: root
         group: root
 
-    - name: enable the httpd site configuration for Kive
+    - name: enable the Apache SSL site configuration for Kive
       command:
         cmd: "a2ensite 001-kive-ssl"
 
