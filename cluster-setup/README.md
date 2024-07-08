@@ -186,9 +186,7 @@ These must be acquired securely from IT or within the software group, and placed
 
 The files needed are:
 
-* `DigiCertCA.crt`: the DigiCert certificate authority (CA) key, which specifies that DigiCert
-  issued the key.
-* `star_cfe.crt`: the wildcard certificate issued by DigiCert, which certifies that this server
+* `star_cfe_chained.crt`: the chained SSL certificate issued by DigiCert, which certifies that this server
   belongs to the `cfenet.ubc.ca` or `bccfe.ca` domain.
 * `star_cfe.key`: our private signing key, used to issue a public key for HTTPS connections.
 
