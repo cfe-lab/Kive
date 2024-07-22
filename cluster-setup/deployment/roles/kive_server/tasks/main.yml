@@ -156,8 +156,8 @@
 
     - name: install SSL certificate
       copy:
-        src: star_cfe.crt
-        dest: /etc/ssl/certs/star_cfe.crt
+        src: star_cfe_chained.crt
+        dest: /etc/ssl/certs/star_cfe_chained.crt
         owner: root
         group: root
 
@@ -169,12 +169,12 @@
         group: root
         mode: "0600"
 
-    - name: install SSL certificate chain file
-      copy:
-        src: DigiCertCA.crt
-        dest: /etc/ssl/certs/DigiCertCA.crt
-        owner: root
-        group: root
+#    - name: install SSL certificate chain file
+#      copy:
+#        src: DigiCertCA.crt
+#        dest: /etc/ssl/certs/DigiCertCA.crt
+#        owner: root
+#        group: root
 
 
 - name: set up log purging
@@ -276,14 +276,14 @@
           command:
             cmd: "a2enconf rotate-kive-logs"
 
-    - name: install the httpd site configuration for Kive
+    - name: install the Apache SSL site configuration for Kive
       copy:
         src: 001-kive-ssl.conf
         dest: /etc/apache2/sites-available
         owner: root
         group: root
 
-    - name: enable the httpd site configuration for Kive
+    - name: enable the Apache SSL site configuration for Kive
       command:
         cmd: "a2ensite 001-kive-ssl"
 

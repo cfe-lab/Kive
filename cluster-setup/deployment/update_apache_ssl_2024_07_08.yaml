@@ -1,0 +1,14 @@
+---
+
+- name: update the Apache SSL configuration file
+  hosts: head
+  tasks:
+    - name: install the Apache SSL site configuration for Kive
+      copy:
+        src: roles/kive_server/files/001-kive-ssl.conf
+        dest: /etc/apache2/sites-available
+        owner: root
+        group: root
+
+- name: update the SSL certificates and restart Apache
+  ansible.builtin.import_playbook: update_ssl_certs.yaml
