@@ -6,16 +6,64 @@ This directory contains code and instructions for setting up a multi-host comput
 
 This procedure, as of December 12, 2023, looks like the following.
 
+### Background: the compute server's backups
+
+Our compute servers use [rsnapshot](http://www.rsnapshot.org/) for backups.  This maintains one full backup
+and several incremental backups, and uses hard links to eliminate duplication between the backups.
+Currently, these backups are written to dedicated local hard drives, but they can be configured to use any 
+mounted filesystem.  In the future, we may use a NAS for these backups.  (We used a NAS in the past, but 
+found that the connection and hardware were both sometimes unreliable.)
+
+#### `rsnapshot.conf`, the main configuration file
+
+The Ansible playbooks in this directory define our default configuration for `rsnapshot`; see the
+`kive_server` role.  This role installs several files that contain configuration details.  The most
+important of these is `/etc/rsnapshot.conf`, which is installed (via template) from 
+`deployment/roles/kive_server/templates/rsnapshot.conf.j2`.  In this file, we configure:
+
+* the backup location (default is `/media/backup/rsnapshot`);
+* the directories to back up and the directories to exclude from backups;
+* the number of "alpha", "beta", and "gamma" backups to retain (default is 6, 7, and 4, respectively);
+* the file that `rsnapshot` will write its log output to (default is `/var/log/rsnapshot.log`);
+
+among other things.  Changing `/etc/rsnapshot.conf` will affect the running system; if you wish your changes
+to be persisted and incorporated into the formal deployment procedure, implement the changes in 
+`deployment/roles/kive_server/templates/rsnapshot.conf.j2` and commit them as well.
+
+#### The alpha, beta, and gamma backups
+
+By default, our alpha backups run every 4 hours, our beta backups run daily, and our gamma backups run weekly.
+(`rsnapshot` also supports another level of backups, delta, which we do not use.)
+Assuming you use the default settings, the backups are available at `/media/backup/rsnapshot/alpha.X`,
+`/media/backup/rsnapshot.beta.X`, and `/media/backup/rsnapshot.gamma.X`.  The most recent backups of 
+each category are always numbered `.0`; each backup task re-numbers each previous backup to the next highest
+number, and discards the oldest one.  (The beta backups take the oldest existing alpha backup and make it 
+the newest beta backup, and similarly for the gamma backups.)
+
+You may also wish to change some details of when the `alpha`, `beta`, and `gamma` backup tasks run;
+these changes may be made to `/etc/systemd/system/rsnapshot_[alpha|beta|gamma].timer`.  Likewise,
+if you wish your changes to be persisted and incorporated into the formal deployment procedure,
+those changes should also be implemented in 
+`deployment/roles/kive_server/files/rsnapshot_[alpha|beta|gamma].timer`, and committed.
+
+#### Restoring from backups
+
+To restore from these backups, copy whatever you wish to restore from the relevant backup directory.
+For example, if you experienced data loss and wish to restore files from the most recent backup, that backup 
+is always `/media/backup/rsnapshot.alpha.0`.  If you accidentally changed a file and want a copy from a
+day or two prior, then you would look at `/media/backup/rsnapshot.beta.1` or `/media/backup/rsnapshot.beta.2`.
+
 ### Before you wipe the old machine
 
 If you're planning to restore the data from the old machine after the deployment,
-make sure your backups are in order.  System backups are typically kept using `rsnapshot`,
-and a backup of the Kive PostgreSQL database is kept using `barman`.  For example,
-on our production server, these are kept on a NAS mounted at `/media/dragonite`.
+make sure your backups are in order.  As discussed above, system backups are typically kept using `rsnapshot`;
+a backup of the Kive PostgreSQL database is kept using `barman`.  As of July 22, 2024,
+on our production server, these are kept on a local physical drive mounted at `/media/backup`.
 
 Optionally, if your backups are on a physical drive connected to the machine, to avoid
 accidentally damaging or altering the backups, you could physically remove them until the 
-setup is complete and you're ready to restore data from them.
+setup is complete and you're ready to restore data from them.  If they are on a NAS, you could
+disconnect the NAS until they're needed again.
 
 There a few files that are worth preserving in particular and having available to you
 during the deployment process:
@@ -35,7 +83,7 @@ during the deployment process:
   and keeping these makes it easier to get the database set back up after importing
   the database from the old system.  Likewise here you can also just preserve the passwords
   and discard the file.  (Note that this file will typically *not* be present in the `rsnapshot`
-  backups, as the Barman user's home directory is in `/var`, which is not backed up.)
+  backups, as the Barman user's home directory is in `/var`, which is not backed up by default.)
 
 ### Install Ubuntu and do basic network setup on the head node
 
