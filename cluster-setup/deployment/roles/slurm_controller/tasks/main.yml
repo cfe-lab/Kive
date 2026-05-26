@@ -1,5 +1,13 @@
 ---
 
+- name: ensure slurm controller alias resolves locally
+  become: true
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^[0-9.]+\s+head(\s|$)'
+    line: "{{ ansible_host | default('127.0.0.1') }} head"
+    create: true
+
 - name: install and start mariadb
   become: true
   become_user: root
