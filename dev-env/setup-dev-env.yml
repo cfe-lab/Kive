@@ -6,6 +6,7 @@
   vars_files:
     - dev_env_vars.yml
   roles:
+    - slurm_builder
     - slurm_controller
     - slurm_worker
     - kive_server
@@ -17,7 +18,7 @@
         path: /tmp/kive_dev_vars
         create: true
         mode: "644"
-        owner: vagrant
+        owner: ubuntu
         block: |
           export KIVE_DEBUG="yes"
           export KIVE_DB_NAME="{{ kive_db_name }}"
@@ -31,23 +32,22 @@
 
           export KIVE_SECRET_KEY="{{kive_server_secret_key}}"
           export KIVE_ALLOWED_HOSTS={{ kive_allowed_hosts | quote }}
-    - name: add vagrant to kive group
+    - name: add ubuntu to kive group
       become: true
       user:
-        name: vagrant
+        name: ubuntu
         append: true
         groups: kive
     - name: allow traffic to dev server
       become: true
       loop:
-        - "8080/tcp"
-        - "8000/tcp"
-      firewalld:
+        - "8080"
+        - "8000"
+      community.general.ufw:
+        rule: allow
         port: "{{ item }}"
-        state: enabled
-        permanent: true
-        immediate: true
-    - name: activate kive's virtualenv on vagrant login
+        proto: tcp
+    - name: activate kive's virtualenv on kive login
       become: true
       become_user: kive
       blockinfile:

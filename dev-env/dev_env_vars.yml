@@ -13,7 +13,8 @@ kive_server_secret_key: fixme-kpXk1iKLbHn6-T7zieLHgADFA8ZSh5itd8k_Sp932fM
 kive_venv: /opt/venv_kive
 kive_db_name: kive
 kive_db_user: kive
-kive_db_host: head
+kive_db_host: localhost
+kive_db_version: 16
 kive_media_root: /var/kive/media_root
 kive_static_root: /var/www/html/kive/static
 kive_slurm_path: "{{ kive_venv }}/bin"
@@ -21,10 +22,39 @@ kive_root: /usr/local/share/Kive
 # - httpd configuration
 kive_httpd_user: kive
 kive_httpd_group: kive
+head_external_interface: enp5s0
+head_internal_interface: enp5s0
+kive_server_email: kive-noreply@example.com
+kive_admins: "[[\"kive\", \"kive@example.com\"]]"
+kive_subject_prefix: "Kive (development) server"
+kive_backup_path: /data/kive_db_backup
+kive_log_level: WARN
+kive_purge_start: "20GB"
+kive_purge_stop: "15GB"
+# - Python version for kive (via deadsnakes PPA)
+kive_python_package: python3.10
+kive_python_executable: python3.10
+kive_python_version: "3.10"
 # - package variables
 slurmbuilddir: "/root"
+# - Slurm source build variables
+slurm_src_basename: "slurm-23.02.5"
+slurm_tarball: "slurm-23.02.5.tar.bz2"
+slurm_source_url: "https://download.schedmd.com/slurm/slurm-23.02.5.tar.bz2"
+slurm_sha1_checksum: b3f06d7030bd771a3a94be06e3c0d58a2630a21e
+# - mod_wsgi source build variables
+mod_wsgi_source_url: "https://files.pythonhosted.org/packages/fe/12/b3756f3b72ae3410a83a9b98862925aea64e854c93ef16c1e46b11e32d59/mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_tarball: "mod_wsgi-4.9.4.tar.gz"
+mod_wsgi_basename: "mod_wsgi-4.9.4"
+mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac9237f5666cfc9"
 # - Nodes to tell Slurm about (with hostname and memory in MB)
 slurmctlnode: head
 slurmnodes:
     - name: head
       memory: "7000"
+slurm_nodes:
+  - name: head
+    memory: "7000"
+kive_db_subnet: 127.0.0.1/32
+barman_password: fixme-barman-dev
+streaming_barman_password: fixme-streaming-barman-dev
