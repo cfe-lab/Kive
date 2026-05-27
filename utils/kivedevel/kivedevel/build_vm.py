@@ -754,6 +754,8 @@ def configure_logging(args: argparse.Namespace, workdir: Path) -> None:
         level = logging.ERROR
     elif getattr(args, "debug", False):
         level = logging.DEBUG
+    elif getattr(args, "verbose", False):
+        level = logging.INFO
     else:
         level = logging.INFO
 
@@ -763,9 +765,9 @@ def configure_logging(args: argparse.Namespace, workdir: Path) -> None:
     handlers: list[logging.Handler] = [
         logging.FileHandler(log_file, encoding="utf-8"),
     ]
-    if getattr(args, "debug", False):
+    if getattr(args, "verbose", False) or getattr(args, "debug", False):
         console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.DEBUG)
+        console.setLevel(logging.DEBUG if getattr(args, "debug", False) else logging.INFO)
         handlers.append(console)
 
     logging.basicConfig(
