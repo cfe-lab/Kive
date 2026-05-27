@@ -305,7 +305,7 @@ def _get_instance_ipv4_for_bridge(instance: str, bridge_cidr: str) -> str:
 # ---------------------------------------------------------------------------
 
 def _ensure_user_data(cmds: Cmds, instance: str) -> bool:
-    print(f"Configuring cloud-init user data for '{instance}'...")
+    logger.info("Configuring cloud-init user data for %s...", instance)
     pubkey = _find_ssh_pubkey()
     password_hash = _generate_password_hash("kive1234")
     ssh_key_block = (
@@ -347,13 +347,13 @@ runcmd:
 
 
 def _enable_network_config(cmds: Cmds, instance: str, host_interface: str) -> bool:
-    print(f"Configuring cloud-init network config for '{instance}'...")
+    logger.info("Configuring cloud-init network config for %s...", instance)
     network_cidr = _get_bridge_cidr(cmds, host_interface)
     if host_interface == "docker0" and network_cidr:
         gateway = network_cidr.split("/")[0]
         prefix = network_cidr.split("/")[1]
         vm_ipv4 = _get_instance_ipv4_for_bridge(instance, network_cidr)
-        print(f"Using static IPv4 {vm_ipv4}/{prefix} for '{instance}' on docker0")
+        logger.info("Using static IPv4 %s/%s for %s on docker0", vm_ipv4, prefix, instance)
         network_config = f"""\
 version: 2
 ethernets:
@@ -385,19 +385,14 @@ def _ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bo
     if not host_interface:
         host_interface = _get_default_host_interface(cmds)
         if not host_interface:
-            print(
-                "Unable to determine host network interface for VM network device.",
-                file=sys.stderr,
-            )
+            logger.error("Unable to determine host network interface for VM network device.")
             sys.exit(1)
     nictype = (
         "bridged"
         if (host_interface == "docker0" or host_interface.startswith("br-"))
         else "macvlan"
     )
-    print(
-        f"Adding network device eth0 on '{host_interface}' (nictype={nictype})..."
-    )
+    logger.info("Adding network device eth0 on %s (nictype=%s)...", host_interface, nictype)
     cmds.incus.run(
         [
             "config", "device", "add",
@@ -428,10 +423,10 @@ def _sudo(*args: str) -> subprocess.CompletedProcess[str]:
 def _handle_workspace_disk(
     cmds: Cmds, instance: str, image_path: Path, root: Path, workdir: Path
 ) -> None:
-    print(f"Building workspace disk image at '{image_path}'...")
+    logger.info("Building workspace disk image at %s...", image_path)
 
     if not image_path.exists():
-        print("Creating workspace disk image with qemu-img and nbd...")
+        logger.info("Creating workspace disk image with qemu-img and nbd...")
 
         # Load nbd kernel module
         _sudo("modprobe", "nbd", "max_part=8")
@@ -439,7 +434,7 @@ def _handle_workspace_disk(
         # Clean stale mountpoint
         mount_dir = workdir / "kive-code-mount"
         if mount_dir.exists():
-            print(f"Cleaning stale mountpoint '{mount_dir}'...")
+            logger.info("Cleaning stale mountpoint %s...", mount_dir)
             _sudo("umount", "--", str(mount_dir))
 
         # Clean stale nbd0 attachment
@@ -448,7 +443,7 @@ def _handle_workspace_disk(
             try:
                 pid = int(nbd_pid_file.read_text().strip())
                 if pid != 0:
-                    print("Cleaning stale /dev/nbd0 attachment...")
+                    logger.info("Cleaning stale /dev/nbd0 attachment...")
                     cmds.qemu_nbd.run(["-d", "/dev/nbd0"], sudo=True, check=False)
                     _sudo("kill", "--", str(pid))
                     time.sleep(1)
@@ -483,9 +478,9 @@ def _handle_workspace_disk(
         except OSError:
             pass
     else:
-        print(f"Using existing image '{image_path}'.")
+        logger.info("Using existing image %s.", image_path)
 
-    print(f"Attaching workspace disk to '{instance}'...")
+    logger.info("Attaching workspace disk to %s...", instance)
     cmds.incus.run(
         [
             "config", "device", "add",
@@ -505,17 +500,11 @@ def _ensure_incus_daemon(cmds: Cmds, root: Path, workdir: Path) -> None:
         return
 
     if not shutil.which("ws-start-incus-daemon"):
-        print(
-            "Incus daemon is not running and ws-start-incus-daemon is not available.",
-            file=sys.stderr,
-        )
-        print(
-            "Start the daemon manually or install the helper script.",
-            file=sys.stderr,
-        )
+        logger.error("Incus daemon is not running and ws-start-incus-daemon is not available.")
+        logger.error("Start the daemon manually or install the helper script.")
         sys.exit(1)
 
-    print("Starting Incus daemon using ws-start-incus-daemon...")
+    logger.info("Starting Incus daemon using ws-start-incus-daemon...")
     subprocess.run(
         ["sudo", "--", "pkill", "-f", "incusd --group incus-admin"],
         check=False,
@@ -531,10 +520,7 @@ def _ensure_incus_daemon(cmds: Cmds, root: Path, workdir: Path) -> None:
 
     time.sleep(5)
     if not cmds.incus.ok(["info"]):
-        print(
-            f"Failed to start Incus daemon. See {log_file}.",
-            file=sys.stderr,
-        )
+        logger.error("Failed to start Incus daemon. See %s.", log_file)
         sys.exit(1)
 
 
