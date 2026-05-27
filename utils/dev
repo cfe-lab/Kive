@@ -1,0 +1,3 @@
+#! /bin/sh
+
+uv run --project "${0%/*}"/kivedevel -- kivedevel "$@"
