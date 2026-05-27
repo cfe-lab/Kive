@@ -18,14 +18,19 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import hashlib
+import logging
 import random
 import re
 import shutil
+import shlex
 import string
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+
+logger = logging.getLogger("kivedevel.build_vm")
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +100,7 @@ class Command:
         capture_output: bool = False,
         input: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        logger.debug("Running command: %s", shlex.join(self._argv(args, sudo=sudo)))
         return subprocess.run(
             self._argv(args, sudo=sudo),
             check=check,
@@ -155,9 +161,9 @@ class Cmds:
     def create(cls) -> "Cmds":
         use_guix = shutil.which("guix") is not None
         if use_guix:
-            print("guix found — all commands will run via guix environment --pure.")
+            logger.info("guix found — all commands will run via guix environment --pure.")
         else:
-            print("guix not found — all commands will run directly.")
+            logger.info("guix not found — all commands will run directly.")
         return cls(
             incus=Incus(use_guix),
             rsync=Rsync(use_guix),
@@ -192,7 +198,7 @@ def _set_instance_config_multiline(
 ) -> None:
     """Set an Incus config key by piping value through stdin."""
     result = cmds.incus.run(
-        ["config", "set", "--", instance, key, "-"],
+        ["config", "set", instance, key, "-"],
         input=value,
         check=False,
         capture_output=True,
@@ -202,12 +208,12 @@ def _set_instance_config_multiline(
 
 
 def _instance_exists(cmds: Cmds, instance: str) -> bool:
-    out = cmds.incus.output(["list", "--", instance, "--format", "csv"])
+    out = cmds.incus.output(["list", instance, "--format", "csv"])
     return out.startswith(instance)
 
 
 def _instance_is_cloud_variant(cmds: Cmds, instance: str) -> bool:
-    out = cmds.incus.output(["config", "show", "--", instance])
+    out = cmds.incus.output(["config", "show", instance])
     return bool(re.search(r"^\s*image\.variant:\s*cloud\s*$", out, re.MULTILINE))
 
 
@@ -334,7 +340,7 @@ ethernets:
 
 
 def _ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bool:
-    out = cmds.incus.output(["config", "device", "list", "--", instance])
+    out = cmds.incus.output(["config", "device", "list", instance])
     if re.search(r"^eth0\s*$", out, re.MULTILINE):
         return False
     if not host_interface:
@@ -355,7 +361,7 @@ def _ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bo
     )
     cmds.incus.run(
         [
-            "config", "device", "add", "--",
+            "config", "device", "add",
             instance, "eth0", "nic",
             f"nictype={nictype}",
             f"parent={host_interface}",
@@ -441,7 +447,7 @@ def _handle_workspace_disk(
     print(f"Attaching workspace disk to '{instance}'...")
     cmds.incus.run(
         [
-            "config", "device", "add", "--",
+            "config", "device", "add",
             instance, "kive-code", "disk",
             f"source={image_path}",
         ],
@@ -521,22 +527,22 @@ def main(args: argparse.Namespace) -> None:
         if not out or not re.search(
             f"^{re.escape(pool)},", out, re.MULTILINE
         ):
-            print(f"Creating storage pool '{pool}'...")
-            cmds.incus.run(["storage", "create", "--", pool, "dir"], check=False)
+            logger.info("Creating storage pool %s...", pool)
+            cmds.incus.run(["storage", "create", pool, "dir"], check=False)
     except Exception as e:
-        print(f"Warning: Could not create storage pool: {e}", file=sys.stderr)
+        logger.warning("Could not create storage pool: %s", e)
 
     # Profile
-    if not cmds.incus.ok(["profile", "show", "--", profile]):
-        print(f"Profile '{profile}' not found. Creating it...")
-        cmds.incus.run(["profile", "create", "--", profile])
+    if not cmds.incus.ok(["profile", "show", profile]):
+        logger.info("Profile %s not found. Creating it...", profile)
+        cmds.incus.run(["profile", "create", profile])
 
     # Root disk in profile
-    if not cmds.incus.ok(["profile", "device", "show", "--", profile]):
-        print(f"Adding root disk to profile '{profile}'...")
+    if not cmds.incus.ok(["profile", "device", "show", profile]):
+        logger.info("Adding root disk to profile %s...", profile)
         cmds.incus.run(
             [
-                "profile", "device", "add", "--",
+                "profile", "device", "add",
                 profile, "root", "disk",
                 f"pool={pool}",
                 "path=/",
@@ -547,11 +553,10 @@ def main(args: argparse.Namespace) -> None:
     # Create VM instance
     created_new_instance = False
     if not _instance_exists(cmds, instance):
-        print(f"Creating VM instance '{instance}'...")
+        logger.info("Creating VM instance %s...", instance)
         cmds.incus.run(
             [
-                "create", "images:ubuntu/noble/cloud", "--",
-                instance,
+                "create", "images:ubuntu/noble/cloud", instance,
                 "--vm",
                 "--config", f"limits.cpu={cpu}",
                 "--config", f"limits.memory={memory}",
@@ -561,24 +566,22 @@ def main(args: argparse.Namespace) -> None:
         created_new_instance = True
     else:
         if not _instance_is_cloud_variant(cmds, instance):
-            print(
+            logger.error(
                 f"Existing VM '{instance}' was not created from a cloud image "
                 "and won't reliably apply login/agent config.",
-                file=sys.stderr,
             )
-            print(
+            logger.error(
                 f"Please run: incus delete -f -- {instance} && "
                 f"./utils/dev build-vm {instance}",
-                file=sys.stderr,
             )
             sys.exit(2)
-        print(f"Instance '{instance}' already exists. Skipping creation.")
-        out = cmds.incus.output(["info", "--", instance])
+        logger.info("Instance %s already exists. Skipping creation.", instance)
+        out = cmds.incus.output(["info", instance])
         if out and not re.search(
             r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE
         ):
-            print(f"Starting instance '{instance}'...")
-            cmds.incus.run(["start", "--", instance])
+            logger.info("Starting instance %s...", instance)
+            cmds.incus.run(["start", instance])
 
     # Configure networking and cloud-init
     restart_required = False
@@ -595,38 +598,38 @@ def main(args: argparse.Namespace) -> None:
         restart_required = True
 
     if not created_new_instance:
-        print(
+        logger.info(
             "Note: cloud-init usually runs only on first boot. "
             "Existing VMs may require recreation to apply updated login/agent settings."
         )
 
     if restart_required:
         try:
-            out = cmds.incus.output(["info", "--", instance])
+            out = cmds.incus.output(["info", instance])
             if out and re.search(
                 r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE
             ):
-                print(f"Restarting '{instance}' to apply configuration changes...")
-                cmds.incus.run(["restart", "--", instance])
+                logger.info("Restarting %s to apply configuration changes...", instance)
+                cmds.incus.run(["restart", instance])
             elif out:
-                print(f"Starting '{instance}' after configuration changes...")
-                cmds.incus.run(["start", "--", instance])
+                logger.info("Starting %s after configuration changes...", instance)
+                cmds.incus.run(["start", instance])
         except Exception as e:
-            print(f"Warning: Could not restart instance: {e}", file=sys.stderr)
+            logger.warning("Could not restart instance: %s", e)
 
     # Workspace disk
     try:
-        out = cmds.incus.output(["config", "show", "--", instance])
+        out = cmds.incus.output(["config", "show", instance])
         if out and "kive-code:" not in out:
             _handle_workspace_disk(cmds, instance, image_path, root, workdir)
         elif out and "kive-code:" in out:
-            print(f"Device 'kive-code' is already attached to '{instance}'.")
+            logger.info("Device 'kive-code' is already attached to %s.", instance)
     except Exception as e:
-        print(f"Warning: Could not check workspace disk: {e}")
+        logger.warning("Could not check workspace disk: %s", e)
 
-    print(
-        f"Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) "
-        f"to connect to '{instance}'."
+    logger.info(
+        "Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) to connect to %s.",
+        instance,
     )
 
 
@@ -646,6 +649,29 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     p = subparsers.add_parser(
         "build-vm",
         help="Build and configure an Incus VM with cloud-init",
+    )
+    log_group = p.add_mutually_exclusive_group()
+    log_group.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Only show errors",
+    )
+    log_group.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Show informational progress messages",
+    )
+    log_group.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show debug logging, including full command lines",
+    )
+    p.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help="Write a persistent log file (default: <workdir>/build-vm.log)",
     )
     p.add_argument(
         "instance",
@@ -691,4 +717,31 @@ def _run(args: argparse.Namespace) -> None:
     """Resolve defaults that depend on other args, then call main()."""
     if args.workdir is None:
         args.workdir = args.root / "tmp" / "build"
+    configure_logging(args, args.workdir)
     main(args)
+
+
+def configure_logging(args: argparse.Namespace, workdir: Path) -> None:
+    """Configure console and file logging for a build run."""
+    if getattr(args, "quiet", False):
+        level = logging.ERROR
+    elif getattr(args, "debug", False):
+        level = logging.DEBUG
+    elif getattr(args, "verbose", False):
+        level = logging.INFO
+    else:
+        level = logging.INFO
+
+    log_file = getattr(args, "log_file", None) or (workdir / "build-vm.log")
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler(log_file, encoding="utf-8"),
+        ],
+        force=True,
+    )
+    logger.debug("Logging configured at %s; log file=%s", logging.getLevelName(level), log_file)
