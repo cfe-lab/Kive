@@ -103,13 +103,43 @@ class Command:
         input: str | None = None,
     ) -> subprocess.CompletedProcess[str]:
         logger.debug("Running command: %s", shlex.join(self._argv(args, sudo=sudo)))
-        return subprocess.run(
-            self._argv(args, sudo=sudo),
-            check=check,
-            capture_output=capture_output,
-            input=input,
-            text=True,
-        )
+        if capture_output:
+            result = subprocess.run(
+                self._argv(args, sudo=sudo),
+                check=False,
+                capture_output=True,
+                input=input,
+                text=True,
+            )
+        else:
+            if logger.isEnabledFor(logging.DEBUG):
+                result = subprocess.run(
+                    self._argv(args, sudo=sudo),
+                    check=False,
+                    input=input,
+                    text=True,
+                )
+            else:
+                result = subprocess.run(
+                    self._argv(args, sudo=sudo),
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    input=input,
+                    text=True,
+                )
+
+        if check and result.returncode != 0:
+            logger.error("Command failed with exit code %s", result.returncode)
+            raise subprocess.CalledProcessError(result.returncode, result.args)
+
+        if logger.isEnabledFor(logging.DEBUG):
+            if result.stdout:
+                logger.debug("stdout:\n%s", result.stdout.rstrip())
+            if result.stderr:
+                logger.debug("stderr:\n%s", result.stderr.rstrip())
+
+        return result
 
     def output(self, args: list[str], *, sudo: bool = False) -> str:
         """Run and return stdout, empty string on failure."""
@@ -389,6 +419,8 @@ def _sudo(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["sudo", "--"] + list(args),
         check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         text=True,
     )
 
@@ -736,21 +768,24 @@ def configure_logging(args: argparse.Namespace, workdir: Path) -> None:
         level = logging.ERROR
     elif getattr(args, "debug", False):
         level = logging.DEBUG
-    elif getattr(args, "verbose", False):
-        level = logging.INFO
     else:
         level = logging.INFO
 
     log_file = getattr(args, "log_file", None) or (workdir / "build-vm.log")
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
+    handlers: list[logging.Handler] = [
+        logging.FileHandler(log_file, encoding="utf-8"),
+    ]
+    if getattr(args, "debug", False):
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.DEBUG)
+        handlers.append(console)
+
     logging.basicConfig(
         level=level,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler(log_file, encoding="utf-8"),
-        ],
+        handlers=handlers,
         force=True,
     )
     logger.debug("Logging configured at %s; log file=%s", logging.getLevelName(level), log_file)
