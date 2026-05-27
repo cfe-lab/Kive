@@ -2,7 +2,7 @@
 import argparse
 import sys
 
-from kivedevel import build_vm
+from . import build_vm
 
 
 def entry() -> None:

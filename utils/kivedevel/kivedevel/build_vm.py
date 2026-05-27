@@ -32,6 +32,8 @@ from pathlib import Path
 
 logger = logging.getLogger("kivedevel.build_vm")
 
+_DEFAULT_KIVE_PASSWORD_HASH = "$6$w7nYcSFmaLbIxt0X$ru7i8S1R8KghBGY7RuclLvDE4ik6C9WZ89HeZeC2LxWJJBBOOkmoWFjSc7viAlL/4Yop9l28Ylw0DyOqmuhbR1"
+
 
 # ---------------------------------------------------------------------------
 # Command abstraction — one class per external tool
@@ -183,14 +185,21 @@ class Cmds:
 # ---------------------------------------------------------------------------
 
 def _generate_password_hash(password: str) -> str:
-    import crypt  # stdlib on Linux
     try:
+        import crypt  # stdlib on Linux
         return crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
     except (AttributeError, ValueError):
         salt = "$6$" + "".join(
             random.choices(string.ascii_letters + string.digits, k=16)
         )
         return crypt.crypt(password, salt)
+    except ModuleNotFoundError:
+        if password == "kive1234":
+            logger.warning(
+                "Python crypt module is unavailable; using precomputed SHA-512 password hash."
+            )
+            return _DEFAULT_KIVE_PASSWORD_HASH
+        raise
 
 
 def _set_instance_config_multiline(
