@@ -118,7 +118,7 @@ jobs:
           sudo systemctl start incus.socket || true
           sudo usermod -aG incus-admin "$USER"
           export PATH
-          sg incus-admin -c 'incus info >/dev/null 2>&1 || incus admin init --auto'
+          sg incus-admin -c 'incus info >/dev/null 2>&1 || incus admin init --auto --storage-backend=dir'
           sg incus-admin -c 'incus info'
 
       - name: Run build-vm smoke test
