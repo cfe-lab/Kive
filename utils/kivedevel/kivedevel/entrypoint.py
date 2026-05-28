@@ -4,6 +4,7 @@ import sys
 from typing import Sequence
 
 from . import build_vm
+from . import checks
 
 
 def main(argv: Sequence[str]) -> int:
@@ -15,6 +16,7 @@ def main(argv: Sequence[str]) -> int:
     subparsers.required = True
 
     build_vm.register_subcommand(subparsers)
+    checks.register_subcommands(subparsers)
 
     args = parser.parse_args(argv)
     args.func(args)
