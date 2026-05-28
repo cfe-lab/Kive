@@ -239,7 +239,6 @@ def _set_instance_config_multiline(
     result = cmds.incus.run(
         ["config", "set", instance, key, "-"],
         input=value,
-        check=False,
         capture_output=True,
     )
     if result.returncode != 0:
@@ -400,7 +399,6 @@ def _ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bo
             f"nictype={nictype}",
             f"parent={host_interface}",
         ],
-        check=False,
     )
     return True
 
@@ -413,7 +411,6 @@ def _sudo(*args: str) -> subprocess.CompletedProcess[str]:
     """Run a privileged system command directly (no guix wrapping needed)."""
     return subprocess.run(
         ["sudo", "--"] + list(args),
-        check=False,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         text=True,
@@ -444,7 +441,7 @@ def _handle_workspace_disk(
                 pid = int(nbd_pid_file.read_text().strip())
                 if pid != 0:
                     logger.info("Cleaning stale /dev/nbd0 attachment...")
-                    cmds.qemu_nbd.run(["-d", "/dev/nbd0"], sudo=True, check=False)
+                    cmds.qemu_nbd.run(["-d", "/dev/nbd0"], sudo=True)
                     _sudo("kill", "--", str(pid))
                     time.sleep(1)
             except (ValueError, OSError):
@@ -490,7 +487,6 @@ def _handle_workspace_disk(
             instance, "kive-code", "disk",
             f"source={image_path}",
         ],
-        check=False,
     )
 
 
@@ -559,7 +555,7 @@ def main(args: argparse.Namespace) -> None:
             f"^{re.escape(pool)},", out, re.MULTILINE
         ):
             logger.info("Creating storage pool %s...", pool)
-            cmds.incus.run(["storage", "create", pool, "dir"], check=False)
+            cmds.incus.run(["storage", "create", pool, "dir"])
     except Exception as e:
         logger.warning("Could not create storage pool: %s", e)
 
