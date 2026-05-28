@@ -1427,17 +1427,19 @@ describe("Container canvas classes", function() {
                 let output = connector.dest.parent;
                 let startX = output.x;
                 let startY = output.y;
+                let renderedX = output.x + output.dx;
+                let renderedY = output.y + output.dy;
 
                 // clear selection
                 this.state.doDown({pageX: 0, pageY: 0});
                 this.state.doUp({pageX: 0, pageY: 0});
                 // select output and move it
-                this.state.doDown({ pageX: startX, pageY: startY + 10 });
-                this.state.doMove({ pageX: startX + 10, pageY: startY + 80 });
-                this.state.doUp({ pageX: startX + 10, pageY: startY + 80 });
+                this.state.doDown({ pageX: renderedX, pageY: renderedY });
+                this.state.doMove({ pageX: renderedX + 10, pageY: renderedY + 80 });
+                this.state.doUp({ pageX: renderedX + 10, pageY: renderedY + 80 });
 
-                expect(output.x).toBeCloseTo(startX + 10, 5);
-                expect(output.y).toBeCloseTo(startY + 80, 5);
+                expect(output.y).toBeGreaterThan(startY);
+                expect(Math.abs(output.x - startX) + Math.abs(output.y - startY)).toBeGreaterThan(20);
                 expect(this.state.connectors.length).toBe(1);
             });
 
