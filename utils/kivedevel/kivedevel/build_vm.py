@@ -534,6 +534,7 @@ def main(args: argparse.Namespace) -> None:
     root: Path = args.root
     workdir: Path = args.workdir
     instance: str = args.instance
+    instance_type: str = args.instance_type
     image_path: Path = workdir / args.image_name
     pool: str = args.pool
     profile: str = args.profile
@@ -580,16 +581,16 @@ def main(args: argparse.Namespace) -> None:
     # Create VM instance
     created_new_instance = False
     if not _instance_exists(cmds, instance):
-        logger.info("Creating VM instance %s...", instance)
-        cmds.incus.run(
-            [
-                "create", "images:ubuntu/noble/cloud", instance,
-                "--vm",
-                "--config", f"limits.cpu={cpu}",
-                "--config", f"limits.memory={memory}",
-                "--profile", profile,
-            ]
-        )
+        logger.info("Creating %s instance %s...", instance_type, instance)
+        create_args = [
+            "create", "images:ubuntu/noble/cloud", instance,
+            "--config", f"limits.cpu={cpu}",
+            "--config", f"limits.memory={memory}",
+            "--profile", profile,
+        ]
+        if instance_type == "vm":
+            create_args.insert(3, "--vm")
+        cmds.incus.run(create_args)
         created_new_instance = True
     else:
         if not _instance_is_cloud_variant(cmds, instance):
@@ -705,6 +706,12 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         nargs="?",
         default="kive-minimal",
         help="Incus instance name (default: kive-minimal)",
+    )
+    p.add_argument(
+        "--instance-type",
+        choices=("vm", "container"),
+        default="vm",
+        help="Incus instance type to create (default: vm)",
     )
     p.add_argument(
         "--root",
