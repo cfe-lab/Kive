@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 
-from .build_vm_core import find_ssh_pubkey, generate_password_hash, get_instance_ipv4_for_bridge, set_instance_config_multiline
-from .build_vm_network import get_bridge_cidr
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
+from .helpers import find_ssh_pubkey, generate_password_hash, get_instance_ipv4_for_bridge, set_instance_config_multiline
+from .network import get_bridge_cidr
 
 
 logger = logging.getLogger("kivedevel")

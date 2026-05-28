@@ -1,14 +1,11 @@
-"""Build-vm command entrypoint and public API."""
-
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
 
-from .build_vm_core import default_root, instance_exists
-from .build_vm_logging import configure_logging
-from .build_vm_runner import run_build_vm
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
+from ..shared import configure_logging, default_root, instance_exists
+from .runner import run_build_vm
 
 
 def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]

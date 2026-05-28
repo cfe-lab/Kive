@@ -4,7 +4,7 @@ import logging
 import re
 import sys
 
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")

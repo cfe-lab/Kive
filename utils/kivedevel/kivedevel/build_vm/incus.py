@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")

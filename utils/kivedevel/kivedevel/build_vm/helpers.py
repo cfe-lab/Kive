@@ -7,16 +7,12 @@ import re
 import string
 from pathlib import Path
 
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")
 
 _DEFAULT_KIVE_PASSWORD_HASH = "$6$w7nYcSFmaLbIxt0X$ru7i8S1R8KghBGY7RuclLvDE4ik6C9WZ89HeZeC2LxWJJBBOOkmoWFjSc7viAlL/4Yop9l28Ylw0DyOqmuhbR1"
-
-
-def default_root() -> Path:
-    return Path(__file__).resolve().parents[3]
 
 
 def generate_password_hash(password: str) -> str:
@@ -37,14 +33,6 @@ def set_instance_config_multiline(cmds: Cmds, instance: str, key: str, value: st
     result = cmds.incus.run(["config", "set", instance, key, "-"], input=value, capture_output=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or f"Failed to set {key}")
-
-
-def instance_exists(cmds: Cmds, instance: str) -> bool:
-    out = cmds.incus.output(["list", instance, "--format", "csv"])
-    for line in out.splitlines():
-        if line.split(",", 1)[0] == instance:
-            return True
-    return False
 
 
 def instance_is_cloud_variant(cmds: Cmds, instance: str) -> bool:

@@ -4,8 +4,9 @@ import logging
 import re
 import sys
 
-from .build_vm_core import instance_exists, instance_is_cloud_variant
-from .kv_commands import Cmds
+from ..kv_commands import Cmds
+from ..shared import instance_exists
+from .helpers import instance_is_cloud_variant
 
 
 logger = logging.getLogger("kivedevel")

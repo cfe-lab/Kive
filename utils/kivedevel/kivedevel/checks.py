@@ -9,25 +9,19 @@ import re
 import sys
 from pathlib import Path
 
-from . import build_vm
+from .kv_commands import Cmds
+from .shared import configure_logging, default_root, instance_exists, instance_is_running
 
 
 logger = logging.getLogger("kivedevel.checks")
 
 
-def _is_instance_running(cmds: build_vm.Cmds, instance: str) -> bool:
-    out = cmds.incus.output(["info", instance])
-    return bool(re.search(r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE))
-
-
-def _device_exists(cmds: build_vm.Cmds, instance: str, device: str) -> bool:
+def _device_exists(cmds: Cmds, instance: str, device: str) -> bool:
     out = cmds.incus.output(["config", "device", "show", instance])
     return bool(re.search(rf"^{re.escape(device)}:\s*$", out, re.MULTILINE))
 
 
-def _required_device_value(
-    cmds: build_vm.Cmds, instance: str, device: str, key: str
-) -> str:
+def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> str:
     value = cmds.incus.output(["config", "device", "get", instance, device, key]).strip()
     if not value:
         logger.error("Missing %s for device %s on %s.", key, device, instance)
@@ -37,17 +31,17 @@ def _required_device_value(
 
 def _run_validate_vm(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
-    build_vm.configure_logging(args, workdir)
+    configure_logging(args, workdir)
 
-    cmds = build_vm.Cmds.create()
+    cmds = Cmds.create()
     cmds.incus.require()
 
     instance = args.instance
-    if not build_vm.instance_exists(cmds, instance):
+    if not instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
 
-    if not _is_instance_running(cmds, instance):
+    if not instance_is_running(cmds, instance):
         logger.error("Instance %s exists but is not running.", instance)
         sys.exit(1)
 
@@ -71,20 +65,20 @@ def _run_validate_vm(args: argparse.Namespace) -> None:
 
 def _run_test_api(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
-    build_vm.configure_logging(args, workdir)
+    configure_logging(args, workdir)
 
-    cmds = build_vm.Cmds.create()
+    cmds = Cmds.create()
     cmds.incus.require()
 
     instance = args.instance
-    if not build_vm.instance_exists(cmds, instance):
+    if not instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
 
     source_path = Path(_required_device_value(cmds, instance, "kive-code", "source"))
     api_package = source_path / "api" / "kiveapi"
     if not api_package.is_dir():
-        fallback = build_vm.default_root() / "api" / "kiveapi"
+        fallback = default_root() / "api" / "kiveapi"
         if fallback.is_dir():
             logger.warning(
                 "Mounted source %s has no API tree; falling back to %s",
@@ -125,7 +119,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     validate.add_argument(
         "--workdir",
         type=Path,
-        default=build_vm.default_root() / "tmp~" / "build",
+        default=default_root() / "tmp~" / "build",
         help="Working directory used for logs",
     )
     for opt, kwargs in log_opts.items():
@@ -140,7 +134,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     test_api.add_argument(
         "--workdir",
         type=Path,
-        default=build_vm.default_root() / "tmp~" / "build",
+        default=default_root() / "tmp~" / "build",
         help="Working directory used for logs",
     )
     for opt, kwargs in log_opts.items():
