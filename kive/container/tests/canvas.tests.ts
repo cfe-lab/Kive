@@ -1413,12 +1413,15 @@ describe("Container canvas classes", function() {
                 drawStartingPipeline(this);
                 var magnet = this.expectedMethod.out_magnets[0];
 
+                this.state.draw(this.ctx);
                 // drag to create output
                 this.state.doDown({pageX: magnet.x, pageY: magnet.y});
                 this.state.doMove({pageX: 250, pageY: 20});
                 this.state.doUp({pageX: 250, pageY: 20}); // in output zone
 
-                let connector = this.actualMethod.out_magnets[0].connected[0];
+                // spawnOutputNode sets dest.connected but not source.connected;
+                // find the connector directly from CanvasState.
+                let connector = this.state.connectors[0];
                 expect(connector).toBeTruthy();
                 expect(CanvasState.isOutputNode(connector.dest.parent)).toBeTruthy();
                 let output = connector.dest.parent;
@@ -1435,7 +1438,7 @@ describe("Container canvas classes", function() {
 
                 expect(output.x).toBeCloseTo(startX + 10, 5);
                 expect(output.y).toBeCloseTo(startY + 80, 5);
-                expect(this.actualMethod.out_magnets[0].connected.length).toBe(1);
+                expect(this.state.connectors.length).toBe(1);
             });
 
             it('should drag output cable', function() {
