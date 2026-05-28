@@ -645,14 +645,11 @@ def main(args: argparse.Namespace) -> None:
             logger.warning("Could not restart instance: %s", e)
 
     # Workspace disk
-    try:
-        out = cmds.incus.output(["config", "show", instance])
-        if out and "kive-code:" not in out:
-            _handle_workspace_disk(cmds, instance, image_path, root, workdir)
-        elif out and "kive-code:" in out:
-            logger.info("Device 'kive-code' is already attached to %s.", instance)
-    except Exception as e:
-        logger.warning("Could not check workspace disk: %s", e)
+    out = cmds.incus.output(["config", "show", instance])
+    if out and "kive-code:" not in out:
+        _handle_workspace_disk(cmds, instance, image_path, root, workdir)
+    elif out and "kive-code:" in out:
+        logger.info("Device 'kive-code' is already attached to %s.", instance)
 
     logger.info(
         "Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) to connect to %s.",
