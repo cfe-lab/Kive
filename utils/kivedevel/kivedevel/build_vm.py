@@ -247,7 +247,10 @@ def _set_instance_config_multiline(
 
 def _instance_exists(cmds: Cmds, instance: str) -> bool:
     out = cmds.incus.output(["list", instance, "--format", "csv"])
-    return out.startswith(instance)
+    for line in out.splitlines():
+        if line.split(",", 1)[0] == instance:
+            return True
+    return False
 
 
 def _instance_is_cloud_variant(cmds: Cmds, instance: str) -> bool:
@@ -417,9 +420,45 @@ def _sudo(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _workspace_rsync_args(root: Path, workdir: Path, destination: Path) -> list[str]:
+    """Return rsync arguments to mirror the repository into destination."""
+    # Copy files while excluding build artifacts under the repo.
+    rsync_args = ["-a", "--exclude=/tmp/"]
+    try:
+        rel_path = workdir.relative_to(root).as_posix()
+    except ValueError:
+        rel_path = None
+    if rel_path is not None:
+        rsync_args += [f"--exclude=/{rel_path}/"]
+    rsync_args += ["--", str(root) + "/", str(destination) + "/"]
+    return rsync_args
+
+
 def _handle_workspace_disk(
-    cmds: Cmds, instance: str, image_path: Path, root: Path, workdir: Path
+    cmds: Cmds,
+    instance: str,
+    image_path: Path,
+    root: Path,
+    workdir: Path,
+    instance_type: str,
 ) -> None:
+    if instance_type == "container":
+        host_mount_dir = workdir / "kive-code-host"
+        logger.info("Building container workspace directory at %s...", host_mount_dir)
+        host_mount_dir.mkdir(parents=True, exist_ok=True)
+        cmds.rsync.run(_workspace_rsync_args(root, workdir, host_mount_dir))
+
+        logger.info("Attaching workspace directory to %s...", instance)
+        cmds.incus.run(
+            [
+                "config", "device", "add",
+                instance, "kive-code", "disk",
+                f"source={host_mount_dir}",
+                "path=/mnt/kive-code",
+            ],
+        )
+        return
+
     logger.info("Building workspace disk image at %s...", image_path)
 
     if not image_path.exists():
@@ -458,16 +497,7 @@ def _handle_workspace_disk(
         mount_dir.mkdir(parents=True, exist_ok=True)
         _sudo("mount", "--", "/dev/nbd0", str(mount_dir))
 
-        # Copy files while excluding build artifacts under the repo.
-        rsync_args = ["-a", "--exclude=/tmp/"]
-        try:
-            rel_path = workdir.relative_to(root).as_posix()
-        except ValueError:
-            rel_path = None
-        if rel_path is not None:
-            rsync_args += [f"--exclude=/{rel_path}/"]
-        rsync_args += ["--", str(root) + "/", str(mount_dir) + "/"]
-        cmds.rsync.run(rsync_args, sudo=True)
+        cmds.rsync.run(_workspace_rsync_args(root, workdir, mount_dir), sudo=True)
         subprocess.run(["sync"], check=True)
 
         # Unmount and disconnect
@@ -647,7 +677,7 @@ def main(args: argparse.Namespace) -> None:
     # Workspace disk
     out = cmds.incus.output(["config", "show", instance])
     if out and "kive-code:" not in out:
-        _handle_workspace_disk(cmds, instance, image_path, root, workdir)
+        _handle_workspace_disk(cmds, instance, image_path, root, workdir, instance_type)
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", instance)
 
