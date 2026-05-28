@@ -116,24 +116,35 @@ jobs:
           sudo systemctl enable --now incus.socket || true
           sudo systemctl start incus.service || true
           sudo systemctl start incus.socket || true
-          sudo usermod -aG incus-admin "$USER"
-          export PATH
-          sg incus-admin -c 'incus info >/dev/null 2>&1 || incus admin init --auto --storage-backend=dir'
-          sg incus-admin -c 'incus info'
+          # Initialize with a dir-backed storage pool and default profile root device
+          sudo incus admin init --preseed <<'EOF'
+          config: {}
+          networks: []
+          storage_pools:
+          - name: default
+            driver: dir
+          profiles:
+          - name: default
+            devices:
+              root:
+                path: /
+                pool: default
+                type: disk
+          EOF
+          sudo incus info
 
       - name: Run build-vm smoke test
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
         run: |
           mkdir -p "$BUILD_VM_WORKDIR"
-          export PATH
-          sg incus-admin -c "cd '$GITHUB_WORKSPACE' && PATH='$PATH' utils/dev build-vm ci-smoke --instance-type container --workdir '$BUILD_VM_WORKDIR' --debug"
+          sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
+            bash -c "cd '$GITHUB_WORKSPACE' && utils/dev build-vm ci-smoke --instance-type container --workdir '$BUILD_VM_WORKDIR' --debug"
 
       - name: Cleanup smoke-test instance
         if: always()
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
         run: |
-          export PATH
-          sg incus-admin -c 'incus delete -f ci-smoke || true'
+          sudo incus delete -f ci-smoke || true
           sudo rm -rf "$BUILD_VM_WORKDIR"
