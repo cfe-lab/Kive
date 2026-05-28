@@ -138,8 +138,7 @@ jobs:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
         run: |
           mkdir -p "$BUILD_VM_WORKDIR"
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
-            bash -c "cd '$GITHUB_WORKSPACE' && utils/dev build-vm ci-smoke --instance-type container --workdir '$BUILD_VM_WORKDIR' --debug"
+          sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev build-vm ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
 
       - name: Cleanup smoke-test instance
         if: always()
