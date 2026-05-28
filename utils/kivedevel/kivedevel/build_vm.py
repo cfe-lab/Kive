@@ -462,7 +462,7 @@ def _handle_workspace_disk(
         _sudo("mount", "--", "/dev/nbd0", str(mount_dir))
 
         # Copy files while excluding build artifacts under the repo.
-        rsync_args = ["-a", "--exclude=/tmp~/"]
+        rsync_args = ["-a", "--exclude=/tmp/"]
         try:
             rel_path = workdir.relative_to(root).as_posix()
         except ValueError:
