@@ -43,7 +43,7 @@ def _run_validate_vm(args: argparse.Namespace) -> None:
     cmds.incus.require()
 
     instance = args.instance
-    if not build_vm._instance_exists(cmds, instance):
+    if not build_vm.instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
 
@@ -77,14 +77,14 @@ def _run_test_api(args: argparse.Namespace) -> None:
     cmds.incus.require()
 
     instance = args.instance
-    if not build_vm._instance_exists(cmds, instance):
+    if not build_vm.instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
 
     source_path = Path(_required_device_value(cmds, instance, "kive-code", "source"))
     api_package = source_path / "api" / "kiveapi"
     if not api_package.is_dir():
-        fallback = build_vm._default_root() / "api" / "kiveapi"
+        fallback = build_vm.default_root() / "api" / "kiveapi"
         if fallback.is_dir():
             logger.warning(
                 "Mounted source %s has no API tree; falling back to %s",
@@ -125,7 +125,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     validate.add_argument(
         "--workdir",
         type=Path,
-        default=build_vm._default_root() / "tmp~" / "build",
+        default=build_vm.default_root() / "tmp~" / "build",
         help="Working directory used for logs",
     )
     for opt, kwargs in log_opts.items():
@@ -140,7 +140,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     test_api.add_argument(
         "--workdir",
         type=Path,
-        default=build_vm._default_root() / "tmp~" / "build",
+        default=build_vm.default_root() / "tmp~" / "build",
         help="Working directory used for logs",
     )
     for opt, kwargs in log_opts.items():
