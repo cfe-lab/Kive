@@ -462,7 +462,7 @@ def _handle_workspace_disk(
         _sudo("mount", "--", "/dev/nbd0", str(mount_dir))
 
         # Copy files while excluding build artifacts under the repo.
-        rsync_args = ["-a", "--exclude=/tmp/"]
+        rsync_args = ["-a", "--exclude=/tmp~/"]
         try:
             rel_path = workdir.relative_to(root).as_posix()
         except ValueError:
@@ -728,7 +728,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         type=Path,
         default=None,
         metavar="DIR",
-        help="Working directory for build artefacts (default: <root>/tmp/build)",
+        help="Working directory for build artefacts (default: <root>/tmp~/build)",
     )
     p.add_argument(
         "--image-name",
@@ -753,7 +753,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
 def _run(args: argparse.Namespace) -> None:
     """Resolve defaults that depend on other args, then call main()."""
     if args.workdir is None:
-        args.workdir = args.root / "tmp" / "build"
+        args.workdir = args.root / "tmp~" / "build"
     configure_logging(args, args.workdir)
     main(args)
 
