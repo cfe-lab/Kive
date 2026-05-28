@@ -127,7 +127,7 @@ jobs:
         run: |
           mkdir -p "$BUILD_VM_WORKDIR"
           export PATH
-          sg incus-admin -c "cd '$GITHUB_WORKSPACE/Kive' && PATH='$PATH' utils/dev build-vm ci-smoke --instance-type container --workdir '$BUILD_VM_WORKDIR' --verbose"
+          sg incus-admin -c "cd '$GITHUB_WORKSPACE' && PATH='$PATH' utils/dev build-vm ci-smoke --instance-type container --workdir '$BUILD_VM_WORKDIR' --verbose"
 
       - name: Cleanup smoke-test instance
         if: always()
