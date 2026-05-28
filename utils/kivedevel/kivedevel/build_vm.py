@@ -461,11 +461,14 @@ def _handle_workspace_disk(
         mount_dir.mkdir(parents=True, exist_ok=True)
         _sudo("mount", "--", "/dev/nbd0", str(mount_dir))
 
-        # Copy files, excluding workdir if it lives inside root
-        rsync_args = ["-a"]
-        if str(workdir).startswith(str(root) + "/"):
-            rel_path = str(workdir)[len(str(root)) + 1:]
-            rsync_args += [f"--exclude={rel_path}"]
+        # Copy files while excluding build artifacts under the repo.
+        rsync_args = ["-a", "--exclude=/tmp/"]
+        try:
+            rel_path = workdir.relative_to(root).as_posix()
+        except ValueError:
+            rel_path = None
+        if rel_path is not None:
+            rsync_args += [f"--exclude=/{rel_path}/"]
         rsync_args += ["--", str(root) + "/", str(mount_dir) + "/"]
         cmds.rsync.run(rsync_args, sudo=True)
         subprocess.run(["sync"], check=True)
@@ -531,8 +534,8 @@ def _ensure_incus_daemon(cmds: Cmds, root: Path, workdir: Path) -> None:
 def main(args: argparse.Namespace) -> None:
     cmds = Cmds.create()
 
-    root: Path = args.root
-    workdir: Path = args.workdir
+    root: Path = args.root.resolve()
+    workdir: Path = args.workdir.resolve()
     instance: str = args.instance
     instance_type: str = args.instance_type
     image_path: Path = workdir / args.image_name
