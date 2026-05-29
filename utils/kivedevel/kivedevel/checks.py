@@ -77,6 +77,9 @@ def _request_status(opener, url: str):
     except urllib.error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         return exc.code, body
+    except urllib.error.URLError:
+        # Connection refused, timeout, or other network issues
+        return None, None
 
 
 def _is_url_reachable(base_url: str) -> bool:
@@ -243,10 +246,14 @@ HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
             text=True,
         )
         url = f"http://{ip}:{port}"
-        for _ in range(12):
-            if _is_url_reachable(url):
-                logger.warning("Primary API unreachable; using SSH-bootstrapped VM smoke API harness at %s", url)
-                return url
+        for attempt in range(12):
+            try:
+                if _is_url_reachable(url):
+                    logger.warning("Primary API unreachable; using SSH-bootstrapped VM smoke API harness at %s", url)
+                    return url
+            except Exception:
+                # Log and continue retrying on any exception (connection refused, timeout, etc.)
+                pass
             time.sleep(0.5)
     except subprocess.CalledProcessError as exc:
         logger.debug("Failed to bootstrap VM smoke API harness: %s", exc)
