@@ -114,7 +114,7 @@ def _vm_ip_candidates(cmds: Cmds, instance: str) -> list[str]:
     return candidates
 
 
-def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None) -> str:
+def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None) -> str | None:
     if explicit:
         return explicit.rstrip("/")
 
@@ -129,8 +129,8 @@ def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None
         except Exception:
             continue
 
-    logger.error("Could not reach API login page at any candidate URL: %s", ", ".join(candidates))
-    sys.exit(1)
+    logger.info("No pre-existing API server reachable at: %s", ", ".join(candidates))
+    return None
 
 
 def _pick_vm_ipv4(cmds: Cmds, instance: str) -> str:
@@ -138,6 +138,34 @@ def _pick_vm_ipv4(cmds: Cmds, instance: str) -> str:
         if not ip.startswith("224.") and not ip.startswith("239."):
             return ip
     return ""
+
+
+def _vm_looks_provisioned_for_primary_api(ip: str) -> bool:
+    ssh_common = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=8",
+        f"ubuntu@{ip}",
+    ]
+    probe = (
+        "test -f /etc/kive_dev_vars "
+        "-o -f /usr/local/share/Kive/kive/manage.py "
+        "-o -d /usr/local/share/Kive/kive"
+    )
+    try:
+        result = subprocess.run(
+            ssh_common + [probe],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        return result.returncode == 0
+    except Exception:
+        return False
 
 
 def _bootstrap_vm_smoke_api(ip: str, port: int, username: str, password: str) -> str | None:
@@ -249,7 +277,7 @@ HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
         for attempt in range(12):
             try:
                 if _is_url_reachable(url):
-                    logger.warning("Primary API unreachable; using SSH-bootstrapped VM smoke API harness at %s", url)
+                    logger.info("Using SSH-bootstrapped VM smoke API harness at %s", url)
                     return url
             except Exception:
                 # Log and continue retrying on any exception (connection refused, timeout, etc.)
@@ -341,14 +369,22 @@ def _run_test_api(args: argparse.Namespace) -> None:
         logger.error("Instance %s is not running.", instance)
         sys.exit(1)
 
-    try:
-        base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
-    except SystemExit:
-        base_url = None
+    base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
 
     if not base_url and not args.base_url:
         vm_ip = _pick_vm_ipv4(cmds, instance)
         if vm_ip:
+            if _vm_looks_provisioned_for_primary_api(vm_ip):
+                logger.warning(
+                    "Primary API appears provisioned on %s but is not reachable on port %s; falling back to smoke harness",
+                    vm_ip,
+                    args.port,
+                )
+            else:
+                logger.info(
+                    "Instance %s appears to be minimally provisioned (no Kive runtime detected); bootstrapping smoke harness",
+                    instance,
+                )
             base_url = _bootstrap_vm_smoke_api(vm_ip, args.port, args.username, args.password)
 
     if not base_url:
