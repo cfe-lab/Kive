@@ -8,7 +8,6 @@ import logging
 import re
 import subprocess
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -114,6 +113,22 @@ def _vm_ip_candidates(cmds: Cmds, instance: str) -> list[str]:
     return candidates
 
 
+def _instance_kind(cmds: Cmds, instance: str) -> str:
+    out = cmds.incus.output(["list", instance, "--format", "json"])
+    if not out:
+        return ""
+    try:
+        payload = json.loads(out)
+    except json.JSONDecodeError:
+        return ""
+    if not isinstance(payload, list) or not payload:
+        return ""
+    kind = payload[0].get("type")
+    if isinstance(kind, str):
+        return kind.lower()
+    return ""
+
+
 def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None) -> str | None:
     if explicit:
         return explicit.rstrip("/")
@@ -131,13 +146,6 @@ def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None
 
     logger.info("No pre-existing API server reachable at: %s", ", ".join(candidates))
     return None
-
-
-def _pick_vm_ipv4(cmds: Cmds, instance: str) -> str:
-    for ip in _vm_ip_candidates(cmds, instance):
-        if not ip.startswith("224.") and not ip.startswith("239."):
-            return ip
-    return ""
 
 
 def _vm_looks_provisioned_for_primary_api(ip: str) -> bool:
@@ -166,149 +174,6 @@ def _vm_looks_provisioned_for_primary_api(ip: str) -> bool:
         return result.returncode == 0
     except Exception:
         return False
-
-
-def _bootstrap_vm_smoke_api(ip: str, port: int, username: str, password: str) -> str | None:
-    script = f"""#!/usr/bin/env python3
-import json
-from http import HTTPStatus
-from http.cookies import SimpleCookie
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import parse_qs, urlparse
-
-USER = {json.dumps(username)}
-PASS = {json.dumps(password)}
-PORT = {port}
-
-SESSIONS = {{}}
-
-
-class Handler(BaseHTTPRequestHandler):
-    def log_message(self, fmt, *args):
-        pass
-
-    def _cookie(self):
-        raw = self.headers.get('Cookie', '')
-        c = SimpleCookie()
-        c.load(raw)
-        return c
-
-    def _send_json(self, status, payload):
-        body = json.dumps(payload).encode('utf-8')
-        self.send_response(status)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def do_GET(self):
-        path = urlparse(self.path).path
-        if path == '/login/':
-            self.send_response(HTTPStatus.OK)
-            self.send_header('Set-Cookie', 'csrftoken=smoke-token; Path=/')
-            self.send_header('Content-Type', 'text/html; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(b'<html><body>login</body></html>')
-            return
-        if path == '/api/datasets/':
-            cookies = self._cookie()
-            sid = cookies.get('sessionid')
-            if sid and sid.value in SESSIONS:
-                self._send_json(HTTPStatus.OK, {{'results': [{{'id': 1, 'name': 'smoke.csv'}}]}})
-            else:
-                self._send_json(HTTPStatus.UNAUTHORIZED, {{'detail': 'auth required'}})
-            return
-        self._send_json(HTTPStatus.NOT_FOUND, {{'detail': 'not found'}})
-
-    def do_POST(self):
-        path = urlparse(self.path).path
-        if path != '/login/':
-            self._send_json(HTTPStatus.NOT_FOUND, {{'detail': 'not found'}})
-            return
-        length = int(self.headers.get('Content-Length', '0'))
-        body = self.rfile.read(length).decode('utf-8', errors='replace')
-        params = parse_qs(body)
-        user = params.get('username', [''])[0]
-        pw = params.get('password', [''])[0]
-        csrf = params.get('csrfmiddlewaretoken', [''])[0]
-        cookies = self._cookie()
-        csrf_cookie = cookies.get('csrftoken')
-        if user == USER and pw == PASS and csrf_cookie and csrf_cookie.value == csrf:
-            sid = 'smoke-session'
-            SESSIONS[sid] = user
-            self.send_response(HTTPStatus.OK)
-            self.send_header('Set-Cookie', f'sessionid={{sid}}; Path=/')
-            self.send_header('Content-Type', 'text/plain; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(b'logged in')
-            return
-        self._send_json(HTTPStatus.UNAUTHORIZED, {{'detail': 'invalid credentials'}})
-
-
-HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
-"""
-
-    ssh_common = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "BatchMode=yes",
-        "-o",
-        "ConnectTimeout=8",
-        f"ubuntu@{ip}",
-    ]
-
-    ssh_error: Exception | None = None
-    # Fresh VMs may report RUNNING before cloud-init has finished enabling ssh.
-    for attempt in range(45):
-        try:
-            subprocess.run(
-                ssh_common + ["true"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                ssh_common + ["cat > /tmp/kivedevel_smoke_api.py"],
-                input=script,
-                text=True,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ssh_common + ["nohup python3 /tmp/kivedevel_smoke_api.py >/tmp/kivedevel_smoke_api.log 2>&1 &"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            ssh_error = None
-            break
-        except subprocess.CalledProcessError as exc:
-            ssh_error = exc
-            # Not ready yet (or key not installed yet); continue polling.
-            time.sleep(1.0)
-        except Exception as exc:  # pragma: no cover - defensive
-            ssh_error = exc
-            time.sleep(1.0)
-
-    if ssh_error is not None:
-        logger.debug("Failed to bootstrap VM smoke API harness after SSH retries: %s", ssh_error)
-        return None
-
-    url = f"http://{ip}:{port}"
-    for attempt in range(12):
-        try:
-            if _is_url_reachable(url):
-                logger.info("Using SSH-bootstrapped VM smoke API harness at %s", url)
-                return url
-        except Exception:
-            # Log and continue retrying on any exception (connection refused, timeout, etc.)
-            pass
-        time.sleep(0.5)
-    return None
 
 
 def _run_api_probe(base_url: str, username: str, password: str) -> dict:
@@ -393,20 +258,27 @@ def _run_test_api(args: argparse.Namespace) -> None:
     base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
 
     if not base_url and not args.base_url:
-        vm_ip = _pick_vm_ipv4(cmds, instance)
-        if vm_ip:
-            if _vm_looks_provisioned_for_primary_api(vm_ip):
-                logger.warning(
-                    "Primary API appears provisioned on %s but is not reachable on port %s; falling back to smoke harness",
-                    vm_ip,
-                    args.port,
-                )
-            else:
-                logger.info(
-                    "Instance %s appears to be minimally provisioned (no Kive runtime detected); bootstrapping smoke harness",
-                    instance,
-                )
-            base_url = _bootstrap_vm_smoke_api(vm_ip, args.port, args.username, args.password)
+        kind = _instance_kind(cmds, instance)
+        vm_ips = _vm_ip_candidates(cmds, instance)
+        vm_ip = vm_ips[0] if vm_ips else ""
+        if vm_ip and _vm_looks_provisioned_for_primary_api(vm_ip):
+            logger.error(
+                "Primary API appears provisioned on %s but is not reachable from host on port %s",
+                vm_ip,
+                args.port,
+            )
+        elif kind == "container":
+            logger.error(
+                "No host-reachable API endpoint for container instance %s. "
+                "Publish the API to a host-reachable address and rerun test-api.",
+                instance,
+            )
+        else:
+            logger.error(
+                "No host-reachable API endpoint for VM instance %s. "
+                "Start a host-reachable API service and rerun test-api.",
+                instance,
+            )
 
     if not base_url:
         logger.error("No reachable API endpoint for instance %s", instance)
