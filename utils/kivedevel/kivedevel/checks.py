@@ -255,13 +255,22 @@ HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
         "-o",
         "UserKnownHostsFile=/dev/null",
         "-o",
+        "BatchMode=yes",
+        "-o",
         "ConnectTimeout=8",
         f"ubuntu@{ip}",
     ]
 
-    ssh_error = None
-    for attempt in range(20):
+    ssh_error: Exception | None = None
+    # Fresh VMs may report RUNNING before cloud-init has finished enabling ssh.
+    for attempt in range(45):
         try:
+            subprocess.run(
+                ssh_common + ["true"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(
                 ssh_common + ["cat > /tmp/kivedevel_smoke_api.py"],
                 input=script,
@@ -279,7 +288,7 @@ HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
             break
         except subprocess.CalledProcessError as exc:
             ssh_error = exc
-            # Fresh VMs may not have SSH ready immediately after startup.
+            # Not ready yet (or key not installed yet); continue polling.
             time.sleep(1.0)
         except Exception as exc:  # pragma: no cover - defensive
             ssh_error = exc
