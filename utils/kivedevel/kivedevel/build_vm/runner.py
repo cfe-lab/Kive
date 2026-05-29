@@ -8,7 +8,7 @@ from .cloud_init import enable_network_config, ensure_user_data
 from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_storage_pool
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
-from .network import ensure_network_device, get_default_host_interface
+from .network import ensure_network_device, get_default_host_interface, get_existing_network_parent
 from .workspace import handle_workspace_attachment
 
 
@@ -37,10 +37,15 @@ def run_build_vm(args: argparse.Namespace) -> None:
 
     restart_required = False
     host_interface = cfg.host_interface
-    if ensure_network_device(cmds, cfg.instance, host_interface):
+    added_network = ensure_network_device(cmds, cfg.instance, host_interface)
+    if added_network:
         if not host_interface:
             host_interface = get_default_host_interface(cmds)
         restart_required = True
+    elif not host_interface:
+        # For existing instances, infer the configured parent NIC so cloud-init
+        # network config can match the actual bridge setup.
+        host_interface = get_existing_network_parent(cmds, cfg.instance) or get_default_host_interface(cmds)
 
     if ensure_user_data(cmds, cfg.instance):
         restart_required = True

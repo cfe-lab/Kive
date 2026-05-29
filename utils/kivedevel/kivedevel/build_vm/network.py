@@ -26,7 +26,7 @@ def get_default_host_interface(cmds: Cmds) -> str:
 
 
 def get_bridge_cidr(cmds: Cmds, iface: str) -> str:
-    out = cmds.ip.output(["-o", "-f", "inet", "addr", "show", "--", iface])
+    out = cmds.ip.output(["-o", "-f", "inet", "addr", "show", iface])
     parts = out.split()
     return parts[3] if len(parts) >= 4 else ""
 
@@ -55,3 +55,23 @@ def ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> boo
         ]
     )
     return True
+
+
+def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
+    """Return the configured parent interface for eth0, if present."""
+    out = cmds.incus.output(["config", "device", "show", instance])
+    if not out:
+        return ""
+
+    in_eth0 = False
+    for raw in out.splitlines():
+        line = raw.rstrip()
+        if re.match(r"^\S", line):
+            in_eth0 = bool(re.match(r"^eth0:\s*$", line))
+            continue
+        if not in_eth0:
+            continue
+        m = re.match(r"^\s+parent:\s*(\S+)\s*$", line)
+        if m:
+            return m.group(1)
+    return ""
