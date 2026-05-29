@@ -259,34 +259,46 @@ HTTPServer(('0.0.0.0', PORT), Handler).serve_forever()
         f"ubuntu@{ip}",
     ]
 
-    try:
-        subprocess.run(
-            ssh_common + ["cat > /tmp/kivedevel_smoke_api.py"],
-            input=script,
-            text=True,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ssh_common + ["nohup python3 /tmp/kivedevel_smoke_api.py >/tmp/kivedevel_smoke_api.log 2>&1 &"],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        url = f"http://{ip}:{port}"
-        for attempt in range(12):
-            try:
-                if _is_url_reachable(url):
-                    logger.info("Using SSH-bootstrapped VM smoke API harness at %s", url)
-                    return url
-            except Exception:
-                # Log and continue retrying on any exception (connection refused, timeout, etc.)
-                pass
-            time.sleep(0.5)
-    except subprocess.CalledProcessError as exc:
-        logger.debug("Failed to bootstrap VM smoke API harness: %s", exc)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.debug("Failed to bootstrap VM smoke API harness: %s", exc)
+    ssh_error = None
+    for attempt in range(20):
+        try:
+            subprocess.run(
+                ssh_common + ["cat > /tmp/kivedevel_smoke_api.py"],
+                input=script,
+                text=True,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ssh_common + ["nohup python3 /tmp/kivedevel_smoke_api.py >/tmp/kivedevel_smoke_api.log 2>&1 &"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            ssh_error = None
+            break
+        except subprocess.CalledProcessError as exc:
+            ssh_error = exc
+            # Fresh VMs may not have SSH ready immediately after startup.
+            time.sleep(1.0)
+        except Exception as exc:  # pragma: no cover - defensive
+            ssh_error = exc
+            time.sleep(1.0)
+
+    if ssh_error is not None:
+        logger.debug("Failed to bootstrap VM smoke API harness after SSH retries: %s", ssh_error)
+        return None
+
+    url = f"http://{ip}:{port}"
+    for attempt in range(12):
+        try:
+            if _is_url_reachable(url):
+                logger.info("Using SSH-bootstrapped VM smoke API harness at %s", url)
+                return url
+        except Exception:
+            # Log and continue retrying on any exception (connection refused, timeout, etc.)
+            pass
+        time.sleep(0.5)
     return None
 
 
