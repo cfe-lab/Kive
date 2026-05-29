@@ -322,28 +322,27 @@ def _run_test_api(args: argparse.Namespace) -> None:
         vm_ip = vm_ips[0] if vm_ips else ""
         
         if kind == "virtual-machine" and vm_ip:
-            # For VMs, try SSH-based startup regardless of provisioning detection
-            logger.info(
-                "API not HTTP-reachable on %s, attempting SSH-based startup...",
-                vm_ip,
-            )
-            if _vm_start_api_via_ssh(vm_ip, args.port):
-                base_url = f"http://{vm_ip}:{args.port}"
-                logger.info("API started successfully, resuming test-api checks...")
-            else:
-                # SSH startup failed; check provisioning to give targeted advice
-                if _vm_looks_provisioned_for_primary_api(vm_ip):
-                    logger.error(
-                        "Failed to start API via SSH on %s. "
-                        "Check /tmp/kive_api.log on the VM for errors.",
-                        vm_ip,
-                    )
+            # For unprov machines, attempt SSH startup if provisioned
+            if _vm_looks_provisioned_for_primary_api(vm_ip):
+                logger.info(
+                    "API not HTTP-reachable on %s, attempting SSH-based startup...",
+                    vm_ip,
+                )
+                if _vm_start_api_via_ssh(vm_ip, args.port):
+                    base_url = f"http://{vm_ip}:{args.port}"
+                    logger.info("API started successfully, resuming test-api checks...")
                 else:
                     logger.error(
-                        "No host-reachable API endpoint for VM instance %s. "
-                        "Run provisioning steps and verify Kive is installed, then rerun test-api.",
-                        instance,
+                        "Failed to start API via SSH on %s. "
+                        "Verify provisioning and dependencies, then try again.",
+                        vm_ip,
                     )
+            else:
+                logger.error(
+                    "No host-reachable API endpoint for VM instance %s. "
+                    "Run provisioning steps and verify Kive is installed, then rerun test-api.",
+                    instance,
+                )
         elif kind == "container":
             logger.error(
                 "No host-reachable API endpoint for container instance %s. "
