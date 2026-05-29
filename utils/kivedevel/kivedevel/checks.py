@@ -8,6 +8,7 @@ import logging
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -176,6 +177,64 @@ def _vm_looks_provisioned_for_primary_api(ip: str) -> bool:
         return False
 
 
+def _vm_start_api_via_ssh(ip: str, port: int, max_wait: int = 30) -> bool:
+    """Attempt to start the Kive API on the VM via SSH and wait for it to become reachable.
+    
+    Returns True if API becomes reachable on the given port, False otherwise.
+    """
+    ssh_common = [
+        "ssh",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "ConnectTimeout=8",
+        f"ubuntu@{ip}",
+    ]
+    
+    # Start the API in the background
+    start_cmd = (
+        "cd /usr/local/share/Kive/kive && "
+        "source /etc/kive_dev_vars 2>/dev/null || true && "
+        "source $HOME/.venv_kive/bin/activate 2>/dev/null || true && "
+        "(python manage.py runserver 0.0.0.0:8000 >/tmp/kive_api.log 2>&1 &) && "
+        "sleep 2 && echo 'started'"
+    )
+    
+    try:
+        result = subprocess.run(
+            ssh_common + [start_cmd],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            logger.debug("SSH API startup failed: %s", (result.stderr or "").strip())
+            return False
+    except Exception as e:
+        logger.debug("SSH API startup exception: %s", e)
+        return False
+    
+    # Wait for API to become HTTP-reachable on the given port
+    url = f"http://{ip}:{port}/login/"
+    deadline = time.time() + max_wait
+    while time.time() < deadline:
+        try:
+            opener = urllib.request.build_opener()
+            with opener.open(url, timeout=2) as response:
+                if response.status == 200:
+                    logger.info("API started and is reachable at %s:%s", ip, port)
+                    return True
+        except Exception:
+            pass
+        time.sleep(1)
+    
+    logger.debug("API did not become reachable at %s:%s within %s seconds", ip, port, max_wait)
+    return False
+
+
 def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     login_url = f"{base_url}/login/"
     datasets_url = f"{base_url}/api/datasets/?limit=1"
@@ -261,12 +320,29 @@ def _run_test_api(args: argparse.Namespace) -> None:
         kind = _instance_kind(cmds, instance)
         vm_ips = _vm_ip_candidates(cmds, instance)
         vm_ip = vm_ips[0] if vm_ips else ""
-        if vm_ip and _vm_looks_provisioned_for_primary_api(vm_ip):
-            logger.error(
-                "Primary API appears provisioned on %s but is not reachable from host on port %s",
-                vm_ip,
-                args.port,
-            )
+        
+        if kind == "virtual-machine" and vm_ip:
+            # For unprov machines, attempt SSH startup if provisioned
+            if _vm_looks_provisioned_for_primary_api(vm_ip):
+                logger.info(
+                    "API not HTTP-reachable on %s, attempting SSH-based startup...",
+                    vm_ip,
+                )
+                if _vm_start_api_via_ssh(vm_ip, args.port):
+                    base_url = f"http://{vm_ip}:{args.port}"
+                    logger.info("API started successfully, resuming test-api checks...")
+                else:
+                    logger.error(
+                        "Failed to start API via SSH on %s. "
+                        "Verify provisioning and dependencies, then try again.",
+                        vm_ip,
+                    )
+            else:
+                logger.error(
+                    "No host-reachable API endpoint for VM instance %s. "
+                    "Run provisioning steps and verify Kive is installed, then rerun test-api.",
+                    instance,
+                )
         elif kind == "container":
             logger.error(
                 "No host-reachable API endpoint for container instance %s. "
@@ -275,8 +351,8 @@ def _run_test_api(args: argparse.Namespace) -> None:
             )
         else:
             logger.error(
-                "No host-reachable API endpoint for VM instance %s. "
-                "Start a host-reachable API service and rerun test-api.",
+                "No host-reachable API endpoint for instance %s. "
+                "Verify the instance is properly provisioned and the API is running.",
                 instance,
             )
 
