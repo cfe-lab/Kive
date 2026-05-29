@@ -130,13 +130,26 @@ def _instance_kind(cmds: Cmds, instance: str) -> str:
     return ""
 
 
-def _resolve_base_url(cmds: Cmds, instance: str, port: int, explicit: str | None) -> str | None:
+def _resolve_base_url(
+    cmds: Cmds,
+    instance: str,
+    port: int,
+    explicit: str | None,
+    fallback_ports: list[int] | None = None,
+) -> str | None:
     if explicit:
         return explicit.rstrip("/")
 
-    candidates = [f"http://127.0.0.1:{port}"]
-    for ip in _vm_ip_candidates(cmds, instance):
-        candidates.append(f"http://{ip}:{port}")
+    ports_to_try = [port]
+    for fallback_port in fallback_ports or []:
+        if fallback_port not in ports_to_try:
+            ports_to_try.append(fallback_port)
+
+    candidates: list[str] = []
+    for candidate_port in ports_to_try:
+        candidates.append(f"http://127.0.0.1:{candidate_port}")
+        for ip in _vm_ip_candidates(cmds, instance):
+            candidates.append(f"http://{ip}:{candidate_port}")
 
     for candidate in candidates:
         try:
@@ -314,7 +327,14 @@ def _run_test_api(args: argparse.Namespace) -> None:
         logger.error("Instance %s is not running.", instance)
         sys.exit(1)
 
-    base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
+    fallback_ports = [80, 8080] if args.port == 8000 else []
+    base_url = _resolve_base_url(
+        cmds,
+        instance,
+        args.port,
+        args.base_url,
+        fallback_ports=fallback_ports,
+    )
 
     if not base_url and not args.base_url:
         kind = _instance_kind(cmds, instance)
