@@ -63,6 +63,11 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         metavar="IFACE",
         help="Host network interface for the VM NIC (auto-detected by default)",
     )
+    parser.add_argument(
+        "--provision",
+        action="store_true",
+        help="Provision container instances for API smoke testing after build",
+    )
     parser.set_defaults(func=run_from_args)
 
 

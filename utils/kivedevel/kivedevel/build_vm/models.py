@@ -17,6 +17,7 @@ class BuildVmConfig:
     memory: str
     cpu: str
     host_interface: str
+    provision: bool
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
@@ -34,4 +35,5 @@ class BuildVmConfig:
             memory=args.memory,
             cpu=args.cpu,
             host_interface=args.host_interface,
+            provision=bool(args.provision),
         )

@@ -9,6 +9,7 @@ from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_st
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import ensure_network_device, get_default_host_interface, get_existing_network_parent
+from .provision import maybe_provision_instance
 from .workspace import handle_workspace_attachment
 
 
@@ -72,6 +73,13 @@ def run_build_vm(args: argparse.Namespace) -> None:
         )
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
+
+    maybe_provision_instance(
+        cmds,
+        cfg.instance,
+        cfg.instance_type,
+        provision=cfg.provision,
+    )
 
     logger.info(
         "Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) to connect to %s.",
