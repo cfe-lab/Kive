@@ -32,8 +32,13 @@ def get_bridge_cidr(cmds: Cmds, iface: str) -> str:
 
 
 def ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bool:
+    # Check per-instance devices first, then profile-inherited devices via expanded config.
     out = cmds.incus.output(["config", "device", "list", instance])
     if re.search(r"^eth0\s*$", out, re.MULTILINE):
+        return False
+    expanded = cmds.incus.output(["config", "show", "--expanded", instance])
+    if re.search(r"^  eth0:\s*$", expanded, re.MULTILINE):
+        logger.info("Network device eth0 already configured via profile on %s.", instance)
         return False
     if not host_interface:
         host_interface = get_default_host_interface(cmds)

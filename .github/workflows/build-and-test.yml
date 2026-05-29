@@ -116,16 +116,27 @@ jobs:
           sudo systemctl enable --now incus.socket || true
           sudo systemctl start incus.service || true
           sudo systemctl start incus.socket || true
-          # Initialize with a dir-backed storage pool and default profile root device
+          # Initialize with a dir-backed storage pool, a bridge network, and default profile
           sudo incus admin init --preseed <<'EOF'
           config: {}
-          networks: []
+          networks:
+          - name: incusbr0
+            type: bridge
+            config:
+              ipv4.address: auto
+              ipv4.nat: "true"
+              ipv6.address: none
           storage_pools:
           - name: default
             driver: dir
           profiles:
           - name: default
             devices:
+              eth0:
+                name: eth0
+                nictype: bridged
+                parent: incusbr0
+                type: nic
               root:
                 path: /
                 pool: default
