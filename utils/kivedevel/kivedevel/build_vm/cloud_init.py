@@ -39,10 +39,36 @@ write_files:
       [Service]
       ExecStart=
       ExecStart=-/sbin/agetty --autologin ubuntu --keep-baud 115200,38400,9600 %I $TERM
+  - path: /usr/local/bin/mount-kive-code.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/bin/sh
+      set -eu
+      mkdir -p /mnt/kive-code
+      if [ -e /dev/disk/by-label/KIVE_CODE ]; then
+        mountpoint -q /mnt/kive-code || mount -t ext4 -o defaults /dev/disk/by-label/KIVE_CODE /mnt/kive-code
+      fi
+  - path: /etc/systemd/system/mount-kive-code.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Mount Kive workspace disk
+      After=local-fs.target
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/mount-kive-code.sh
+      RemainAfterExit=true
+
+      [Install]
+      WantedBy=multi-user.target
 runcmd:
   - [systemctl, daemon-reload]
   - [systemctl, enable, --now, ssh]
   - [systemctl, restart, serial-getty@ttyS0]
+  - [systemctl, enable, --now, mount-kive-code.service]
   - [sh, -c, 'systemctl enable --now incus-agent || true']
   - [sh, -c, 'systemctl enable --now lxd-agent || true']
 """
