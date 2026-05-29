@@ -76,8 +76,21 @@ runcmd:
     return True
 
 
-def enable_network_config(cmds: Cmds, instance: str, host_interface: str) -> bool:
+def enable_network_config(cmds: Cmds, instance: str, host_interface: str, instance_type: str) -> bool:
     logger.info("Configuring cloud-init network config for %s...", instance)
+    if instance_type == "container":
+        network_config = """\
+version: 2
+ethernets:
+  eth0:
+    dhcp4: true
+    dhcp6: false
+    nameservers:
+      addresses: [8.8.8.8,1.1.1.1]
+"""
+        set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
+        return True
+
     network_cidr = get_bridge_cidr(cmds, host_interface)
     if host_interface == "docker0" and network_cidr:
         gateway = network_cidr.split("/")[0]

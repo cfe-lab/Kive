@@ -50,7 +50,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     if ensure_user_data(cmds, cfg.instance):
         restart_required = True
 
-    if enable_network_config(cmds, cfg.instance, host_interface):
+    if enable_network_config(cmds, cfg.instance, host_interface, cfg.instance_type):
         restart_required = True
 
     if not created_new_instance:

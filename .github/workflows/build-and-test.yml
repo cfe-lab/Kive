@@ -140,6 +140,18 @@ jobs:
           mkdir -p "$BUILD_VM_WORKDIR"
           sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev build-vm ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
           sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev validate-vm ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
+          sudo incus exec ci-smoke -- bash -lc '
+            set -euo pipefail
+            export DEBIAN_FRONTEND=noninteractive
+            apt-get update
+            apt-get install -y ansible
+            ln -sfn /mnt/kive-code /usr/local/share/Kive
+            cd /usr/local/share/Kive/dev-env
+            printf "head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\n" > /tmp/dev_inv.ini
+            ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
+            ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
+            ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
+          '
           sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev test-api ci-smoke --workdir "$BUILD_VM_WORKDIR" --debug
 
       - name: Cleanup smoke-test instance
