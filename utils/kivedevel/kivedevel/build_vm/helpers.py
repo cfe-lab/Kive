@@ -5,6 +5,7 @@ import logging
 import random
 import re
 import string
+import subprocess
 from pathlib import Path
 
 from ..kv_commands import Cmds
@@ -47,6 +48,36 @@ def find_ssh_pubkey() -> str:
         if pubkey.exists():
             return pubkey.read_text().strip()
     return ""
+
+
+def ensure_ssh_identity(workdir: Path) -> tuple[Path, str]:
+    home = Path.home()
+
+    ed25519 = home / ".ssh" / "id_ed25519"
+    ed25519_pub = home / ".ssh" / "id_ed25519.pub"
+    if ed25519.exists() and ed25519_pub.exists():
+        return ed25519, ed25519_pub.read_text().strip()
+
+    rsa = home / ".ssh" / "id_rsa"
+    rsa_pub = home / ".ssh" / "id_rsa.pub"
+    if rsa.exists() and rsa_pub.exists():
+        return rsa, rsa_pub.read_text().strip()
+
+    key_path = workdir / "kive_build_ssh_ed25519"
+    pub_path = workdir / "kive_build_ssh_ed25519.pub"
+    if not key_path.exists() or not pub_path.exists():
+        logger.info("No local SSH key found; generating temporary build key at %s", key_path)
+        result = subprocess.run(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            err = (result.stderr or "").strip()
+            raise RuntimeError(err or "Failed to generate SSH key")
+
+    return key_path, pub_path.read_text().strip()
 
 
 def get_instance_ipv4_for_bridge(instance: str, bridge_cidr: str) -> str:

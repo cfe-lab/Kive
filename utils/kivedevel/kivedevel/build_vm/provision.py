@@ -37,11 +37,18 @@ ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
 """
 
 
-def maybe_provision_instance(cmds: Cmds, instance: str, instance_type: str, *, provision: bool) -> None:
+def maybe_provision_instance(
+    cmds: Cmds,
+    instance: str,
+    instance_type: str,
+    *,
+    provision: bool,
+    ssh_identity_file: str | None = None,
+) -> None:
     if not provision:
         return
 
     logger.info("Provisioning %s instance %s via SSH...", instance_type, instance)
     ip = resolve_instance_ip(cmds, instance)
-    wait_for_ssh(ip)
-    run_ssh_script(ip, _PROVISION_SCRIPT)
+    wait_for_ssh(ip, identity_file=ssh_identity_file)
+    run_ssh_script(ip, _PROVISION_SCRIPT, identity_file=ssh_identity_file)

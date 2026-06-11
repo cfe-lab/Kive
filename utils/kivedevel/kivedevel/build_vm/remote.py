@@ -48,7 +48,13 @@ def resolve_instance_ip(cmds: Cmds, instance: str, *, timeout_seconds: int = 180
     raise RuntimeError(f"Could not determine IPv4 address for {instance}")
 
 
-def wait_for_ssh(ip: str, *, user: str = "ubuntu", timeout_seconds: int = 240) -> None:
+def wait_for_ssh(
+    ip: str,
+    *,
+    user: str = "ubuntu",
+    timeout_seconds: int = 240,
+    identity_file: str | None = None,
+) -> None:
     deadline = time.time() + timeout_seconds
     argv = [
         "ssh",
@@ -57,10 +63,13 @@ def wait_for_ssh(ip: str, *, user: str = "ubuntu", timeout_seconds: int = 240) -
         "-o",
         "UserKnownHostsFile=/dev/null",
         "-o",
+        "BatchMode=yes",
+        "-o",
         "ConnectTimeout=8",
-        f"{user}@{ip}",
-        "true",
     ]
+    if identity_file:
+        argv.extend(["-i", identity_file])
+    argv.extend([f"{user}@{ip}", "true"])
     while time.time() < deadline:
         result = subprocess.run(argv, check=False, capture_output=True, text=True)
         if result.returncode == 0:
@@ -70,7 +79,7 @@ def wait_for_ssh(ip: str, *, user: str = "ubuntu", timeout_seconds: int = 240) -
     raise RuntimeError(f"SSH did not become ready on {user}@{ip}")
 
 
-def run_ssh_script(ip: str, script: str, *, user: str = "ubuntu") -> None:
+def run_ssh_script(ip: str, script: str, *, user: str = "ubuntu", identity_file: str | None = None) -> None:
     argv = [
         "ssh",
         "-o",
@@ -78,11 +87,13 @@ def run_ssh_script(ip: str, script: str, *, user: str = "ubuntu") -> None:
         "-o",
         "UserKnownHostsFile=/dev/null",
         "-o",
+        "BatchMode=yes",
+        "-o",
         "ConnectTimeout=12",
-        f"{user}@{ip}",
-        "bash",
-        "-se",
     ]
+    if identity_file:
+        argv.extend(["-i", identity_file])
+    argv.extend([f"{user}@{ip}", "bash", "-se"])
     result = subprocess.run(argv, input=script, check=False, capture_output=True, text=True)
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()

@@ -10,11 +10,21 @@ from .network import get_bridge_cidr
 logger = logging.getLogger("kivedevel")
 
 
-def ensure_user_data(cmds: Cmds, instance: str) -> bool:
+def ensure_user_data(cmds: Cmds, instance: str, extra_ssh_pubkey: str = "") -> bool:
     logger.info("Configuring cloud-init user data for %s...", instance)
-    pubkey = find_ssh_pubkey()
+    pubkeys: list[str] = []
+    default_pubkey = find_ssh_pubkey()
+    if default_pubkey:
+        pubkeys.append(default_pubkey)
+    if extra_ssh_pubkey and extra_ssh_pubkey not in pubkeys:
+        pubkeys.append(extra_ssh_pubkey)
+
     password_hash = generate_password_hash("kive1234")
-    ssh_key_block = f"\n    ssh_authorized_keys:\n      - {pubkey}" if pubkey else ""
+    ssh_key_block = ""
+    if pubkeys:
+        lines = ["\n    ssh_authorized_keys:"] + [f"      - {key}" for key in pubkeys]
+        ssh_key_block = "\n".join(lines)
+
     userdata = f"""\
 #cloud-config
 users:
