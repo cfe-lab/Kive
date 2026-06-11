@@ -1,40 +1,18 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from ..kv_commands import Cmds
-from .remote import resolve_instance_ip, run_ssh_script, wait_for_ssh
 
 
 logger = logging.getLogger("kivedevel")
 
-
-_PROVISION_SCRIPT = """\
-set -euo pipefail
-export DEBIAN_FRONTEND=noninteractive
-
-if command -v cloud-init >/dev/null 2>&1; then
-    sudo cloud-init status --wait || true
-fi
-
-if ! command -v ansible-playbook >/dev/null 2>&1; then
-    sudo apt-get update
-    sudo apt-get install -y ansible
-fi
-
-if [ -L /usr/local/share/Kive ]; then
-    sudo ln -sfn /mnt/kive-code /usr/local/share/Kive
-elif [ ! -e /usr/local/share/Kive ]; then
-    sudo mkdir -p /usr/local/share
-    sudo ln -s /mnt/kive-code /usr/local/share/Kive
-fi
-
-cd /usr/local/share/Kive/dev-env
-printf 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\n' > /tmp/dev_inv.ini
-ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \\
-ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \\
-ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
-"""
+def _pull_file(cmds: Cmds, instance: str, path: str) -> tuple[bool, str]:
+    result = cmds.incus.run(["file", "pull", f"{instance}{path}", "-"], check=False, capture_output=True)
+    if result.returncode == 0:
+        return True, (result.stdout or "").strip()
+    return False, ""
 
 
 def maybe_provision_instance(
@@ -43,12 +21,26 @@ def maybe_provision_instance(
     instance_type: str,
     *,
     provision: bool,
-    ssh_identity_file: str | None = None,
 ) -> None:
     if not provision:
         return
 
-    logger.info("Provisioning %s instance %s via SSH...", instance_type, instance)
-    ip = resolve_instance_ip(cmds, instance)
-    wait_for_ssh(ip, identity_file=ssh_identity_file)
-    run_ssh_script(ip, _PROVISION_SCRIPT, identity_file=ssh_identity_file)
+    logger.info("Waiting for %s instance %s to finish cloud-init provisioning...", instance_type, instance)
+    deadline = time.time() + 1200
+    while time.time() < deadline:
+        done, _ = _pull_file(cmds, instance, "/run/kive-provision.done")
+        if done:
+            logger.info("Provisioning completed for %s.", instance)
+            return
+
+        failed, _ = _pull_file(cmds, instance, "/run/kive-provision.failed")
+        if failed:
+            _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
+            details = log_body or "Provisioning failed inside instance."
+            raise RuntimeError(details)
+
+        time.sleep(2)
+
+    _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
+    details = log_body or "Provisioning timed out waiting for /run/kive-provision.done"
+    raise RuntimeError(details)

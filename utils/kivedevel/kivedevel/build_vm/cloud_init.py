@@ -10,20 +10,57 @@ from .network import get_bridge_cidr
 logger = logging.getLogger("kivedevel")
 
 
-def ensure_user_data(cmds: Cmds, instance: str, extra_ssh_pubkey: str = "") -> bool:
+def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool:
     logger.info("Configuring cloud-init user data for %s...", instance)
-    pubkeys: list[str] = []
-    default_pubkey = find_ssh_pubkey()
-    if default_pubkey:
-        pubkeys.append(default_pubkey)
-    if extra_ssh_pubkey and extra_ssh_pubkey not in pubkeys:
-        pubkeys.append(extra_ssh_pubkey)
+    pubkey = find_ssh_pubkey()
 
     password_hash = generate_password_hash("kive1234")
-    ssh_key_block = ""
-    if pubkeys:
-        lines = ["\n    ssh_authorized_keys:"] + [f"      - {key}" for key in pubkeys]
-        ssh_key_block = "\n".join(lines)
+    ssh_key_block = f"\n    ssh_authorized_keys:\n      - {pubkey}" if pubkey else ""
+
+    provision_write_files = ""
+    provision_runcmd = ""
+    if provision:
+        provision_write_files = """
+  - path: /usr/local/bin/kive-provision.sh
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      LOG_FILE=/var/log/kive-provision.log
+      rm -f /run/kive-provision.done /run/kive-provision.failed
+      {
+        for _ in $(seq 1 300); do
+          if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
+            break
+          fi
+          sleep 2
+        done
+        if [ ! -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
+          echo "Workspace mount not ready at /mnt/kive-code/dev-env/setup-dev-env.yml"
+          exit 1
+        fi
+
+        export DEBIAN_FRONTEND=noninteractive
+        if ! command -v ansible-playbook >/dev/null 2>&1; then
+          apt-get update
+          apt-get install -y ansible
+        fi
+
+        ln -sfn /mnt/kive-code /usr/local/share/Kive
+        cd /usr/local/share/Kive/dev-env
+        printf 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\\n' > /tmp/dev_inv.ini
+        ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \\
+        ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \\
+        ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
+
+        touch /run/kive-provision.done
+      } >>"$LOG_FILE" 2>&1 || {
+        touch /run/kive-provision.failed
+        exit 1
+      }
+"""
+        provision_runcmd = "\n  - [sh, -c, '/usr/local/bin/kive-provision.sh || true']"
 
     userdata = f"""\
 #cloud-config
@@ -74,6 +111,7 @@ write_files:
 
       [Install]
       WantedBy=multi-user.target
+{provision_write_files}
 runcmd:
   - [systemctl, daemon-reload]
   - [systemctl, enable, --now, ssh]
@@ -81,6 +119,7 @@ runcmd:
   - [systemctl, enable, --now, mount-kive-code.service]
   - [sh, -c, 'systemctl enable --now incus-agent || true']
   - [sh, -c, 'systemctl enable --now lxd-agent || true']
+{provision_runcmd}
 """
     set_instance_config_multiline(cmds, instance, "user.user-data", userdata)
     return True
