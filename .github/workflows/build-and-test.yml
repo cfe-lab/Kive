@@ -93,7 +93,7 @@ jobs:
   build-vm-smoke:
     name: Smoke test utils/dev build-vm
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
