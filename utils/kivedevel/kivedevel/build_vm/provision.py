@@ -26,7 +26,7 @@ def maybe_provision_instance(
         return
 
     logger.info("Waiting for %s instance %s to finish cloud-init provisioning...", instance_type, instance)
-    deadline = time.time() + 1200
+    deadline = time.time() + 60 * 60 * 3 # 3 hours
     while time.time() < deadline:
         done, _ = _pull_file(cmds, instance, "/run/kive-provision.done")
         if done:
