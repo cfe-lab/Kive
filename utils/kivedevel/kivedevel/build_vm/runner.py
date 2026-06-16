@@ -37,7 +37,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     )
 
     restart_required = False
-    cfg.instance_type = actual_instance_type
+    instance_type = actual_instance_type
     host_interface = cfg.host_interface
     added_network = ensure_network_device(cmds, cfg.instance, host_interface)
     if added_network:
@@ -52,7 +52,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
         restart_required = True
 
-    if enable_network_config(cmds, cfg.instance, host_interface, cfg.instance_type):
+    if enable_network_config(cmds, cfg.instance, host_interface, instance_type):
         restart_required = True
 
     if not created_new_instance:
@@ -70,7 +70,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
             cfg.image_path,
             cfg.root,
             cfg.workdir,
-            cfg.instance_type,
+            instance_type,
         )
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
@@ -78,7 +78,14 @@ def run_build_vm(args: argparse.Namespace) -> None:
     maybe_provision_instance(
         cmds,
         cfg.instance,
-        cfg.instance_type,
+        instance_type,
+        provision=cfg.provision,
+    )
+
+    maybe_provision_instance(
+        cmds,
+        cfg.instance,
+        instance_type,
         provision=cfg.provision,
     )
 
