@@ -2,6 +2,11 @@ from __future__ import annotations
 
 import logging
 
+try:
+    import yaml
+except ModuleNotFoundError:  # pragma: no cover
+    yaml = None
+
 from ..kv_commands import Cmds
 from .helpers import find_ssh_pubkey, generate_password_hash, get_instance_ipv4_for_bridge, set_instance_config_multiline
 from .network import get_bridge_cidr
@@ -46,7 +51,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         export DEBIAN_FRONTEND=noninteractive
         ln -sfn /mnt/kive-code /usr/local/share/Kive
         cd /usr/local/share/Kive/dev-env
-        printf 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\n' > /tmp/dev_inv.ini
+        printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
         ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
@@ -145,6 +150,14 @@ runcmd:
   - [sh, -c, 'systemctl enable --now lxd-agent || true']
 {provision_runcmd}
 """
+    if yaml is not None:
+        try:
+            yaml.safe_load(userdata)
+        except Exception as exc:
+            raise RuntimeError(f"Generated invalid cloud-init user-data for {instance}: {exc}") from exc
+    else:
+        logger.warning("PyYAML not installed; skipping cloud-init user-data syntax validation.")
+
     set_instance_config_multiline(cmds, instance, "user.user-data", userdata)
     return True
 
@@ -161,6 +174,14 @@ ethernets:
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
+        if yaml is not None:
+            try:
+                yaml.safe_load(network_config)
+            except Exception as exc:
+                raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
+        else:
+            logger.warning("PyYAML not installed; skipping cloud-init network config syntax validation.")
+
         set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
         return True
 
@@ -190,5 +211,14 @@ ethernets:
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
+
+    if yaml is not None:
+        try:
+            yaml.safe_load(network_config)
+        except Exception as exc:
+            raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
+    else:
+        logger.warning("PyYAML not installed; skipping cloud-init network config syntax validation.")
+
     set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
     return True

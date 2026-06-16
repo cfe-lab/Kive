@@ -27,7 +27,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     ensure_storage_pool(cmds, cfg.pool)
     ensure_profile_with_root_disk(cmds, cfg.profile, cfg.pool, cfg.root_size)
 
-    created_new_instance = ensure_instance(
+    created_new_instance, actual_instance_type = ensure_instance(
         cmds,
         cfg.instance,
         cfg.instance_type,
@@ -37,6 +37,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     )
 
     restart_required = False
+    cfg.instance_type = actual_instance_type
     host_interface = cfg.host_interface
     added_network = ensure_network_device(cmds, cfg.instance, host_interface)
     if added_network:

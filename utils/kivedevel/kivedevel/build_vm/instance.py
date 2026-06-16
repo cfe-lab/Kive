@@ -12,7 +12,7 @@ from .helpers import instance_is_cloud_variant
 logger = logging.getLogger("kivedevel")
 
 
-def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str, cpu: str, memory: str) -> bool:
+def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str, cpu: str, memory: str) -> tuple[bool, str]:
     if not instance_exists(cmds, instance):
         logger.info("Creating %s instance %s...", instance_type, instance)
         create_args = [
@@ -32,6 +32,12 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         result = cmds.incus.run(create_args, check=False, capture_output=True)
         if result.returncode != 0:
             stderr = (result.stderr or "").lower()
+            if "instance type \"virtual-machine\" is not supported" in stderr:
+                logger.warning(
+                    "Incus server does not support VM instances; falling back to container for %s.",
+                    instance,
+                )
+                return ensure_instance(cmds, instance, "container", profile, cpu, memory)
             if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
                 logger.warning(
                     "Incus server does not support unprivileged containers; retrying %s as privileged.",
@@ -41,20 +47,19 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
                 privileged_result = cmds.incus.run(privileged_args)
                 if privileged_result.returncode == 0:
                     logger.info("Successfully created privileged instance %s.", instance)
-                    return True
+                    return True, instance_type
                 else:
                     logger.error(
                         "Failed to create privileged instance %s. Please ensure your Incus server supports unprivileged containers or run with --privileged.",
                         instance,
                     )
                     raise RuntimeError("Failed to create privileged instance: see previous incus output.")
-                return True
             if result.stderr:
                 logger.error(result.stderr.strip())
             if result.stdout:
                 logger.error(result.stdout.strip())
             raise RuntimeError("Failed to create instance: see previous incus output.")
-        return True
+        return True, instance_type
 
     if not instance_is_cloud_variant(cmds, instance):
         logger.error(
@@ -69,7 +74,7 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
     if out and not re.search(r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE):
         logger.info("Starting instance %s...", instance)
         cmds.incus.run(["start", instance])
-    return False
+    return False, instance_type
 
 
 def maybe_restart_after_config(cmds: Cmds, instance: str, restart_required: bool) -> None:
