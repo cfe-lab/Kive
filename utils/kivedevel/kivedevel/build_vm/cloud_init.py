@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import logging
 
-try:
-    import yaml
-except ModuleNotFoundError:  # pragma: no cover
-    yaml = None
+import yaml
 
 from ..kv_commands import Cmds
 from .helpers import find_ssh_pubkey, generate_password_hash, get_instance_ipv4_for_bridge, set_instance_config_multiline
@@ -150,13 +147,10 @@ runcmd:
   - [sh, -c, 'systemctl enable --now lxd-agent || true']
 {provision_runcmd}
 """
-    if yaml is not None:
-        try:
-            yaml.safe_load(userdata)
-        except Exception as exc:
-            raise RuntimeError(f"Generated invalid cloud-init user-data for {instance}: {exc}") from exc
-    else:
-        logger.warning("PyYAML not installed; skipping cloud-init user-data syntax validation.")
+    try:
+        yaml.safe_load(userdata)
+    except Exception as exc:
+        raise RuntimeError(f"Generated invalid cloud-init user-data for {instance}: {exc}") from exc
 
     set_instance_config_multiline(cmds, instance, "user.user-data", userdata)
     return True
@@ -174,13 +168,10 @@ ethernets:
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
-        if yaml is not None:
-            try:
-                yaml.safe_load(network_config)
-            except Exception as exc:
-                raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
-        else:
-            logger.warning("PyYAML not installed; skipping cloud-init network config syntax validation.")
+        try:
+            yaml.safe_load(network_config)
+        except Exception as exc:
+            raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
 
         set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
         return True
@@ -212,13 +203,10 @@ ethernets:
       addresses: [8.8.8.8,1.1.1.1]
 """
 
-    if yaml is not None:
-        try:
-            yaml.safe_load(network_config)
-        except Exception as exc:
-            raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
-    else:
-        logger.warning("PyYAML not installed; skipping cloud-init network config syntax validation.")
+    try:
+        yaml.safe_load(network_config)
+    except Exception as exc:
+        raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
 
     set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
     return True

@@ -15,6 +15,26 @@ def _pull_file(cmds: Cmds, instance: str, path: str) -> tuple[bool, str]:
     return False, ""
 
 
+def _cloud_init_diagnostics(cmds: Cmds, instance: str) -> str:
+    diagnostics: list[str] = []
+
+    status_result = cmds.incus.run(
+        ["exec", instance, "--", "cloud-init", "status", "--long"],
+        check=False,
+        capture_output=True,
+    )
+    status_output = (status_result.stdout or status_result.stderr or "").strip()
+    if status_output:
+        diagnostics.append(f"cloud-init status:\n{status_output}")
+
+    for path in ("/var/log/cloud-init.log", "/var/log/cloud-init-output.log", "/var/log/cloud-init-local.log"):
+        ok, body = _pull_file(cmds, instance, path)
+        if ok and body:
+            diagnostics.append(f"{path}:\n{body}")
+
+    return "\n\n".join(diagnostics) if diagnostics else "No cloud-init diagnostics available."
+
+
 def maybe_provision_instance(
     cmds: Cmds,
     instance: str,
@@ -37,10 +57,12 @@ def maybe_provision_instance(
         if failed:
             _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
             details = log_body or "Provisioning failed inside instance."
-            raise RuntimeError(details)
+            diagnostics = _cloud_init_diagnostics(cmds, instance)
+            raise RuntimeError(f"{details}\n\n{diagnostics}")
 
         time.sleep(2)
 
     _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
     details = log_body or "Provisioning timed out waiting for /var/lib/kive-provision/done"
-    raise RuntimeError(details)
+    diagnostics = _cloud_init_diagnostics(cmds, instance)
+    raise RuntimeError(f"{details}\n\n{diagnostics}")
