@@ -11,7 +11,9 @@ authors = [
     { name = "British Columbia Centre for Excellence in HIV/AIDS", email = "vmysak@bccfe.ca" },
 ]
 requires-python = ">=3.13, <3.14"
-dependencies = []
+dependencies = [
+    "yaml==6.0.2",
+]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
