@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ..kv_commands import Cmds
 from ..shared import configure_logging, default_root, instance_exists
+from . import purge
 from .runner import run_build_vm
 
 
@@ -69,6 +70,8 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         help="Provision container instances for API smoke testing after build",
     )
     parser.set_defaults(func=run_from_args)
+
+    purge.register_subcommand(subparsers)
 
 
 def main(args: argparse.Namespace) -> None:
