@@ -28,7 +28,23 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         ]
         if instance_type == "vm":
             create_args.insert(3, "--vm")
-        cmds.incus.run(create_args)
+
+        result = cmds.incus.run(create_args, check=False, capture_output=True)
+        if result.returncode != 0:
+            stderr = (result.stderr or "").lower()
+            if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
+                logger.warning(
+                    "Incus server does not support unprivileged containers; retrying %s as privileged.",
+                    instance,
+                )
+                privileged_args = create_args + ["--config", "security.privileged=true"]
+                cmds.incus.run(privileged_args)
+                return True
+            if result.stderr:
+                logger.error(result.stderr.strip())
+            if result.stdout:
+                logger.error(result.stdout.strip())
+            raise RuntimeError("Failed to create instance: see previous incus output.")
         return True
 
     if not instance_is_cloud_variant(cmds, instance):
