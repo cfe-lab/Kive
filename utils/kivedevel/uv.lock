@@ -78,6 +78,9 @@ wheels = [
 name = "kivedevel"
 version = "1.0.0"
 source = { editable = "." }
+dependencies = [
+    { name = "pyyaml" },
+]
 
 [package.optional-dependencies]
 dev = [
@@ -96,6 +99,7 @@ requires-dist = [
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.9.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=6.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "ruff", marker = "extra == 'dev'" },
 ]
 provides-extras = ["test", "dev"]
