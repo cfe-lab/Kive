@@ -28,12 +28,12 @@ def maybe_provision_instance(
     logger.info("Waiting for %s instance %s to finish cloud-init provisioning...", instance_type, instance)
     deadline = time.time() + 1200
     while time.time() < deadline:
-        done, _ = _pull_file(cmds, instance, "/run/kive-provision.done")
+        done, _ = _pull_file(cmds, instance, "/var/lib/kive-provision/done")
         if done:
             logger.info("Provisioning completed for %s.", instance)
             return
 
-        failed, _ = _pull_file(cmds, instance, "/run/kive-provision.failed")
+        failed, _ = _pull_file(cmds, instance, "/var/lib/kive-provision/failed")
         if failed:
             _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
             details = log_body or "Provisioning failed inside instance."
@@ -42,5 +42,5 @@ def maybe_provision_instance(
         time.sleep(2)
 
     _, log_body = _pull_file(cmds, instance, "/var/log/kive-provision.log")
-    details = log_body or "Provisioning timed out waiting for /run/kive-provision.done"
+    details = log_body or "Provisioning timed out waiting for /var/lib/kive-provision/done"
     raise RuntimeError(details)

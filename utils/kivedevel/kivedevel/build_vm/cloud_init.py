@@ -27,10 +27,10 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
     content: |
       #!/usr/bin/env bash
       set -euo pipefail
+      STATE_DIR=/var/lib/kive-provision
       LOG_FILE=/var/log/kive-provision.log
-        STATE_DIR=/var/lib/kive-provision
-        mkdir -p "$STATE_DIR"
-        rm -f "$STATE_DIR/done" "$STATE_DIR/failed"
+      mkdir -p "$STATE_DIR"
+      rm -f "$STATE_DIR/done" "$STATE_DIR/failed"
       {
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
@@ -44,54 +44,41 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
 
         export DEBIAN_FRONTEND=noninteractive
-        if ! command -v ansible-playbook >/dev/null 2>&1; then
-          apt-get update
-          apt-get install -y ansible
-        fi
-          if ! command -v curl >/dev/null 2>&1; then
-            apt-get update
-            apt-get install -y curl
-          fi
-
         ln -sfn /mnt/kive-code /usr/local/share/Kive
         cd /usr/local/share/Kive/dev-env
-        printf 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\\n' > /tmp/dev_inv.ini
-        ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \\
-        ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \\
+        printf 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3\n' > /tmp/dev_inv.ini
+        ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
+        ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
 
-          cat > /etc/systemd/system/kive-api-smoke.service <<'UNIT'
-          [Unit]
-          Description=Kive API smoke server
-          After=network-online.target
+        if [ ! -x /opt/venv_kive/bin/python ]; then
+          echo "Missing /opt/venv_kive/bin/python after provisioning"
+          exit 1
+        fi
 
-          [Service]
-          Type=simple
-          Restart=on-failure
-          RestartSec=2
-          WorkingDirectory=/usr/local/share/Kive/kive
-          ExecStart=/bin/bash -lc 'source /etc/kive_dev_vars 2>/dev/null || true; PYTHON_BIN=/opt/venv_kive/bin/python; if [ ! -x "$PYTHON_BIN" ]; then PYTHON_BIN=/usr/bin/python3; fi; exec "$PYTHON_BIN" manage.py runserver 0.0.0.0:8000'
+        PYTHON_BIN=/opt/venv_kive/bin/python
+        if [ ! -x "$PYTHON_BIN" ]; then
+          PYTHON_BIN=/usr/bin/python3
+        fi
 
-          [Install]
-          WantedBy=multi-user.target
-          UNIT
-          systemctl daemon-reload
-          systemctl enable --now kive-api-smoke.service
+        cd /usr/local/share/Kive/kive
+        source /etc/kive_dev_vars 2>/dev/null || true
+        nohup "$PYTHON_BIN" manage.py runserver 0.0.0.0:8000 >/var/log/kive-api-smoke.log 2>&1 &
 
-          for _ in $(seq 1 180); do
-            if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
-              break
-            fi
-            sleep 1
-          done
-          if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
-            echo "API did not become reachable on 127.0.0.1:8000/login/"
-            exit 1
+        for _ in $(seq 1 180); do
+          if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+            break
           fi
+          sleep 1
+        done
+        if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+          echo "API did not become reachable on 127.0.0.1:8000/login/"
+          exit 1
+        fi
 
-          touch "$STATE_DIR/done"
+        touch "$STATE_DIR/done"
       } >>"$LOG_FILE" 2>&1 || {
-          touch "$STATE_DIR/failed"
+        touch "$STATE_DIR/failed"
         exit 1
       }
 """
@@ -112,6 +99,8 @@ ssh_pwauth: true
 package_update: false
 package_upgrade: false
 packages:
+  - ansible
+  - curl
   - openssh-server
 write_files:
   - path: /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf
