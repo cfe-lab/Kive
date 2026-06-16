@@ -38,7 +38,16 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
                     instance,
                 )
                 privileged_args = create_args + ["--config", "security.privileged=true"]
-                cmds.incus.run(privileged_args)
+                privileged_result = cmds.incus.run(privileged_args)
+                if privileged_result.returncode == 0:
+                    logger.info("Successfully created privileged instance %s.", instance)
+                    return True
+                else:
+                    logger.error(
+                        "Failed to create privileged instance %s. Please ensure your Incus server supports unprivileged containers or run with --privileged.",
+                        instance,
+                    )
+                    raise RuntimeError("Failed to create privileged instance: see previous incus output.")
                 return True
             if result.stderr:
                 logger.error(result.stderr.strip())
