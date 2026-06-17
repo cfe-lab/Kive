@@ -82,13 +82,6 @@ def run_build_vm(args: argparse.Namespace) -> None:
         provision=cfg.provision,
     )
 
-    maybe_provision_instance(
-        cmds,
-        cfg.instance,
-        instance_type,
-        provision=cfg.provision,
-    )
-
     logger.info(
         "Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) to connect to %s.",
         cfg.instance,

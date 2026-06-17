@@ -53,19 +53,20 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
 
-        if [ ! -x /opt/venv_kive/bin/python ]; then
-          echo "Missing /opt/venv_kive/bin/python after provisioning"
-          exit 1
-        fi
-
         PYTHON_BIN=/opt/venv_kive/bin/python
         if [ ! -x "$PYTHON_BIN" ]; then
           PYTHON_BIN=/usr/bin/python3
         fi
+        if [ ! -x "$PYTHON_BIN" ]; then
+          echo "Missing Python interpreter after provisioning"
+          exit 1
+        fi
+        export PYTHON_BIN
 
         cd /usr/local/share/Kive/kive
+        source /tmp/kive_dev_vars 2>/dev/null || true
         source /etc/kive_dev_vars 2>/dev/null || true
-        nohup "$PYTHON_BIN" manage.py runserver 0.0.0.0:8000 >/var/log/kive-api-smoke.log 2>&1 &
+        nohup bash -lc ". /tmp/kive_dev_vars 2>/dev/null || true; . /etc/kive_dev_vars 2>/dev/null || true; exec \"$PYTHON_BIN\" manage.py runserver 0.0.0.0:8000" >/var/log/kive-api-smoke.log 2>&1 &
 
         for _ in $(seq 1 180); do
           if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
@@ -122,6 +123,12 @@ write_files:
       if [ -e /dev/disk/by-label/KIVE_CODE ]; then
         mountpoint -q /mnt/kive-code || mount -t ext4 -o defaults /dev/disk/by-label/KIVE_CODE /mnt/kive-code
       fi
+  - path: /etc/apt/apt.conf.d/99force-ipv4
+    owner: root:root
+    permissions: '0644'
+    content: |
+      Acquire::ForceIPv4 "true";
+      Acquire::Retries "3";
   - path: /etc/systemd/system/mount-kive-code.service
     owner: root:root
     permissions: '0644'
