@@ -47,7 +47,9 @@ def maybe_provision_instance(
 
     logger.info("Waiting for %s instance %s to finish cloud-init provisioning...", instance_type, instance)
     deadline = time.time() + 1200
+    attempt = 0
     while time.time() < deadline:
+        attempt += 1
         done, _ = _pull_file(cmds, instance, "/var/lib/kive-provision/done")
         if done:
             logger.info("Provisioning completed for %s.", instance)
@@ -59,6 +61,18 @@ def maybe_provision_instance(
             details = log_body or "Provisioning failed inside instance."
             diagnostics = _cloud_init_diagnostics(cmds, instance)
             raise RuntimeError(f"{details}\n\n{diagnostics}")
+
+        if attempt % 10 == 0 and logger.isEnabledFor(logging.DEBUG):
+            logger.debug("Provision polling attempt %s for %s: no done/failed markers yet", attempt, instance)
+            probe_result = cmds.incus.run(
+                ["exec", instance, "--", "sh", "-c", "ls -la /var/lib/kive-provision /var/log/kive-provision.log /var/log/cloud-init-output.log 2>/dev/null || true"],
+                check=False,
+                capture_output=True,
+            )
+            if probe_result.stdout:
+                logger.debug("Provision probe stdout:\n%s", probe_result.stdout.strip())
+            if probe_result.stderr:
+                logger.debug("Provision probe stderr:\n%s", probe_result.stderr.strip())
 
         time.sleep(2)
 

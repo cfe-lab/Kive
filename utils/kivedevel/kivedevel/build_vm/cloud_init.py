@@ -33,6 +33,17 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       LOG_FILE=/var/log/kive-provision.log
       mkdir -p "$STATE_DIR"
       rm -f "$STATE_DIR/done" "$STATE_DIR/failed"
+      exec >>"$LOG_FILE" 2>&1
+      set -x
+      date
+      uname -a
+      echo "HOSTNAME=$(hostname)"
+      echo "PWD=$(pwd)"
+      echo "USER=$(id)"
+      echo "ENVIRONMENT:"
+      env | sort
+      echo "--- initial file checks ---"
+      ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
       {
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
@@ -52,6 +63,9 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
+        echo "ansible exit code: $?"
+        ls -la /opt/venv_kive/bin /usr/bin/python3 /tmp/kive_dev_vars /etc/kive_dev_vars || true
+        cat /tmp/kive_dev_vars | sed -n '1,80p' || true
 
         PYTHON_BIN=/opt/venv_kive/bin/python
         if [ ! -x "$PYTHON_BIN" ]; then
@@ -64,9 +78,18 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         export PYTHON_BIN
 
         cd /usr/local/share/Kive/kive
+        pwd
+        ls -la . || true
+        echo "Using PYTHON_BIN=$PYTHON_BIN"
         source /tmp/kive_dev_vars 2>/dev/null || true
         source /etc/kive_dev_vars 2>/dev/null || true
+        echo "ENV after sourcing dev vars:"
+        env | sort
         nohup bash -lc ". /tmp/kive_dev_vars 2>/dev/null || true; . /etc/kive_dev_vars 2>/dev/null || true; exec \"$PYTHON_BIN\" manage.py runserver 0.0.0.0:8000" >/var/log/kive-api-smoke.log 2>&1 &
+        echo "runserver launched, PID=$!"
+        ps -ef | grep manage.py | grep -v grep || true
+        sleep 2
+        cat /var/log/kive-api-smoke.log || true
 
         for _ in $(seq 1 180); do
           if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
