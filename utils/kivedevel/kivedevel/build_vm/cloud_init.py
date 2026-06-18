@@ -32,7 +32,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       STATE_DIR=/var/lib/kive-provision
       LOG_FILE=/var/log/kive-provision.log
       mkdir -p "$STATE_DIR"
-      rm -f "$STATE_DIR/done" "$STATE_DIR/failed"
+      rm -f "$STATE_DIR/done" "$STATE_DIR/failed" "$STATE_DIR/started"
       exec >>"$LOG_FILE" 2>&1
       set -x
       date
@@ -44,6 +44,11 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       env | sort
       echo "--- initial file checks ---"
       ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
+      mount | grep /mnt/kive-code || true
+      find /mnt/kive-code -maxdepth 2 -type f 2>/dev/null | sort | head -80 || true
+      echo "--- provision startup marker ---"
+      touch "$STATE_DIR/started"
+      trap 'echo "ERROR trap at line $LINENO status $?"; touch "$STATE_DIR/failed"; exit 1' ERR INT TERM
       {
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
@@ -104,6 +109,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
 
         touch "$STATE_DIR/done"
       } >>"$LOG_FILE" 2>&1 || {
+        echo "Provision script failed; writing failed marker"
         touch "$STATE_DIR/failed"
         exit 1
       }

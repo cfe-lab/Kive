@@ -11,26 +11,37 @@ logger = logging.getLogger("kivedevel")
 def _pull_file(cmds: Cmds, instance: str, path: str) -> tuple[bool, str]:
     result = cmds.incus.run(["file", "pull", f"{instance}{path}", "-"], check=False, capture_output=True)
     if result.returncode == 0:
+        logger.debug("incus file pull %s returned 0", path)
         return True, (result.stdout or "").strip()
-    return False, ""
+    stderr_text = (result.stderr or "").strip()
+    logger.debug(
+        "incus file pull %s returned %s; stdout=%r; stderr=%r",
+        path,
+        result.returncode,
+        result.stdout,
+        stderr_text,
+    )
+    return False, stderr_text
 
 
 def _cloud_init_diagnostics(cmds: Cmds, instance: str) -> str:
     diagnostics: list[str] = []
 
     status_result = cmds.incus.run(
-        ["exec", instance, "--", "cloud-init", "status", "--long"],
+        ["exec", instance, "--", "sh", "-c", "echo '=== PATH ==='; command -v cloud-init || true; echo '=== cloud-init status ==='; cloud-init status --long 2>&1 || true; echo '=== systemctl status ==='; systemctl status mount-kive-code.service cloud-init --no-pager 2>&1 || true; echo '=== mount status ==='; mount | grep /mnt/kive-code 2>&1 || true; echo '=== file list ==='; ls -la /mnt/kive-code /usr/local/bin/kive-provision.sh /usr/local/bin/mount-kive-code.sh /etc/systemd/system/mount-kive-code.service 2>&1 || true; echo '=== provision dir ==='; ls -la /var/lib/kive-provision /var/log 2>&1 || true; echo '=== log tails ==='; tail -n 40 /var/log/kive-provision.log /var/log/cloud-init-output.log 2>&1 || true"],
         check=False,
         capture_output=True,
     )
     status_output = (status_result.stdout or status_result.stderr or "").strip()
     if status_output:
-        diagnostics.append(f"cloud-init status:\n{status_output}")
+        diagnostics.append(f"instance probe:\n{status_output}")
 
-    for path in ("/var/log/cloud-init.log", "/var/log/cloud-init-output.log", "/var/log/cloud-init-local.log"):
+    for path in ("/var/log/cloud-init.log", "/var/log/cloud-init-output.log", "/var/log/cloud-init-local.log", "/var/log/kive-provision.log"):
         ok, body = _pull_file(cmds, instance, path)
         if ok and body:
             diagnostics.append(f"{path}:\n{body}")
+        elif body:
+            diagnostics.append(f"{path}: could not pull file; stderr:\n{body}")
 
     return "\n\n".join(diagnostics) if diagnostics else "No cloud-init diagnostics available."
 
@@ -65,7 +76,14 @@ def maybe_provision_instance(
         if attempt % 10 == 0 and logger.isEnabledFor(logging.DEBUG):
             logger.debug("Provision polling attempt %s for %s: no done/failed markers yet", attempt, instance)
             probe_result = cmds.incus.run(
-                ["exec", instance, "--", "sh", "-c", "ls -la /var/lib/kive-provision /var/log/kive-provision.log /var/log/cloud-init-output.log 2>/dev/null || true"],
+                [
+                    "exec",
+                    instance,
+                    "--",
+                    "sh",
+                    "-c",
+                    "printf '--- file layout ---\n'; ls -la /var/lib/kive-provision /var/log 2>/dev/null || true; printf '--- provision tree ---\n'; find /var/lib/kive-provision -maxdepth 2 -type f 2>/dev/null | sort || true; printf '--- tail logs ---\n'; tail -n 20 /var/log/kive-provision.log /var/log/cloud-init-output.log 2>/dev/null || true; printf '--- cloud-init status ---\n'; cloud-init status --long 2>/dev/null || true; printf '--- process list ---\n'; ps -ef | grep -E 'cloud-init|manage.py|ansible' | grep -v grep || true",
+                ],
                 check=False,
                 capture_output=True,
             )
