@@ -44,11 +44,27 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       env | sort
       echo "--- initial file checks ---"
       ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
-      mount | grep /mnt/kive-code || true
-      find /mnt/kive-code -maxdepth 2 -type f 2>/dev/null | sort | head -80 || true
+      ip addr || true
+      ip route || true
+      cat /etc/resolv.conf || true
+      getent hosts archive.ubuntu.com || true
+      echo "=== archive.ubuntu.com connectivity check ==="
+      if ! curl -fsSI --connect-timeout 10 http://archive.ubuntu.com/ubuntu/ >/dev/null 2>&1; then
+        echo "Network check failed: cannot reach archive.ubuntu.com"
+        cloud-init status --long 2>&1 || true
+        exit 1
+      fi
+      echo "=== cloud-init status check ==="
+      cloud_init_status=$(cloud-init status --wait --long 2>&1 || true)
+      echo "$cloud_init_status"
+      if printf '%s\\n' "$cloud_init_status" | grep -qi 'status: error'; then
+        echo "cloud-init reported an error status"
+        cat /var/log/cloud-init.log /var/log/cloud-init-output.log 2>/dev/null || true
+        exit 1
+      fi
       echo "--- provision startup marker ---"
       touch "$STATE_DIR/started"
-      trap 'echo "ERROR trap at line $LINENO status $?"; touch "$STATE_DIR/failed"; exit 1' ERR INT TERM
+      trap 'status=$?; echo "FAIL trap at line $LINENO status $status"; if [ -f "$STATE_DIR/done" ]; then exit $status; fi; touch "$STATE_DIR/failed" || true; exit $status' EXIT
       {
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
@@ -68,7 +84,10 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
-        echo "ansible exit code: $?"
+        if [ $? -ne 0 ]; then
+          echo "ansible-playbook failed" >&2
+          exit 1
+        fi
         ls -la /opt/venv_kive/bin /usr/bin/python3 /tmp/kive_dev_vars /etc/kive_dev_vars || true
         cat /tmp/kive_dev_vars | sed -n '1,80p' || true
 
@@ -86,8 +105,17 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         pwd
         ls -la . || true
         echo "Using PYTHON_BIN=$PYTHON_BIN"
-        source /tmp/kive_dev_vars 2>/dev/null || true
-        source /etc/kive_dev_vars 2>/dev/null || true
+        if [ -s /tmp/kive_dev_vars ]; then
+          source /tmp/kive_dev_vars
+        fi
+        if [ -s /etc/kive_dev_vars ]; then
+          source /etc/kive_dev_vars
+        fi
+        if [ ! -s /tmp/kive_dev_vars ] && [ ! -s /etc/kive_dev_vars ]; then
+          echo "Missing kive_dev_vars configuration files"
+          ls -la /tmp/kive_dev_vars /etc/kive_dev_vars || true
+          exit 1
+        fi
         echo "ENV after sourcing dev vars:"
         env | sort
         nohup bash -lc ". /tmp/kive_dev_vars 2>/dev/null || true; . /etc/kive_dev_vars 2>/dev/null || true; exec \"$PYTHON_BIN\" manage.py runserver 0.0.0.0:8000" >/var/log/kive-api-smoke.log 2>&1 &
@@ -108,13 +136,9 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
 
         touch "$STATE_DIR/done"
-      } >>"$LOG_FILE" 2>&1 || {
-        echo "Provision script failed; writing failed marker"
-        touch "$STATE_DIR/failed"
-        exit 1
-      }
+      } >>"$LOG_FILE" 2>&1
 """
-        provision_runcmd = "\n  - [sh, -c, '/usr/local/bin/kive-provision.sh || true']"
+        provision_runcmd = "\n  - [sh, -c, '/usr/local/bin/kive-provision.sh']"
 
     userdata = f"""\
 #cloud-config

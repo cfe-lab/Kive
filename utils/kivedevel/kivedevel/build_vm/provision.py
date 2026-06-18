@@ -28,7 +28,7 @@ def _cloud_init_diagnostics(cmds: Cmds, instance: str) -> str:
     diagnostics: list[str] = []
 
     status_result = cmds.incus.run(
-        ["exec", instance, "--", "sh", "-c", "echo '=== PATH ==='; command -v cloud-init || true; echo '=== cloud-init status ==='; cloud-init status --long 2>&1 || true; echo '=== systemctl status ==='; systemctl status mount-kive-code.service cloud-init --no-pager 2>&1 || true; echo '=== mount status ==='; mount | grep /mnt/kive-code 2>&1 || true; echo '=== file list ==='; ls -la /mnt/kive-code /usr/local/bin/kive-provision.sh /usr/local/bin/mount-kive-code.sh /etc/systemd/system/mount-kive-code.service 2>&1 || true; echo '=== provision dir ==='; ls -la /var/lib/kive-provision /var/log 2>&1 || true; echo '=== log tails ==='; tail -n 40 /var/log/kive-provision.log /var/log/cloud-init-output.log 2>&1 || true"],
+        ["exec", instance, "--", "sh", "-c", "echo '=== PATH ==='; command -v cloud-init || true; echo '=== cloud-init status ==='; cloud-init status --long 2>&1 || true; echo '=== systemctl status ==='; systemctl status mount-kive-code.service cloud-init --no-pager 2>&1 || true; echo '=== mount status ==='; mount | grep /mnt/kive-code 2>&1 || true; echo '=== file list ==='; ls -la /mnt/kive-code /usr/local/bin/kive-provision.sh /usr/local/bin/mount-kive-code.sh /etc/systemd/system/mount-kive-code.service 2>&1 || true; echo '=== provision dir ==='; ls -la /var/lib/kive-provision /var/log 2>&1 || true; echo '=== log tails ==='; tail -n 40 /var/log/kive-provision.log /var/log/cloud-init-output.log 2>&1 || true; echo '=== API log tail ==='; tail -n 40 /var/log/kive-api-smoke.log 2>&1 || true; echo '=== resolv.conf ==='; cat /etc/resolv.conf 2>&1 || true; echo '=== ip addr ==='; ip addr 2>&1 || true; echo '=== ip route ==='; ip route 2>&1 || true"],
         check=False,
         capture_output=True,
     )
@@ -73,6 +73,16 @@ def maybe_provision_instance(
             diagnostics = _cloud_init_diagnostics(cmds, instance)
             raise RuntimeError(f"{details}\n\n{diagnostics}")
 
+        status_result = cmds.incus.run(
+            ["exec", instance, "--", "sh", "-c", "cloud-init status --long 2>&1 || true"],
+            check=False,
+            capture_output=True,
+        )
+        status_text = (status_result.stdout or status_result.stderr or "").strip()
+        if status_text and "status: error" in status_text.lower():
+            diagnostics = _cloud_init_diagnostics(cmds, instance)
+            raise RuntimeError(f"cloud-init reported error status before provisioning succeeded:\n\n{status_text}\n\n{diagnostics}")
+
         if attempt % 10 == 0 and logger.isEnabledFor(logging.DEBUG):
             logger.debug("Provision polling attempt %s for %s: no done/failed markers yet", attempt, instance)
             probe_result = cmds.incus.run(
@@ -82,7 +92,7 @@ def maybe_provision_instance(
                     "--",
                     "sh",
                     "-c",
-                    "printf '--- file layout ---\n'; ls -la /var/lib/kive-provision /var/log 2>/dev/null || true; printf '--- provision tree ---\n'; find /var/lib/kive-provision -maxdepth 2 -type f 2>/dev/null | sort || true; printf '--- tail logs ---\n'; tail -n 20 /var/log/kive-provision.log /var/log/cloud-init-output.log 2>/dev/null || true; printf '--- cloud-init status ---\n'; cloud-init status --long 2>/dev/null || true; printf '--- process list ---\n'; ps -ef | grep -E 'cloud-init|manage.py|ansible' | grep -v grep || true",
+                    "printf '%s\n' '--- file layout ---'; ls -la /var/lib/kive-provision /var/log 2>/dev/null || true; printf '%s\n' '--- provision tree ---'; find /var/lib/kive-provision -maxdepth 2 -type f 2>/dev/null | sort || true; printf '%s\n' '--- tail logs ---'; tail -n 20 /var/log/kive-provision.log /var/log/cloud-init-output.log /var/log/kive-api-smoke.log 2>/dev/null || true; printf '%s\n' '--- cloud-init status ---'; cloud-init status --long 2>/dev/null || true; printf '%s\n' '--- process list ---'; ps -ef | grep -E 'cloud-init|manage.py|ansible' | grep -v grep || true; printf '%s\n' '--- network ---'; ip addr 2>/dev/null || true; ip route 2>/dev/null || true; cat /etc/resolv.conf 2>/dev/null || true",
                 ],
                 check=False,
                 capture_output=True,
