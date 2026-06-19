@@ -56,7 +56,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       echo "--- initial file checks ---"
       ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
       echo "=== cloud-init status check ==="
-      cloud_init_status=$(cloud-init status --wait --long 2>&1 || true)
+      cloud_init_status=$(cloud-init status --long 2>&1 || true)
       echo "$cloud_init_status"
       if printf '%s\\n' "$cloud_init_status" | grep -qi 'status: error'; then
         echo "cloud-init reported an error status"
@@ -69,18 +69,22 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       cat /etc/resolv.conf || true
       getent hosts archive.ubuntu.com || true
       getent ahostsv4 archive.ubuntu.com || true
-      if ! python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
-        echo "Network check failed: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)"
+      if ! timeout --foreground 30s python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
+        echo "Network check failed or timed out: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)" >&2
         exit 1
       fi
       echo "=== apt install prerequisites ==="
       export DEBIAN_FRONTEND=noninteractive
-      if ! apt-get update; then
-        echo "apt-get update failed" >&2
+      if ! timeout --foreground 180s apt-get update; then
+        echo "apt-get update failed or timed out" >&2
         exit 1
       fi
-      if ! apt-get install -y ansible curl openssh-server; then
-        echo "apt-get install failed" >&2
+      if ! timeout --foreground 300s apt-get install -y ansible curl openssh-server; then
+        echo "apt-get install failed or timed out" >&2
+        exit 1
+      fi
+      if ! systemctl enable --now ssh; then
+        echo "Failed to enable/start ssh after installing openssh-server" >&2
         exit 1
       fi
       {
@@ -99,10 +103,10 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ln -sfn /mnt/kive-code /usr/local/share/Kive
         cd /usr/local/share/Kive/dev-env
         printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
-        if ! ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
+        if ! timeout --foreground 900s ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
         ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
-          echo "ansible-playbook failed" >&2
+          echo "ansible-playbook failed or timed out" >&2
           exit 1
         fi
         ls -la /opt/venv_kive/bin /usr/bin/python3 /tmp/kive_dev_vars /etc/kive_dev_vars || true
@@ -213,7 +217,6 @@ write_files:
 {provision_write_files}
 runcmd:
   - [systemctl, daemon-reload]
-  - [systemctl, enable, --now, ssh]
   - [systemctl, restart, serial-getty@ttyS0]
   - [systemctl, enable, --now, mount-kive-code.service]
   - [sh, -c, 'systemctl enable --now incus-agent || true']
