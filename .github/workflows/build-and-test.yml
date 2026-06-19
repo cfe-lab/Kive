@@ -217,22 +217,50 @@ jobs:
 
           SMOKE=incus-net-smoke
           sudo incus delete -f "$SMOKE" || true
+          trap 'sudo incus delete -f "$SMOKE" || true' EXIT
+
           sudo incus launch images:ubuntu/noble/cloud "$SMOKE" --profile default --config limits.cpu=1 --config limits.memory=512MB
 
-          for i in $(seq 1 60); do
-            if sudo incus exec "$SMOKE" -- true >/dev/null 2>&1; then
+          echo "=== wait for smoke container network readiness ==="
+          for i in $(seq 1 120); do
+            if sudo incus exec "$SMOKE" -- sh -lc '
+              test -e /etc/resolv.conf &&
+              ip -4 addr show dev eth0 | grep -q "inet " &&
+              ip route | grep -q "^default " &&
+              getent ahostsv4 archive.ubuntu.com >/dev/null
+            '; then
+              echo "smoke container network is ready"
               break
+            fi
+            if [ "$i" -eq 120 ]; then
+              echo "smoke container network readiness timed out"
+              sudo incus exec "$SMOKE" -- sh -lc '
+                echo "--- cloud-init ---"; cloud-init status --long 2>&1 || true
+                echo "--- ip addr ---"; ip addr || true
+                echo "--- ip route ---"; ip route || true
+                echo "--- resolv.conf ---"; cat /etc/resolv.conf || true
+                echo "--- systemd-networkd ---"; systemctl status systemd-networkd --no-pager || true
+                echo "--- systemd-resolved ---"; systemctl status systemd-resolved --no-pager || true
+                echo "--- journal network snippets ---"; journalctl -u systemd-networkd -u systemd-resolved --no-pager -n 100 || true
+              ' || true
+              exit 1
             fi
             sleep 1
           done
 
           echo "=== guest network smoke diagnostics ==="
-          sudo incus exec "$SMOKE" -- sh -lc 'ip addr; ip route; cat /etc/resolv.conf; getent hosts archive.ubuntu.com; getent ahostsv4 archive.ubuntu.com'
+          sudo incus exec "$SMOKE" -- sh -lc '
+            ip addr
+            ip route
+            cat /etc/resolv.conf
+            getent hosts archive.ubuntu.com
+            getent ahostsv4 archive.ubuntu.com
+          '
 
           echo "=== guest TCP egress test ==="
-          sudo incus exec "$SMOKE" -- sh -lc 'python3 -c "import socket,sys; addr=socket.getaddrinfo(\"archive.ubuntu.com\",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM); sock.settimeout(10); sock.connect(addr); sock.close(); print(\"ok\")"'
-
-          sudo incus delete -f "$SMOKE" || true
+          sudo incus exec "$SMOKE" -- sh -lc '
+            python3 -c "import socket,sys; addr=socket.getaddrinfo(\"archive.ubuntu.com\",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; print(\"connecting to\", addr); sock=socket.create_connection(addr, timeout=10); sock.close(); print(\"TCP egress ok\")"
+          '
 
       - name: Run build-vm smoke test
         env:
