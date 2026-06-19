@@ -100,7 +100,10 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
 
         export DEBIAN_FRONTEND=noninteractive
-        ln -sfn /mnt/kive-code /usr/local/share/Kive
+        rm -rf /usr/local/share/Kive
+        mkdir -p /usr/local/share/Kive
+        cp -a /mnt/kive-code/. /usr/local/share/Kive/
+        chown -R root:root /usr/local/share/Kive
         cd /usr/local/share/Kive/dev-env
         printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
         export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg
