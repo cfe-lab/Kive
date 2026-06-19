@@ -86,7 +86,9 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("timeout --foreground 30s python3", saved_user_data["value"])
         self.assertIn("timeout --foreground 180s apt-get update", saved_user_data["value"])
         self.assertIn("timeout --foreground 300s apt-get install -y ansible curl openssh-server", saved_user_data["value"])
-        self.assertIn("timeout --foreground 900s ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg", saved_user_data["value"])
+        self.assertIn("export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg", saved_user_data["value"])
+        self.assertIn("export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles", saved_user_data["value"])
+        self.assertIn("if ! timeout --foreground 900s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then", saved_user_data["value"])
 
     def test_provision_polling_deadline_is_shorter_than_workflow_timeout(self):
         self.assertEqual(provision.DEFAULT_PROVISION_TIMEOUT, 900)
