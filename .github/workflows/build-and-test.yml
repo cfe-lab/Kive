@@ -144,6 +144,17 @@ jobs:
           EOF
           sudo incus info
 
+      - name: Print host-side Incus networking diagnostics
+        run: |
+          sudo incus network show incusbr0 || true
+          sudo incus profile show default || true
+          sudo sysctl net.ipv4.ip_forward || true
+          sudo ip addr || true
+          sudo ip route || true
+          sudo iptables -S || true
+          sudo iptables -t nat -S || true
+          sudo nft list ruleset || true
+
       - name: Run build-vm smoke test
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm

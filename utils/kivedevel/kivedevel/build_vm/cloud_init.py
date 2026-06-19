@@ -33,6 +33,17 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       LOG_FILE=/var/log/kive-provision.log
       mkdir -p "$STATE_DIR"
       rm -f "$STATE_DIR/done" "$STATE_DIR/failed" "$STATE_DIR/started"
+      touch "$STATE_DIR/started"
+
+      mark_failed_on_exit() {
+        status=$?
+        if [ "$status" -ne 0 ] && [ ! -f "$STATE_DIR/done" ]; then
+          touch "$STATE_DIR/failed" || true
+        fi
+        exit "$status"
+      }
+      trap mark_failed_on_exit EXIT
+
       exec >>"$LOG_FILE" 2>&1
       set -x
       date
@@ -44,16 +55,6 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       env | sort
       echo "--- initial file checks ---"
       ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
-      ip addr || true
-      ip route || true
-      cat /etc/resolv.conf || true
-      getent hosts archive.ubuntu.com || true
-      echo "=== archive.ubuntu.com connectivity check ==="
-      if ! curl -fsSI --connect-timeout 10 http://archive.ubuntu.com/ubuntu/ >/dev/null 2>&1; then
-        echo "Network check failed: cannot reach archive.ubuntu.com"
-        cloud-init status --long 2>&1 || true
-        exit 1
-      fi
       echo "=== cloud-init status check ==="
       cloud_init_status=$(cloud-init status --wait --long 2>&1 || true)
       echo "$cloud_init_status"
@@ -62,9 +63,26 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         cat /var/log/cloud-init.log /var/log/cloud-init-output.log 2>/dev/null || true
         exit 1
       fi
-      echo "--- provision startup marker ---"
-      touch "$STATE_DIR/started"
-      trap 'status=$?; echo "FAIL trap at line $LINENO status $status"; if [ -f "$STATE_DIR/done" ]; then exit $status; fi; touch "$STATE_DIR/failed" || true; exit $status' EXIT
+      echo "=== network preflight ==="
+      ip addr || true
+      ip route || true
+      cat /etc/resolv.conf || true
+      getent hosts archive.ubuntu.com || true
+      getent ahostsv4 archive.ubuntu.com || true
+      if ! python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
+        echo "Network check failed: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)"
+        exit 1
+      fi
+      echo "=== apt install prerequisites ==="
+      export DEBIAN_FRONTEND=noninteractive
+      if ! apt-get update; then
+        echo "apt-get update failed" >&2
+        exit 1
+      fi
+      if ! apt-get install -y ansible curl openssh-server; then
+        echo "apt-get install failed" >&2
+        exit 1
+      fi
       {
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
@@ -81,10 +99,9 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ln -sfn /mnt/kive-code /usr/local/share/Kive
         cd /usr/local/share/Kive/dev-env
         printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
-        ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
+        if ! ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg \
         ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles \
-        ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
-        if [ $? -ne 0 ]; then
+        ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
           echo "ansible-playbook failed" >&2
           exit 1
         fi
@@ -154,10 +171,6 @@ users:
 ssh_pwauth: true
 package_update: false
 package_upgrade: false
-packages:
-  - ansible
-  - curl
-  - openssh-server
 write_files:
   - path: /etc/systemd/system/serial-getty@ttyS0.service.d/override.conf
     owner: root:root

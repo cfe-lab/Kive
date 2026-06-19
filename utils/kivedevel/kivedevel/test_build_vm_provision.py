@@ -60,9 +60,13 @@ class TestBuildVmProvision(unittest.TestCase):
                 with mock.patch.object(cloud_init, "generate_password_hash", return_value="hash"):
                     cloud_init.ensure_user_data(cmds, "ci-smoke", provision=True)
 
-        self.assertIn("printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini", saved_user_data["value"])
-        self.assertIn("touch \"$STATE_DIR/failed\"", saved_user_data["value"])
-        self.assertNotIn("/usr/local/bin/kive-provision.sh || true", saved_user_data["value"])
+        self.assertIn("touch \"$STATE_DIR/started\"", saved_user_data["value"])
+        self.assertIn("trap mark_failed_on_exit EXIT", saved_user_data["value"])
+        self.assertIn("if [ \"$status\" -ne 0 ] && [ ! -f \"$STATE_DIR/done\" ]; then", saved_user_data["value"])
+        self.assertIn("if ! python3 -c 'import socket,sys; addr=socket.getaddrinfo(\"archive.ubuntu.com\", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'", saved_user_data["value"])
+        self.assertIn("apt-get install -y ansible curl openssh-server", saved_user_data["value"])
+        self.assertNotIn("packages:\n  - ansible\n  - curl\n  - openssh-server", saved_user_data["value"])
+        self.assertNotIn("ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml\n        if [ $? -ne 0 ]", saved_user_data["value"])
 
     def test_periodic_probe_uses_safe_printf(self):
         source = inspect.getsource(provision)
