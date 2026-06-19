@@ -89,6 +89,18 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg", saved_user_data["value"])
         self.assertIn("export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles", saved_user_data["value"])
         self.assertIn("if ! timeout --foreground 900s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then", saved_user_data["value"])
+        self.assertNotIn("timeout --foreground 900s ANSIBLE_CONFIG=", saved_user_data["value"])
+
+    def test_workflow_contains_incus_bridge_egress_repair(self):
+        workflow_path = Path(__file__).resolve().parents[4] / "Kive" / ".github" / "workflows" / "build-and-test.yml"
+        workflow_text = workflow_path.read_text()
+        self.assertIn("Repair Incus bridge egress on GitHub runner", workflow_text)
+        self.assertIn("Verify Incus container egress", workflow_text)
+        self.assertIn("sudo iptables -C DOCKER-USER -i \"$BRIDGE\" -j ACCEPT", workflow_text)
+        self.assertIn("sudo iptables -C FORWARD -i \"$BRIDGE\" -j ACCEPT", workflow_text)
+        self.assertIn("sudo incus exec \"$SMOKE\" -- sh -lc 'python3 -c \"import socket,sys; addr=socket.getaddrinfo(\\\"archive.ubuntu.com\\\",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM); sock.settimeout(10); sock.connect(addr); sock.close(); print(\\\"ok\\\")\"'", workflow_text)
+        self.assertNotIn("iptables -F", workflow_text)
+        self.assertIn("Run build-vm smoke test", workflow_text)
 
     def test_provision_polling_deadline_is_shorter_than_workflow_timeout(self):
         self.assertEqual(provision.DEFAULT_PROVISION_TIMEOUT, 900)

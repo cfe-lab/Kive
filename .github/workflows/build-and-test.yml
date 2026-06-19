@@ -149,11 +149,90 @@ jobs:
           sudo incus network show incusbr0 || true
           sudo incus profile show default || true
           sudo sysctl net.ipv4.ip_forward || true
+          sudo sysctl net.ipv4.conf.all.forwarding || true
           sudo ip addr || true
           sudo ip route || true
           sudo iptables -S || true
           sudo iptables -t nat -S || true
           sudo nft list ruleset || true
+
+      - name: Repair Incus bridge egress on GitHub runner
+        run: |
+          set -euxo pipefail
+
+          BRIDGE=incusbr0
+
+          echo "=== host networking before repair ==="
+          sudo incus network show "$BRIDGE" || true
+          sudo sysctl net.ipv4.ip_forward || true
+          sudo sysctl net.ipv4.conf.all.forwarding || true
+          sudo sysctl net.ipv4.conf.default.forwarding || true
+          sudo ip addr || true
+          sudo ip route || true
+          sudo iptables -S || true
+          sudo iptables -t nat -S || true
+          sudo nft list ruleset || true
+
+          echo "=== ensure host IPv4 forwarding ==="
+          sudo sysctl -w net.ipv4.ip_forward=1
+          sudo sysctl -w net.ipv4.conf.all.forwarding=1 || true
+          sudo sysctl -w net.ipv4.conf.default.forwarding=1 || true
+
+          echo "=== ensure Incus bridge NAT/routing config ==="
+          sudo incus network set "$BRIDGE" ipv4.nat true
+          sudo incus network set "$BRIDGE" ipv4.routing true
+          sudo incus network set "$BRIDGE" ipv4.firewall true
+          sudo incus network show "$BRIDGE"
+
+          echo "=== allow Incus bridge through Docker/host forward filters ==="
+          if sudo iptables -nL DOCKER-USER >/dev/null 2>&1; then
+            sudo iptables -C DOCKER-USER -i "$BRIDGE" -j ACCEPT 2>/dev/null || sudo iptables -I DOCKER-USER 1 -i "$BRIDGE" -j ACCEPT
+            sudo iptables -C DOCKER-USER -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || sudo iptables -I DOCKER-USER 1 -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+          fi
+
+          sudo iptables -C FORWARD -i "$BRIDGE" -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD 1 -i "$BRIDGE" -j ACCEPT
+          sudo iptables -C FORWARD -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD 1 -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+
+          echo "=== add targeted NAT fallback for Incus subnet ==="
+          CIDR4=$(sudo incus network get "$BRIDGE" ipv4.address || true)
+          if [ -n "$CIDR4" ]; then
+            if python3 -c 'import ipaddress,sys; net=ipaddress.ip_network(sys.argv[1], strict=False); print(net.with_prefixlen)' "$CIDR4" >/tmp/incus-net.txt 2>/dev/null; then
+              NETCIDR=$(cat /tmp/incus-net.txt)
+              sudo iptables -t nat -C POSTROUTING -s "$NETCIDR" ! -d "$NETCIDR" -j MASQUERADE 2>/dev/null || sudo iptables -t nat -I POSTROUTING 1 -s "$NETCIDR" ! -d "$NETCIDR" -j MASQUERADE
+            fi
+          fi
+
+          echo "=== host networking after repair ==="
+          sudo sysctl net.ipv4.ip_forward || true
+          sudo sysctl net.ipv4.conf.all.forwarding || true
+          sudo sysctl net.ipv4.conf.default.forwarding || true
+          sudo iptables -S FORWARD || true
+          sudo iptables -S DOCKER-USER || true
+          sudo iptables -t nat -S POSTROUTING || true
+          sudo nft list ruleset || true
+
+      - name: Verify Incus container egress
+        run: |
+          set -euxo pipefail
+
+          SMOKE=incus-net-smoke
+          sudo incus delete -f "$SMOKE" || true
+          sudo incus launch images:ubuntu/noble/cloud "$SMOKE" --profile default --config limits.cpu=1 --config limits.memory=512MB
+
+          for i in $(seq 1 60); do
+            if sudo incus exec "$SMOKE" -- true >/dev/null 2>&1; then
+              break
+            fi
+            sleep 1
+          done
+
+          echo "=== guest network smoke diagnostics ==="
+          sudo incus exec "$SMOKE" -- sh -lc 'ip addr; ip route; cat /etc/resolv.conf; getent hosts archive.ubuntu.com; getent ahostsv4 archive.ubuntu.com'
+
+          echo "=== guest TCP egress test ==="
+          sudo incus exec "$SMOKE" -- sh -lc 'python3 -c "import socket,sys; addr=socket.getaddrinfo(\"archive.ubuntu.com\",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM); sock.settimeout(10); sock.connect(addr); sock.close(); print(\"ok\")"'
+
+          sudo incus delete -f "$SMOKE" || true
 
       - name: Run build-vm smoke test
         env:
