@@ -91,22 +91,52 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("if ! timeout --foreground 900s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then", saved_user_data["value"])
         self.assertNotIn("timeout --foreground 900s ANSIBLE_CONFIG=", saved_user_data["value"])
 
-    def test_workflow_contains_incus_bridge_egress_repair(self):
+    def test_workflow_calls_developer_facing_commands(self):
         workflow_path = Path(__file__).resolve().parents[4] / "Kive" / ".github" / "workflows" / "build-and-test.yml"
         workflow_text = workflow_path.read_text()
-        self.assertIn("Repair Incus bridge egress on GitHub runner", workflow_text)
-        self.assertIn("Verify Incus container egress", workflow_text)
-        self.assertIn("sudo iptables -C DOCKER-USER -i \"$BRIDGE\" -j ACCEPT", workflow_text)
-        self.assertIn("sudo iptables -C FORWARD -i \"$BRIDGE\" -j ACCEPT", workflow_text)
-        self.assertIn("python3 -c \"import socket,sys; addr=socket.getaddrinfo(\\\"archive.ubuntu.com\\\",80,socket.AF_INET,socket.SOCK_STREAM)", workflow_text)
-        self.assertIn("test -e /etc/resolv.conf &&", workflow_text)
-        self.assertIn("ip -4 addr show dev eth0 | grep -q \"inet \" &&", workflow_text)
-        self.assertIn("ip route | grep -q \"^default \" &&", workflow_text)
-        self.assertIn("getent ahostsv4 archive.ubuntu.com >/dev/null", workflow_text)
-        self.assertIn("trap 'sudo incus delete -f \"$SMOKE\" || true' EXIT", workflow_text)
-        self.assertNotIn("sudo incus exec \"$SMOKE\" -- true", workflow_text)
-        self.assertNotIn("iptables -F", workflow_text)
-        self.assertIn("Run build-vm smoke test", workflow_text)
+
+        self.assertIn("utils/dev prepare-host", workflow_text)
+        self.assertIn("utils/dev check-network", workflow_text)
+        self.assertIn("utils/dev smoke-local-install", workflow_text)
+        self.assertIn("utils/dev cleanup-local-install", workflow_text)
+
+        self.assertNotIn("utils/dev ci ", workflow_text)
+        self.assertNotIn("Repair Incus bridge egress on GitHub runner", workflow_text)
+        self.assertNotIn("Verify Incus container egress", workflow_text)
+        self.assertNotIn("for i in $(seq 1 120)", workflow_text)
+        self.assertNotIn("sudo incus admin init --preseed", workflow_text)
+        self.assertNotIn("sudo iptables -C DOCKER-USER", workflow_text)
+        self.assertNotIn("sudo iptables -C FORWARD", workflow_text)
+        self.assertNotIn("sudo iptables -t nat -C POSTROUTING", workflow_text)
+        self.assertNotIn("sudo iptables -t nat -I POSTROUTING", workflow_text)
+
+        lines = workflow_text.splitlines()
+        debug_lines = [l for l in lines if "utils/dev prepare-host" in l]
+        self.assertTrue(any("prepare-host" in l for l in lines))
+        self.assertTrue(any("check-network" in l for l in lines))
+        self.assertTrue(any("smoke-local-install" in l for l in lines))
+        self.assertTrue(any("cleanup-local-install" in l for l in lines))
+
+        # Verify cleanup is conditional on always()
+        self.assertIn("if: always()", workflow_text)
+
+        # Verify steps appear in correct order
+        import re
+        job_section_start = workflow_text.find("build-vm-smoke:")
+        job_section = workflow_text[job_section_start:]
+        job_step_names = re.findall(r"- name: (.+)", job_section)
+        self.assertIn("Prepare host", job_step_names)
+        self.assertIn("Check guest network", job_step_names)
+        self.assertIn("Smoke-test local install", job_step_names)
+        self.assertIn("Cleanup local install smoke test", job_step_names)
+
+        prepare_idx = job_step_names.index("Prepare host")
+        check_idx = job_step_names.index("Check guest network")
+        smoke_idx = job_step_names.index("Smoke-test local install")
+        cleanup_idx = job_step_names.index("Cleanup local install smoke test")
+        self.assertLess(prepare_idx, check_idx)
+        self.assertLess(check_idx, smoke_idx)
+        self.assertLess(smoke_idx, cleanup_idx)
 
     def test_provision_polling_deadline_is_shorter_than_workflow_timeout(self):
         self.assertEqual(provision.DEFAULT_PROVISION_TIMEOUT, 900)
