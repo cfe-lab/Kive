@@ -110,7 +110,7 @@ def run_check_network(args: argparse.Namespace) -> None:
         if result.returncode != 0:
             stderr = result.stderr or ""
             if _needs_privileged_fallback(stderr):
-                last_line = [l for l in stderr.splitlines() if l.strip()]
+                last_line = [line for line in stderr.splitlines() if line.strip()]
                 hint = last_line[-1].strip() if last_line else "no uid/gid allocation"
                 logger.warning(
                     "Host does not support unprivileged containers "

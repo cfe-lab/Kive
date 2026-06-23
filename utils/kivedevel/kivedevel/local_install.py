@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import subprocess
-import sys
 from pathlib import Path
 
 from . import checks

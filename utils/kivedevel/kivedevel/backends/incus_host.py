@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import subprocess
-import sys
 
 from ..kv_commands import Cmds
 from ..shared import configure_console_logging
