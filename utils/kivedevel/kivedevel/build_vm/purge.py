@@ -12,7 +12,6 @@ from ..shared import configure_logging, default_root
 logger = logging.getLogger("kivedevel.build_vm.purge")
 
 _RESOURCE_MARKER = ".kive-devel-resource.json"
-_KNOWN_LEGACY_INSTANCES = ("kive-minimal", "ci-smoke", "network-smoke")
 
 
 def _is_mountpoint(path: Path) -> bool:
@@ -54,19 +53,13 @@ def _device_attached(cmds: Cmds, instance: str) -> bool:
     return any(line.strip() == "kive-code:" for line in out.splitlines())
 
 
-def _remove_device(cmds: Cmds, instance: str, dry_run: bool) -> None:
-    if dry_run:
-        logger.info("[dry-run] Would remove device 'kive-code' from instance '%s'.", instance)
-        return
+def _remove_device(cmds: Cmds, instance: str) -> None:
     logger.info("Removing device 'kive-code' from instance '%s'...", instance)
     cmds.incus.run(["config", "device", "remove", instance, "kive-code"], check=False)
 
 
-def _remove_image(image_path: Path, dry_run: bool) -> None:
+def _remove_image(image_path: Path) -> None:
     if image_path.exists():
-        if dry_run:
-            logger.info("[dry-run] Would remove workspace image '%s'.", image_path)
-            return
         logger.info("Removing workspace image '%s'...", image_path)
         try:
             image_path.unlink()
@@ -74,19 +67,13 @@ def _remove_image(image_path: Path, dry_run: bool) -> None:
             subprocess.run(["sudo", "rm", "-f", "--", str(image_path)], check=False)
 
 
-def _remove_workdir(workdir: Path, dry_run: bool) -> None:
+def _remove_workdir(workdir: Path) -> None:
     if workdir.exists():
-        if dry_run:
-            logger.info("[dry-run] Would remove build directory '%s'.", workdir)
-            return
         logger.info("Removing build directory '%s'...", workdir)
         subprocess.run(["sudo", "rm", "-rf", "--", str(workdir)], check=False)
 
 
-def _delete_instance(cmds: Cmds, instance: str, dry_run: bool) -> None:
-    if dry_run:
-        logger.info("[dry-run] Would delete instance '%s'.", instance)
-        return
+def _delete_instance(cmds: Cmds, instance: str) -> None:
     cmds.incus.run(["delete", "-f", "--", instance], check=False)
 
 
@@ -110,7 +97,8 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     for marker in root.rglob(_RESOURCE_MARKER):
         try:
             data = json.loads(marker.read_text())
-            if data.get("created-by") == "utils/dev":
+            created_by = data.get("created_by") or data.get("created-by")
+            if created_by == "utils/dev":
                 candidates.append(marker.parent.resolve())
         except (json.JSONDecodeError, OSError):
             continue
@@ -127,26 +115,25 @@ def run_purge(args: argparse.Namespace) -> None:
     cmds = Cmds.create()
     cmds.incus.require()
 
-    dry_run: bool = getattr(args, "dry_run", False)
-
     # Phase 1: Discover tagged instances.
     tagged = _find_tagged_instances(cmds)
+    tagged_set = set(tagged)
 
-    # Phase 2: Legacy fallback — check known instance names.
-    legacy_instances = [i for i in _KNOWN_LEGACY_INSTANCES if i not in tagged]
+    # Phase 2: Explicit --instance overrides.
     extra_instances = getattr(args, "instances", []) or []
 
-    all_instances = list(tagged) + legacy_instances + extra_instances
+    all_instances = list(tagged) + extra_instances
+
+    # Log any legacy untagged instances that were discovered but skipped.
+    _check_legacy_skipped(cmds, tagged_set)
 
     # Phase 3: Discover marked workdirs.
     marked = _find_marked_workdirs(root)
 
-    # Phase 4: Legacy fallback — default workdir path.
+    # Phase 4: Explicit --workdir overrides.
     extra_workdirs = getattr(args, "workdirs", []) or []
 
     all_workdirs = list(marked)
-    if workdir_default not in all_workdirs:
-        all_workdirs.append(workdir_default)
     for w in extra_workdirs:
         w_resolved = w.resolve() if isinstance(w, Path) else Path(w).resolve()
         if w_resolved not in all_workdirs:
@@ -158,42 +145,54 @@ def run_purge(args: argparse.Namespace) -> None:
 
     logger.info("Resources to purge: %d instance(s), %d workdir(s)", len(all_instances), len(all_workdirs))
 
-    # Phase 5: Detach stale NBD.
     _detach_stale_nbd()
 
-    # Phase 6: Cleanup per-instance resources.
     for instance in all_instances:
         if _device_attached(cmds, instance):
-            _remove_device(cmds, instance, dry_run)
-        elif not dry_run:
+            _remove_device(cmds, instance)
+        else:
             logger.debug("No kive-code device attached to '%s'.", instance)
 
-    # Phase 7: Cleanup per-workdir resources.
     for workdir in all_workdirs:
         mountpoint_path = workdir / "kive-code-mount"
         if mountpoint_path.exists() and _is_mountpoint(mountpoint_path):
-            if dry_run:
-                logger.info("[dry-run] Would unmount '%s'.", mountpoint_path)
-            else:
-                logger.info("Cleaning stale mountpoint '%s'...", mountpoint_path)
-                _umount(mountpoint_path)
+            logger.info("Cleaning stale mountpoint '%s'...", mountpoint_path)
+            _umount(mountpoint_path)
 
         image_path = workdir / "kive-code.qcow2"
-        _remove_image(image_path, dry_run)
-        _remove_workdir(workdir, dry_run)
+        _remove_image(image_path)
+        _remove_workdir(workdir)
 
-    # Phase 8: Delete instances.
     for instance in all_instances:
-        _delete_instance(cmds, instance, dry_run)
+        _delete_instance(cmds, instance)
 
     logger.info("Purge complete. All Kive development resources removed.")
+
+
+def _check_legacy_skipped(cmds: Cmds, tagged_set: set[str]) -> None:
+    """Log a warning for any untagged legacy-name instances found running."""
+    known_legacy = ("kive-minimal", "ci-smoke", "network-smoke")
+    for name in known_legacy:
+        if name not in tagged_set:
+            out = cmds.incus.run(
+                ["list", name, "--format", "csv", "--columns", "n"],
+                check=False,
+                capture_output=True,
+            )
+            if out.returncode == 0 and out.stdout.strip():
+                logger.warning(
+                    "Skipping untagged legacy instance '%s'; "
+                    "pass --instance %s to remove it explicitly.",
+                    name, name,
+                )
 
 
 def register_subcommand(subparsers) -> None:
     root = default_root()
     parser = subparsers.add_parser(
         "purge",
-        help="Remove all development resources (instances, workdirs, images) created by utils/dev",
+        help="Remove all development resources created by utils/dev. "
+        "This deletes tagged Incus instances and marked local build directories.",
     )
     log_group = parser.add_mutually_exclusive_group()
     log_group.add_argument("--quiet", action="store_true", help="Only show errors")
@@ -214,16 +213,11 @@ def register_subcommand(subparsers) -> None:
         help=f"Repository root used to discover marked workdirs (default: {root})",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print what would be removed without deleting anything",
-    )
-    parser.add_argument(
         "--instance",
         action="append",
         dest="instances",
         default=None,
-        help="Additional instance name to purge (may be repeated, in addition to discovered instances)",
+        help="Explicit instance name to purge (may be repeated, in addition to discovered tagged instances)",
     )
     parser.add_argument(
         "--workdir",
@@ -231,6 +225,6 @@ def register_subcommand(subparsers) -> None:
         action="append",
         dest="workdirs",
         default=None,
-        help="Additional workdir path to purge (may be repeated, in addition to discovered workdirs)",
+        help="Explicit workdir path to purge (may be repeated, in addition to discovered marked workdirs)",
     )
     parser.set_defaults(func=run_purge)
