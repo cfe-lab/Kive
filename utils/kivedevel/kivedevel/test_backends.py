@@ -167,8 +167,60 @@ class TestIncusHostCheckBeforeInsert(unittest.TestCase):
         )
 
 
+class TestNeedsPrivilegedFallback(unittest.TestCase):
+    def test_matches_uid_gid_configured(self):
+        self.assertTrue(
+            incus_network._needs_privileged_fallback(
+                "Error: Failed instance creation: "
+                "Failed creating instance record: "
+                "Failed initializing instance: Invalid config: "
+                "No uid/gid allocation configured"
+            )
+        )
+
+    def test_matches_no_map_for_user(self):
+        self.assertTrue(
+            incus_network._needs_privileged_fallback(
+                "some error: no map found for user"
+            )
+        )
+
+    def test_matches_only_privileged_supported(self):
+        self.assertTrue(
+            incus_network._needs_privileged_fallback(
+                "only privileged containers are supported"
+            )
+        )
+
+    def test_does_not_match_unrelated_error(self):
+        self.assertFalse(
+            incus_network._needs_privileged_fallback(
+                "Error: image not found"
+            )
+        )
+
+    def test_does_not_match_empty_string(self):
+        self.assertFalse(incus_network._needs_privileged_fallback(""))
+
+
 class TestIncusNetworkCheckReadiness(unittest.TestCase):
     """Verify network readiness checks look for the right indicators."""
+
+    def _make_cmds(self, side_effects: list) -> mock.Mock:
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = side_effects
+        return cmds
+
+    def _make_args(self, **overrides) -> mock.Mock:
+        args = mock.Mock()
+        args.backend = "incus"
+        args.instance = "network-smoke"
+        args.host = "archive.ubuntu.com"
+        args.port = 80
+        args.debug = False
+        for k, v in overrides.items():
+            setattr(args, k, v)
+        return args
 
     def test_guest_network_ready_command_includes_all_checks(self):
         cmds = mock.Mock()
@@ -198,20 +250,97 @@ class TestIncusNetworkCheckReadiness(unittest.TestCase):
         self.assertFalse(result)
 
     def test_run_check_network_cleans_up_in_finally_on_success(self):
-        cmds = mock.Mock()
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
+        cmds = self._make_cmds([
+            MockRunResult(returncode=0),  # delete
+            MockRunResult(returncode=0),  # launch
+            MockRunResult(returncode=0),  # guest_network_ready poll
+            MockRunResult(returncode=0),  # tcp connect
+            MockRunResult(returncode=0),  # finally delete
+        ])
 
         with mock.patch.object(incus_network, "Cmds") as mock_cmds_cls:
             mock_cmds_cls.create.return_value = cmds
+            incus_network.run_check_network(self._make_args())
 
-            args = mock.Mock()
-            args.backend = "incus"
-            args.instance = "network-smoke"
-            args.host = "archive.ubuntu.com"
-            args.port = 80
-            args.debug = False
+        delete_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:2] == ["delete", "-f"]
+        ]
+        self.assertGreaterEqual(len(delete_calls), 1)
 
-            incus_network.run_check_network(args)
+    def test_retries_privileged_on_uid_gid_error(self):
+        cmds = self._make_cmds([
+            MockRunResult(returncode=0),  # delete
+            MockRunResult(returncode=1, stderr="No uid/gid allocation configured"),  # launch fails
+            MockRunResult(returncode=0),  # privileged launch succeeds
+            MockRunResult(returncode=0),  # network ready poll
+            MockRunResult(returncode=0),  # tcp connect
+            MockRunResult(returncode=0),  # finally delete
+        ])
+
+        with mock.patch.object(incus_network, "Cmds") as mock_cmds_cls:
+            mock_cmds_cls.create.return_value = cmds
+            incus_network.run_check_network(self._make_args())
+
+        launch_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][0] == "launch"
+        ]
+        self.assertEqual(len(launch_calls), 2)
+        second_launch = launch_calls[1][0][0]
+        self.assertIn("security.privileged=true", second_launch)
+
+    def test_retries_privileged_on_no_map_for_user(self):
+        cmds = self._make_cmds([
+            MockRunResult(returncode=0),  # delete
+            MockRunResult(returncode=1, stderr="no map found for user"),  # launch fails
+            MockRunResult(returncode=0),  # privileged launch succeeds
+            MockRunResult(returncode=0),  # network ready poll
+            MockRunResult(returncode=0),  # tcp connect
+            MockRunResult(returncode=0),  # finally delete
+        ])
+
+        with mock.patch.object(incus_network, "Cmds") as mock_cmds_cls:
+            mock_cmds_cls.create.return_value = cmds
+            incus_network.run_check_network(self._make_args())
+
+        launch_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][0] == "launch"
+        ]
+        self.assertEqual(len(launch_calls), 2)
+        second_launch = launch_calls[1][0][0]
+        self.assertIn("security.privileged=true", second_launch)
+
+    def test_does_not_retry_on_unrelated_error(self):
+        cmds = self._make_cmds([
+            MockRunResult(returncode=0),  # delete
+            MockRunResult(returncode=1, stderr="Error: image not found"),  # launch fails
+            MockRunResult(returncode=0),  # finally delete
+        ])
+
+        with mock.patch.object(incus_network, "Cmds") as mock_cmds_cls:
+            mock_cmds_cls.create.return_value = cmds
+            with self.assertRaises(SystemExit):
+                incus_network.run_check_network(self._make_args())
+
+        launch_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][0] == "launch"
+        ]
+        self.assertEqual(len(launch_calls), 1)
+
+    def test_cleanup_on_launch_failure(self):
+        cmds = self._make_cmds([
+            MockRunResult(returncode=0),  # delete
+            MockRunResult(returncode=1, stderr="Error: image not found"),  # launch fails
+            MockRunResult(returncode=0),  # finally delete
+        ])
+
+        with mock.patch.object(incus_network, "Cmds") as mock_cmds_cls:
+            mock_cmds_cls.create.return_value = cmds
+            with self.assertRaises(SystemExit):
+                incus_network.run_check_network(self._make_args())
 
         delete_calls = [
             c for c in cmds.incus.run.call_args_list

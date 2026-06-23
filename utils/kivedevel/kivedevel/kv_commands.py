@@ -85,7 +85,16 @@ class Command:
 
         if check and result.returncode != 0:
             logger.error("Command failed with exit code %s", result.returncode)
-            raise subprocess.CalledProcessError(result.returncode, result.args)
+            if result.stderr:
+                stderr_body = result.stderr.rstrip()
+                logger.error("stderr:\n%s", stderr_body)
+            if result.stdout:
+                stdout_body = result.stdout.rstrip()
+                logger.error("stdout:\n%s", stdout_body)
+            raise subprocess.CalledProcessError(
+                result.returncode, result.args,
+                output=result.stdout, stderr=result.stderr,
+            )
 
         if logger.isEnabledFor(logging.DEBUG):
             if result.stdout:

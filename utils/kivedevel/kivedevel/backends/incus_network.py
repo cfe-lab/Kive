@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import subprocess
 import sys
 import time
 
@@ -62,6 +63,16 @@ def _tcp_connect_test(cmds: Cmds, instance: str, host: str, port: int) -> None:
         sys.exit(1)
 
 
+def _needs_privileged_fallback(stderr: str) -> bool:
+    fragments = (
+        "no uid/gid allocation configured",
+        "no map found for user",
+        "only privileged containers are supported",
+    )
+    lowered = stderr.lower()
+    return any(f in lowered for f in fragments)
+
+
 def run_check_network(args: argparse.Namespace) -> None:
     # CLI is backend-generic; only incus is implemented today.
     assert args.backend == "incus", f"Unsupported backend: {args.backend}"
@@ -77,17 +88,41 @@ def run_check_network(args: argparse.Namespace) -> None:
     # Delete any stale temporary instance.
     cmds.incus.run(["delete", "-f", instance], check=False)
 
+    def _launch_smoke(privileged: bool = False) -> subprocess.CompletedProcess[str]:
+        cmd = [
+            "launch",
+            "images:ubuntu/noble/cloud",
+            instance,
+            "--profile", "default",
+            "--config", "limits.cpu=1",
+            "--config", "limits.memory=512MB",
+        ]
+        if privileged:
+            cmd += ["--config", "security.privileged=true"]
+        return cmds.incus.run(cmd, check=False, capture_output=True)
+
     try:
-        cmds.incus.run(
-            [
-                "launch",
-                "images:ubuntu/noble/cloud",
-                instance,
-                "--profile", "default",
-                "--config", "limits.cpu=1",
-                "--config", "limits.memory=512MB",
-            ]
-        )
+        result = _launch_smoke()
+        if result.returncode != 0:
+            stderr = result.stderr or ""
+            if _needs_privileged_fallback(stderr):
+                last_line = [l for l in stderr.splitlines() if l.strip()]
+                hint = last_line[-1].strip() if last_line else "no uid/gid allocation"
+                logger.warning(
+                    "Host does not support unprivileged containers "
+                    "(%s). Retrying %s as privileged.",
+                    hint, instance,
+                )
+                result = _launch_smoke(privileged=True)
+            if result.returncode != 0:
+                logger.error("Failed to launch smoke instance %s.", instance)
+                if result.stderr:
+                    logger.error("stderr:\n%s", result.stderr.rstrip())
+                if result.stdout:
+                    logger.error("stdout:\n%s", result.stdout.rstrip())
+                sys.exit(1)
+        else:
+            logger.info("Launched instance %s.", instance)
 
         logger.info("=== wait for guest network readiness ===")
         for i in range(1, NETWORK_READY_TIMEOUT + 1):
