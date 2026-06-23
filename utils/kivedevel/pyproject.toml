@@ -40,6 +40,7 @@ dev = [
     # Dependencies required for development (linting, type checking, etc.)
     "ruff",
     "mypy==1.9.0",
+    "types-PyYAML",
     "bandit",
 ]
 
@@ -51,7 +52,7 @@ markers = [
 ]
 
 [tool.mypy]
-files = ["tests"]
+files = ["kivedevel"]
 ignore_missing_imports = true
 strict_optional = true
 allow_untyped_calls = false
@@ -59,3 +60,7 @@ warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = false
 strict = true
+
+[[tool.mypy.overrides]]
+module = "test_*"
+ignore_errors = true
