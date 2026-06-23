@@ -61,8 +61,10 @@ def run_enter_vm(args: argparse.Namespace) -> None:
         stripped = [c for c in args.command if c != "--"]
         if stripped:
             exec_args.extend(["--"] + stripped)
+    else:
+        exec_args.extend(["--", args.shell])
 
     if args.command:
-        subprocess.run(exec_args)
+        raise SystemExit(subprocess.run(exec_args).returncode)
     else:
         raise SystemExit(subprocess.call(exec_args))
