@@ -205,5 +205,64 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("cloud-init reported error status", str(cm.exception).lower())
 
 
+class TestTlsKeyRemoval(unittest.TestCase):
+    """Verify no TLS private key material is committed to the repository."""
+
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_star_cfe_key_not_present(self):
+        old_key = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "files" / "star_cfe.key"
+        self.assertFalse(
+            old_key.exists(),
+            "Private key star_cfe.key must not exist in the repository. "
+            "Remove it with git rm.",
+        )
+
+    def test_star_cfe_cert_not_present(self):
+        old_cert = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "files" / "star_cfe_chained.crt"
+        self.assertFalse(
+            old_cert.exists(),
+            "Dev certificate star_cfe_chained.crt should be removed. "
+            "Self-signed generation replaces committed cert material.",
+        )
+
+    def test_no_committed_private_key_in_kive_server_files(self):
+        files_dir = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "files"
+        if files_dir.is_dir():
+            for path in files_dir.rglob("*"):
+                if path.is_file():
+                    content = path.read_text(encoding="utf-8", errors="ignore")
+                    self.assertNotIn(
+                        "BEGIN PRIVATE KEY",
+                        content,
+                        f"Private key material found in committed file: {path}",
+                    )
+
+    def test_dev_env_vars_set_self_signed(self):
+        dev_vars = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
+        text = dev_vars.read_text()
+        self.assertIn("kive_tls_mode: self_signed", text)
+
+    def test_ssl_template_uses_variable_paths(self):
+        ssl_template = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "templates" / "001-kive-ssl.conf.j2"
+        text = ssl_template.read_text()
+        self.assertIn("{{ kive_ssl_cert_path }}", text)
+        self.assertIn("{{ kive_ssl_key_path }}", text)
+        self.assertNotIn("star_cfe_chained.crt", text)
+        self.assertNotIn("star_cfe.key", text)
+
+    def test_server_role_installs_ssl_from_template_not_copy(self):
+        tasks_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "tasks" / "main.yml"
+        text = tasks_path.read_text()
+        self.assertIn("template:\n        src: 001-kive-ssl.conf.j2", text)
+        self.assertNotIn("copy:\n        src: 001-kive-ssl.conf", text)
+
+    def test_server_role_enables_ssl_module(self):
+        tasks_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "kive_server" / "tasks" / "main.yml"
+        text = tasks_path.read_text()
+        self.assertIn("name: ssl", text)
+        self.assertIn("state: present", text)
+
+
 if __name__ == "__main__":
     unittest.main()
