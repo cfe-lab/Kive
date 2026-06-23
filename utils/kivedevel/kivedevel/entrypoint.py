@@ -5,6 +5,8 @@ from typing import Sequence
 
 from . import build_vm
 from . import checks
+from . import local_install
+from .backends import incus_host, incus_network
 
 
 def main(argv: Sequence[str]) -> int:
@@ -17,6 +19,9 @@ def main(argv: Sequence[str]) -> int:
 
     build_vm.register_subcommand(subparsers)
     checks.register_subcommands(subparsers)
+    incus_host.register_subcommand(subparsers)
+    incus_network.register_subcommand(subparsers)
+    local_install.register_subcommand(subparsers)
 
     args = parser.parse_args(argv)
     args.func(args)

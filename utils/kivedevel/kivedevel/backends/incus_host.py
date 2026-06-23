@@ -1,0 +1,259 @@
+"""Host preparation for Incus backend: initialize daemon, configure bridge, repair egress."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import subprocess
+import sys
+
+from ..kv_commands import Cmds
+
+
+logger = logging.getLogger("kivedevel.backends.incus_host")
+
+
+def _run(cmd: list[str], *, check: bool = True, **kwargs) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, check=check, capture_output=True, text=True, **kwargs)
+
+
+def _print_diagnostics(cmds: Cmds, bridge: str) -> None:
+    logger.info("=== host networking diagnostics ===")
+    cmds.incus.run(["network", "show", bridge], check=False)
+    sysctl_val = _run(["sysctl", "net.ipv4.ip_forward"], check=False)
+    logger.info("ip_forward: %s", sysctl_val.stdout.strip() if sysctl_val.returncode == 0 else "unknown")
+    cmds.ip.run(["addr"], check=False)
+    cmds.ip.run(["route"], check=False)
+    _run(["iptables", "-S"], check=False)
+    _run(["iptables", "-t", "nat", "-S"], check=False)
+    _run(["nft", "list", "ruleset"], check=False)
+
+
+def _enable_ipv4_forwarding() -> None:
+    _run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
+    _run(["sysctl", "-w", "net.ipv4.conf.all.forwarding=1"], check=False)
+    _run(["sysctl", "-w", "net.ipv4.conf.default.forwarding=1"], check=False)
+
+
+def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
+    cmds.incus.run(["network", "set", bridge, "ipv4.nat", "true"])
+    cmds.incus.run(["network", "set", bridge, "ipv4.routing", "true"])
+    cmds.incus.run(["network", "set", bridge, "ipv4.firewall", "true"])
+
+
+def _add_bridge_forwarding_rules(bridge: str) -> None:
+    docker_chain = _run(["iptables", "-nL", "DOCKER-USER"], check=False)
+    if docker_chain.returncode == 0:
+        accept_in = _run(
+            ["iptables", "-C", "DOCKER-USER", "-i", bridge, "-j", "ACCEPT"],
+            check=False,
+        )
+        if accept_in.returncode != 0:
+            _run(["iptables", "-I", "DOCKER-USER", "1", "-i", bridge, "-j", "ACCEPT"])
+
+        accept_out = _run(
+            [
+                "iptables",
+                "-C",
+                "DOCKER-USER",
+                "-o",
+                bridge,
+                "-m",
+                "conntrack",
+                "--ctstate",
+                "RELATED,ESTABLISHED",
+                "-j",
+                "ACCEPT",
+            ],
+            check=False,
+        )
+        if accept_out.returncode != 0:
+            _run(
+                [
+                    "iptables",
+                    "-I",
+                    "DOCKER-USER",
+                    "1",
+                    "-o",
+                    bridge,
+                    "-m",
+                    "conntrack",
+                    "--ctstate",
+                    "RELATED,ESTABLISHED",
+                    "-j",
+                    "ACCEPT",
+                ]
+            )
+
+    fwd_in = _run(
+        ["iptables", "-C", "FORWARD", "-i", bridge, "-j", "ACCEPT"],
+        check=False,
+    )
+    if fwd_in.returncode != 0:
+        _run(["iptables", "-I", "FORWARD", "1", "-i", bridge, "-j", "ACCEPT"])
+
+    fwd_out = _run(
+        [
+            "iptables",
+            "-C",
+            "FORWARD",
+            "-o",
+            bridge,
+            "-m",
+            "conntrack",
+            "--ctstate",
+            "RELATED,ESTABLISHED",
+            "-j",
+            "ACCEPT",
+        ],
+        check=False,
+    )
+    if fwd_out.returncode != 0:
+        _run(
+            [
+                "iptables",
+                "-I",
+                "FORWARD",
+                "1",
+                "-o",
+                bridge,
+                "-m",
+                "conntrack",
+                "--ctstate",
+                "RELATED,ESTABLISHED",
+                "-j",
+                "ACCEPT",
+            ]
+        )
+
+
+def _add_masquerade_fallback(cmds: Cmds, bridge: str) -> None:
+    cidr4 = cmds.incus.output(["network", "get", bridge, "ipv4.address"])
+    if not cidr4:
+        return
+    result = _run(
+        [
+            "python3",
+            "-c",
+            "import ipaddress,sys; net=ipaddress.ip_network(sys.argv[1], strict=False); print(net.with_prefixlen)",
+            cidr4,
+        ],
+        check=False,
+    )
+    if result.returncode != 0:
+        return
+    netcidr = result.stdout.strip()
+    check = _run(
+        [
+            "iptables",
+            "-t",
+            "nat",
+            "-C",
+            "POSTROUTING",
+            "-s",
+            netcidr,
+            "!", "-d", netcidr,
+            "-j",
+            "MASQUERADE",
+        ],
+        check=False,
+    )
+    if check.returncode != 0:
+        _run(
+            [
+                "iptables",
+                "-t",
+                "nat",
+                "-I",
+                "POSTROUTING",
+                "1",
+                "-s",
+                netcidr,
+                "!", "-d", netcidr,
+                "-j",
+                "MASQUERADE",
+            ]
+        )
+
+
+def run_prepare_host(args: argparse.Namespace) -> None:
+    bridge: str = args.bridge
+    debug: bool = getattr(args, "debug", False)
+
+    cmds = Cmds.create()
+
+    if debug:
+        logger.info("Preparing host for Incus backend (bridge=%s)...", bridge)
+
+    # Start and enable Incus service/socket (forgiving).
+    for unit in ("incus.service", "incus.socket"):
+        _run(["systemctl", "enable", "--now", unit], check=False)
+        _run(["systemctl", "start", unit], check=False)
+
+    # Initialize Incus with dir-backed storage pool, bridge network, default profile.
+    preseed = f"""config: {{}}
+networks:
+- name: {bridge}
+  type: bridge
+  config:
+    ipv4.address: auto
+    ipv4.nat: "true"
+    ipv6.address: none
+storage_pools:
+- name: default
+  driver: dir
+profiles:
+- name: default
+  devices:
+    eth0:
+      name: eth0
+      nictype: bridged
+      parent: {bridge}
+      type: nic
+    root:
+      path: /
+      pool: default
+      type: disk
+"""
+    cmds.incus.run(["admin", "init", "--preseed"], input=preseed, check=False)
+    cmds.incus.run(["info"], check=False)
+
+    if debug:
+        _print_diagnostics(cmds, bridge)
+
+    _enable_ipv4_forwarding()
+    _set_bridge_options(cmds, bridge)
+    _add_bridge_forwarding_rules(bridge)
+    _add_masquerade_fallback(cmds, bridge)
+
+    if debug:
+        logger.info("=== host networking after repair ===")
+        _run(["sysctl", "net.ipv4.ip_forward"], check=False)
+        _run(["sysctl", "net.ipv4.conf.all.forwarding"], check=False)
+        _run(["sysctl", "net.ipv4.conf.default.forwarding"], check=False)
+        _run(["iptables", "-S", "FORWARD"], check=False)
+        _run(["iptables", "-S", "DOCKER-USER"], check=False)
+        _run(["iptables", "-t", "nat", "-S", "POSTROUTING"], check=False)
+        _run(["nft", "list", "ruleset"], check=False)
+
+    logger.info("Host preparation complete.")
+
+
+def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
+    parser = subparsers.add_parser(
+        "prepare-host",
+        help="Prepare the local machine so build-vm or smoke-local-install can run",
+    )
+    parser.add_argument(
+        "--backend",
+        default="incus",
+        choices=("incus",),
+        help="Backend to prepare for (default: incus)",
+    )
+    parser.add_argument(
+        "--bridge",
+        default="incusbr0",
+        help="Backend bridge network (default: incusbr0)",
+    )
+    parser.add_argument("--debug", action="store_true", help="Show debug logging")
+    parser.set_defaults(func=run_prepare_host)
