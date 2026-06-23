@@ -228,22 +228,48 @@ modify the `user_name` variable if necessary.
 
 ### Configure TLS for the web server
 
-Before you install Kive in the next step, configure TLS for Apache.
+Before installing Kive in production, get the SSL credentials for the server.
+These must be acquired securely from IT or within the software group.  Do not
+commit certificate or private-key material to source control.
 
-Two modes are supported (set via `kive_tls_mode`):
+Two TLS modes are supported via `kive_tls_mode`:
 
-* `provided` (production default): copy certificate and key files from external paths
-  on the Ansible controller.  Set `kive_ssl_certificate_src` and `kive_ssl_key_src` to the
-  paths of the certificate and private key files respectively.  *DO NOT* commit private
-  key material to the repository.
+* `provided` (production): copy certificate and key files from external paths
+  on the Ansible controller.  Set `kive_ssl_certificate_src` to the chained
+  certificate file and `kive_ssl_key_src` to the private key file.  The role
+  copies these to `kive_ssl_cert_path` and `kive_ssl_key_path` on the target.
 
-* `self_signed` (dev/local): a self-signed certificate and key are generated automatically
-  on the target machine during provisioning.  No files need to be placed in the deployment
-  directory; this is the default for the local install / build-vm smoke test path.
+* `self_signed` (dev/local): a self-signed certificate and key are generated
+  automatically on the target machine during provisioning.  No files need to
+  be placed in the deployment directory.  This is the default for the local
+  install / build-vm smoke test path.
 
-The Apache SSL site configuration template uses Ansible variables
-`kive_ssl_cert_path` and `kive_ssl_key_path` so the same template works
-in either mode.
+For production, the certificate source should normally be a chained certificate.
+Historically this was named `star_cfe_chained.crt`, and the private key was
+named `star_cfe.key`; the exact file names are no longer required, but the same
+inputs are still needed.
+
+The chained certificate is made up of:
+
+* the wildcard/server certificate;
+* the intermediate certificate;
+* the root certificate.
+
+For example, to create the chained certificate from individual parts:
+
+    cat star_cfe.crt intermediate.csr DigiCertCA.crt > star_cfe_chained.crt
+
+The chained certificate can be verified with:
+
+    openssl verify star_cfe_chained.crt
+
+Keep these files outside the repository and reference them via the Ansible
+variables `kive_ssl_certificate_src` and `kive_ssl_key_src` in your inventory
+or group vars.
+
+The Apache SSL site configuration template (`001-kive-ssl.conf.j2`) uses
+`kive_ssl_cert_path` and `kive_ssl_key_path` so the same template works in
+either mode.
 
 ### Set up network drives
 
