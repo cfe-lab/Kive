@@ -83,6 +83,6 @@ def run_build_vm(args: argparse.Namespace) -> None:
     )
 
     logger.info(
-        "Build step complete. Use ws-enter-vm (or ./utils/dev enter-vm) to connect to %s.",
+        "Build step complete. Use ./utils/dev enter-vm %s to connect.",
         cfg.instance,
     )

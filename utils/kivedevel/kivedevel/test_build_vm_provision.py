@@ -264,5 +264,99 @@ class TestTlsKeyRemoval(unittest.TestCase):
         self.assertIn("state: present", text)
 
 
+class TestEnterVm(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_enter_vm_registered_in_entrypoint(self):
+        entrypoint_path = self.REPO_ROOT / "utils" / "kivedevel" / "kivedevel" / "entrypoint.py"
+        text = entrypoint_path.read_text()
+        self.assertIn("enter_vm.register_subcommand", text)
+
+    def test_enter_vm_module_has_register_and_run(self):
+        import importlib
+        sys.path.insert(0, str(self.REPO_ROOT))
+        mod = importlib.import_module("Kive.utils.kivedevel.kivedevel.enter_vm")
+        self.assertTrue(hasattr(mod, "register_subcommand"))
+        self.assertTrue(hasattr(mod, "run_enter_vm"))
+
+    def test_enter_vm_checks_instance_exists_in_run(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import run_enter_vm
+        source = inspect.getsource(run_enter_vm)
+        self.assertIn("instance_exists", source)
+
+    def test_enter_vm_starts_instance_if_not_running(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import run_enter_vm
+        source = inspect.getsource(run_enter_vm)
+        self.assertIn("instance_is_running", source)
+
+    def test_enter_vm_uses_native_incus_exec(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import run_enter_vm
+        source = inspect.getsource(run_enter_vm)
+        self.assertIn("incus", source)
+        self.assertIn("exec", source)
+
+    def test_enter_vm_uses_subprocess_call_for_interactive(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import run_enter_vm
+        source = inspect.getsource(run_enter_vm)
+        self.assertIn("subprocess.call", source)
+        self.assertNotIn("capture_output=True", source)
+
+    def test_build_completion_message_refers_to_enter_vm(self):
+        runner_path = self.REPO_ROOT / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "runner.py"
+        text = runner_path.read_text()
+        self.assertIn("./utils/dev enter-vm", text)
+        self.assertNotIn("ws-enter-vm", text)
+
+    def test_enter_vm_default_instance_is_kive_minimal(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("default=\"kive-minimal\"", source)
+
+    def test_enter_vm_default_user_is_ubuntu(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("default=\"ubuntu\"", source)
+
+    def test_enter_vm_default_shell_is_bash(self):
+        from Kive.utils.kivedevel.kivedevel.enter_vm import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("default=\"/bin/bash\"", source)
+
+
+class TestNoWorkspaceHelperReferences(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+    THIS_FILE = Path(__file__).resolve()
+
+    def test_no_ws_enter_vm_references(self):
+        needles = self._build_needles()
+        ignored_dirs = {".git", "__pycache__", ".mypy_cache", "node_modules", "tmp~", ".venv"}
+        for path in self.REPO_ROOT.rglob("*"):
+            if any(part in ignored_dirs for part in path.parts):
+                continue
+            if path.is_file() and path.name not in ("package-lock.json", self.THIS_FILE.name):
+                try:
+                    text = path.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                for needle in needles:
+                    if needle in text:
+                        self.fail(f"{needle} found in {path}")
+
+    def test_no_ws_hyphen_in_python_source(self):
+        ignored_dirs = {".git", "__pycache__", ".mypy_cache", "node_modules", "tmp~", ".venv"}
+        for path in self.REPO_ROOT.rglob("*.py"):
+            if any(part in ignored_dirs for part in path.parts):
+                continue
+            if path.resolve() == self.THIS_FILE:
+                continue
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            self.assertNotIn("ws-", text, f"ws-* reference found in {path}")
+
+    @staticmethod
+    def _build_needles():
+        prefix = "ws"
+        return [f"{prefix}-enter-vm", f"{prefix}-start-incus-daemon"]
+
+
 if __name__ == "__main__":
     unittest.main()

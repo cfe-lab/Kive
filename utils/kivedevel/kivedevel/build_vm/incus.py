@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -18,22 +17,22 @@ def ensure_incus_daemon(cmds: Cmds, root: Path, workdir: Path) -> None:
     if cmds.incus.ok(["info"]):
         return
 
-    if not shutil.which("ws-start-incus-daemon"):
-        logger.error("Incus daemon is not running and ws-start-incus-daemon is not available.")
-        logger.error("Start the daemon manually or install the helper script.")
-        sys.exit(1)
+    logger.info("Incus is not running. Attempting to start the daemon via systemctl...")
+    subprocess.run(
+        ["systemctl", "start", "incus.service", "incus.socket"],
+        capture_output=True,
+    )
 
-    logger.info("Starting Incus daemon using ws-start-incus-daemon...")
-    subprocess.run(["sudo", "--", "pkill", "-f", "incusd --group incus-admin"], check=False)
+    time.sleep(3)
+    if cmds.incus.ok(["info"]):
+        return
 
-    log_file = workdir / "incusd_restart.log"
-    with open(log_file, "w") as handle:
-        subprocess.Popen(["ws-start-incus-daemon", "--", str(root)], stdout=handle, stderr=handle)
-
-    time.sleep(5)
-    if not cmds.incus.ok(["info"]):
-        logger.error("Failed to start Incus daemon. See %s.", log_file)
-        sys.exit(1)
+    logger.error(
+        "Incus does not appear to be running or accessible.\n"
+        "Please install and initialize Incus, ensure your user can access it,"
+        " then rerun this command."
+    )
+    sys.exit(1)
 
 
 def ensure_storage_pool(cmds: Cmds, pool: str) -> None:
