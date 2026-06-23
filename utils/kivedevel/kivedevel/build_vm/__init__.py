@@ -65,11 +65,12 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         help="Host network interface for the VM NIC (auto-detected by default)",
     )
     parser.add_argument(
-        "--provision",
-        action="store_true",
-        help="Provision container instances for API smoke testing after build",
+        "--no-provision",
+        action="store_false",
+        dest="provision",
+        help="Skip provisioning after build (default: enabled)",
     )
-    parser.set_defaults(func=run_from_args)
+    parser.set_defaults(func=run_from_args, provision=True)
 
     purge.register_subcommand(subparsers)
 
