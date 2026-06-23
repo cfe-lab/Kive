@@ -14,10 +14,17 @@ logger = logging.getLogger("kivedevel")
 _RESOURCE_MARKER = ".kive-devel-resource.json"
 
 
-def _write_marker(workdir: Path) -> None:
+def _write_marker(workdir: Path, root: Path) -> None:
     marker = workdir / _RESOURCE_MARKER
     if not marker.exists():
-        marker.write_text(json.dumps({"created-by": "utils/dev"}) + "\n")
+        data = {
+            "created_by": "utils/dev",
+            "project": "Kive",
+            "repo_root": str(root),
+            "workdir": str(workdir),
+            "kind": "build-workdir",
+        }
+        marker.write_text(json.dumps(data, indent=2) + "\n")
         logger.debug("Created resource marker %s", marker)
 
 
@@ -118,7 +125,7 @@ def _build_and_attach_vm_workspace(cmds: Cmds, instance: str, image_path: Path, 
 
 
 def handle_workspace_attachment(cmds: Cmds, instance: str, image_path: Path, root: Path, workdir: Path, instance_type: str) -> None:
-    _write_marker(workdir)
+    _write_marker(workdir, root)
 
     if instance_type == "container":
         _attach_container_workspace(cmds, instance, root, workdir)
