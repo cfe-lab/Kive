@@ -8,11 +8,74 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import checks
+from .build_vm.runner import run_build_vm
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root, instance_exists
 
 
 logger = logging.getLogger("kivedevel.local_install")
+
+
+def _build_vm_args(
+    instance: str,
+    instance_type: str,
+    workdir: Path,
+    debug: bool,
+) -> argparse.Namespace:
+    root = default_root()
+    return argparse.Namespace(
+        instance=instance,
+        instance_type=instance_type,
+        workdir=workdir,
+        root=root,
+        image_name="kive-code.qcow2",
+        pool="default",
+        profile="default",
+        root_size="10GiB",
+        memory="1GB",
+        cpu="1",
+        host_interface="",
+        provision=True,
+        quiet=False,
+        verbose=False,
+        debug=debug,
+        log_file=None,
+    )
+
+
+def _validate_vm_args(
+    instance: str,
+    instance_type: str,
+    workdir: Path,
+    debug: bool,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        instance=instance,
+        instance_type=instance_type,
+        workdir=workdir,
+        quiet=False,
+        verbose=False,
+        debug=debug,
+    )
+
+
+def _test_api_args(
+    instance: str,
+    workdir: Path,
+    debug: bool,
+) -> argparse.Namespace:
+    return argparse.Namespace(
+        instance=instance,
+        workdir=workdir,
+        port=8000,
+        base_url=None,
+        username="kive",
+        password="kive",
+        quiet=False,
+        verbose=False,
+        debug=debug,
+    )
 
 
 def run_smoke_local_install(args: argparse.Namespace) -> None:
@@ -25,27 +88,17 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
     workdir.mkdir(parents=True, exist_ok=True)
 
-    commands: list[list[str]] = []
+    build_args = _build_vm_args(instance, instance_type, workdir, debug)
+    logger.info("Running: build-vm %s --instance-type %s --provision --workdir %s", instance, instance_type, workdir)
+    run_build_vm(build_args)
 
-    for subcmd in ("build-vm", "validate-vm", "test-api"):
-        cmd = [
-            "utils/dev", subcmd, instance,
-            "--workdir", str(workdir),
-        ]
-        if subcmd != "test-api":
-            cmd.extend(["--instance-type", instance_type])
-        if subcmd == "build-vm":
-            cmd.append("--provision")
-        if debug:
-            cmd.append("--debug")
-        commands.append(cmd)
+    validate_args = _validate_vm_args(instance, instance_type, workdir, debug)
+    logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
+    checks._run_validate_vm(validate_args)
 
-    for cmd in commands:
-        logger.info("Running: %s", " ".join(cmd))
-        result = subprocess.run(cmd, check=False)
-        if result.returncode != 0:
-            logger.error("Command failed with exit code %s: %s", result.returncode, " ".join(cmd))
-            sys.exit(result.returncode)
+    api_args = _test_api_args(instance, workdir, debug)
+    logger.info("Running: test-api %s --workdir %s", instance, workdir)
+    checks._run_test_api(api_args)
 
     logger.info("Smoke test passed.")
 
