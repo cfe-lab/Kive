@@ -99,6 +99,7 @@ def run_check_network(args: argparse.Namespace) -> None:
             "--profile", "default",
             "--config", "limits.cpu=1",
             "--config", "limits.memory=512MB",
+            "--config", "user.kive.devel.created-by=utils/dev",
         ]
         if privileged:
             cmd += ["--config", "security.privileged=true"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import subprocess
 from pathlib import Path
@@ -8,6 +9,16 @@ from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")
+
+
+_RESOURCE_MARKER = ".kive-devel-resource.json"
+
+
+def _write_marker(workdir: Path) -> None:
+    marker = workdir / _RESOURCE_MARKER
+    if not marker.exists():
+        marker.write_text(json.dumps({"created-by": "utils/dev"}) + "\n")
+        logger.debug("Created resource marker %s", marker)
 
 
 def _sudo(*args: str) -> subprocess.CompletedProcess[str]:
@@ -107,6 +118,8 @@ def _build_and_attach_vm_workspace(cmds: Cmds, instance: str, image_path: Path, 
 
 
 def handle_workspace_attachment(cmds: Cmds, instance: str, image_path: Path, root: Path, workdir: Path, instance_type: str) -> None:
+    _write_marker(workdir)
+
     if instance_type == "container":
         _attach_container_workspace(cmds, instance, root, workdir)
         return

@@ -23,6 +23,8 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
             f"limits.cpu={cpu}",
             "--config",
             f"limits.memory={memory}",
+            "--config",
+            "user.kive.devel.created-by=utils/dev",
             "--profile",
             profile,
         ]
