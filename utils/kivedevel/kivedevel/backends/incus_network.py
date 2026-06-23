@@ -63,7 +63,9 @@ def _tcp_connect_test(cmds: Cmds, instance: str, host: str, port: int) -> None:
 
 
 def run_check_network(args: argparse.Namespace) -> None:
-    bridge: str = args.bridge
+    # CLI is backend-generic; only incus is implemented today.
+    assert args.backend == "incus", f"Unsupported backend: {args.backend}"
+
     instance: str = args.instance
     host: str = args.host
     port: int = args.port
@@ -127,11 +129,6 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         default="incus",
         choices=("incus",),
         help="Backend to use (default: incus)",
-    )
-    parser.add_argument(
-        "--bridge",
-        default="incusbr0",
-        help="Backend bridge network (default: incusbr0)",
     )
     parser.add_argument(
         "--instance",

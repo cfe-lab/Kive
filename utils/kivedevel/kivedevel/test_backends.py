@@ -206,7 +206,6 @@ class TestIncusNetworkCheckReadiness(unittest.TestCase):
 
             args = mock.Mock()
             args.backend = "incus"
-            args.bridge = "incusbr0"
             args.instance = "network-smoke"
             args.host = "archive.ubuntu.com"
             args.port = 80

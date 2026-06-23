@@ -177,6 +177,9 @@ def _add_masquerade_fallback(cmds: Cmds, bridge: str) -> None:
 
 
 def run_prepare_host(args: argparse.Namespace) -> None:
+    # CLI is backend-generic; only incus is implemented today.
+    assert args.backend == "incus", f"Unsupported backend: {args.backend}"
+
     bridge: str = args.bridge
     debug: bool = getattr(args, "debug", False)
 

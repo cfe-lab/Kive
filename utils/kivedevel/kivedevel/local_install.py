@@ -29,7 +29,6 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
     for subcmd in ("build-vm", "validate-vm", "test-api"):
         cmd = [
-            "sudo", "--preserve-env=PATH,BUILD_VM_WORKDIR",
             "utils/dev", subcmd, instance,
             "--workdir", str(workdir),
         ]
@@ -68,7 +67,7 @@ def run_cleanup_local_install(args: argparse.Namespace) -> None:
 
     if workdir is not None and workdir.exists():
         logger.info("Removing workdir %s...", workdir)
-        subprocess.run(["sudo", "rm", "-rf", str(workdir)], check=False)
+        subprocess.run(["rm", "-rf", str(workdir)], check=False)
 
     logger.info("Cleanup complete.")
 

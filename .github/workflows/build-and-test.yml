@@ -114,7 +114,7 @@ jobs:
         run: sudo --preserve-env=PATH utils/dev prepare-host --backend incus --bridge incusbr0 --debug
 
       - name: Check guest network
-        run: sudo --preserve-env=PATH utils/dev check-network --backend incus --bridge incusbr0 --instance network-smoke --host archive.ubuntu.com --port 80 --debug
+        run: sudo --preserve-env=PATH utils/dev check-network --backend incus --instance network-smoke --host archive.ubuntu.com --port 80 --debug
 
       - name: Smoke-test local install
         env:
