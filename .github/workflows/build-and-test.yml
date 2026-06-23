@@ -110,171 +110,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y incus rsync qemu-utils iproute2
 
-      - name: Start and initialize Incus
-        run: |
-          sudo systemctl enable --now incus.service || true
-          sudo systemctl enable --now incus.socket || true
-          sudo systemctl start incus.service || true
-          sudo systemctl start incus.socket || true
-          # Initialize with a dir-backed storage pool, a bridge network, and default profile
-          sudo incus admin init --preseed <<'EOF'
-          config: {}
-          networks:
-          - name: incusbr0
-            type: bridge
-            config:
-              ipv4.address: auto
-              ipv4.nat: "true"
-              ipv6.address: none
-          storage_pools:
-          - name: default
-            driver: dir
-          profiles:
-          - name: default
-            devices:
-              eth0:
-                name: eth0
-                nictype: bridged
-                parent: incusbr0
-                type: nic
-              root:
-                path: /
-                pool: default
-                type: disk
-          EOF
-          sudo incus info
+      - name: Prepare host
+        run: sudo --preserve-env=PATH utils/dev prepare-host --backend incus --bridge incusbr0 --debug
 
-      - name: Print host-side Incus networking diagnostics
-        run: |
-          sudo incus network show incusbr0 || true
-          sudo incus profile show default || true
-          sudo sysctl net.ipv4.ip_forward || true
-          sudo sysctl net.ipv4.conf.all.forwarding || true
-          sudo ip addr || true
-          sudo ip route || true
-          sudo iptables -S || true
-          sudo iptables -t nat -S || true
-          sudo nft list ruleset || true
+      - name: Check guest network
+        run: sudo --preserve-env=PATH utils/dev check-network --backend incus --bridge incusbr0 --instance network-smoke --host archive.ubuntu.com --port 80 --debug
 
-      - name: Repair Incus bridge egress on GitHub runner
-        run: |
-          set -euxo pipefail
-
-          BRIDGE=incusbr0
-
-          echo "=== host networking before repair ==="
-          sudo incus network show "$BRIDGE" || true
-          sudo sysctl net.ipv4.ip_forward || true
-          sudo sysctl net.ipv4.conf.all.forwarding || true
-          sudo sysctl net.ipv4.conf.default.forwarding || true
-          sudo ip addr || true
-          sudo ip route || true
-          sudo iptables -S || true
-          sudo iptables -t nat -S || true
-          sudo nft list ruleset || true
-
-          echo "=== ensure host IPv4 forwarding ==="
-          sudo sysctl -w net.ipv4.ip_forward=1
-          sudo sysctl -w net.ipv4.conf.all.forwarding=1 || true
-          sudo sysctl -w net.ipv4.conf.default.forwarding=1 || true
-
-          echo "=== ensure Incus bridge NAT/routing config ==="
-          sudo incus network set "$BRIDGE" ipv4.nat true
-          sudo incus network set "$BRIDGE" ipv4.routing true
-          sudo incus network set "$BRIDGE" ipv4.firewall true
-          sudo incus network show "$BRIDGE"
-
-          echo "=== allow Incus bridge through Docker/host forward filters ==="
-          if sudo iptables -nL DOCKER-USER >/dev/null 2>&1; then
-            sudo iptables -C DOCKER-USER -i "$BRIDGE" -j ACCEPT 2>/dev/null || sudo iptables -I DOCKER-USER 1 -i "$BRIDGE" -j ACCEPT
-            sudo iptables -C DOCKER-USER -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || sudo iptables -I DOCKER-USER 1 -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-          fi
-
-          sudo iptables -C FORWARD -i "$BRIDGE" -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD 1 -i "$BRIDGE" -j ACCEPT
-          sudo iptables -C FORWARD -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || sudo iptables -I FORWARD 1 -o "$BRIDGE" -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
-
-          echo "=== add targeted NAT fallback for Incus subnet ==="
-          CIDR4=$(sudo incus network get "$BRIDGE" ipv4.address || true)
-          if [ -n "$CIDR4" ]; then
-            if python3 -c 'import ipaddress,sys; net=ipaddress.ip_network(sys.argv[1], strict=False); print(net.with_prefixlen)' "$CIDR4" >/tmp/incus-net.txt 2>/dev/null; then
-              NETCIDR=$(cat /tmp/incus-net.txt)
-              sudo iptables -t nat -C POSTROUTING -s "$NETCIDR" ! -d "$NETCIDR" -j MASQUERADE 2>/dev/null || sudo iptables -t nat -I POSTROUTING 1 -s "$NETCIDR" ! -d "$NETCIDR" -j MASQUERADE
-            fi
-          fi
-
-          echo "=== host networking after repair ==="
-          sudo sysctl net.ipv4.ip_forward || true
-          sudo sysctl net.ipv4.conf.all.forwarding || true
-          sudo sysctl net.ipv4.conf.default.forwarding || true
-          sudo iptables -S FORWARD || true
-          sudo iptables -S DOCKER-USER || true
-          sudo iptables -t nat -S POSTROUTING || true
-          sudo nft list ruleset || true
-
-      - name: Verify Incus container egress
-        run: |
-          set -euxo pipefail
-
-          SMOKE=incus-net-smoke
-          sudo incus delete -f "$SMOKE" || true
-          trap 'sudo incus delete -f "$SMOKE" || true' EXIT
-
-          sudo incus launch images:ubuntu/noble/cloud "$SMOKE" --profile default --config limits.cpu=1 --config limits.memory=512MB
-
-          echo "=== wait for smoke container network readiness ==="
-          for i in $(seq 1 120); do
-            if sudo incus exec "$SMOKE" -- sh -lc '
-              test -e /etc/resolv.conf &&
-              ip -4 addr show dev eth0 | grep -q "inet " &&
-              ip route | grep -q "^default " &&
-              getent ahostsv4 archive.ubuntu.com >/dev/null
-            '; then
-              echo "smoke container network is ready"
-              break
-            fi
-            if [ "$i" -eq 120 ]; then
-              echo "smoke container network readiness timed out"
-              sudo incus exec "$SMOKE" -- sh -lc '
-                echo "--- cloud-init ---"; cloud-init status --long 2>&1 || true
-                echo "--- ip addr ---"; ip addr || true
-                echo "--- ip route ---"; ip route || true
-                echo "--- resolv.conf ---"; cat /etc/resolv.conf || true
-                echo "--- systemd-networkd ---"; systemctl status systemd-networkd --no-pager || true
-                echo "--- systemd-resolved ---"; systemctl status systemd-resolved --no-pager || true
-                echo "--- journal network snippets ---"; journalctl -u systemd-networkd -u systemd-resolved --no-pager -n 100 || true
-              ' || true
-              exit 1
-            fi
-            sleep 1
-          done
-
-          echo "=== guest network smoke diagnostics ==="
-          sudo incus exec "$SMOKE" -- sh -lc '
-            ip addr
-            ip route
-            cat /etc/resolv.conf
-            getent hosts archive.ubuntu.com
-            getent ahostsv4 archive.ubuntu.com
-          '
-
-          echo "=== guest TCP egress test ==="
-          sudo incus exec "$SMOKE" -- sh -lc '
-            python3 -c "import socket,sys; addr=socket.getaddrinfo(\"archive.ubuntu.com\",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; print(\"connecting to\", addr); sock=socket.create_connection(addr, timeout=10); sock.close(); print(\"TCP egress ok\")"
-          '
-
-      - name: Run build-vm smoke test
+      - name: Smoke-test local install
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
-        run: |
-          mkdir -p "$BUILD_VM_WORKDIR"
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev build-vm ci-smoke --instance-type container --provision --workdir "$BUILD_VM_WORKDIR" --debug
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev validate-vm ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev test-api ci-smoke --workdir "$BUILD_VM_WORKDIR" --debug
+        run: sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev smoke-local-install --instance ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
 
-      - name: Cleanup smoke-test instance
+      - name: Cleanup local install smoke test
         if: always()
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
-        run: |
-          sudo incus delete -f ci-smoke || true
-          sudo rm -rf "$BUILD_VM_WORKDIR"
+        run: sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev cleanup-local-install --instance ci-smoke --workdir "$BUILD_VM_WORKDIR"
