@@ -2,6 +2,11 @@
 # and modifying `/etc/apache2/sites-available/default-ssl.conf`.  That file
 # has some helpful comments that may be useful to look at if you ever need
 # to further adjust this file.
+#
+# Certificate and key paths are controlled by Ansible variables
+# (kive_ssl_cert_path, kive_ssl_key_path) so that TLS material can be
+# supplied via self-signed generation (dev) or external files (production)
+# without committing private key material to the repository.
 
 <IfModule mod_ssl.c>
     <VirtualHost _default_:443>
@@ -14,8 +19,8 @@
 
         SSLEngine on
 
-        SSLCertificateFile      /etc/ssl/certs/star_cfe_chained.crt
-        SSLCertificateKeyFile /etc/ssl/private/star_cfe.key
+        SSLCertificateFile      {{ kive_ssl_cert_path }}
+        SSLCertificateKeyFile {{ kive_ssl_key_path }}
         # SSLCertificateChainFile /etc/ssl/certs/DigiCertCA.crt
 
         #SSLOptions +FakeBasicAuth +ExportCertData +StrictRequire
