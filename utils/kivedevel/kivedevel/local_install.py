@@ -94,11 +94,11 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
     validate_args = _validate_vm_args(instance, instance_type, workdir, debug)
     logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
-    checks._run_validate_vm(validate_args)
+    checks.run_validate_vm(validate_args)
 
     api_args = _test_api_args(instance, workdir, debug)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
-    checks._run_test_api(api_args)
+    checks.run_test_api(api_args)
 
     logger.info("Smoke test passed.")
 

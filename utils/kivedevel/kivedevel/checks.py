@@ -35,7 +35,7 @@ def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> 
     return value
 
 
-def _run_validate_vm(args: argparse.Namespace) -> None:
+def run_validate_vm(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
     configure_logging(args, workdir)
 
@@ -311,7 +311,7 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     return result
 
 
-def _run_test_api(args: argparse.Namespace) -> None:
+def run_test_api(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
     configure_logging(args, workdir)
 
@@ -445,7 +445,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     )
     for opt, kwargs in log_opts.items():
         validate.add_argument(f"--{opt}", **kwargs)
-    validate.set_defaults(func=_run_validate_vm)
+    validate.set_defaults(func=run_validate_vm)
 
     test_api = subparsers.add_parser(
         "test-api",
@@ -481,4 +481,4 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
     )
     for opt, kwargs in log_opts.items():
         test_api.add_argument(f"--{opt}", **kwargs)
-    test_api.set_defaults(func=_run_test_api)
+    test_api.set_defaults(func=run_test_api)
