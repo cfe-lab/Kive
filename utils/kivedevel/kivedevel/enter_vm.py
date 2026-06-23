@@ -6,10 +6,17 @@ import subprocess
 import sys
 
 from .kv_commands import Cmds
-from .shared import instance_exists, instance_is_running
+from .shared import configure_console_logging, instance_exists, instance_is_running
 
 
 logger = logging.getLogger("kivedevel")
+
+
+def _add_log_flags(parser: argparse.ArgumentParser) -> None:
+    log_group = parser.add_mutually_exclusive_group()
+    log_group.add_argument("--quiet", action="store_true", help="Only show errors")
+    log_group.add_argument("--verbose", action="store_true", help="Show informational progress messages")
+    log_group.add_argument("--debug", action="store_true", help="Show debug logging, including full command lines")
 
 
 def register_subcommand(subparsers) -> None:
@@ -20,16 +27,17 @@ def register_subcommand(subparsers) -> None:
     parser.add_argument("instance", nargs="?", default="kive-minimal", help="Incus instance name (default: kive-minimal)")
     parser.add_argument("--user", default="ubuntu", help="Username to log in as (default: ubuntu)")
     parser.add_argument("--shell", default="/bin/bash", help="Shell to launch (default: /bin/bash)")
-    parser.add_argument("--debug", action="store_true", help="Enable debug logging")
     parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
         help="Optional command to run inside the instance (prefix with --)",
     )
+    _add_log_flags(parser)
     parser.set_defaults(func=run_enter_vm)
 
 
 def run_enter_vm(args: argparse.Namespace) -> None:
+    configure_console_logging(args)
     cmds = Cmds.create()
     cmds.incus.require()
 

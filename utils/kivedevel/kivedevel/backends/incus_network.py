@@ -9,6 +9,7 @@ import sys
 import time
 
 from ..kv_commands import Cmds
+from ..shared import configure_console_logging
 
 
 logger = logging.getLogger("kivedevel.backends.incus_network")
@@ -74,6 +75,8 @@ def _needs_privileged_fallback(stderr: str) -> bool:
 
 
 def run_check_network(args: argparse.Namespace) -> None:
+    configure_console_logging(args)
+
     # CLI is backend-generic; only incus is implemented today.
     assert args.backend == "incus", f"Unsupported backend: {args.backend}"
 
@@ -136,11 +139,11 @@ def run_check_network(args: argparse.Namespace) -> None:
             time.sleep(POLL_INTERVAL)
 
         if debug:
-            logger.info("=== guest network diagnostics ===")
+            logger.info("=== guest network diagnostics (%s) ===", host)
             cmds.incus.run(
                 [
                     "exec", instance, "--", "sh", "-lc",
-                    "ip addr; ip route; cat /etc/resolv.conf; getent hosts archive.ubuntu.com; getent ahostsv4 archive.ubuntu.com",
+                    f"ip addr; ip route; cat /etc/resolv.conf; getent hosts {host}; getent ahostsv4 {host}",
                 ],
                 check=False,
             )
@@ -149,6 +152,13 @@ def run_check_network(args: argparse.Namespace) -> None:
         logger.info("Guest network check passed.")
     finally:
         cmds.incus.run(["delete", "-f", instance], check=False)
+
+
+def _add_log_flags(parser: argparse.ArgumentParser) -> None:
+    log_group = parser.add_mutually_exclusive_group()
+    log_group.add_argument("--quiet", action="store_true", help="Only show errors")
+    log_group.add_argument("--verbose", action="store_true", help="Show informational progress messages")
+    log_group.add_argument("--debug", action="store_true", help="Show debug logging, including full command lines")
 
 
 def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
@@ -181,5 +191,5 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         default=80,
         help="TCP port to test connectivity against (default: 80)",
     )
-    parser.add_argument("--debug", action="store_true", help="Show debug logging")
+    _add_log_flags(parser)
     parser.set_defaults(func=run_check_network)

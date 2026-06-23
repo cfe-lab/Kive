@@ -12,15 +12,38 @@ def default_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
-def configure_logging(args, workdir: Path, *, default_log_name: str = "build-vm.log") -> None:
+def _log_level(args) -> int:
     if getattr(args, "quiet", False):
-        level = logging.ERROR
-    elif getattr(args, "debug", False):
-        level = logging.DEBUG
+        return logging.ERROR
+    if getattr(args, "debug", False):
+        return logging.DEBUG
+    if getattr(args, "verbose", False):
+        return logging.INFO
+    return logging.INFO
+
+
+def configure_console_logging(args) -> None:
+    level = _log_level(args)
+    if getattr(args, "debug", False):
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.DEBUG)
     elif getattr(args, "verbose", False):
-        level = logging.INFO
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.INFO)
     else:
-        level = logging.INFO
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.INFO)
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[console],
+        force=True,
+    )
+
+
+def configure_logging(args, workdir: Path, *, default_log_name: str = "build-vm.log") -> None:
+    level = _log_level(args)
 
     log_file = getattr(args, "log_file", None) or (workdir / default_log_name)
     log_file.parent.mkdir(parents=True, exist_ok=True)

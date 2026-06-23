@@ -1,3 +1,4 @@
+import logging
 import sys
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from Kive.utils.kivedevel.kivedevel.backends import incus_host
 from Kive.utils.kivedevel.kivedevel.backends import incus_network
+from Kive.utils.kivedevel.kivedevel.shared import _log_level, configure_console_logging
 
 
 class MockRunResult:
@@ -165,6 +167,61 @@ class TestIncusHostCheckBeforeInsert(unittest.TestCase):
                 for cmd in call_log
             )
         )
+
+
+class TestConsoleLogging(unittest.TestCase):
+    def test_log_level_debug(self):
+        args = mock.Mock()
+        args.quiet = False
+        args.verbose = False
+        args.debug = True
+        self.assertEqual(_log_level(args), logging.DEBUG)
+
+    def test_log_level_verbose(self):
+        args = mock.Mock()
+        args.quiet = False
+        args.verbose = True
+        args.debug = False
+        self.assertEqual(_log_level(args), logging.INFO)
+
+    def test_log_level_quiet(self):
+        args = mock.Mock()
+        args.quiet = True
+        args.verbose = False
+        args.debug = False
+        self.assertEqual(_log_level(args), logging.ERROR)
+
+    def test_log_level_default(self):
+        args = mock.Mock()
+        args.quiet = False
+        args.verbose = False
+        args.debug = False
+        self.assertEqual(_log_level(args), logging.INFO)
+
+    def test_configure_console_logging_sets_debug_level(self):
+        args = mock.Mock()
+        args.quiet = False
+        args.verbose = False
+        args.debug = True
+        try:
+            configure_console_logging(args)
+            root = logging.getLogger()
+            self.assertTrue(root.isEnabledFor(logging.DEBUG))
+        finally:
+            logging.basicConfig(handlers=[logging.NullHandler()], force=True)
+
+    def test_configure_console_logging_sets_error_level(self):
+        args = mock.Mock()
+        args.quiet = True
+        args.verbose = False
+        args.debug = False
+        try:
+            configure_console_logging(args)
+            root = logging.getLogger()
+            self.assertFalse(root.isEnabledFor(logging.INFO))
+            self.assertTrue(root.isEnabledFor(logging.ERROR))
+        finally:
+            logging.basicConfig(handlers=[logging.NullHandler()], force=True)
 
 
 class TestNeedsPrivilegedFallback(unittest.TestCase):

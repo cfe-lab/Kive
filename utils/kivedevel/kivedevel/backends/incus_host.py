@@ -8,6 +8,7 @@ import subprocess
 import sys
 
 from ..kv_commands import Cmds
+from ..shared import configure_console_logging
 
 
 logger = logging.getLogger("kivedevel.backends.incus_host")
@@ -177,6 +178,8 @@ def _add_masquerade_fallback(cmds: Cmds, bridge: str) -> None:
 
 
 def run_prepare_host(args: argparse.Namespace) -> None:
+    configure_console_logging(args)
+
     # CLI is backend-generic; only incus is implemented today.
     assert args.backend == "incus", f"Unsupported backend: {args.backend}"
 
@@ -242,6 +245,13 @@ profiles:
     logger.info("Host preparation complete.")
 
 
+def _add_log_flags(parser: argparse.ArgumentParser) -> None:
+    log_group = parser.add_mutually_exclusive_group()
+    log_group.add_argument("--quiet", action="store_true", help="Only show errors")
+    log_group.add_argument("--verbose", action="store_true", help="Show informational progress messages")
+    log_group.add_argument("--debug", action="store_true", help="Show debug logging, including full command lines")
+
+
 def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     parser = subparsers.add_parser(
         "prepare-host",
@@ -258,5 +268,5 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         default="incusbr0",
         help="Backend bridge network (default: incusbr0)",
     )
-    parser.add_argument("--debug", action="store_true", help="Show debug logging")
+    _add_log_flags(parser)
     parser.set_defaults(func=run_prepare_host)
