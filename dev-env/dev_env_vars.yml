@@ -28,6 +28,11 @@ kive_server_email: kive-noreply@example.com
 kive_admins: "[[\"kive\", \"kive@example.com\"]]"
 kive_subject_prefix: "Kive (development) server"
 kive_backup_path: /data/kive_db_backup
+# - TLS configuration (self-signed for dev)
+kive_tls_mode: self_signed
+kive_tls_common_name: kive-dev.local
+kive_ssl_cert_path: /etc/ssl/certs/kive-dev-selfsigned.crt
+kive_ssl_key_path: /etc/ssl/private/kive-dev-selfsigned.key
 kive_log_level: WARN
 kive_purge_start: "20GB"
 kive_purge_stop: "15GB"
