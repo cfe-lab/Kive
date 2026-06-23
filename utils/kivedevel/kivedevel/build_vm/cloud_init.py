@@ -196,12 +196,14 @@ write_files:
       if [ -e /dev/disk/by-label/KIVE_CODE ]; then
         mountpoint -q /mnt/kive-code || mount -t ext4 -o defaults /dev/disk/by-label/KIVE_CODE /mnt/kive-code
       fi
-  - path: /etc/apt/apt.conf.d/99force-ipv4
+  - path: /etc/apt/apt.conf.d/80-kive-retries
     owner: root:root
     permissions: '0644'
     content: |
       Acquire::ForceIPv4 "true";
-      Acquire::Retries "3";
+      Acquire::Retries "5";
+      Acquire::http::Timeout "30";
+      Acquire::https::Timeout "30";
   - path: /etc/systemd/system/mount-kive-code.service
     owner: root:root
     permissions: '0644'
