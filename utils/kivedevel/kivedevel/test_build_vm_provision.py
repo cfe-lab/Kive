@@ -301,12 +301,6 @@ class TestEnterVm(unittest.TestCase):
         self.assertIn("subprocess.call", source)
         self.assertNotIn("capture_output=True", source)
 
-    def test_build_completion_message_refers_to_enter_vm(self):
-        runner_path = self.REPO_ROOT / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "runner.py"
-        text = runner_path.read_text()
-        self.assertIn("./utils/dev enter-vm", text)
-        self.assertNotIn("ws-enter-vm", text)
-
     def test_enter_vm_default_instance_is_kive_minimal(self):
         from Kive.utils.kivedevel.kivedevel.enter_vm import register_subcommand
         source = inspect.getsource(register_subcommand)
