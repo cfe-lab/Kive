@@ -143,10 +143,16 @@
         state: present
         name: wsgi
 
-# This is following the general instructions for Ubuntu SSL support
-# in `/usr/share/doc/apache2/README.Debian.gz`.
-# For the certificates to be installed, they should be placed in the
-# directory you're running Ansible in, with the desired names.
+# TLS certificate and key provisioning.
+#
+# Two modes (kive_tls_mode):
+#
+#   self_signed  — generate a self-signed cert+key on the target via openssl.
+#                  Intended for dev/local environments.  No secrets committed.
+#
+#   provided     — copy cert/key from kive_ssl_certificate_src / kive_ssl_key_src.
+#                  Intended for production.  Do NOT commit private keys.
+#
 - name: enable Apache SSL support
   become: true
   block:
@@ -155,27 +161,78 @@
         state: present
         name: ssl
 
-    - name: install SSL certificate
-      copy:
-        src: star_cfe_chained.crt
-        dest: /etc/ssl/certs/star_cfe_chained.crt
-        owner: root
-        group: root
+    - name: ensure openssl is installed (needed for self-signed mode)
+      apt:
+        name: openssl
+        state: present
+      when: kive_tls_mode | default('provided') == 'self_signed'
 
-    - name: install SSL key
-      copy:
-        src: star_cfe.key
-        dest: /etc/ssl/private/star_cfe.key
+    - name: generate self-signed development TLS certificate
+      command:
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -nodes
+          - -newkey
+          - rsa:2048
+          - -days
+          - "3650"
+          - -subj
+          - "/CN={{ kive_tls_common_name | default('kive-dev.local') }}"
+          - -keyout
+          - "{{ kive_ssl_key_path }}"
+          - -out
+          - "{{ kive_ssl_cert_path }}"
+      args:
+        creates: "{{ kive_ssl_key_path }}"
+      when: kive_tls_mode | default('provided') == 'self_signed'
+
+    - name: secure self-signed TLS key
+      file:
+        path: "{{ kive_ssl_key_path }}"
         owner: root
         group: root
         mode: "0600"
+      when: kive_tls_mode | default('provided') == 'self_signed'
 
-#    - name: install SSL certificate chain file
-#      copy:
-#        src: DigiCertCA.crt
-#        dest: /etc/ssl/certs/DigiCertCA.crt
-#        owner: root
-#        group: root
+    - name: set self-signed TLS certificate permissions
+      file:
+        path: "{{ kive_ssl_cert_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: kive_tls_mode | default('provided') == 'self_signed'
+
+    - name: validate provided TLS variables
+      assert:
+        that:
+          - kive_ssl_certificate_src is defined
+          - kive_ssl_certificate_src | length > 0
+          - kive_ssl_key_src is defined
+          - kive_ssl_key_src | length > 0
+        fail_msg: >
+          kive_tls_mode=provided requires kive_ssl_certificate_src and
+          kive_ssl_key_src to be set to paths on the Ansible controller.
+      when: kive_tls_mode | default('provided') == 'provided'
+
+    - name: install provided SSL certificate
+      copy:
+        src: "{{ kive_ssl_certificate_src }}"
+        dest: "{{ kive_ssl_cert_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: kive_tls_mode | default('provided') == 'provided'
+
+    - name: install provided SSL key
+      copy:
+        src: "{{ kive_ssl_key_src }}"
+        dest: "{{ kive_ssl_key_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      when: kive_tls_mode | default('provided') == 'provided'
 
 
 - name: set up log purging
@@ -278,9 +335,9 @@
             cmd: "a2enconf rotate-kive-logs"
 
     - name: install the Apache SSL site configuration for Kive
-      copy:
-        src: 001-kive-ssl.conf
-        dest: /etc/apache2/sites-available
+      template:
+        src: 001-kive-ssl.conf.j2
+        dest: /etc/apache2/sites-available/001-kive-ssl.conf
         owner: root
         group: root
 
