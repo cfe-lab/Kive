@@ -1,6 +1,5 @@
 import inspect
 import sys
-import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -8,13 +7,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from Kive.utils.kivedevel.kivedevel.build_vm import cloud_init, provision
-
-
-class MockRunResult:
-    def __init__(self, returncode=0, stdout="", stderr=""):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
+from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult
 
 
 class TestBuildVmProvision(unittest.TestCase):
@@ -114,11 +107,10 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertNotIn("sudo iptables -t nat -I POSTROUTING", workflow_text)
 
         lines = workflow_text.splitlines()
-        debug_lines = [l for l in lines if "utils/dev prepare-host" in l]
-        self.assertTrue(any("prepare-host" in l for l in lines))
-        self.assertTrue(any("check-network" in l for l in lines))
-        self.assertTrue(any("smoke-local-install" in l for l in lines))
-        self.assertTrue(any("cleanup-local-install" in l for l in lines))
+        self.assertTrue(any("prepare-host" in line for line in lines))
+        self.assertTrue(any("check-network" in line for line in lines))
+        self.assertTrue(any("smoke-local-install" in line for line in lines))
+        self.assertTrue(any("cleanup-local-install" in line for line in lines))
 
         # Verify cleanup is conditional on always()
         self.assertIn("if: always()", workflow_text)
@@ -350,6 +342,366 @@ class TestNoWorkspaceHelperReferences(unittest.TestCase):
     def _build_needles():
         prefix = "ws"
         return [f"{prefix}-enter-vm", f"{prefix}-start-incus-daemon"]
+
+
+class TestPurge(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_purge_parser_rejects_dry_run(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertNotIn("dry-run", source)
+        self.assertNotIn("dry_run", source)
+
+    def test_run_purge_no_dry_run(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import run_purge
+        source = inspect.getsource(run_purge)
+        self.assertNotIn("dry_run", source)
+
+    def test_helper_functions_no_dry_run(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        source = inspect.getsource(purge_mod)
+        self.assertNotIn("dry-run", source)
+
+    def test_purge_help_deletes_resources(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("deletes", source.lower())
+
+    def test_find_tagged_instances_returns_matching(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kive-minimal\nci-smoke\nother-instance\n",
+            "user.kive.devel.created-by: utils/dev\nother: stuff\n",
+            "some: config\n",
+            "user.kive.devel.created-by: utils/dev\n",
+        ]
+        result = purge_mod._find_tagged_instances(cmds)
+        self.assertEqual(sorted(result), sorted(["kive-minimal", "other-instance"]))
+
+    def test_find_tagged_instances_returns_empty_when_none(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = "kive-minimal\nci-smoke\n"
+        result = purge_mod._find_tagged_instances(cmds)
+        self.assertEqual(result, [])
+
+    def test_find_marked_workdirs_accepts_created_by_underscore(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import _find_marked_workdirs
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text('{"created_by": "utils/dev", "kind": "build-workdir"}\n')
+            result = _find_marked_workdirs(Path(tmp))
+            self.assertEqual(len(result), 1)
+
+    def test_find_marked_workdirs_accepts_old_hyphen_key(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import _find_marked_workdirs
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text('{"created-by": "utils/dev"}\n')
+            result = _find_marked_workdirs(Path(tmp))
+            self.assertEqual(len(result), 1)
+
+    def test_find_marked_workdirs_rejects_unknown_creator(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import _find_marked_workdirs
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text('{"created_by": "other-tool"}\n')
+            result = _find_marked_workdirs(Path(tmp))
+            self.assertEqual(len(result), 0)
+
+    def test_find_marked_workdirs_returns_empty_when_no_marker(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.purge import _find_marked_workdirs
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            result = _find_marked_workdirs(Path(tmp))
+            self.assertEqual(result, [])
+
+    def test_purge_deletes_tagged_instances_and_marked_workdirs(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        # _find_tagged_instances: list + config show kive-minimal
+        # _check_legacy_skipped: uses run() not output()
+        # _device_attached: config show kive-minimal
+        cmds.incus.output.side_effect = [
+            "kive-minimal\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text('{"created_by": "utils/dev", "kind": "build-workdir"}\n')
+
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+            delete_calls = [
+                c for c in cmds.incus.run.call_args_list
+                if c[0][0][:2] == ["delete", "-f"]
+            ]
+            dev_remove_calls = [
+                c for c in cmds.incus.run.call_args_list
+                if "device" in c[0][0] and "remove" in c[0][0]
+            ]
+            self.assertGreaterEqual(len(dev_remove_calls), 1,
+                                    "Should remove kive-code device from tagged instance")
+            self.assertGreaterEqual(len(delete_calls), 1,
+                                    "Should delete tagged instance")
+
+    def test_purge_idempotent_when_nothing_to_purge(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+                    purge_mod.run_purge(args)
+
+    def test_purge_does_not_delete_untagged_legacy_by_default(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        # legacy instances listed but none tagged
+        cmds.incus.output.side_effect = [
+            "kive-minimal\nci-smoke\n",
+            "some: config\n",
+            "other: config\n",
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="kive-minimal\n")
+
+        call_log = {"config_shows": 0}
+
+        def config_show_side_effect(cmd, **kwargs):
+            call_log["config_shows"] += 1
+            return "some: config\n"
+
+        cmds.incus.output.side_effect = None
+        cmds.incus.output.side_effect = config_show_side_effect
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+            delete_calls = [
+                c for c in cmds.incus.run.call_args_list
+                if c[0][0][:2] == ["delete", "-f"]
+            ]
+            self.assertEqual(len(delete_calls), 0,
+                             "Should not delete untagged legacy instances")
+
+    def test_purge_deletes_untagged_instance_with_explicit_flag(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "",
+            "some: config\n",
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = ["kive-minimal"]
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+            delete_calls = [
+                c for c in cmds.incus.run.call_args_list
+                if c[0][0][:2] == ["delete", "-f"]
+            ]
+            self.assertGreaterEqual(len(delete_calls), 1,
+                                    "Should delete instance when explicitly named with --instance")
+
+    def test_purge_remove_device_before_delete(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        # _find_tagged_instances: list + config show
+        # _check_legacy_skipped: uses run() not output()
+        # _device_attached: config show
+        cmds.incus.output.side_effect = [
+            "kive-minimal\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            call_order = []
+
+            def run_logger(cmd, check=True, capture_output=False, **kw):
+                call_order.append(" ".join(cmd) if isinstance(cmd, list) else str(cmd))
+                return MockRunResult(returncode=0)
+
+            cmds.incus.run.side_effect = run_logger
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+            # Verify device removal happens before instance deletion
+            dev_idx = next((i for i, c in enumerate(call_order) if "device" in c and "remove" in c), None)
+            del_idx = next((i for i, c in enumerate(call_order) if c.startswith("delete -f")), None)
+            if dev_idx is not None and del_idx is not None:
+                self.assertLess(dev_idx, del_idx,
+                                "Device removal should happen before instance deletion")
+
+
+class TestTlsReadme(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_readme_documents_kive_tls_mode(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("kive_tls_mode", text)
+
+    def test_readme_documents_provided_mode(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("provided", text)
+
+    def test_readme_documents_self_signed_mode(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("self_signed", text)
+
+    def test_readme_mentions_certificate_src_variables(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("kive_ssl_certificate_src", text)
+        self.assertIn("kive_ssl_key_src", text)
+
+    def test_readme_says_do_not_commit_private_key(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        # "Do not" and "commit" are on separate lines in the markdown
+        self.assertIn("Do not", text)
+        self.assertIn("private-key material", text)
+        # The TLS section should warn against committing key material
+        tls_section = text[text.find("### Configure TLS"):text.find("### Set up network")]
+        self.assertIn("Do not", tls_section)
+        self.assertIn("commit", tls_section)
+
+    def test_readme_includes_chained_cert_example(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("star_cfe.crt", text)
+        self.assertIn("star_cfe_chained.crt", text)
+
+    def test_readme_includes_openssl_verify(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("openssl verify", text)
+
+    def test_readme_explains_chained_cert_contents(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("wildcard/server certificate", text)
+        self.assertIn("intermediate certificate", text)
+        self.assertIn("root certificate", text)
+
+    def test_readme_mentions_kive_ssl_cert_path(self):
+        readme = self.REPO_ROOT / "cluster-setup" / "README.md"
+        text = readme.read_text()
+        self.assertIn("kive_ssl_cert_path", text)
+        self.assertIn("kive_ssl_key_path", text)
+
+
+class TestBuildVmParser(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_build_vm_provision_defaults_to_true(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertTrue(args.provision)
+
+    def test_no_provision_sets_false(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--no-provision"])
+        self.assertFalse(args.provision)
+
+    def test_build_vm_help_shows_no_provision(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("no-provision", source)
+        self.assertNotIn("--provision", source.replace("--no-provision", ""))
+
+    def test_build_vm_has_no_provision_not_standalone_provision(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        source = inspect.getsource(register_subcommand)
+        self.assertIn("no-provision", source)
+        # "add_argument" for just "--provision" (without "--no-") should not appear
+        add_lines = [line for line in source.splitlines() if "add_argument" in line and '"-provision"' in line]
+        self.assertEqual(len(add_lines), 0)
 
 
 if __name__ == "__main__":

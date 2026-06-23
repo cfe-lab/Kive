@@ -9,13 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from Kive.utils.kivedevel.kivedevel.backends import incus_host
 from Kive.utils.kivedevel.kivedevel.backends import incus_network
 from Kive.utils.kivedevel.kivedevel.shared import _log_level, configure_console_logging
-
-
-class MockRunResult:
-    def __init__(self, returncode=0, stdout="", stderr=""):
-        self.returncode = returncode
-        self.stdout = stdout
-        self.stderr = stderr
+from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult
 
 
 class TestIncusHostCheckBeforeInsert(unittest.TestCase):
