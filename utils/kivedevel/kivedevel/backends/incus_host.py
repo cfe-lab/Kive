@@ -15,7 +15,14 @@ logger = logging.getLogger("kivedevel.backends.incus_host")
 
 
 def _run(cmd: list[str], *, check: bool = True, **kwargs) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, check=check, capture_output=True, text=True, **kwargs)
+    logger.debug("Running: %s", " ".join(cmd))
+    result = subprocess.run(cmd, check=check, capture_output=True, text=True, **kwargs)
+    if logger.isEnabledFor(logging.DEBUG):
+        if result.stdout:
+            logger.debug("stdout:\n%s", result.stdout.rstrip())
+        if result.stderr:
+            logger.debug("stderr:\n%s", result.stderr.rstrip())
+    return result
 
 
 def _print_diagnostics(cmds: Cmds, bridge: str) -> None:
