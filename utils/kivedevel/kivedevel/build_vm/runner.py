@@ -19,18 +19,19 @@ logger = logging.getLogger("kivedevel")
 
 PROXY_DEVICE = "kive-web"
 GUEST_WEB_PORT = 8000
-VM_NETWORK = "kivebr0"
-VM_CIDR = "10.247.172.1/24"
-VM_IP = "10.247.172.80"
+VM_NETWORK = "incusbr0"
+VM_CIDR = ""
+VM_IP = ""
 
 
-def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
+def _proxy_config(cfg: BuildVmConfig, vm_ip: str | None = None) -> dict[str, str]:
+    actual_vm_ip = vm_ip if vm_ip is not None else cfg.vm_ip
     config = {
         "listen": f"tcp:127.0.0.1:{cfg.web_port}",
         "type": "proxy",
     }
     if cfg.instance_type == "vm":
-        config["connect"] = f"tcp:{cfg.vm_ip}:{GUEST_WEB_PORT}"
+        config["connect"] = f"tcp:{actual_vm_ip}:{GUEST_WEB_PORT}"
         config["nat"] = "true"
     else:
         config["connect"] = f"tcp:127.0.0.1:{GUEST_WEB_PORT}"
@@ -66,12 +67,12 @@ def _proxy_args(desired: dict[str, str]) -> list[str]:
     return args_list
 
 
-def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
+def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig, vm_ip: str | None = None) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
 
-    desired = _proxy_config(cfg)
+    desired = _proxy_config(cfg, vm_ip=vm_ip)
     current = _current_proxy_config(cmds, cfg.instance)
 
     if current is None:
@@ -158,7 +159,10 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
-    ensure_vm_network(cmds, cfg.vm_network, cfg.vm_cidr, cfg.workdir)
+    actual_cidr, actual_vm_ip = ensure_vm_network(
+        cmds, cfg.vm_network, cfg.vm_cidr, cfg.vm_ip, cfg.workdir,
+    )
+    logger.debug("Using network %s (cidr=%s, vm_ip=%s)", cfg.vm_network, actual_cidr, actual_vm_ip)
 
     created_new_instance, actual_instance_type = ensure_instance(
         cmds,
@@ -170,7 +174,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     )
 
     restart_required = False
-    added_nic = ensure_vm_nic(cmds, cfg.instance, cfg.vm_network, cfg.vm_ip)
+    added_nic = ensure_vm_nic(cmds, cfg.instance, cfg.vm_network, actual_vm_ip)
     if added_nic:
         restart_required = True
 
@@ -194,7 +198,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg)
+    _ensure_web_proxy_device(cmds, cfg, vm_ip=actual_vm_ip)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 
