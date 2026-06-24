@@ -14,6 +14,34 @@ logger = logging.getLogger("kivedevel")
 _RESOURCE_MARKER = ".kive-devel-resource.json"
 
 
+def _registry_path(root: Path) -> Path:
+    return root / "tmp~" / ".kive-devel-resources.json"
+
+
+def _read_registry(path: Path) -> list[dict]:
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, list) else [data]
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _register_resource(path: Path, entry: dict) -> None:
+    entries = _read_registry(path)
+    entries.append(entry)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(entries, indent=2) + "\n")
+
+
+def _registry_has(path: Path, kind: str, name: str) -> bool:
+    for entry in _read_registry(path):
+        if entry.get("kind") == kind and entry.get("name") == name:
+            return True
+    return False
+
+
 def _network_marker_path(workdir: Path) -> Path:
     return workdir / _RESOURCE_MARKER
 
@@ -112,64 +140,102 @@ def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
     return ""
 
 
-def ensure_vm_network(cmds: Cmds, network: str, cidr: str, vm_ip: str, workdir: Path) -> tuple[str, str]:
-    if _network_owned_by_marker(workdir, network):
-        logger.debug("Owned network %s already exists.", network)
+def _owns_bridge(root: Path, bridge: str) -> bool:
+    return _registry_has(_registry_path(root), "linux-bridge", bridge)
+
+
+def _bridge_exists(cmds: Cmds, bridge: str) -> bool:
+    return cmds.ip.ok(["link", "show", bridge])
+
+
+def _create_owned_bridge(cmds: Cmds, root: Path, bridge: str, cidr: str) -> None:
+    logger.info("Creating owned bridge %s (%s)...", bridge, cidr)
+    try:
+        cmds.ip.run(["link", "add", bridge, "type", "bridge"], sudo=True)
+    except Exception:
+        logger.error("Failed to create bridge '%s'.", bridge)
+        sys.exit(1)
+
+    try:
+        cmds.ip.run(["addr", "add", cidr, "dev", bridge], sudo=True)
+    except Exception:
+        logger.error("Failed to add address %s to bridge '%s'.", cidr, bridge)
+        _delete_bridge(cmds, bridge)
+        sys.exit(1)
+
+    try:
+        cmds.ip.run(["link", "set", bridge, "up"], sudo=True)
+    except Exception:
+        logger.error("Failed to bring bridge '%s' up.", bridge)
+        _delete_bridge(cmds, bridge)
+        sys.exit(1)
+
+    reg = _registry_path(root)
+    _register_resource(reg, {
+        "type": "linux-bridge", "name": bridge,
+        "created_by": "utils/dev", "project": "Kive", "kind": "linux-bridge",
+    })
+    _register_resource(reg, {
+        "type": "bridge-ip", "name": cidr,
+        "created_by": "utils/dev", "project": "Kive", "kind": "bridge-ip",
+    })
+    logger.info("Registered owned bridge %s.", bridge)
+
+
+def _setup_host_nat(cmds: Cmds, root: Path, bridge_name: str, cidr: str) -> None:
+    logger.info("Setting up NAT for bridge %s (%s)...", bridge_name, cidr)
+    try:
+        cmds.nft.run(["add", "table", "inet", "kive_devel"], sudo=True)
+    except Exception:
+        logger.warning("nftables table 'kive_devel' may already exist (non-fatal).")
+
+    try:
+        cmds.nft.run([
+            "add", "chain", "inet", "kive_devel", "postrouting",
+            "{ type nat hook postrouting priority srcnat ; }",
+        ], sudo=True)
+    except Exception:
+        logger.warning("nftables chain 'kive_devel.postrouting' may already exist (non-fatal).")
+
+    try:
+        prefix_len = cidr.split("/")[1]
+        network_base = cidr.rsplit(".", 1)[0]
+        network = f"{network_base}.0/{prefix_len}"
+        cmds.nft.run([
+            "add", "rule", "inet", "kive_devel", "postrouting",
+            f"ip saddr {network} masquerade",
+        ], sudo=True)
+    except Exception:
+        logger.error("Failed to add NAT masquerade rule for %s.", network)
+        sys.exit(1)
+
+    reg = _registry_path(root)
+    _register_resource(reg, {
+        "type": "nft-table", "name": "inet kive_devel",
+        "created_by": "utils/dev", "project": "Kive", "kind": "nft-table",
+    })
+
+
+def _delete_bridge(cmds: Cmds, bridge: str) -> None:
+    logger.info("Deleting owned bridge %s...", bridge)
+    cmds.ip.run(["link", "delete", bridge], sudo=True, check=False)
+
+
+def ensure_owned_bridge(cmds: Cmds, root: Path, bridge_name: str, cidr: str, vm_ip: str, workdir: Path) -> tuple[str, str]:
+    if _owns_bridge(root, bridge_name):
+        logger.debug("Owned bridge %s already registered.", bridge_name)
         return cidr, vm_ip
 
-    out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
-    networks = [line.strip() for line in out.splitlines() if line.strip()]
-
-    if network in networks:
+    if _bridge_exists(cmds, bridge_name):
         logger.error(
-            "Network '%s' already exists but is not recorded as owned by utils/dev.\n"
+            "Bridge '%s' already exists but is not recorded as owned by utils/dev.\n"
             "Choose a different --vm-network name or remove the conflicting resource manually.",
-            network,
+            bridge_name,
         )
         sys.exit(1)
 
-    logger.info("Creating managed network %s (%s)...", network, cidr)
-    try:
-        cmds.incus.run(
-            [
-                "network", "create", "--type=bridge", network,
-                f"ipv4.address={cidr}",
-                "ipv4.nat=true",
-                "ipv6.address=none",
-            ]
-        )
-    except Exception:
-        logger.error(
-            "Failed to create bridge network '%s'.\n"
-            "  Verify Incus is properly initialized.",
-            network,
-        )
-        sys.exit(1)
-
-    marker_path = _network_marker_path(workdir)
-    _write_marker_entry(marker_path, {
-        "type": "incus-network",
-        "name": network,
-        "created_by": "utils/dev",
-        "project": "Kive",
-        "kind": "network",
-    })
-    logger.info("Recorded managed network %s in %s", network, marker_path)
-
-    # Best-effort: tag the network in Incus for in-app visibility.
-    # Failure must not block build-vm.
-    try:
-        cmds.incus.run(
-            [
-                "network", "set", network,
-                "user.kive.devel.created-by=utils/dev",
-                "user.kive.devel.project=Kive",
-                "user.kive.devel.kind=network",
-            ],
-            check=False,
-        )
-    except Exception:
-        logger.debug("Best-effort network metadata set failed (non-fatal).")
+    _create_owned_bridge(cmds, root, bridge_name, cidr)
+    _setup_host_nat(cmds, root, bridge_name, cidr)
 
     return cidr, vm_ip
 
@@ -179,17 +245,17 @@ def _eth0_exists(cmds: Cmds, instance: str) -> bool:
     return bool(re.search(r"^eth0\s*$", out, re.MULTILINE))
 
 
-def ensure_vm_nic(cmds: Cmds, instance: str, network: str, static_ip: str) -> bool:
+def ensure_vm_nic(cmds: Cmds, instance: str, bridge_name: str, static_ip: str) -> bool:
     if _eth0_exists(cmds, instance):
         logger.debug("NIC eth0 already exists on %s.", instance)
         return False
-    logger.info("Adding NIC eth0 to %s (network=%s, ipv4.address=%s)...", instance, network, static_ip)
+    logger.info("Adding NIC eth0 to %s (bridge=%s)...", instance, bridge_name)
     cmds.incus.run(
         [
             "config", "device", "add",
             instance, "eth0", "nic",
-            f"network={network}",
-            f"ipv4.address={static_ip}",
+            "nictype=bridged",
+            f"parent={bridge_name}",
         ]
     )
     return True

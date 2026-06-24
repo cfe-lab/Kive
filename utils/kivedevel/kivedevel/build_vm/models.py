@@ -20,7 +20,7 @@ class BuildVmConfig:
     provision: bool = True
     web_port: int = 8000
     no_web_proxy: bool = False
-    vm_network: str = "kive-devel-net"
+    vm_network: str = "kive-devel-br"
     vm_cidr: str = "10.247.172.1/24"
     vm_ip: str = "10.247.172.80"
 

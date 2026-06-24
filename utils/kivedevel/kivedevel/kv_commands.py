@@ -147,6 +147,11 @@ class Ip(Command):
     guix_package = "iproute2"
 
 
+class Nft(Command):
+    exe = "nft"
+    guix_package = "nftables"
+
+
 @dataclasses.dataclass(frozen=True)
 class Cmds:
     incus: Incus
@@ -154,6 +159,7 @@ class Cmds:
     qemu_img: QemuImg
     qemu_nbd: QemuNbd
     ip: Ip
+    nft: Nft
     use_guix: bool
 
     @classmethod
@@ -169,6 +175,7 @@ class Cmds:
             qemu_img=QemuImg(use_guix),
             qemu_nbd=QemuNbd(use_guix),
             ip=Ip(use_guix),
+            nft=Nft(use_guix),
             use_guix=use_guix,
         )
 

@@ -87,10 +87,10 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument(
         "--vm-network",
-        default="kive-devel-net",
+        default="kive-devel-br",
         metavar="NAME",
-        help="Incus managed network for VM NIC (default: kive-devel-net). "
-        "A reserved Kive development network created and owned by utils/dev.",
+        help="Owned Linux bridge for VM NIC (default: kive-devel-br). "
+        "A reserved Kive development bridge created and owned by utils/dev.",
     )
     parser.add_argument(
         "--vm-cidr",

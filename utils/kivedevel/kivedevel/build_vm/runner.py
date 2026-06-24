@@ -9,7 +9,7 @@ from .cloud_init import enable_network_config, ensure_user_data
 from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_storage_pool
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
-from .network import ensure_network_device, ensure_vm_nic, ensure_vm_network, get_default_host_interface, get_existing_network_parent
+from .network import ensure_network_device, ensure_owned_bridge, ensure_vm_nic, get_default_host_interface, get_existing_network_parent
 from .provision import maybe_provision_instance
 from .workspace import handle_workspace_attachment
 
@@ -19,7 +19,7 @@ logger = logging.getLogger("kivedevel")
 
 PROXY_DEVICE = "kive-web"
 GUEST_WEB_PORT = 8000
-VM_NETWORK = "kive-devel-net"
+VM_NETWORK = "kive-devel-br"
 VM_CIDR = ""
 VM_IP = ""
 
@@ -159,10 +159,11 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
-    actual_cidr, actual_vm_ip = ensure_vm_network(
-        cmds, cfg.vm_network, cfg.vm_cidr, cfg.vm_ip, cfg.workdir,
+    actual_cidr, actual_vm_ip = ensure_owned_bridge(
+        cmds, cfg.root, cfg.vm_network, cfg.vm_cidr, cfg.vm_ip, cfg.workdir,
     )
-    logger.debug("Using network %s (cidr=%s, vm_ip=%s)", cfg.vm_network, actual_cidr, actual_vm_ip)
+    gateway = actual_cidr.rsplit(".", 1)[0] + ".1"
+    logger.debug("Using bridge %s (cidr=%s, vm_ip=%s, gateway=%s)", cfg.vm_network, actual_cidr, actual_vm_ip, gateway)
 
     created_new_instance, actual_instance_type = ensure_instance(
         cmds,
@@ -181,7 +182,8 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
         restart_required = True
 
-    if enable_network_config(cmds, cfg.instance, "", actual_instance_type):
+    if enable_network_config(cmds, cfg.instance, "", actual_instance_type,
+                             static_ip=actual_vm_ip, cidr=actual_cidr, gateway=gateway):
         restart_required = True
 
     if not created_new_instance:

@@ -12,6 +12,7 @@ from ..shared import configure_logging, default_root
 logger = logging.getLogger("kivedevel.build_vm.purge")
 
 _RESOURCE_MARKER = ".kive-devel-resource.json"
+_REGISTRY_NAME = ".kive-devel-resources.json"
 
 
 def _is_mountpoint(path: Path) -> bool:
@@ -166,7 +167,10 @@ def run_purge(args: argparse.Namespace) -> None:
         if w_resolved not in all_workdirs:
             all_workdirs.append(w_resolved)
 
-    if not all_instances and not all_workdirs and not tagged_networks:
+    registry_entries = _read_registry(root)
+    has_registry = bool(registry_entries)
+
+    if not all_instances and not all_workdirs and not tagged_networks and not has_registry:
         logger.info("No Kive development resources found to purge.")
         return
 
@@ -218,7 +222,43 @@ def run_purge(args: argparse.Namespace) -> None:
                 len(remaining),
             )
 
+    # Phase 5: Remove owned bridges and NAT rules from the central registry.
+    _remove_bridges(cmds, root)
+    _remove_nftables(cmds, root)
+
     logger.info("Purge complete. All Kive development resources removed.")
+
+
+def _read_registry(root: Path) -> list[dict]:
+    path = root / "tmp~" / _REGISTRY_NAME
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+        return data if isinstance(data, list) else [data]
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _remove_bridges(cmds: Cmds, root: Path) -> list[str]:
+    bridges = []
+    for entry in _read_registry(root):
+        if entry.get("kind") == "linux-bridge":
+            name = entry.get("name")
+            if name:
+                bridges.append(name)
+                logger.info("Removing owned bridge '%s'...", name)
+                cmds.ip.run(["link", "delete", name], sudo=True, check=False)
+    return bridges
+
+
+def _remove_nftables(cmds: Cmds, root: Path) -> None:
+    for entry in _read_registry(root):
+        if entry.get("kind") == "nft-table":
+            table_name = entry.get("name")
+            if table_name:
+                logger.info("Removing owned nftables table '%s'...", table_name)
+                cmds.nft.run(["delete", "table"] + table_name.split(), sudo=True, check=False)
 
 
 def _check_legacy_skipped(cmds: Cmds, tagged_set: set[str]) -> None:

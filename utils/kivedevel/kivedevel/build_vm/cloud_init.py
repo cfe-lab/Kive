@@ -235,10 +235,33 @@ runcmd:
     return True
 
 
-def enable_network_config(cmds: Cmds, instance: str, host_interface: str, instance_type: str) -> bool:
+def enable_network_config(
+    cmds: Cmds,
+    instance: str,
+    host_interface: str,
+    instance_type: str,
+    static_ip: str | None = None,
+    cidr: str | None = None,
+    gateway: str | None = None,
+) -> bool:
     logger.info("Configuring cloud-init network config for %s...", instance)
     if instance_type == "vm":
-        network_config = """\
+        if static_ip and cidr and gateway:
+            network_config = f"""\
+version: 2
+ethernets:
+  enp5s0:
+    dhcp4: false
+    addresses:
+      - {static_ip}/{cidr.split("/")[1]}
+    routes:
+      - to: default
+        via: {gateway}
+    nameservers:
+      addresses: [8.8.8.8,1.1.1.1]
+"""
+        else:
+            network_config = """\
 version: 2
 ethernets:
   enp5s0:
