@@ -17,7 +17,7 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         logger.info("Creating %s instance %s...", instance_type, instance)
         create_args = [
             "create",
-            "images:ubuntu/noble/cloud",
+            "images:ubuntu/jammy/cloud",
             instance,
             "--config",
             f"limits.cpu={cpu}",
