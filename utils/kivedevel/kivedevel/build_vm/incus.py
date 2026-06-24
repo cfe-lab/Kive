@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+import yaml
 
 from ..kv_commands import Cmds
 
@@ -51,49 +52,30 @@ def ensure_profile_with_root_disk(cmds: Cmds, profile: str, pool: str, root_size
         logger.info("Profile %s not found. Creating it...", profile)
         cmds.incus.run(["profile", "create", profile])
 
-    out = cmds.incus.output(["profile", "show", profile, "--format", "json"])
+    out = cmds.incus.output(["profile", "device", "show", profile])
     try:
-        profile_data = json.loads(out) if out else {}
-    except json.JSONDecodeError:
-        profile_data = {}
-    devices = profile_data.get("devices", {}) if isinstance(profile_data, dict) else {}
-
-    if not devices:
-        logger.info("Adding root disk to profile %s...", profile)
-        cmds.incus.run(
-            [
-                "profile",
-                "device",
-                "add",
-                profile,
-                "root",
-                "disk",
-                f"pool={pool}",
-                "path=/",
-                f"size={root_size}",
-            ]
+        devices = yaml.safe_load(out)
+    except yaml.YAMLError as exc:
+        logger.error(
+            "Failed to parse device list from profile %s: %s",
+            profile,
+            exc,
         )
-        return
+        sys.exit(1)
+
+    if not isinstance(devices, dict):
+        logger.error(
+            "Expected a device mapping from profile %s, got: %s",
+            profile,
+            type(devices).__name__,
+        )
+        sys.exit(1)
 
     root_device = devices.get("root")
-    if root_device is None:
-        logger.info("Adding root disk to profile %s...", profile)
-        cmds.incus.run(
-            [
-                "profile",
-                "device",
-                "add",
-                profile,
-                "root",
-                "disk",
-                f"pool={pool}",
-                "path=/",
-                f"size={root_size}",
-            ]
-        )
-        return
-
-    if not isinstance(root_device, dict) or root_device.get("type") != "disk" or root_device.get("path") != "/":
+    if root_device is not None:
+        if isinstance(root_device, dict) and root_device.get("type") == "disk" and root_device.get("path") == "/":
+            logger.debug("Profile %s already has a valid root disk device.", profile)
+            return
         logger.error(
             "Profile %s has a device named 'root' that is not a disk at /.\n"
             "Found: %s\n"
@@ -103,4 +85,17 @@ def ensure_profile_with_root_disk(cmds: Cmds, profile: str, pool: str, root_size
         )
         sys.exit(1)
 
-    logger.debug("Profile %s already has a valid root disk device.", profile)
+    logger.info("Adding root disk to profile %s...", profile)
+    cmds.incus.run(
+        [
+            "profile",
+            "device",
+            "add",
+            profile,
+            "root",
+            "disk",
+            f"pool={pool}",
+            "path=/",
+            f"size={root_size}",
+        ]
+    )

@@ -1,5 +1,4 @@
 import inspect
-import json
 import subprocess
 import sys
 import unittest
@@ -1482,16 +1481,15 @@ class TestSlurmBuilderRole(unittest.TestCase):
 
 
 class TestProfileRootDisk(unittest.TestCase):
-    def _make_cmds(self, ok_return: bool = True, output_json: str = ""):
+    def _make_cmds(self, ok_return: bool = True, output_yaml: str = ""):
         cmds = mock.Mock()
         cmds.incus.ok.return_value = ok_return
-        cmds.incus.output.return_value = output_json
+        cmds.incus.output.return_value = output_yaml
         return cmds
 
-    def test_empty_profile_adds_root_disk(self):
+    def test_empty_devices_adds_root_disk(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        empty_profile = '{"name": "default", "devices": {}, "config": {}}'
-        cmds = self._make_cmds(output_json=empty_profile)
+        cmds = self._make_cmds(output_yaml="{}")
 
         ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
 
@@ -1505,34 +1503,23 @@ class TestProfileRootDisk(unittest.TestCase):
         self.assertIn("path=/", args_list)
         self.assertIn("size=10GiB", args_list)
 
-    def test_null_devices_output_adds_root_disk(self):
+    def test_null_devices_output_fails(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        empty_output = '{"name": "default", "devices": null, "config": {}}'
-        cmds = self._make_cmds(output_json=empty_output)
+        cmds = self._make_cmds(output_yaml="null")
 
-        ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
-
-        add_calls = [
-            c for c in cmds.incus.run.call_args_list
-            if "device" in c[0][0] and "add" in c[0][0]
-        ]
-        self.assertEqual(len(add_calls), 1)
+        with self.assertRaises(SystemExit):
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
 
     def test_existing_root_disk_is_idempotent(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        valid_profile = json.dumps({
-            "name": "default",
-            "devices": {
-                "root": {
-                    "path": "/",
-                    "pool": "default",
-                    "size": "10GiB",
-                    "type": "disk",
-                }
-            },
-            "config": {},
-        })
-        cmds = self._make_cmds(output_json=valid_profile)
+        devices_yaml = """\
+root:
+  path: /
+  pool: default
+  size: 10GiB
+  type: disk
+"""
+        cmds = self._make_cmds(output_yaml=devices_yaml)
 
         ensure_profile_with_root_disk(cmds, "default", "default", "10GiB")
 
@@ -1544,18 +1531,13 @@ class TestProfileRootDisk(unittest.TestCase):
 
     def test_other_devices_no_root_adds_root_disk(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        profile_with_data = json.dumps({
-            "name": "default",
-            "devices": {
-                "data": {
-                    "path": "/data",
-                    "pool": "default",
-                    "type": "disk",
-                }
-            },
-            "config": {},
-        })
-        cmds = self._make_cmds(output_json=profile_with_data)
+        devices_yaml = """\
+data:
+  path: /data
+  pool: default
+  type: disk
+"""
+        cmds = self._make_cmds(output_yaml=devices_yaml)
 
         ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
 
@@ -1567,18 +1549,13 @@ class TestProfileRootDisk(unittest.TestCase):
 
     def test_incompatible_root_device_fails(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        nic_root = json.dumps({
-            "name": "default",
-            "devices": {
-                "root": {
-                    "nictype": "bridged",
-                    "parent": "incusbr0",
-                    "type": "nic",
-                }
-            },
-            "config": {},
-        })
-        cmds = self._make_cmds(output_json=nic_root)
+        devices_yaml = """\
+root:
+  nictype: bridged
+  parent: incusbr0
+  type: nic
+"""
+        cmds = self._make_cmds(output_yaml=devices_yaml)
 
         with self.assertRaises(SystemExit):
             ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
@@ -1589,15 +1566,43 @@ class TestProfileRootDisk(unittest.TestCase):
         ]
         self.assertEqual(len(add_calls), 0, "Should not add root disk when incompatible root exists")
 
+    def test_invalid_yaml_fails(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
+        cmds = self._make_cmds(output_yaml="not: valid: yaml: [")
+
+        with self.assertRaises(SystemExit):
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+
+        add_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if "device" in c[0][0] and "add" in c[0][0]
+        ]
+        self.assertEqual(len(add_calls), 0)
+
     def test_debug_log_when_root_disk_added(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
-        empty_profile = '{"name": "default", "devices": {}, "config": {}}'
-        cmds = self._make_cmds(output_json=empty_profile)
+        cmds = self._make_cmds(output_yaml="{}")
 
         with self.assertLogs("kivedevel", level="INFO") as logs:
             ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
 
         self.assertTrue(any("Adding root disk" in msg for msg in logs.output))
+
+    def test_log_when_existing_root_skipped(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
+        devices_yaml = """\
+root:
+  path: /
+  pool: default
+  size: 10GiB
+  type: disk
+"""
+        cmds = self._make_cmds(output_yaml=devices_yaml)
+
+        with self.assertLogs("kivedevel", level="DEBUG") as logs:
+            ensure_profile_with_root_disk(cmds, "default", "default", "10GiB")
+
+        self.assertTrue(any("already has a valid root disk" in msg for msg in logs.output))
 
     def test_runner_calls_ensure_profile_before_ensure_instance(self):
         runner_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "runner.py"
