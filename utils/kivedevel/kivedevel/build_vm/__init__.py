@@ -87,24 +87,22 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument(
         "--vm-network",
-        default="incusbr0",
+        default="kive-devel-net",
         metavar="NAME",
-        help="Incus managed network for VM NIC (default: incusbr0). "
-        "For the default incusbr0 bridge, CIDR and IP are auto-detected.",
+        help="Incus managed network for VM NIC (default: kive-devel-net). "
+        "A reserved Kive development network created and owned by utils/dev.",
     )
     parser.add_argument(
         "--vm-cidr",
         default="10.247.172.1/24",
         metavar="CIDR",
-        help="CIDR for the VM managed network (default: 10.247.172.1/24). "
-        "Only used when --vm-network is a custom network, not incusbr0.",
+        help="CIDR for the VM managed network (default: 10.247.172.1/24).",
     )
     parser.add_argument(
         "--vm-ip",
         default="10.247.172.80",
         metavar="IP",
-        help="Static VM IP address on the managed network (default: 10.247.172.80). "
-        "Only used when --vm-network is a custom network, not incusbr0.",
+        help="Static VM IP address on the managed network (default: 10.247.172.80).",
     )
     parser.set_defaults(func=run_from_args, provision=True)
 

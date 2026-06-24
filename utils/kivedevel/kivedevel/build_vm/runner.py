@@ -19,7 +19,7 @@ logger = logging.getLogger("kivedevel")
 
 PROXY_DEVICE = "kive-web"
 GUEST_WEB_PORT = 8000
-VM_NETWORK = "incusbr0"
+VM_NETWORK = "kive-devel-net"
 VM_CIDR = ""
 VM_IP = ""
 
