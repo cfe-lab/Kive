@@ -1012,14 +1012,34 @@ class TestBuildVmWebProxy(unittest.TestCase):
 
     def test_proxy_config_format(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.runner import _proxy_config, GUEST_WEB_PORT
-        config = _proxy_config(8000)
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=8000, no_web_proxy=False,
+        )
+        config = _proxy_config(cfg)
         self.assertEqual(config["type"], "proxy")
         self.assertEqual(config["listen"], "tcp:127.0.0.1:8000")
         self.assertEqual(config["connect"], f"tcp:127.0.0.1:{GUEST_WEB_PORT}")
 
     def test_proxy_config_custom_port(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.runner import _proxy_config
-        config = _proxy_config(18000)
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=18000, no_web_proxy=False,
+        )
+        config = _proxy_config(cfg)
         self.assertEqual(config["listen"], "tcp:127.0.0.1:18000")
 
     def test_ensure_web_proxy_device_creates_new(self):
@@ -1480,7 +1500,7 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.output.return_value = ""
 
         with tempfile.TemporaryDirectory() as tmp:
-            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
         create_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1499,7 +1519,7 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.output.return_value = ""
 
         with tempfile.TemporaryDirectory() as tmp:
-            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
         create_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1521,7 +1541,7 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.output.return_value = ""
 
         with tempfile.TemporaryDirectory() as tmp:
-            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
             marker = Path(tmp) / ".kive-devel-resource.json"
             self.assertTrue(marker.exists())
             data = json.loads(marker.read_text())
@@ -1540,7 +1560,7 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.run.side_effect = [None, RuntimeError("network set failed")]
 
         with tempfile.TemporaryDirectory() as tmp:
-            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
         # Should not raise — metadata set failure is best-effort
 
@@ -1558,7 +1578,7 @@ class TestVmNetwork(unittest.TestCase):
             marker.write_text(json.dumps([
                 {"kind": "network", "name": "kivebr0", "created_by": "utils/dev"},
             ], indent=2) + "\n")
-            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
         create_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1577,27 +1597,7 @@ class TestVmNetwork(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit):
-                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
-
-    def test_reuses_incusbr0_without_marker(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
-        import tempfile
-        cmds = mock.Mock()
-        cmds.incus.output.side_effect = [
-            "kivebr0\nincusbr0\n",  # network list includes incusbr0
-        ]
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            # No marker file at all for incusbr0
-            ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", Path(tmp))
-
-        create_calls = [
-            c for c in cmds.incus.run.call_args_list
-            if c[0][0][:2] == ["network", "create"]
-        ]
-        self.assertEqual(len(create_calls), 0,
-                         "Should not create incusbr0, always reuse default bridge")
+                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
     def test_creation_failure_does_not_fallback_to_container(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
@@ -1608,7 +1608,69 @@ class TestVmNetwork(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit):
-                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+    def test_derive_vm_ip_from_cidr(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _derive_vm_ip_from_cidr
+        self.assertEqual(_derive_vm_ip_from_cidr("10.247.172.1/24"), "10.247.172.80")
+        self.assertEqual(_derive_vm_ip_from_cidr("172.16.0.1/16"), "172.16.0.80")
+        self.assertEqual(_derive_vm_ip_from_cidr("192.168.1.254/24"), "192.168.1.80")
+
+    def test_incusbr0_repairs_and_returns_actual_cidr_and_ip(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kivebr0\nincusbr0\n",   # network list — incusbr0 exists
+            "10.42.0.1/24",          # incus network get incusbr0 ipv4.address
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+        cmds.ip.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            cidr, vm_ip = ensure_vm_network(
+                cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp),
+            )
+
+        self.assertEqual(cidr, "10.42.0.1/24")
+        self.assertEqual(vm_ip, "10.42.0.80")
+
+        # Should not attempt to create any network
+        create_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:2] == ["network", "create"]
+        ]
+        self.assertEqual(len(create_calls), 0)
+
+        # Should repair bridge NAT settings
+        set_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:4] == ["network", "set", "incusbr0"]
+        ]
+        self.assertEqual(len(set_calls), 3)
+        set_keys = {c[0][0][4] for c in set_calls}
+        self.assertEqual(set_keys, {"ipv4.nat=true", "ipv4.routing=true", "ipv4.firewall=true"})
+
+        # Should enable IPv4 forwarding
+        sysctl_calls = [
+            c for c in cmds.ip.run.call_args_list
+            if "sysctl" in c[0][0]
+        ]
+        self.assertGreaterEqual(len(sysctl_calls), 1)
+
+    def test_incusbr0_fails_on_missing_address(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "incusbr0\n",            # network list — incusbr0 exists
+            "",                      # incus network get incusbr0 ipv4.address — empty!
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
     def test_purge_removes_marker_owned_network(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
@@ -1683,6 +1745,36 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertEqual(len(delete_calls), 0,
                          "Should skip network deletion when instances remain")
+
+    def test_purge_does_not_delete_incusbr0(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # No marker file — incusbr0 is never marker-owned
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+        delete_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:4] == ["network", "delete", "incusbr0"]
+        ]
+        self.assertEqual(len(delete_calls), 0,
+                         "Should never delete incusbr0")
 
 
 class TestProfileRootDisk(unittest.TestCase):
