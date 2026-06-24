@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sys
+
+import yaml
 
 from ..kv_commands import Cmds
 
@@ -87,15 +88,20 @@ _KIVE_NET_OWNER = "user.kive.devel.created-by"
 
 
 def _network_config(cmds: Cmds, network: str) -> dict:
-    out = cmds.incus.output(["network", "show", network, "--format", "json"])
+    out = cmds.incus.output(["network", "show", network])
     try:
-        return json.loads(out) if out else {}
-    except json.JSONDecodeError:
+        data = yaml.safe_load(out)
+    except yaml.YAMLError as exc:
+        logger.error("Failed to parse network config for %s: %s", network, exc)
         return {}
+    if not isinstance(data, dict):
+        logger.error("Expected a mapping from network show %s, got: %s", network, type(data).__name__)
+        return {}
+    return data.get("config", {})
 
 
 def _network_is_tagged(cmds: Cmds, network: str) -> bool:
-    config = _network_config(cmds, network).get("config", {})
+    config = _network_config(cmds, network)
     return isinstance(config, dict) and config.get(_KIVE_NET_OWNER) == "utils/dev"
 
 
