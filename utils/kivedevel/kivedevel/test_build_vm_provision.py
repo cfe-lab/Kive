@@ -1493,11 +1493,43 @@ class TestSlurmBuilderRole(unittest.TestCase):
 
 
 class TestVmNetwork(unittest.TestCase):
+    _M_YAML = """config:
+  ipv4.address: 10.247.172.1/24
+  ipv4.nat: "true"
+name: kivebr0
+type: bridge
+managed: true
+"""
+
+    _MI_YAML = """config:
+  ipv4.address: 10.42.0.1/24
+  ipv4.nat: "true"
+name: incusbr0
+type: bridge
+managed: true
+"""
+
+    _U_YAML = """config: {}
+name: incusbr0
+type: bridge
+managed: false
+"""
+
+    _MN_YAML = """config: {}
+name: incusbr0
+type: bridge
+managed: true
+"""
+
+    def _setup_create_path(self, cmds, cidr="10.247.172.1/24"):
+        cmds.incus.output.return_value = ""
+        cmds.ip.output.return_value = ""
+
     def test_network_create_includes_explicit_bridge_type(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
+        self._setup_create_path(cmds)
 
         with tempfile.TemporaryDirectory() as tmp:
             ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
@@ -1516,7 +1548,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
+        self._setup_create_path(cmds)
 
         with tempfile.TemporaryDirectory() as tmp:
             ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
@@ -1538,7 +1570,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
+        self._setup_create_path(cmds)
 
         with tempfile.TemporaryDirectory() as tmp:
             ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
@@ -1555,8 +1587,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
-        # First call (create) succeeds, second call (set) fails
+        self._setup_create_path(cmds)
         cmds.incus.run.side_effect = [None, RuntimeError("network set failed")]
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1568,9 +1599,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.side_effect = [
-            "kivebr0\n",          # network list shows it
-        ]
+        cmds.incus.output.return_value = self._M_YAML
         cmds.incus.run.return_value = MockRunResult(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1590,9 +1619,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.side_effect = [
-            "kivebr0\n",          # network list shows it
-        ]
+        cmds.incus.output.return_value = self._M_YAML
         cmds.incus.run.return_value = MockRunResult(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1603,7 +1630,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
+        self._setup_create_path(cmds)
         cmds.incus.run.side_effect = RuntimeError("Can't parse a version: UNKNOWN")
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1616,33 +1643,55 @@ class TestVmNetwork(unittest.TestCase):
         self.assertEqual(_derive_vm_ip_from_cidr("172.16.0.1/16"), "172.16.0.80")
         self.assertEqual(_derive_vm_ip_from_cidr("192.168.1.254/24"), "192.168.1.80")
 
-    def test_incusbr0_repairs_and_returns_actual_cidr_and_ip(self):
+    def test_get_network_info_managed(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _get_network_info
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = self._MI_YAML
+        info = _get_network_info(cmds, "incusbr0")
+        self.assertIsNotNone(info)
+        self.assertTrue(info["managed"])
+        self.assertEqual(info["ipv4_address"], "10.42.0.1/24")
+        self.assertEqual(info["name"], "incusbr0")
+
+    def test_get_network_info_unmanaged(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _get_network_info
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = self._U_YAML
+        info = _get_network_info(cmds, "incusbr0")
+        self.assertIsNotNone(info)
+        self.assertFalse(info["managed"])
+
+    def test_get_network_info_not_found(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _get_network_info
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        info = _get_network_info(cmds, "nonexistent")
+        self.assertIsNone(info)
+
+    def test_incusbr0_managed_returns_cidr_and_ip(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.side_effect = [
-            "kivebr0\nincusbr0\n",   # network list — incusbr0 exists
-            "10.42.0.1/24",          # incus network get incusbr0 ipv4.address
-        ]
+        cmds.incus.output.return_value = self._MI_YAML
         cmds.incus.run.return_value = MockRunResult(returncode=0)
-        cmds.ip.run.return_value = MockRunResult(returncode=0)
 
-        with tempfile.TemporaryDirectory() as tmp:
-            cidr, vm_ip = ensure_vm_network(
-                cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp),
-            )
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.subprocess.run") as mock_sysctl:
+            mock_sysctl.return_value = mock.Mock(returncode=0)
+
+            with tempfile.TemporaryDirectory() as tmp:
+                cidr, vm_ip = ensure_vm_network(
+                    cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp),
+                )
 
         self.assertEqual(cidr, "10.42.0.1/24")
         self.assertEqual(vm_ip, "10.42.0.80")
 
-        # Should not attempt to create any network
         create_calls = [
             c for c in cmds.incus.run.call_args_list
             if c[0][0][:2] == ["network", "create"]
         ]
         self.assertEqual(len(create_calls), 0)
 
-        # Should repair bridge NAT settings
         set_calls = [
             c for c in cmds.incus.run.call_args_list
             if c[0][0][:4] == ["network", "set", "incusbr0"]
@@ -1651,26 +1700,51 @@ class TestVmNetwork(unittest.TestCase):
         set_keys = {c[0][0][4] for c in set_calls}
         self.assertEqual(set_keys, {"ipv4.nat=true", "ipv4.routing=true", "ipv4.firewall=true"})
 
-        # Should enable IPv4 forwarding
-        sysctl_calls = [
-            c for c in cmds.ip.run.call_args_list
-            if "sysctl" in c[0][0]
-        ]
-        self.assertGreaterEqual(len(sysctl_calls), 1)
+        mock_sysctl.assert_called_once()
 
-    def test_incusbr0_fails_on_missing_address(self):
+    def test_incusbr0_unmanaged_fails(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
         cmds = mock.Mock()
-        cmds.incus.output.side_effect = [
-            "incusbr0\n",            # network list — incusbr0 exists
-            "",                      # incus network get incusbr0 ipv4.address — empty!
-        ]
+        cmds.incus.output.return_value = self._U_YAML
         cmds.incus.run.return_value = MockRunResult(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit):
                 ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+    def test_incusbr0_managed_no_address_fails(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = self._MN_YAML
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+    def test_incusbr0_non_existent_fails(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+    def test_no_fallback_to_container_on_network_failure(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        self._setup_create_path(cmds)
+        # Creation raises -> ensure_vm_network should sys.exit, not return
+        cmds.incus.run.side_effect = RuntimeError("create failed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", "10.247.172.80", Path(tmp))
 
     def test_purge_removes_marker_owned_network(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
@@ -1711,12 +1785,11 @@ class TestVmNetwork(unittest.TestCase):
         import tempfile
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
-        # 3 legacy checks + 1 network list call = 4 run calls
         cmds.incus.run.side_effect = [
-            MockRunResult(returncode=0, stdout=""),             # legacy check 1
-            MockRunResult(returncode=0, stdout=""),             # legacy check 2
-            MockRunResult(returncode=0, stdout=""),             # legacy check 3
-            MockRunResult(returncode=0, stdout="kive-minimal\n"),  # network check — instances remain
+            MockRunResult(returncode=0, stdout=""),
+            MockRunResult(returncode=0, stdout=""),
+            MockRunResult(returncode=0, stdout=""),
+            MockRunResult(returncode=0, stdout="kive-minimal\n"),
         ]
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1754,7 +1827,6 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.run.return_value = MockRunResult(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmp:
-            # No marker file — incusbr0 is never marker-owned
             args = mock.Mock()
             args.root = Path(tmp)
             args.instances = None
