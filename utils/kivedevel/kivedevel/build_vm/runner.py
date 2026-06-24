@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import re
 
 from ..kv_commands import Cmds
 from .cloud_init import enable_network_config, ensure_user_data
@@ -14,6 +15,79 @@ from .workspace import handle_workspace_attachment
 
 
 logger = logging.getLogger("kivedevel")
+
+
+PROXY_DEVICE = "kive-web"
+GUEST_WEB_PORT = 8000
+
+
+def _proxy_config(host_port: int) -> dict[str, str]:
+    return {
+        "listen": f"tcp:127.0.0.1:{host_port}",
+        "connect": f"tcp:127.0.0.1:{GUEST_WEB_PORT}",
+        "type": "proxy",
+    }
+
+
+def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
+    out = cmds.incus.output(["config", "show", instance])
+    block_pattern = re.compile(
+        rf"^{PROXY_DEVICE}:\s*\n((?:\s+\w+: .+\n?)*)",
+        re.MULTILINE,
+    )
+    m = block_pattern.search(out)
+    if not m:
+        return None
+    config: dict[str, str] = {}
+    for line in m.group(1).splitlines():
+        line = line.strip()
+        if ":" in line:
+            key, _, val = line.partition(":")
+            config[key.strip()] = val.strip()
+    return config
+
+
+def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
+    if cfg.no_web_proxy:
+        logger.debug("Web proxy device creation disabled by --no-web-proxy.")
+        return
+
+    desired = _proxy_config(cfg.web_port)
+    current = _current_proxy_config(cmds, cfg.instance)
+
+    if current is None:
+        logger.info(
+            "Creating proxy device '%s' (%s -> %s)...",
+            PROXY_DEVICE, desired["listen"], desired["connect"],
+        )
+        cmds.incus.run([
+            "config", "device", "add", cfg.instance, PROXY_DEVICE,
+            desired["type"],
+            f"listen={desired['listen']}",
+            f"connect={desired['connect']}",
+        ])
+        return
+
+    if current.get("listen") == desired["listen"] and current.get("connect") == desired["connect"]:
+        logger.debug(
+            "Proxy device '%s' already present with matching config (%s -> %s).",
+            PROXY_DEVICE, desired["listen"], desired["connect"],
+        )
+        return
+
+    logger.debug(
+        "Updating proxy device '%s': was (%s -> %s), now (%s -> %s).",
+        PROXY_DEVICE,
+        current.get("listen", "?"), current.get("connect", "?"),
+        desired["listen"], desired["connect"],
+    )
+    cmds.incus.run(["config", "device", "remove", cfg.instance, PROXY_DEVICE])
+    cmds.incus.run([
+        "config", "device", "add", cfg.instance, PROXY_DEVICE,
+        desired["type"],
+        f"listen={desired['listen']}",
+        f"connect={desired['connect']}",
+    ])
 
 
 def run_build_vm(args: argparse.Namespace) -> None:
@@ -75,6 +149,8 @@ def run_build_vm(args: argparse.Namespace) -> None:
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
+    _ensure_web_proxy_device(cmds, cfg)
+
     maybe_provision_instance(
         cmds,
         cfg.instance,
@@ -86,3 +162,6 @@ def run_build_vm(args: argparse.Namespace) -> None:
         "Build step complete. Use ./utils/dev enter-vm %s to connect.",
         cfg.instance,
     )
+
+    if cfg.provision and not cfg.no_web_proxy:
+        print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")

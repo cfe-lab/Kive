@@ -70,6 +70,18 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         dest="provision",
         help="Skip provisioning after build (default: enabled)",
     )
+    parser.add_argument(
+        "--web-port",
+        type=int,
+        default=8000,
+        metavar="PORT",
+        help="Host port for the Kive web proxy (default: 8000)",
+    )
+    parser.add_argument(
+        "--no-web-proxy",
+        action="store_true",
+        help="Skip Incus proxy device creation for the Kive web port",
+    )
     parser.set_defaults(func=run_from_args, provision=True)
 
     purge.register_subcommand(subparsers)

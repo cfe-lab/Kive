@@ -48,14 +48,14 @@ def _detach_stale_nbd() -> None:
     cmds.qemu_nbd.run(["-d", "/dev/nbd0"], sudo=True, check=False)
 
 
-def _device_attached(cmds: Cmds, instance: str) -> bool:
+def _device_attached(cmds: Cmds, instance: str, device: str = "kive-code") -> bool:
     out = cmds.incus.output(["config", "show", instance])
-    return any(line.strip() == "kive-code:" for line in out.splitlines())
+    return any(line.strip() == f"{device}:" for line in out.splitlines())
 
 
-def _remove_device(cmds: Cmds, instance: str) -> None:
-    logger.info("Removing device 'kive-code' from instance '%s'...", instance)
-    cmds.incus.run(["config", "device", "remove", instance, "kive-code"], check=False)
+def _remove_device(cmds: Cmds, instance: str, device: str = "kive-code") -> None:
+    logger.info("Removing device '%s' from instance '%s'...", device, instance)
+    cmds.incus.run(["config", "device", "remove", instance, device], check=False)
 
 
 def _remove_image(image_path: Path) -> None:
@@ -148,10 +148,14 @@ def run_purge(args: argparse.Namespace) -> None:
     _detach_stale_nbd()
 
     for instance in all_instances:
-        if _device_attached(cmds, instance):
-            _remove_device(cmds, instance)
+        if _device_attached(cmds, instance, "kive-code"):
+            _remove_device(cmds, instance, "kive-code")
         else:
             logger.debug("No kive-code device attached to '%s'.", instance)
+        if _device_attached(cmds, instance, "kive-web"):
+            _remove_device(cmds, instance, "kive-web")
+        else:
+            logger.debug("No kive-web device attached to '%s'.", instance)
 
     for workdir in all_workdirs:
         mountpoint_path = workdir / "kive-code-mount"

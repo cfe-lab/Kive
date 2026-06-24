@@ -18,6 +18,8 @@ class BuildVmConfig:
     cpu: str
     host_interface: str
     provision: bool = True
+    web_port: int = 8000
+    no_web_proxy: bool = False
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
@@ -36,4 +38,6 @@ class BuildVmConfig:
             cpu=args.cpu,
             host_interface=args.host_interface,
             provision=bool(args.provision),
+            web_port=args.web_port,
+            no_web_proxy=bool(args.no_web_proxy),
         )
