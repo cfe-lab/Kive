@@ -123,6 +123,9 @@ def ensure_vm_network(cmds: Cmds, network: str, cidr: str, workdir: Path) -> Non
     networks = [line.strip() for line in out.splitlines() if line.strip()]
 
     if network in networks:
+        if network == "incusbr0":
+            logger.debug("Using existing default bridge %s.", network)
+            return
         if _network_owned_by_marker(workdir, network):
             logger.debug("Managed network %s already exists and is owned by utils/dev.", network)
             return
