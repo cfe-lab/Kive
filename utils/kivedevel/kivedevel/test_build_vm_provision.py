@@ -593,9 +593,11 @@ class TestPurge(unittest.TestCase):
         cmds = mock.Mock()
         # _find_tagged_instances: list + config show kive-minimal
         # _check_legacy_skipped: uses run() not output()
-        # _device_attached: config show kive-minimal
+        # _device_attached(kive-code): config show kive-minimal
+        # _device_attached(kive-web): config show kive-minimal
         cmds.incus.output.side_effect = [
             "kive-minimal\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
         ]
@@ -704,6 +706,7 @@ class TestPurge(unittest.TestCase):
         cmds.incus.output.side_effect = [
             "",
             "some: config\n",
+            "some: config\n",
         ]
         cmds.incus.run.return_value = MockRunResult(returncode=0)
 
@@ -735,9 +738,11 @@ class TestPurge(unittest.TestCase):
         cmds = mock.Mock()
         # _find_tagged_instances: list + config show
         # _check_legacy_skipped: uses run() not output()
-        # _device_attached: config show
+        # _device_attached(kive-code): config show
+        # _device_attached(kive-web): config show
         cmds.incus.output.side_effect = [
             "kive-minimal\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
         ]
@@ -868,6 +873,361 @@ class TestBuildVmParser(unittest.TestCase):
         # "add_argument" for just "--provision" (without "--no-") should not appear
         add_lines = [line for line in source.splitlines() if "add_argument" in line and '"-provision"' in line]
         self.assertEqual(len(add_lines), 0)
+
+
+class TestBuildVmWebProxy(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_web_port_default_is_8000(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertEqual(args.web_port, 8000)
+
+    def test_web_port_parsed(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--web-port", "18000"])
+        self.assertEqual(args.web_port, 18000)
+
+    def test_no_web_proxy_defaults_to_false(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertFalse(args.no_web_proxy)
+
+    def test_no_web_proxy_flag(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--no-web-proxy"])
+        self.assertTrue(args.no_web_proxy)
+
+    def test_config_from_args_includes_web_port(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        args = mock.Mock()
+        args.root = Path("/tmp")
+        args.workdir = Path("/tmp/work")
+        args.instance = "test"
+        args.instance_type = "container"
+        args.image_name = "test.qcow2"
+        args.pool = "default"
+        args.profile = "default"
+        args.root_size = "10GiB"
+        args.memory = "1GB"
+        args.cpu = "1"
+        args.host_interface = ""
+        args.provision = True
+        args.web_port = 18000
+        args.no_web_proxy = True
+        cfg = BuildVmConfig.from_args(args)
+        self.assertEqual(cfg.web_port, 18000)
+        self.assertTrue(cfg.no_web_proxy)
+
+    def test_proxy_config_format(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _proxy_config, GUEST_WEB_PORT
+        config = _proxy_config(8000)
+        self.assertEqual(config["type"], "proxy")
+        self.assertEqual(config["listen"], "tcp:127.0.0.1:8000")
+        self.assertEqual(config["connect"], f"tcp:127.0.0.1:{GUEST_WEB_PORT}")
+
+    def test_proxy_config_custom_port(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _proxy_config
+        config = _proxy_config(18000)
+        self.assertEqual(config["listen"], "tcp:127.0.0.1:18000")
+
+    def test_ensure_web_proxy_device_creates_new(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_proxy_device, PROXY_DEVICE
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        # Simulate no existing kive-web device
+        cmds.incus.output.return_value = "other-device:\n  type: nic\n"
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=8000, no_web_proxy=False,
+        )
+        _ensure_web_proxy_device(cmds, cfg)
+        add_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:4] == ["config", "device", "add", "test"]
+               and PROXY_DEVICE in c[0][0]
+        ]
+        self.assertEqual(len(add_calls), 1)
+        args_list = add_calls[0][0][0]
+        self.assertIn("listen=tcp:127.0.0.1:8000", args_list)
+        self.assertIn("connect=tcp:127.0.0.1:8000", args_list)
+
+    def test_ensure_web_proxy_device_skipped_when_no_web_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_proxy_device
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=8000, no_web_proxy=True,
+        )
+        _ensure_web_proxy_device(cmds, cfg)
+        cmds.incus.run.assert_not_called()
+
+    def test_ensure_web_proxy_device_skipped_when_already_matches(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_proxy_device
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        # Existing device with matching config
+        cmds.incus.output.return_value = (
+            "kive-web:\n"
+            "  listen: tcp:127.0.0.1:8000\n"
+            "  connect: tcp:127.0.0.1:8000\n"
+            "  type: proxy\n"
+        )
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=8000, no_web_proxy=False,
+        )
+        _ensure_web_proxy_device(cmds, cfg)
+        # No add or remove should be called
+        cmds.incus.run.assert_not_called()
+
+    def test_ensure_web_proxy_device_updates_when_port_differs(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_proxy_device
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        # Existing device with old port
+        cmds.incus.output.return_value = (
+            "kive-web:\n"
+            "  listen: tcp:127.0.0.1:8000\n"
+            "  connect: tcp:127.0.0.1:8000\n"
+            "  type: proxy\n"
+        )
+        cmds.incus.run.return_value = None
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=True,
+            web_port=18000, no_web_proxy=False,
+        )
+        _ensure_web_proxy_device(cmds, cfg)
+        remove_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if "device" in c[0][0] and "remove" in c[0][0] and "kive-web" in c[0][0]
+        ]
+        add_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if "device" in c[0][0] and "add" in c[0][0] and "kive-web" in c[0][0]
+        ]
+        self.assertEqual(len(remove_calls), 1)
+        self.assertEqual(len(add_calls), 1)
+        add_args = add_calls[0][0][0]
+        self.assertIn("listen=tcp:127.0.0.1:18000", add_args)
+
+    def test_run_build_vm_prints_stable_url(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import run_build_vm
+        import io
+        import contextlib
+        args = mock.Mock()
+        args.root = Path("/tmp")
+        args.workdir = Path("/tmp/work")
+        args.instance = "test"
+        args.instance_type = "container"
+        args.image_name = "test.qcow2"
+        args.pool = "default"
+        args.profile = "default"
+        args.root_size = "10GiB"
+        args.memory = "1GB"
+        args.cpu = "1"
+        args.host_interface = ""
+        args.provision = True
+        args.web_port = 8000
+        args.no_web_proxy = False
+        args.debug = True
+        args.verbose = True
+        args.quiet = False
+        args.log_file = None
+
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.Cmds") as mock_cmds_cls,
+            mock.patch.object(Path, "mkdir"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_incus_daemon"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_storage_pool"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_profile_with_root_disk"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance", return_value=(True, "container")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_network_device", return_value=False),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.logger"),
+        ):
+            cmds = mock.Mock()
+            cmds.incus.output.return_value = ""
+            mock_cmds_cls.create.return_value = cmds
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                run_build_vm(args)
+            output = buf.getvalue()
+        self.assertIn("http://127.0.0.1:8000/login/", output)
+
+    def test_run_build_vm_skips_url_when_no_provision(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import run_build_vm
+        import io
+        import contextlib
+        args = mock.Mock()
+        args.root = Path("/tmp")
+        args.workdir = Path("/tmp/work")
+        args.instance = "test"
+        args.instance_type = "container"
+        args.image_name = "test.qcow2"
+        args.pool = "default"
+        args.profile = "default"
+        args.root_size = "10GiB"
+        args.memory = "1GB"
+        args.cpu = "1"
+        args.host_interface = ""
+        args.provision = False
+        args.web_port = 8000
+        args.no_web_proxy = False
+        args.debug = True
+        args.verbose = True
+        args.quiet = False
+        args.log_file = None
+
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.Cmds") as mock_cmds_cls,
+            mock.patch.object(Path, "mkdir"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_incus_daemon"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_storage_pool"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_profile_with_root_disk"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance", return_value=(True, "container")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_network_device", return_value=False),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.logger"),
+        ):
+            cmds = mock.Mock()
+            cmds.incus.output.return_value = ""
+            mock_cmds_cls.create.return_value = cmds
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                run_build_vm(args)
+            output = buf.getvalue()
+        self.assertNotIn("http://127.0.0.1:8000/login/", output)
+
+    def test_run_build_vm_skips_url_when_no_web_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import run_build_vm
+        import io
+        import contextlib
+        args = mock.Mock()
+        args.root = Path("/tmp")
+        args.workdir = Path("/tmp/work")
+        args.instance = "test"
+        args.instance_type = "container"
+        args.image_name = "test.qcow2"
+        args.pool = "default"
+        args.profile = "default"
+        args.root_size = "10GiB"
+        args.memory = "1GB"
+        args.cpu = "1"
+        args.host_interface = ""
+        args.provision = True
+        args.web_port = 8000
+        args.no_web_proxy = True
+        args.debug = True
+        args.verbose = True
+        args.quiet = False
+        args.log_file = None
+
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.Cmds") as mock_cmds_cls,
+            mock.patch.object(Path, "mkdir"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_incus_daemon"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_storage_pool"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_profile_with_root_disk"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance", return_value=(True, "container")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_network_device", return_value=False),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.logger"),
+        ):
+            cmds = mock.Mock()
+            cmds.incus.output.return_value = ""
+            mock_cmds_cls.create.return_value = cmds
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                run_build_vm(args)
+            output = buf.getvalue()
+        self.assertNotIn("http://127.0.0.1:8000/login/", output)
+
+    def test_purge_removes_web_proxy_device(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kive-minimal\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
+            "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+            web_remove_calls = [
+                c for c in cmds.incus.run.call_args_list
+                if "device" in c[0][0] and "remove" in c[0][0] and "kive-web" in c[0][0]
+            ]
+            self.assertGreaterEqual(len(web_remove_calls), 1,
+                                    "Should remove kive-web proxy device from tagged instance")
 
 
 if __name__ == "__main__":
