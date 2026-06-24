@@ -1,4 +1,5 @@
 import inspect
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -7,6 +8,7 @@ from unittest import mock
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from Kive.utils.kivedevel.kivedevel.build_vm import cloud_init, provision
+from Kive.utils.kivedevel.kivedevel.kv_commands import Command
 from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult
 
 
@@ -24,23 +26,21 @@ class TestBuildVmProvision(unittest.TestCase):
         instance = "ci-smoke"
         cmds = mock.Mock()
 
-        def run_side_effect(cmd, check=False, capture_output=False):
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/done"]:
-                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/failed"]:
-                return MockRunResult(returncode=0, stdout="", stderr="")
-            if cmd[:3] == ["exec", instance, "--"] and cmd[3:] == ["cloud-init", "status", "--long"]:
-                return MockRunResult(returncode=0, stdout="status: error\n", stderr="")
-            if cmd[:2] == ["file", "pull"]:
-                return MockRunResult(returncode=0, stdout="", stderr="")
-            return MockRunResult(returncode=0, stdout="", stderr="")
+        def run_side_effect(cmd, **kwargs):
+            if "provision.log" in " ".join(cmd):
+                return MockRunResult(returncode=0, stdout="FAILED: ansible error", stderr="")
+            return MockRunResult(returncode=1, stdout="", stderr="")
 
         cmds.incus.run.side_effect = run_side_effect
 
-        with self.assertRaises(RuntimeError) as cm:
-            provision.maybe_provision_instance(cmds, instance, "container", provision=True)
+        def probe_side_effect(_cmds, _instance):
+            return ("failed", None)
 
-        self.assertIn("provisioning failed inside instance", str(cm.exception).lower())
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with self.assertRaises(RuntimeError) as cm:
+                provision.maybe_provision_instance(cmds, instance, "container", provision=True)
+
+        self.assertIn("FAILED: ansible error", str(cm.exception))
 
     def test_ensure_user_data_generates_safe_printf_and_failed_marker(self):
         cmds = mock.Mock()
@@ -139,62 +139,177 @@ class TestBuildVmProvision(unittest.TestCase):
     def test_maybe_provision_instance_fails_on_stuck_started_marker(self):
         instance = "ci-smoke"
         cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="")
 
-        def run_side_effect(cmd, check=False, capture_output=False):
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/done"]:
-                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/failed"]:
-                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/started"]:
-                return MockRunResult(returncode=0, stdout="started", stderr="")
-            if cmd[:3] == ["exec", instance, "--"] and cmd[3:] == ["sh", "-c", "cloud-init status --long 2>&1 || true"]:
-                return MockRunResult(returncode=0, stdout="status: running\n", stderr="")
-            if cmd[:2] == ["file", "pull"]:
-                return MockRunResult(returncode=0, stdout="", stderr="")
-            return MockRunResult(returncode=0, stdout="", stderr="")
+        monotonic_values = iter([0, 1, 900])
 
-        cmds.incus.run.side_effect = run_side_effect
+        def fake_monotonic():
+            return next(monotonic_values)
 
-        time_values = [0]
+        def probe_side_effect(_cmds, _instance):
+            return ("started", None)
 
-        def fake_time():
-            if len(time_values) == 1:
-                time_values.append(841)
-                return 0
-            return 841
-
-        with mock.patch.object(provision.time, "time", side_effect=fake_time):
-            with mock.patch.object(provision.time, "sleep", return_value=None):
-                with self.assertRaises(RuntimeError) as cm:
-                    provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=900)
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=fake_monotonic):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    with self.assertRaises(RuntimeError) as cm:
+                        provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=900)
 
         self.assertIn("Provisioning appears stuck", str(cm.exception))
 
-    def test_periodic_probe_uses_safe_printf(self):
-        source = inspect.getsource(provision)
-        self.assertIn("printf '%s\\n' '--- file layout ---'", source)
+    def test_marker_probe_script_is_bounded_shell(self):
+        self.assertIn("set -e", provision._BOUNDED_PROBE_SCRIPT)
+        self.assertIn("done", provision._BOUNDED_PROBE_SCRIPT)
+        self.assertIn("failed", provision._BOUNDED_PROBE_SCRIPT)
 
-    def test_maybe_provision_instance_raises_on_cloud_init_error_status(self):
+    def test_diagnostics_script_includes_cloud_init_status(self):
+        self.assertIn("cloud-init status", provision._DIAGNOSTICS_SCRIPT)
+        self.assertIn("systemctl status", provision._DIAGNOSTICS_SCRIPT)
+        self.assertIn("log tails", provision._DIAGNOSTICS_SCRIPT.lower())
+
+    def test_maybe_provision_instance_aborts_on_consecutive_transport_failures(self):
         instance = "ci-smoke"
         cmds = mock.Mock()
 
-        def run_side_effect(cmd, check=False, capture_output=False):
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/done"]:
-                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
-            if cmd[:3] == ["file", "pull", f"{instance}/var/lib/kive-provision/failed"]:
-                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
-            if cmd[:3] == ["exec", instance, "--"] and cmd[3:] == ["sh", "-c", "cloud-init status --long 2>&1 || true"]:
-                return MockRunResult(returncode=0, stdout="status: error\n", stderr="")
-            if cmd[:2] == ["file", "pull"]:
-                return MockRunResult(returncode=0, stdout="", stderr="")
-            return MockRunResult(returncode=0, stdout="", stderr="")
+        def probe_side_effect(_cmds, _instance):
+            return (None, "connection refused")
 
-        cmds.incus.run.side_effect = run_side_effect
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1, 2, 3, 4, 5, 6]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    with self.assertRaises(RuntimeError) as cm:
+                        provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=60)
 
-        with self.assertRaises(RuntimeError) as cm:
-            provision.maybe_provision_instance(cmds, instance, "container", provision=True)
+            self.assertIn("transport failures", str(cm.exception).lower())
 
-        self.assertIn("cloud-init reported error status", str(cm.exception).lower())
+
+class TestCommandTimeout(unittest.TestCase):
+    def test_run_passes_timeout_to_subprocess(self):
+        cmd = Command(use_guix=False)
+        cmd.exe = "true"
+        with mock.patch.object(cmd, "_argv", return_value=["true"]):
+            with mock.patch("subprocess.run") as mock_run:
+                mock_run.return_value = MockRunResult(returncode=0)
+                cmd.run([], timeout=30)
+                _, kwargs = mock_run.call_args
+                self.assertEqual(kwargs["timeout"], 30)
+
+    def test_run_raises_on_non_positive_timeout(self):
+        cmd = Command(use_guix=False)
+        with self.assertRaises(ValueError):
+            cmd.run([], timeout=0)
+        with self.assertRaises(ValueError):
+            cmd.run([], timeout=-1)
+
+    def test_output_accepts_timeout(self):
+        cmd = Command(use_guix=False)
+        cmd.exe = "echo"
+        with mock.patch.object(cmd, "run") as mock_run:
+            mock_run.return_value = MockRunResult(returncode=0, stdout="hello")
+            result = cmd.output([], timeout=5)
+            self.assertEqual(result, "hello")
+            _, kwargs = mock_run.call_args
+            self.assertEqual(kwargs["timeout"], 5)
+
+
+class TestProbeMarkers(unittest.TestCase):
+    def test_probe_markers_returns_done(self):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="done\n")
+
+        marker, error = provision._probe_markers(cmds, "test-instance")
+
+        self.assertEqual(marker, "done")
+        self.assertIsNone(error)
+
+    def test_probe_markers_returns_failed(self):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="failed\n")
+
+        marker, error = provision._probe_markers(cmds, "test-instance")
+
+        self.assertEqual(marker, "failed")
+        self.assertIsNone(error)
+
+    def test_probe_markers_returns_none_on_transport_failure(self):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="Error: connection refused")
+
+        marker, error = provision._probe_markers(cmds, "test-instance")
+
+        self.assertIsNone(marker)
+        self.assertIsNotNone(error)
+
+    def test_probe_markers_returns_none_on_timeout(self):
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = subprocess.TimeoutExpired(cmd="incus", timeout=30)
+
+        marker, error = provision._probe_markers(cmds, "test-instance")
+
+        self.assertIsNone(marker)
+        self.assertIn("timed out", error)
+
+    def test_probe_markers_passes_timeout_to_run(self):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="none\n")
+
+        provision._probe_markers(cmds, "test-instance")
+
+        _, kwargs = cmds.incus.run.call_args
+        self.assertEqual(kwargs.get("timeout"), provision.PROBE_TIMEOUT)
+
+
+class TestIsTransportFailure(unittest.TestCase):
+    def test_connection_refused_is_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="connection refused")
+        self.assertTrue(provision._is_transport_failure(result))
+
+    def test_return_code_zero_is_not_failure(self):
+        result = MockRunResult(returncode=0, stdout="", stderr="")
+        self.assertFalse(provision._is_transport_failure(result))
+
+    def test_command_not_found_is_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="not found")
+        self.assertTrue(provision._is_transport_failure(result))
+
+    def test_empty_stderr_is_not_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="")
+        self.assertFalse(provision._is_transport_failure(result))
+
+
+class TestValidateVmSlurmProbe(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_validate_vm_calls_slurm_probe(self):
+        from Kive.utils.kivedevel.kivedevel.checks import run_validate_vm
+        source = inspect.getsource(run_validate_vm)
+        self.assertIn("_run_slurm_probe", source)
+
+    def test_slurm_probe_script_checks_hostname_and_services(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _SLURM_PROBE_SCRIPT
+        self.assertIn("hostname -s", _SLURM_PROBE_SCRIPT)
+        self.assertIn("getent hosts head", _SLURM_PROBE_SCRIPT)
+        self.assertIn("systemctl is-active", _SLURM_PROBE_SCRIPT)
+        self.assertIn("squeue", _SLURM_PROBE_SCRIPT)
+
+    def test_slurm_probe_uses_bounded_exec(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_slurm_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="")
+        _run_slurm_probe(cmds, "test-instance")
+        _, kwargs = cmds.incus.run.call_args
+        self.assertEqual(kwargs.get("timeout"), 15)
+
+    def test_slurm_probe_logs_warning_for_wrong_hostname(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_slurm_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=0,
+            stdout="=== hostname ===\nwrong-host\n=== getent hosts head ===\n127.0.0.1 head\n=== Slurm services ===\nactive: slurmdbd\nactive: slurmctld\ninactive: slurmd\n=== Slurm commands ===\n/usr/bin/squeue\n/usr/bin/sinfo\n",
+        )
+        with self.assertLogs("kivedevel.checks", level="WARNING") as logs:
+            _run_slurm_probe(cmds, "test-instance")
+        self.assertTrue(any("wrong-host" in msg for msg in logs.output))
 
 
 class TestTlsKeyRemoval(unittest.TestCase):
