@@ -42,6 +42,9 @@ def _build_vm_args(
         verbose=False,
         debug=debug,
         log_file=None,
+        vm_network="kivebr0",
+        vm_cidr="10.247.172.1/24",
+        vm_ip="10.247.172.80",
     )
 
 
