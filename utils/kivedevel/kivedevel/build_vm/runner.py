@@ -9,7 +9,7 @@ from .cloud_init import enable_network_config, ensure_user_data
 from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_storage_pool
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
-from .network import ensure_network_device, get_default_host_interface, get_existing_network_parent
+from .network import ensure_network_device, ensure_vm_nic, ensure_vm_network, get_default_host_interface, get_existing_network_parent
 from .provision import maybe_provision_instance
 from .workspace import handle_workspace_attachment
 
@@ -19,14 +19,22 @@ logger = logging.getLogger("kivedevel")
 
 PROXY_DEVICE = "kive-web"
 GUEST_WEB_PORT = 8000
+VM_NETWORK = "kivebr0"
+VM_CIDR = "10.247.172.1/24"
+VM_IP = "10.247.172.80"
 
 
-def _proxy_config(host_port: int) -> dict[str, str]:
-    return {
-        "listen": f"tcp:127.0.0.1:{host_port}",
-        "connect": f"tcp:127.0.0.1:{GUEST_WEB_PORT}",
+def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
+    config = {
+        "listen": f"tcp:127.0.0.1:{cfg.web_port}",
         "type": "proxy",
     }
+    if cfg.instance_type == "vm":
+        config["connect"] = f"tcp:{cfg.vm_ip}:{GUEST_WEB_PORT}"
+        config["nat"] = "true"
+    else:
+        config["connect"] = f"tcp:127.0.0.1:{GUEST_WEB_PORT}"
+    return config
 
 
 def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
@@ -47,12 +55,23 @@ def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
     return config
 
 
+def _proxy_args(desired: dict[str, str]) -> list[str]:
+    args_list = [
+        desired["type"],
+        f"listen={desired['listen']}",
+        f"connect={desired['connect']}",
+    ]
+    if "nat" in desired:
+        args_list.append(f"nat={desired['nat']}")
+    return args_list
+
+
 def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
 
-    desired = _proxy_config(cfg.web_port)
+    desired = _proxy_config(cfg)
     current = _current_proxy_config(cmds, cfg.instance)
 
     if current is None:
@@ -62,9 +81,7 @@ def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
         )
         cmds.incus.run([
             "config", "device", "add", cfg.instance, PROXY_DEVICE,
-            desired["type"],
-            f"listen={desired['listen']}",
-            f"connect={desired['connect']}",
+            *_proxy_args(desired),
         ])
         return
 
@@ -84,10 +101,107 @@ def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     cmds.incus.run(["config", "device", "remove", cfg.instance, PROXY_DEVICE])
     cmds.incus.run([
         "config", "device", "add", cfg.instance, PROXY_DEVICE,
-        desired["type"],
-        f"listen={desired['listen']}",
-        f"connect={desired['connect']}",
+        *_proxy_args(desired),
     ])
+
+
+def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
+    """Run build-vm for container mode (CI/lightweight smoke testing)."""
+    created_new_instance, actual_instance_type = ensure_instance(
+        cmds,
+        cfg.instance,
+        cfg.instance_type,
+        cfg.profile,
+        cfg.cpu,
+        cfg.memory,
+    )
+
+    restart_required = False
+    host_interface = cfg.host_interface
+    added_network = ensure_network_device(cmds, cfg.instance, host_interface)
+    if added_network:
+        if not host_interface:
+            host_interface = get_default_host_interface(cmds)
+        restart_required = True
+    elif not host_interface:
+        host_interface = get_existing_network_parent(cmds, cfg.instance) or get_default_host_interface(cmds)
+
+    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
+        restart_required = True
+
+    if enable_network_config(cmds, cfg.instance, host_interface, actual_instance_type):
+        restart_required = True
+
+    if not created_new_instance:
+        logger.info(
+            "Note: cloud-init usually runs only on first boot. "
+            "Existing instances may require recreation to apply updated login/agent settings."
+        )
+
+    maybe_restart_after_config(cmds, cfg.instance, restart_required)
+
+    out = cmds.incus.output(["config", "show", cfg.instance])
+    if out and "kive-code:" not in out:
+        handle_workspace_attachment(cmds, cfg.instance, cfg.image_path, cfg.root, cfg.workdir, actual_instance_type)
+    elif out and "kive-code:" in out:
+        logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
+
+    _ensure_web_proxy_device(cmds, cfg)
+
+    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
+
+    if cfg.provision and not cfg.no_web_proxy:
+        print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")
+
+    return actual_instance_type
+
+
+def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
+    """Run build-vm for VM mode (default, recommended local dev)."""
+    ensure_vm_network(cmds, cfg.vm_network, cfg.vm_cidr)
+
+    created_new_instance, actual_instance_type = ensure_instance(
+        cmds,
+        cfg.instance,
+        cfg.instance_type,
+        cfg.profile,
+        cfg.cpu,
+        cfg.memory,
+    )
+
+    restart_required = False
+    added_nic = ensure_vm_nic(cmds, cfg.instance, cfg.vm_network, cfg.vm_ip)
+    if added_nic:
+        restart_required = True
+
+    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
+        restart_required = True
+
+    if enable_network_config(cmds, cfg.instance, "", actual_instance_type):
+        restart_required = True
+
+    if not created_new_instance:
+        logger.info(
+            "Note: cloud-init usually runs only on first boot. "
+            "Existing VMs may require recreation to apply updated login/agent settings."
+        )
+
+    maybe_restart_after_config(cmds, cfg.instance, restart_required)
+
+    out = cmds.incus.output(["config", "show", cfg.instance])
+    if out and "kive-code:" not in out:
+        handle_workspace_attachment(cmds, cfg.instance, cfg.image_path, cfg.root, cfg.workdir, actual_instance_type)
+    elif out and "kive-code:" in out:
+        logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
+
+    _ensure_web_proxy_device(cmds, cfg)
+
+    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
+
+    if cfg.provision and not cfg.no_web_proxy:
+        print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")
+
+    return actual_instance_type
 
 
 def run_build_vm(args: argparse.Namespace) -> None:
@@ -101,67 +215,12 @@ def run_build_vm(args: argparse.Namespace) -> None:
     ensure_storage_pool(cmds, cfg.pool)
     ensure_profile_with_root_disk(cmds, cfg.profile, cfg.pool, cfg.root_size)
 
-    created_new_instance, actual_instance_type = ensure_instance(
-        cmds,
-        cfg.instance,
-        cfg.instance_type,
-        cfg.profile,
-        cfg.cpu,
-        cfg.memory,
-    )
-
-    restart_required = False
-    instance_type = actual_instance_type
-    host_interface = cfg.host_interface
-    added_network = ensure_network_device(cmds, cfg.instance, host_interface)
-    if added_network:
-        if not host_interface:
-            host_interface = get_default_host_interface(cmds)
-        restart_required = True
-    elif not host_interface:
-        # For existing instances, infer the configured parent NIC so cloud-init
-        # network config can match the actual bridge setup.
-        host_interface = get_existing_network_parent(cmds, cfg.instance) or get_default_host_interface(cmds)
-
-    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
-        restart_required = True
-
-    if enable_network_config(cmds, cfg.instance, host_interface, instance_type):
-        restart_required = True
-
-    if not created_new_instance:
-        logger.info(
-            "Note: cloud-init usually runs only on first boot. Existing VMs may require recreation to apply updated login/agent settings."
-        )
-
-    maybe_restart_after_config(cmds, cfg.instance, restart_required)
-
-    out = cmds.incus.output(["config", "show", cfg.instance])
-    if out and "kive-code:" not in out:
-        handle_workspace_attachment(
-            cmds,
-            cfg.instance,
-            cfg.image_path,
-            cfg.root,
-            cfg.workdir,
-            instance_type,
-        )
-    elif out and "kive-code:" in out:
-        logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
-
-    _ensure_web_proxy_device(cmds, cfg)
-
-    maybe_provision_instance(
-        cmds,
-        cfg.instance,
-        instance_type,
-        provision=cfg.provision,
-    )
+    if cfg.instance_type == "vm":
+        _run_build_vm_vm(cfg, cmds)
+    else:
+        _run_build_vm_container(cfg, cmds)
 
     logger.info(
         "Build step complete. Use ./utils/dev enter-vm %s to connect.",
         cfg.instance,
     )
-
-    if cfg.provision and not cfg.no_web_proxy:
-        print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")

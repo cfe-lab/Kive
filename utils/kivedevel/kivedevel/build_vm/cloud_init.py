@@ -5,8 +5,7 @@ import logging
 import yaml
 
 from ..kv_commands import Cmds
-from .helpers import find_ssh_pubkey, generate_password_hash, get_instance_ipv4_for_bridge, set_instance_config_multiline
-from .network import get_bridge_cidr
+from .helpers import find_ssh_pubkey, generate_password_hash, set_instance_config_multiline
 
 
 logger = logging.getLogger("kivedevel")
@@ -238,37 +237,13 @@ runcmd:
 
 def enable_network_config(cmds: Cmds, instance: str, host_interface: str, instance_type: str) -> bool:
     logger.info("Configuring cloud-init network config for %s...", instance)
-    if instance_type == "container":
+    if instance_type == "vm":
         network_config = """\
 version: 2
 ethernets:
-  eth0:
+  enp5s0:
     dhcp4: true
     dhcp6: false
-    nameservers:
-      addresses: [8.8.8.8,1.1.1.1]
-"""
-        try:
-            yaml.safe_load(network_config)
-        except Exception as exc:
-            raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
-
-        set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
-        return True
-
-    network_cidr = get_bridge_cidr(cmds, host_interface)
-    if host_interface == "docker0" and network_cidr:
-        gateway = network_cidr.split("/")[0]
-        prefix = network_cidr.split("/")[1]
-        vm_ipv4 = get_instance_ipv4_for_bridge(instance, network_cidr)
-        logger.info("Using static IPv4 %s/%s for %s on docker0", vm_ipv4, prefix, instance)
-        network_config = f"""\
-version: 2
-ethernets:
-  enp5s0:
-    dhcp4: false
-    addresses: [{vm_ipv4}/{prefix}]
-    gateway4: {gateway}
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
@@ -276,7 +251,7 @@ ethernets:
         network_config = """\
 version: 2
 ethernets:
-  enp5s0:
+  eth0:
     dhcp4: true
     dhcp6: false
     nameservers:

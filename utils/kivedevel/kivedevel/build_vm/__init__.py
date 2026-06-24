@@ -85,6 +85,24 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         action="store_true",
         help="Skip Incus proxy device creation for the Kive web port",
     )
+    parser.add_argument(
+        "--vm-network",
+        default="kivebr0",
+        metavar="NAME",
+        help="Incus managed network for VM NIC (default: kivebr0)",
+    )
+    parser.add_argument(
+        "--vm-cidr",
+        default="10.247.172.1/24",
+        metavar="CIDR",
+        help="CIDR for the VM managed network (default: 10.247.172.1/24)",
+    )
+    parser.add_argument(
+        "--vm-ip",
+        default="10.247.172.80",
+        metavar="IP",
+        help="Static VM IP address on the managed network (default: 10.247.172.80)",
+    )
     parser.set_defaults(func=run_from_args, provision=True)
 
     purge.register_subcommand(subparsers)

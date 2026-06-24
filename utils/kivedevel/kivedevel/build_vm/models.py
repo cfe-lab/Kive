@@ -20,6 +20,9 @@ class BuildVmConfig:
     provision: bool = True
     web_port: int = 8000
     no_web_proxy: bool = False
+    vm_network: str = "kivebr0"
+    vm_cidr: str = "10.247.172.1/24"
+    vm_ip: str = "10.247.172.80"
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
@@ -40,4 +43,7 @@ class BuildVmConfig:
             provision=bool(args.provision),
             web_port=args.web_port,
             no_web_proxy=bool(args.no_web_proxy),
+            vm_network=args.vm_network,
+            vm_cidr=args.vm_cidr,
+            vm_ip=args.vm_ip,
         )

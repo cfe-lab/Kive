@@ -592,11 +592,13 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
+        # find_tagged_networks: network list --format csv (empty)
         # _find_tagged_instances: list + config show kive-minimal
         # _check_legacy_skipped: uses run() not output()
         # _device_attached(kive-code): config show kive-minimal
         # _device_attached(kive-web): config show kive-minimal
         cmds.incus.output.side_effect = [
+            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
@@ -704,7 +706,12 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
+        # find_tagged_networks: network list
+        # _find_tagged_instances: instance list
+        # _device_attached(kive-code): config show
+        # _device_attached(kive-web): config show
         cmds.incus.output.side_effect = [
+            "",
             "",
             "some: config\n",
             "some: config\n",
@@ -737,11 +744,13 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
+        # find_tagged_networks: network list
         # _find_tagged_instances: list + config show
         # _check_legacy_skipped: uses run() not output()
         # _device_attached(kive-code): config show
         # _device_attached(kive-web): config show
         cmds.incus.output.side_effect = [
+            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
@@ -1271,7 +1280,13 @@ class TestBuildVmWebProxy(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
+        # find_tagged_networks: network list
+        # _find_tagged_instances: list + config show
+        # _device_attached(kive-code): config show
+        # _device_attached(kive-web): config show
+        # network cleanup skipped if no network cleanup needed
         cmds.incus.output.side_effect = [
+            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",

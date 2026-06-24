@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
@@ -80,3 +81,94 @@ def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
         if m:
             return m.group(1)
     return ""
+
+
+_KIVE_NET_OWNER = "user.kive.devel.created-by"
+
+
+def _network_config(cmds: Cmds, network: str) -> dict:
+    out = cmds.incus.output(["network", "show", network, "--format", "json"])
+    try:
+        return json.loads(out) if out else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _network_is_tagged(cmds: Cmds, network: str) -> bool:
+    config = _network_config(cmds, network).get("config", {})
+    return isinstance(config, dict) and config.get(_KIVE_NET_OWNER) == "utils/dev"
+
+
+def _cidr_in_use(cmds: Cmds, cidr: str) -> bool:
+    out = cmds.ip.output(["route", "show", cidr])
+    return bool(out.strip())
+
+
+def ensure_vm_network(cmds: Cmds, network: str, cidr: str) -> None:
+    out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
+    networks = [line.strip() for line in out.splitlines() if line.strip()]
+
+    if network in networks:
+        if _network_is_tagged(cmds, network):
+            logger.debug("Managed network %s already exists and is owned by utils/dev.", network)
+            return
+        logger.error(
+            "Network %s already exists but is not owned by utils/dev.\n"
+            "Use --vm-network to specify a different network name.",
+            network,
+        )
+        sys.exit(1)
+
+    if _cidr_in_use(cmds, cidr):
+        logger.error(
+            "CIDR %s is already in use on this host.\n"
+            "Use --vm-cidr to specify a different network CIDR.",
+            cidr,
+        )
+        sys.exit(1)
+
+    logger.info("Creating managed network %s (%s)...", network, cidr)
+    cmds.incus.run(
+        [
+            "network", "create", network,
+            f"ipv4.address={cidr}",
+            "ipv4.nat=true",
+            "ipv6.address=none",
+            f"{_KIVE_NET_OWNER}=utils/dev",
+            "user.kive.devel.project=Kive",
+            "user.kive.devel.kind=network",
+        ]
+    )
+
+
+def _eth0_exists(cmds: Cmds, instance: str) -> bool:
+    out = cmds.incus.output(["config", "device", "list", instance])
+    return bool(re.search(r"^eth0\s*$", out, re.MULTILINE))
+
+
+def ensure_vm_nic(cmds: Cmds, instance: str, network: str, static_ip: str) -> bool:
+    if _eth0_exists(cmds, instance):
+        logger.debug("NIC eth0 already exists on %s.", instance)
+        return False
+    logger.info("Adding NIC eth0 to %s (network=%s, ipv4.address=%s)...", instance, network, static_ip)
+    cmds.incus.run(
+        [
+            "config", "device", "add",
+            instance, "eth0", "nic",
+            f"network={network}",
+            f"ipv4.address={static_ip}",
+        ]
+    )
+    return True
+
+
+def find_tagged_networks(cmds: Cmds) -> list[str]:
+    out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
+    tagged = []
+    for line in out.splitlines():
+        name = line.strip()
+        if name and _network_is_tagged(cmds, name):
+            tagged.append(name)
+    if tagged:
+        logger.info("Found tagged networks: %s", ", ".join(tagged))
+    return tagged

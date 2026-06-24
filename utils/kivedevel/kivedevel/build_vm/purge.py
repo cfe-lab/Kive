@@ -8,6 +8,7 @@ from pathlib import Path
 
 from ..kv_commands import Cmds
 from ..shared import configure_logging, default_root
+from .network import find_tagged_networks
 
 logger = logging.getLogger("kivedevel.build_vm.purge")
 
@@ -127,7 +128,10 @@ def run_purge(args: argparse.Namespace) -> None:
     # Log any legacy untagged instances that were discovered but skipped.
     _check_legacy_skipped(cmds, tagged_set)
 
-    # Phase 3: Discover marked workdirs.
+    # Phase 3: Discover tagged networks.
+    tagged_networks = find_tagged_networks(cmds)
+
+    # Phase 4: Discover marked workdirs.
     marked = _find_marked_workdirs(root)
 
     # Phase 4: Explicit --workdir overrides.
@@ -139,7 +143,7 @@ def run_purge(args: argparse.Namespace) -> None:
         if w_resolved not in all_workdirs:
             all_workdirs.append(w_resolved)
 
-    if not all_instances and not all_workdirs:
+    if not all_instances and not all_workdirs and not tagged_networks:
         logger.info("No Kive development resources found to purge.")
         return
 
@@ -169,6 +173,27 @@ def run_purge(args: argparse.Namespace) -> None:
 
     for instance in all_instances:
         _delete_instance(cmds, instance)
+
+    if tagged_networks:
+        remaining = set()
+        for name in tagged_networks:
+            out = cmds.incus.run(
+                ["list", "--format", "csv", "--columns", "n"],
+                check=False,
+                capture_output=True,
+            )
+            if out.returncode == 0:
+                remaining = set(line.strip() for line in out.stdout.splitlines() if line.strip())
+                break
+        if not remaining:
+            for net in tagged_networks:
+                logger.info("Removing managed network '%s'...", net)
+                cmds.incus.run(["network", "delete", net], check=False)
+        else:
+            logger.info(
+                "Skipping network removal: %d instance(s) still exist.",
+                len(remaining),
+            )
 
     logger.info("Purge complete. All Kive development resources removed.")
 
