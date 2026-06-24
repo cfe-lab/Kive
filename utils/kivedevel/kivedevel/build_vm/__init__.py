@@ -13,7 +13,8 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     root = default_root()
     parser = subparsers.add_parser(
         "build-vm",
-        help="Build and configure an Incus VM with cloud-init",
+        help="Build and provision a local Kive development environment in an Incus VM (default, recommended). "
+        "Container mode (--instance-type container) is for CI and lightweight provisioning smoke tests only.",
     )
     log_group = parser.add_mutually_exclusive_group()
     log_group.add_argument("--quiet", action="store_true", help="Only show errors")
@@ -31,7 +32,9 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         "--instance-type",
         choices=("vm", "container"),
         default="vm",
-        help="Incus instance type to create (default: vm)",
+        help="Instance type (default: vm). "
+        "VM is the recommended default for local development with full Slurm and Singularity support. "
+        "Container mode is for CI and lightweight provisioning smoke tests only.",
     )
     parser.add_argument(
         "--root",
@@ -56,8 +59,8 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     parser.add_argument("--pool", default="default", help="Incus storage pool (default: default)")
     parser.add_argument("--profile", default="default", help="Incus profile (default: default)")
     parser.add_argument("--root-size", default="10GiB", help="Root disk size (default: 10GiB)")
-    parser.add_argument("--memory", default="1GB", help="VM memory limit (default: 1GB)")
-    parser.add_argument("--cpu", default="1", help="VM CPU count (default: 1)")
+    parser.add_argument("--memory", default="8GiB", help="VM memory limit (default: 8GiB)")
+    parser.add_argument("--cpu", default="4", help="VM CPU count (default: 4)")
     parser.add_argument(
         "--host-interface",
         default="",

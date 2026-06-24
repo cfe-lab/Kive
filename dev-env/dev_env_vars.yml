@@ -57,10 +57,12 @@ slurmctlnode: head
 slurmctlnode_address: 127.0.0.1
 slurmnodes:
     - name: head
-      memory: "7000"
+      cpus: "4"
+      memory: "8000"
 slurm_nodes:
   - name: head
-    memory: "7000"
+    cpus: "4"
+    memory: "8000"
 kive_db_subnet: 127.0.0.1/32
 barman_password: fixme-barman-dev
 streaming_barman_password: fixme-streaming-barman-dev

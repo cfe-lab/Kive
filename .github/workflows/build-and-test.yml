@@ -116,7 +116,7 @@ jobs:
       - name: Check guest network
         run: sudo --preserve-env=PATH utils/dev check-network --backend incus --instance network-smoke --host archive.ubuntu.com --port 80 --debug
 
-      - name: Smoke-test local install
+      - name: Smoke-test local install (container mode, CI / provisioning check)
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
         run: sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev smoke-local-install --instance ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug

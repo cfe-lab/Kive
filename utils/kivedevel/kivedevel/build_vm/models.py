@@ -9,14 +9,14 @@ class BuildVmConfig:
     root: Path
     workdir: Path
     instance: str
-    instance_type: str
     image_path: Path
-    pool: str
-    profile: str
-    root_size: str
-    memory: str
-    cpu: str
-    host_interface: str
+    instance_type: str = "vm"
+    pool: str = "default"
+    profile: str = "default"
+    root_size: str = "10GiB"
+    memory: str = "8GiB"
+    cpu: str = "4"
+    host_interface: str = ""
     provision: bool = True
     web_port: int = 8000
     no_web_proxy: bool = False

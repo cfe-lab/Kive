@@ -99,6 +99,52 @@ def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
         logger.debug("Slurm commands found:\n%s", cmds_text)
 
 
+_SINGULARITY_PROBE_SCRIPT = """
+set -e
+echo '=== singularity version ==='
+singularity --version 2>&1 || echo 'not installed'
+echo '=== singularity exec test ==='
+if command -v singularity >/dev/null 2>&1; then
+  singularity exec docker://alpine:latest /bin/true 2>&1 && echo 'exec OK' || echo 'exec FAILED'
+else
+  echo 'singularity not available'
+fi
+"""
+
+
+def _run_singularity_probe(cmds: Cmds, instance: str) -> None:
+    try:
+        result = cmds.incus.run(
+            ["exec", instance, "--", "sh", "-c", _SINGULARITY_PROBE_SCRIPT],
+            check=False,
+            capture_output=True,
+            timeout=30,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("Singularity probe timed out on %s", instance)
+        return
+    except Exception as exc:
+        logger.debug("Singularity probe skipped on %s: %s", instance, exc)
+        return
+
+    output = (result.stdout or "").strip()
+    if not output:
+        logger.debug("Singularity probe returned empty output on %s", instance)
+        return
+
+    if "not installed" in output:
+        logger.warning("Singularity is not installed in %s.", instance)
+        return
+
+    if "exec FAILED" in output:
+        logger.warning("Singularity exec test failed in %s.", instance)
+
+    if "exec OK" in output:
+        logger.info("Singularity can execute containers in %s.", instance)
+
+    logger.debug("Singularity probe output:\n%s", output)
+
+
 def run_validate_vm(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
     configure_logging(args, workdir)
@@ -120,6 +166,9 @@ def run_validate_vm(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     _run_slurm_probe(cmds, instance)
+
+    if args.instance_type == "vm":
+        _run_singularity_probe(cmds, instance)
 
     if args.instance_type == "container":
         # Container mode mounts repo source as a host directory at /mnt/kive-code.

@@ -72,6 +72,19 @@
       pip:
         requirements: "{{ kive_root }}/requirements-dev.txt"
         virtualenv: "{{ kive_venv }}"
+    - name: install singularity container runtime
+      become: true
+      block:
+        - name: install singularity package
+          apt:
+            name: singularity-container
+            state: present
+            update_cache: false
+      rescue:
+        - name: warn about missing singularity
+          debug:
+            msg: "singularity-container package not available; container jobs via Singularity will not work in this environment"
+
     - name: let kive create databases for testing
       become: true
       become_user: postgres

@@ -122,12 +122,12 @@ class TestBuildVmProvision(unittest.TestCase):
         job_step_names = re.findall(r"- name: (.+)", job_section)
         self.assertIn("Prepare host", job_step_names)
         self.assertIn("Check guest network", job_step_names)
-        self.assertIn("Smoke-test local install", job_step_names)
+        self.assertIn("Smoke-test local install", " ".join(job_step_names))
         self.assertIn("Cleanup local install smoke test", job_step_names)
 
         prepare_idx = job_step_names.index("Prepare host")
         check_idx = job_step_names.index("Check guest network")
-        smoke_idx = job_step_names.index("Smoke-test local install")
+        smoke_idx = next(i for i, name in enumerate(job_step_names) if name.startswith("Smoke-test local install"))
         cleanup_idx = job_step_names.index("Cleanup local install smoke test")
         self.assertLess(prepare_idx, check_idx)
         self.assertLess(check_idx, smoke_idx)
@@ -873,6 +873,77 @@ class TestBuildVmParser(unittest.TestCase):
         # "add_argument" for just "--provision" (without "--no-") should not appear
         add_lines = [line for line in source.splitlines() if "add_argument" in line and '"-provision"' in line]
         self.assertEqual(len(add_lines), 0)
+
+    def test_default_instance_type_is_vm(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertEqual(args.instance_type, "vm")
+
+    def test_explicit_instance_type_container(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--instance-type", "container"])
+        self.assertEqual(args.instance_type, "container")
+
+    def test_default_cpu_is_4(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertEqual(args.cpu, "4")
+
+    def test_default_memory_is_8GiB(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm"])
+        self.assertEqual(args.memory, "8GiB")
+
+
+class TestBuildVmDefaults(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_dev_env_vars_slurm_node_cpus_match_vm_default(self):
+        dev_vars_path = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
+        text = dev_vars_path.read_text()
+        self.assertIn("cpus: \"4\"", text)
+        self.assertIn("memory: \"8000\"", text)
+
+    def test_workflow_ci_passes_instance_type_container(self):
+        workflow_path = self.REPO_ROOT / ".github" / "workflows" / "build-and-test.yml"
+        text = workflow_path.read_text()
+        self.assertIn("--instance-type container", text)
+        self.assertIn("container mode", text.lower())
+
+    def test_singularity_probe_script_exists(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _SINGULARITY_PROBE_SCRIPT
+        self.assertIn("singularity", _SINGULARITY_PROBE_SCRIPT)
+        self.assertIn("exec", _SINGULARITY_PROBE_SCRIPT)
+        self.assertIn("exec OK", _SINGULARITY_PROBE_SCRIPT)
+        self.assertIn("exec FAILED", _SINGULARITY_PROBE_SCRIPT)
+
+    def test_validate_vm_calls_singularity_probe_in_vm_mode(self):
+        from Kive.utils.kivedevel.kivedevel.checks import run_validate_vm
+        source = inspect.getsource(run_validate_vm)
+        self.assertIn("_run_singularity_probe", source)
+        self.assertIn('args.instance_type == "vm"', source)
+
+    def test_setup_dev_env_installs_singularity(self):
+        setup_path = self.REPO_ROOT / "dev-env" / "setup-dev-env.yml"
+        text = setup_path.read_text()
+        self.assertIn("singularity-container", text)
+        self.assertIn("install singularity", text.lower())
 
 
 class TestBuildVmWebProxy(unittest.TestCase):
