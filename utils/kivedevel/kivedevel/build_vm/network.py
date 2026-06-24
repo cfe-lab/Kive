@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -123,36 +124,90 @@ def _derive_vm_ip_from_cidr(cidr: str) -> str:
     return f"{base}.80"
 
 
+def _get_network_info(cmds: Cmds, name: str) -> dict | None:
+    """Inspect an Incus network via ``incus network show``.
+
+    Returns ``None`` if the network does not exist in Incus.
+    Otherwise returns a dict with keys ``name``, ``managed`` (bool),
+    and ``ipv4_address`` (str, possibly empty).
+    """
+    try:
+        out = cmds.incus.output(["network", "show", name])
+    except Exception:
+        return None
+    if not out:
+        return None
+    import yaml
+    try:
+        data = yaml.safe_load(out)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    config = data.get("config") or {}
+    if not isinstance(config, dict):
+        config = {}
+    return {
+        "name": data.get("name", name),
+        "managed": bool(data.get("managed", False)),
+        "ipv4_address": config.get("ipv4.address", ""),
+    }
+
+
 def _repair_bridge_nat(cmds: Cmds, bridge: str) -> None:
     for key in ("ipv4.nat", "ipv4.routing", "ipv4.firewall"):
-        cmds.incus.run(["network", "set", bridge, f"{key}=true"], check=False)
-    cmds.ip.run(["sysctl", "-w", "net.ipv4.ip_forward=1"], check=False)
+        cmds.incus.run(["network", "set", bridge, f"{key}=true"])
+    subprocess.run(
+        ["sysctl", "-w", "net.ipv4.ip_forward=1"],
+        check=True, capture_output=True, text=True,
+    )
 
 
 def ensure_vm_network(cmds: Cmds, network: str, cidr: str, vm_ip: str, workdir: Path) -> tuple[str, str]:
-    out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
-    networks = [line.strip() for line in out.splitlines() if line.strip()]
+    info = _get_network_info(cmds, network)
 
-    if network in networks:
+    if info is not None:
+        if not info["managed"]:
+            logger.error(
+                "Network '%s' exists but is not an Incus-managed bridge.\n"
+                "It may be an OS-level bridge that Incus cannot configure.\n"
+                "Use a different managed network name, for example:\n"
+                "  utils/dev prepare-host --bridge kivebr0 --debug\n"
+                "  utils/dev build-vm --vm-network kivebr0",
+                network,
+            )
+            sys.exit(1)
+
+        ipv4_address = info["ipv4_address"]
+        if not ipv4_address:
+            logger.error(
+                "Network '%s' is managed but has no ipv4.address configured.\n"
+                "Run: utils/dev prepare-host --bridge %s --debug",
+                network, network,
+            )
+            sys.exit(1)
+
         if network == "incusbr0":
-            logger.debug("Using existing default bridge %s.", network)
+            logger.debug("Using existing managed bridge %s.", network)
             _repair_bridge_nat(cmds, network)
-            actual_cidr = cmds.incus.output(["network", "get", network, "ipv4.address"]).strip()
-            if not actual_cidr:
-                logger.error(
-                    "Bridge %s has no ipv4.address configured.\n"
-                    "Run: utils/dev prepare-host --bridge incusbr0 --debug",
-                    network,
-                )
-                sys.exit(1)
-            actual_vm_ip = _derive_vm_ip_from_cidr(actual_cidr)
-            return actual_cidr, actual_vm_ip
+            actual_vm_ip = _derive_vm_ip_from_cidr(ipv4_address)
+            return ipv4_address, actual_vm_ip
+
         if _network_owned_by_marker(workdir, network):
             logger.debug("Managed network %s already exists and is owned by utils/dev.", network)
             return cidr, vm_ip
+
         logger.error(
-            "Network %s already exists but is not owned by utils/dev.\n"
+            "Network '%s' already exists but is not owned by utils/dev.\n"
             "Use --vm-network to specify a different network name.",
+            network,
+        )
+        sys.exit(1)
+
+    if network == "incusbr0":
+        logger.error(
+            "Default bridge '%s' is not configured in Incus.\n"
+            "Run: utils/dev prepare-host --bridge incusbr0 --debug",
             network,
         )
         sys.exit(1)
