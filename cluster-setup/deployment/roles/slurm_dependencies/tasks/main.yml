@@ -15,23 +15,31 @@
       - hwloc
       - libhwloc-dev
       # AMD GPU support:
-      # FIXME this does not compile correctly; can we find a proper dev package?
-      - rocm-device-libs
+      # FIXME rocm-device-libs not available on Ubuntu 24.04, skipping
+      # - rocm-device-libs
       # HDF5 job profiling:
       - libhdf5-dev
       # To generate HTML man pages:
+      - man2html
+      # InfiniBand accounting:
+      - libibmad-dev
+      - libibumad-dev
       # Intel GPU support:
       - libvpl-dev
       # IPMI energy consumption:
-      # FIXME this does not compile correctly; are all the required headers in place?
-      - libfreeipmi-dev
+      # FIXME libfreeipmi-dev not available on Ubuntu 24.04, skipping
+      # - libfreeipmi-dev
       # lua support:
       - liblua5.4-dev
       # MUNGE support:
+      - libmunge-dev
+      # MariaDB support:
+      - libmariadb-dev
       # NUMA affinity:
       - libnuma-dev
       # NVIDIA GPU support:
-      - libnvidia-ml-dev
+      # FIXME libnvidia-ml-dev not available without NVIDIA drivers, skipping
+      # - libnvidia-ml-dev
       # PAM support:
       - libpam0g-dev
       # PMIx support:
