@@ -5,6 +5,17 @@
 - hosts: head
   vars_files:
     - dev_env_vars.yml
+  pre_tasks:
+    - name: set local development hostname
+      become: true
+      hostname:
+        name: "{{ slurmctlnode }}"
+    - name: ensure Slurm controller hostname resolves locally
+      become: true
+      lineinfile:
+        path: /etc/hosts
+        regexp: '^{{ slurmctlnode_address }}\s+{{ slurmctlnode }}(\s|$)'
+        line: "{{ slurmctlnode_address }} {{ slurmctlnode }}"
   roles:
     - slurm_builder
     - slurm_controller
