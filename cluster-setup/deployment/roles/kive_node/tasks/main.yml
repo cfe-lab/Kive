@@ -1,25 +1,9 @@
 ---
 
-- name: configure apt retries
-  become: true
-  copy:
-    dest: /etc/apt/apt.conf.d/80-kive-retries
-    mode: "0644"
-    content: |
-      Acquire::ForceIPv4 "true";
-      Acquire::Retries "5";
-      Acquire::http::Timeout "30";
-      Acquire::https::Timeout "30";
-
 - name: add the deadsnakes PPA to get old versions of Python
   become: true
   apt_repository:
     repo: ppa:deadsnakes/ppa
-  register: deadsnakes_ppa
-  until: deadsnakes_ppa is succeeded
-  retries: 5
-  delay: 30
-  when: kive_add_deadsnakes_ppa | default(true) | bool
 
 - name: install the version of Python required by kive
   become: true
