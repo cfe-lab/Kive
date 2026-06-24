@@ -22,9 +22,3 @@ kive_ssl_key_path: /etc/ssl/private/kive.key
 # These must be local paths on the Ansible controller.
 kive_ssl_certificate_src: null
 kive_ssl_key_src: null
-
-# Whether to add the deadsnakes PPA for older Python versions.
-# Production deployments on Ubuntu Jammy (22.04) have Python 3.10 natively
-# and can set this to false.  Dev/local deployments on newer Ubuntu releases
-# (Noble, Oracular) need the PPA to install Python 3.10.
-kive_add_deadsnakes_ppa: true

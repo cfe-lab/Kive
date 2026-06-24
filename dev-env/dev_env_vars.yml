@@ -36,8 +36,7 @@ kive_ssl_key_path: /etc/ssl/private/kive-dev-selfsigned.key
 kive_log_level: WARN
 kive_purge_start: "20GB"
 kive_purge_stop: "15GB"
-# - Python version for kive (native on Jammy, deadsnakes on newer releases)
-kive_add_deadsnakes_ppa: false
+# - Python version for kive (via deadsnakes PPA)
 kive_python_package: python3.10
 kive_python_executable: python3.10
 kive_python_version: "3.10"
