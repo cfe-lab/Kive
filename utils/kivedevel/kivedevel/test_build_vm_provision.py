@@ -1426,5 +1426,44 @@ class TestNoVMFallback(unittest.TestCase):
         self.assertNotIn("fallback", text)
 
 
+class TestSlurmBuilderRole(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_slurm_download_uses_get_url_with_checksum(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertIn("get_url:", text)
+        self.assertIn("checksum:", text)
+        self.assertIn("slurm_sha1_checksum", text)
+
+    def test_slurm_download_has_timeout(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertIn("timeout: 60", text)
+
+    def test_slurm_download_has_retries(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertIn("retries: 5", text)
+        self.assertIn("delay: 30", text)
+
+    def test_slurm_download_uses_until_succeeded(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertIn("until:", text)
+        self.assertIn("succeeded", text)
+
+    def test_slurm_download_registers_result(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertIn("register:", text)
+
+    def test_slurm_download_no_stat_guard(self):
+        task_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_builder" / "tasks" / "main.yml"
+        text = task_path.read_text()
+        self.assertNotIn("stat:", text)
+        self.assertNotIn("slurm_download.stat.exists", text)
+
+
 if __name__ == "__main__":
     unittest.main()
