@@ -1473,6 +1473,25 @@ class TestSlurmBuilderRole(unittest.TestCase):
 
 
 class TestVmNetwork(unittest.TestCase):
+    def test_network_create_includes_explicit_bridge_type(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+        create_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:2] == ["network", "create"]
+        ]
+        self.assertEqual(len(create_calls), 1)
+        args = create_calls[0][0][0]
+        self.assertIn("--type=bridge", args)
+        self.assertEqual(args[2], "--type=bridge")
+        self.assertEqual(args[3], "kivebr0")
+
     def test_network_create_includes_only_standard_keys(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
         import tempfile
@@ -1484,7 +1503,7 @@ class TestVmNetwork(unittest.TestCase):
 
         create_calls = [
             c for c in cmds.incus.run.call_args_list
-            if c[0][0][:3] == ["network", "create", "kivebr0"]
+            if c[0][0][:2] == ["network", "create"]
         ]
         self.assertEqual(len(create_calls), 1)
         args = create_calls[0][0][0]
@@ -1517,7 +1536,8 @@ class TestVmNetwork(unittest.TestCase):
         import tempfile
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
-        cmds.incus.run.side_effect = RuntimeError("network set failed")
+        # First call (create) succeeds, second call (set) fails
+        cmds.incus.run.side_effect = [None, RuntimeError("network set failed")]
 
         with tempfile.TemporaryDirectory() as tmp:
             ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
@@ -1542,7 +1562,7 @@ class TestVmNetwork(unittest.TestCase):
 
         create_calls = [
             c for c in cmds.incus.run.call_args_list
-            if c[0][0][:3] == ["network", "create", "kivebr0"]
+            if c[0][0][:2] == ["network", "create"]
         ]
         self.assertEqual(len(create_calls), 0, "Should not create network when marker-owned")
 
@@ -1554,6 +1574,37 @@ class TestVmNetwork(unittest.TestCase):
             "kivebr0\n",          # network list shows it
         ]
         cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+    def test_reuses_incusbr0_without_marker(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kivebr0\nincusbr0\n",  # network list includes incusbr0
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            # No marker file at all for incusbr0
+            ensure_vm_network(cmds, "incusbr0", "10.247.172.1/24", Path(tmp))
+
+        create_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:2] == ["network", "create"]
+        ]
+        self.assertEqual(len(create_calls), 0,
+                         "Should not create incusbr0, always reuse default bridge")
+
+    def test_creation_failure_does_not_fallback_to_container(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.incus.run.side_effect = RuntimeError("Can't parse a version: UNKNOWN")
 
         with tempfile.TemporaryDirectory() as tmp:
             with self.assertRaises(SystemExit):
