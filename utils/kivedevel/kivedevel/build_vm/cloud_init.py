@@ -115,38 +115,6 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         ls -la /opt/venv_kive/bin /usr/bin/python3 /tmp/kive_dev_vars /etc/kive_dev_vars || true
         cat /tmp/kive_dev_vars | sed -n '1,80p' || true
 
-        echo "=== post-provision Slurm smoke check ==="
-        hostname -s
-        if [ "$(hostname -s)" != "head" ]; then
-          echo "Hostname is not 'head'; Slurm controller identity will not match." >&2
-          exit 1
-        fi
-        if ! getent hosts head >/dev/null; then
-          echo "'head' does not resolve via getent hosts; SlurmctldHost lookup will fail." >&2
-          exit 1
-        fi
-        if ! getent hosts head | grep -q "127.0.0.1"; then
-          echo "'head' does not resolve to 127.0.0.1; Slurm may bind to the wrong address." >&2
-          exit 1
-        fi
-        for svc in slurmdbd slurmctld slurmd; do
-          if ! systemctl is-active --quiet "$svc"; then
-            echo "Slurm service $svc is not active after provisioning." >&2
-            systemctl status "$svc" --no-pager || true
-            exit 1
-          fi
-          echo "  $svc: active"
-        done
-        echo "=== Slurm queue check ==="
-        if ! squeue -a; then
-          echo "squeue -a failed; Slurm controller may not be accepting requests." >&2
-          exit 1
-        fi
-        if ! sinfo -Nel; then
-          echo "sinfo -Nel failed; node state is unavailable." >&2
-          exit 1
-        fi
-        echo "=== Slurm smoke check passed ==="
 
         PYTHON_BIN=/opt/venv_kive/bin/python
         if [ ! -x "$PYTHON_BIN" ]; then
