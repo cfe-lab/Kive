@@ -312,6 +312,57 @@ class TestValidateVmSlurmProbe(unittest.TestCase):
         self.assertTrue(any("wrong-host" in msg for msg in logs.output))
 
 
+class TestSlurmControllerRole(unittest.TestCase):
+    REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
+
+    def test_etc_hosts_task_uses_slurmctlnode_address_not_ansible_host(self):
+        role_task = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_controller" / "tasks" / "main.yml"
+        text = role_task.read_text()
+        self.assertIn("slurmctlnode_address", text)
+        self.assertNotIn("ansible_host", text)
+
+    def test_etc_hosts_task_uses_slurmctlnode_parameter_not_hardcoded(self):
+        role_task = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_controller" / "tasks" / "main.yml"
+        text = role_task.read_text()
+        self.assertIn("{{ slurmctlnode }}", text)
+        # The regexp and line should both use the parameter, not a literal 'head'
+        etc_hosts_block = text[text.find("ensure slurm controller"):text.find("install and start mariadb")]
+        self.assertNotIn(" head", etc_hosts_block.split("{{")[0])
+
+    def test_role_defaults_include_slurmctlnode_address(self):
+        defaults = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_controller" / "defaults" / "main.yml"
+        text = defaults.read_text()
+        self.assertIn("slurmctlnode_address: 127.0.0.1", text)
+
+    def test_setup_dev_env_pre_tasks_set_hostname_before_roles(self):
+        setup_path = self.REPO_ROOT / "dev-env" / "setup-dev-env.yml"
+        text = setup_path.read_text()
+        # pre_tasks must come before roles
+        pre_tasks_idx = text.find("pre_tasks:")
+        roles_idx = text.find("roles:")
+        self.assertGreater(roles_idx, pre_tasks_idx)
+        # hostname task must be before /etc/hosts task
+        hostname_idx = text.find("set local development hostname")
+        hosts_idx = text.find("ensure Slurm controller hostname resolves locally")
+        self.assertGreater(hosts_idx, hostname_idx)
+        # Both are before roles
+        self.assertGreater(roles_idx, hosts_idx)
+
+    def test_setup_dev_env_writes_slurmctlnode_address(self):
+        setup_path = self.REPO_ROOT / "dev-env" / "setup-dev-env.yml"
+        text = setup_path.read_text()
+        self.assertIn("slurmctlnode_address", text)
+        self.assertIn("slurmctlnode", text)
+        # The regexp should match the literal address
+        self.assertIn("regexp: '^{{ slurmctlnode_address }}", text)
+
+    def test_slurm_conf_template_uses_slurmctlnode(self):
+        template_path = self.REPO_ROOT / "cluster-setup" / "deployment" / "roles" / "slurm_controller" / "templates" / "slurm.conf.j2"
+        text = template_path.read_text()
+        self.assertIn("SlurmctldHost={{ slurmctlnode }}", text)
+        self.assertIn("AccountingStorageHost={{ slurmctlnode }}", text)
+
+
 class TestTlsKeyRemoval(unittest.TestCase):
     """Verify no TLS private key material is committed to the repository."""
 
