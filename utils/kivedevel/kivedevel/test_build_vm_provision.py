@@ -1301,5 +1301,130 @@ class TestBuildVmWebProxy(unittest.TestCase):
                                     "Should remove kive-web proxy device from tagged instance")
 
 
+class TestEnsureInstance(unittest.TestCase):
+    def test_vm_unsupported_raises_runtime_error(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.instance import ensure_instance
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=1,
+            stdout="",
+            stderr='Error: instance type "virtual-machine" is not supported',
+        )
+
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.instance.instance_exists", return_value=False):
+            with self.assertRaises(RuntimeError) as cm_err:
+                ensure_instance(cmds, "test", "vm", "default", "4", "8GiB")
+
+        self.assertIn("VM instances are not supported", str(cm_err.exception))
+
+    def test_vm_unsupported_does_not_fallback_to_container(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.instance import ensure_instance
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=1,
+            stdout="",
+            stderr='Error: instance type "virtual-machine" is not supported',
+        )
+
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.instance.instance_exists", return_value=False):
+            with self.assertRaises(RuntimeError):
+                ensure_instance(cmds, "test", "vm", "default", "4", "8GiB")
+
+        # ensure_instance should only be called once (no recursive fallback)
+        self.assertEqual(cmds.incus.run.call_count, 1)
+
+    def test_container_mode_still_retries_privileged(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.instance import ensure_instance
+        cmds = mock.Mock()
+        # First call fails with uid/gid error, second succeeds
+        cmds.incus.run.side_effect = [
+            MockRunResult(returncode=1, stdout="", stderr="no uid/gid allocation configured"),
+            MockRunResult(returncode=0, stdout="", stderr=""),
+        ]
+
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.instance.instance_exists", return_value=False):
+            result = ensure_instance(cmds, "test", "container", "default", "1", "1GB")
+
+        self.assertEqual(result, (True, "container"))
+        self.assertEqual(cmds.incus.run.call_count, 2)
+
+    def test_container_privileged_retry_still_fails(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.instance import ensure_instance
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = [
+            MockRunResult(returncode=1, stdout="", stderr="no uid/gid allocation configured"),
+            MockRunResult(returncode=1, stdout="", stderr="still failed"),
+        ]
+
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.instance.instance_exists", return_value=False):
+            with self.assertRaises(RuntimeError) as cm_err:
+                ensure_instance(cmds, "test", "container", "default", "1", "1GB")
+
+        self.assertIn("privileged", str(cm_err.exception).lower())
+
+
+class TestSingularityProbeFatal(unittest.TestCase):
+    def test_vm_mode_singularity_exec_failed_is_fatal(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_singularity_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=0,
+            stdout="exec FAILED",
+            stderr="",
+        )
+
+        with self.assertRaises(SystemExit):
+            _run_singularity_probe(cmds, "test", fatal=True)
+
+    def test_vm_mode_singularity_not_installed_is_fatal(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_singularity_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=0,
+            stdout="not installed",
+            stderr="",
+        )
+
+        with self.assertRaises(SystemExit):
+            _run_singularity_probe(cmds, "test", fatal=True)
+
+    def test_vm_mode_singularity_ok_no_exit(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_singularity_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=0,
+            stdout="exec OK",
+            stderr="",
+        )
+
+        # Should not raise
+        _run_singularity_probe(cmds, "test", fatal=True)
+
+    def test_non_fatal_mode_returns_on_exec_failed(self):
+        from Kive.utils.kivedevel.kivedevel.checks import _run_singularity_probe
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=0,
+            stdout="exec FAILED",
+            stderr="",
+        )
+
+        # Should not raise when not fatal
+        _run_singularity_probe(cmds, "test", fatal=False)
+
+    def test_validate_vm_passes_fatal_to_singularity_probe(self):
+        from Kive.utils.kivedevel.kivedevel.checks import run_validate_vm
+        source = inspect.getsource(run_validate_vm)
+        self.assertIn("fatal=True", source)
+
+
+class TestNoVMFallback(unittest.TestCase):
+    def test_source_has_no_falling_back_to_container(self):
+        instance_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "instance.py"
+        text = instance_path.read_text()
+        self.assertNotIn("falling back", text)
+        self.assertNotIn("fallback", text)
+
+
 if __name__ == "__main__":
     unittest.main()

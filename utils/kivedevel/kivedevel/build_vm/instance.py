@@ -34,28 +34,32 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         result = cmds.incus.run(create_args, check=False, capture_output=True)
         if result.returncode != 0:
             stderr = (result.stderr or "").lower()
-            if "instance type \"virtual-machine\" is not supported" in stderr:
-                logger.warning(
-                    "Incus server does not support VM instances; falling back to container for %s.",
-                    instance,
+            if instance_type == "vm" and "instance type \"virtual-machine\" is not supported" in stderr:
+                logger.error(
+                    "Incus VM instances are not supported on this host.\n"
+                    "The default local Kive development environment requires an Incus VM "
+                    "so Singularity jobs can run reliably.\n"
+                    "Enable Incus VM support, or explicitly run with --instance-type container "
+                    "for CI/lightweight smoke testing only."
                 )
-                return ensure_instance(cmds, instance, "container", profile, cpu, memory)
-            if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
-                logger.warning(
-                    "Incus server does not support unprivileged containers; retrying %s as privileged.",
-                    instance,
-                )
-                privileged_args = create_args + ["--config", "security.privileged=true"]
-                privileged_result = cmds.incus.run(privileged_args)
-                if privileged_result.returncode == 0:
-                    logger.info("Successfully created privileged instance %s.", instance)
-                    return True, instance_type
-                else:
-                    logger.error(
-                        "Failed to create privileged instance %s. Please ensure your Incus server supports unprivileged containers or run with --privileged.",
+                raise RuntimeError("Incus VM instances are not supported on this host.")
+            if instance_type == "container":
+                if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
+                    logger.warning(
+                        "Incus server does not support unprivileged containers; retrying %s as privileged.",
                         instance,
                     )
-                    raise RuntimeError("Failed to create privileged instance: see previous incus output.")
+                    privileged_args = create_args + ["--config", "security.privileged=true"]
+                    privileged_result = cmds.incus.run(privileged_args)
+                    if privileged_result.returncode == 0:
+                        logger.info("Successfully created privileged instance %s.", instance)
+                        return True, instance_type
+                    else:
+                        logger.error(
+                            "Failed to create privileged instance %s. Please ensure your Incus server supports unprivileged containers or run with --privileged.",
+                            instance,
+                        )
+                        raise RuntimeError("Failed to create privileged instance: see previous incus output.")
             if result.stderr:
                 logger.error(result.stderr.strip())
             if result.stdout:

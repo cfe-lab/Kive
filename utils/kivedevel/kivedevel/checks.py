@@ -112,7 +112,7 @@ fi
 """
 
 
-def _run_singularity_probe(cmds: Cmds, instance: str) -> None:
+def _run_singularity_probe(cmds: Cmds, instance: str, fatal: bool = False) -> None:
     try:
         result = cmds.incus.run(
             ["exec", instance, "--", "sh", "-c", _SINGULARITY_PROBE_SCRIPT],
@@ -121,7 +121,11 @@ def _run_singularity_probe(cmds: Cmds, instance: str) -> None:
             timeout=30,
         )
     except subprocess.TimeoutExpired:
-        logger.warning("Singularity probe timed out on %s", instance)
+        msg = "Singularity probe timed out on %s" % instance
+        if fatal:
+            logger.error(msg)
+            sys.exit(1)
+        logger.warning(msg)
         return
     except Exception as exc:
         logger.debug("Singularity probe skipped on %s: %s", instance, exc)
@@ -129,15 +133,24 @@ def _run_singularity_probe(cmds: Cmds, instance: str) -> None:
 
     output = (result.stdout or "").strip()
     if not output:
-        logger.debug("Singularity probe returned empty output on %s", instance)
+        msg = "Singularity probe returned empty output on %s" % instance
+        if fatal:
+            logger.error(msg)
+            sys.exit(1)
+        logger.debug(msg)
         return
 
     if "not installed" in output:
-        logger.warning("Singularity is not installed in %s.", instance)
+        logger.error("Singularity is not installed in %s.", instance)
+        if fatal:
+            sys.exit(1)
         return
 
     if "exec FAILED" in output:
-        logger.warning("Singularity exec test failed in %s.", instance)
+        logger.error("Singularity exec test failed in %s.", instance)
+        if fatal:
+            sys.exit(1)
+        return
 
     if "exec OK" in output:
         logger.info("Singularity can execute containers in %s.", instance)
@@ -168,7 +181,7 @@ def run_validate_vm(args: argparse.Namespace) -> None:
     _run_slurm_probe(cmds, instance)
 
     if args.instance_type == "vm":
-        _run_singularity_probe(cmds, instance)
+        _run_singularity_probe(cmds, instance, fatal=True)
 
     if args.instance_type == "container":
         # Container mode mounts repo source as a host directory at /mnt/kive-code.
