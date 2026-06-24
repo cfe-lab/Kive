@@ -36,6 +36,8 @@ def _build_vm_args(
         cpu="1",
         host_interface="",
         provision=True,
+        web_port=8000,
+        no_web_proxy=False,
         quiet=False,
         verbose=False,
         debug=debug,
