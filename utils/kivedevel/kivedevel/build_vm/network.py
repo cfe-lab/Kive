@@ -145,14 +145,27 @@ def ensure_vm_network(cmds: Cmds, network: str, cidr: str, workdir: Path) -> Non
         sys.exit(1)
 
     logger.info("Creating managed network %s (%s)...", network, cidr)
-    cmds.incus.run(
-        [
-            "network", "create", network,
-            f"ipv4.address={cidr}",
-            "ipv4.nat=true",
-            "ipv6.address=none",
-        ]
-    )
+    try:
+        cmds.incus.run(
+            [
+                "network", "create", "--type=bridge", network,
+                f"ipv4.address={cidr}",
+                "ipv4.nat=true",
+                "ipv6.address=none",
+            ]
+        )
+    except Exception:
+        logger.error(
+            "Failed to create managed bridge network '%s'.\n"
+            "  The Incus bridge creation command failed. This may be a known bug\n"
+            "  in this version of Incus ('Can't parse a version: UNKNOWN').\n"
+            "  Workarounds:\n"
+            "    - Run: utils/dev prepare-host --bridge incusbr0 --debug\n"
+            "    - Or use an existing bridge: --vm-network incusbr0\n"
+            "  Failing command: incus network create --type=bridge %s ipv4.address=%s ipv4.nat=true ipv6.address=none",
+            network, network, cidr,
+        )
+        sys.exit(1)
 
     marker_path = _network_marker_path(workdir)
     _write_marker_entry(marker_path, {
