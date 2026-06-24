@@ -1,4 +1,5 @@
 import inspect
+import json
 import subprocess
 import sys
 import unittest
@@ -591,13 +592,11 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
-        # find_tagged_networks: network list --format csv (empty)
         # _find_tagged_instances: list + config show kive-minimal
         # _check_legacy_skipped: uses run() not output()
         # _device_attached(kive-code): config show kive-minimal
         # _device_attached(kive-web): config show kive-minimal
         cmds.incus.output.side_effect = [
-            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
@@ -705,12 +704,10 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
-        # find_tagged_networks: network list
         # _find_tagged_instances: instance list
         # _device_attached(kive-code): config show
         # _device_attached(kive-web): config show
         cmds.incus.output.side_effect = [
-            "",
             "",
             "some: config\n",
             "some: config\n",
@@ -743,13 +740,11 @@ class TestPurge(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
-        # find_tagged_networks: network list
         # _find_tagged_instances: list + config show
         # _check_legacy_skipped: uses run() not output()
         # _device_attached(kive-code): config show
         # _device_attached(kive-web): config show
         cmds.incus.output.side_effect = [
-            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\n",
@@ -1279,13 +1274,10 @@ class TestBuildVmWebProxy(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
-        # find_tagged_networks: network list
         # _find_tagged_instances: list + config show
         # _device_attached(kive-code): config show
         # _device_attached(kive-web): config show
-        # network cleanup skipped if no network cleanup needed
         cmds.incus.output.side_effect = [
-            "",
             "kive-minimal\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
             "user.kive.devel.created-by: utils/dev\nkive-code:\nkive-web:\n",
@@ -1478,6 +1470,168 @@ class TestSlurmBuilderRole(unittest.TestCase):
         text = task_path.read_text()
         self.assertNotIn("stat:", text)
         self.assertNotIn("slurm_download.stat.exists", text)
+
+
+class TestVmNetwork(unittest.TestCase):
+    def test_network_create_includes_only_standard_keys(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+        create_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:3] == ["network", "create", "kivebr0"]
+        ]
+        self.assertEqual(len(create_calls), 1)
+        args = create_calls[0][0][0]
+        self.assertIn("ipv4.address=10.247.172.1/24", args)
+        self.assertIn("ipv4.nat=true", args)
+        self.assertIn("ipv6.address=none", args)
+        for a in args:
+            self.assertNotIn("user.kive.devel", a,
+                             f"network create arg '{a}' must not contain user.kive.devel.* keys")
+
+    def test_network_create_writes_marker(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            self.assertTrue(marker.exists())
+            data = json.loads(marker.read_text())
+            entries = data if isinstance(data, list) else [data]
+            self.assertTrue(any(
+                e.get("kind") == "network" and e.get("name") == "kivebr0"
+                for e in entries
+            ))
+
+    def test_metadata_set_failure_is_nonfatal(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.incus.run.side_effect = RuntimeError("network set failed")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+        # Should not raise — metadata set failure is best-effort
+
+    def test_reuses_existing_marker_owned_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kivebr0\n",          # network list shows it
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text(json.dumps([
+                {"kind": "network", "name": "kivebr0", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+            ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+        create_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:3] == ["network", "create", "kivebr0"]
+        ]
+        self.assertEqual(len(create_calls), 0, "Should not create network when marker-owned")
+
+    def test_fails_on_existing_unowned_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_network
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "kivebr0\n",          # network list shows it
+        ]
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(SystemExit):
+                ensure_vm_network(cmds, "kivebr0", "10.247.172.1/24", Path(tmp))
+
+    def test_purge_removes_marker_owned_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text(json.dumps([
+                {"kind": "network", "name": "kivebr0", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+        delete_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:3] == ["network", "delete", "kivebr0"]
+        ]
+        self.assertGreaterEqual(len(delete_calls), 1,
+                                "Should delete marker-owned network")
+
+    def test_purge_skips_network_when_instances_remain(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        # 3 legacy checks + 1 network list call = 4 run calls
+        cmds.incus.run.side_effect = [
+            MockRunResult(returncode=0, stdout=""),             # legacy check 1
+            MockRunResult(returncode=0, stdout=""),             # legacy check 2
+            MockRunResult(returncode=0, stdout=""),             # legacy check 3
+            MockRunResult(returncode=0, stdout="kive-minimal\n"),  # network check — instances remain
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            marker = Path(tmp) / ".kive-devel-resource.json"
+            marker.write_text(json.dumps([
+                {"kind": "network", "name": "kivebr0", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+        delete_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:3] == ["network", "delete"]
+        ]
+        self.assertEqual(len(delete_calls), 0,
+                         "Should skip network deletion when instances remain")
 
 
 class TestProfileRootDisk(unittest.TestCase):

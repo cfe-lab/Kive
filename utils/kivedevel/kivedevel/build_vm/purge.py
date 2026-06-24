@@ -8,7 +8,6 @@ from pathlib import Path
 
 from ..kv_commands import Cmds
 from ..shared import configure_logging, default_root
-from .network import find_tagged_networks
 
 logger = logging.getLogger("kivedevel.build_vm.purge")
 
@@ -98,14 +97,38 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     for marker in root.rglob(_RESOURCE_MARKER):
         try:
             data = json.loads(marker.read_text())
-            created_by = data.get("created_by") or data.get("created-by")
-            if created_by == "utils/dev":
-                candidates.append(marker.parent.resolve())
+            entries = data if isinstance(data, list) else [data]
         except (json.JSONDecodeError, OSError):
             continue
+        for entry in entries:
+            created_by = entry.get("created_by") or entry.get("created-by")
+            if created_by != "utils/dev":
+                continue
+            kind = entry.get("kind")
+            if kind is None or kind == "build-workdir":
+                candidates.append(marker.parent.resolve())
+                break
     if candidates:
         logger.info("Found marked workdirs: %s", ", ".join(str(p) for p in candidates))
     return candidates
+
+
+def _find_marked_networks(root: Path) -> list[str]:
+    tagged = []
+    for marker in root.rglob(_RESOURCE_MARKER):
+        try:
+            data = json.loads(marker.read_text())
+            entries = data if isinstance(data, list) else [data]
+        except (json.JSONDecodeError, OSError):
+            continue
+        for entry in entries:
+            if entry.get("kind") == "network" and entry.get("created_by") == "utils/dev":
+                name = entry.get("name")
+                if name:
+                    tagged.append(name)
+    if tagged:
+        logger.info("Found tagged networks: %s", ", ".join(tagged))
+    return tagged
 
 
 def run_purge(args: argparse.Namespace) -> None:
@@ -129,7 +152,7 @@ def run_purge(args: argparse.Namespace) -> None:
     _check_legacy_skipped(cmds, tagged_set)
 
     # Phase 3: Discover tagged networks.
-    tagged_networks = find_tagged_networks(cmds)
+    tagged_networks = _find_marked_networks(root)
 
     # Phase 4: Discover marked workdirs.
     marked = _find_marked_workdirs(root)

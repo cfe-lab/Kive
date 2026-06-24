@@ -16,16 +16,23 @@ _RESOURCE_MARKER = ".kive-devel-resource.json"
 
 def _write_marker(workdir: Path, root: Path) -> None:
     marker = workdir / _RESOURCE_MARKER
-    if not marker.exists():
-        data = {
-            "created_by": "utils/dev",
-            "project": "Kive",
-            "repo_root": str(root),
-            "workdir": str(workdir),
-            "kind": "build-workdir",
-        }
-        marker.write_text(json.dumps(data, indent=2) + "\n")
-        logger.debug("Created resource marker %s", marker)
+    entry = {
+        "created_by": "utils/dev",
+        "project": "Kive",
+        "repo_root": str(root),
+        "workdir": str(workdir),
+        "kind": "build-workdir",
+    }
+    existing = []
+    if marker.exists():
+        try:
+            data = json.loads(marker.read_text())
+            existing = data if isinstance(data, list) else [data]
+        except (json.JSONDecodeError, OSError):
+            pass
+    existing.append(entry)
+    marker.write_text(json.dumps(existing, indent=2) + "\n")
+    logger.debug("Updated resource marker %s", marker)
 
 
 def _sudo(*args: str) -> subprocess.CompletedProcess[str]:

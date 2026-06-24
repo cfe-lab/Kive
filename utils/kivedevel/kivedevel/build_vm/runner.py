@@ -158,7 +158,7 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
-    ensure_vm_network(cmds, cfg.vm_network, cfg.vm_cidr)
+    ensure_vm_network(cmds, cfg.vm_network, cfg.vm_cidr, cfg.workdir)
 
     created_new_instance, actual_instance_type = ensure_instance(
         cmds,

@@ -1,15 +1,44 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
-
-import yaml
+from pathlib import Path
 
 from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")
+
+_RESOURCE_MARKER = ".kive-devel-resource.json"
+
+
+def _network_marker_path(workdir: Path) -> Path:
+    return workdir / _RESOURCE_MARKER
+
+
+def _read_marker_entries(marker_path: Path) -> list[dict]:
+    if not marker_path.exists():
+        return []
+    try:
+        data = json.loads(marker_path.read_text())
+        return data if isinstance(data, list) else [data]
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _write_marker_entry(marker_path: Path, entry: dict) -> None:
+    entries = _read_marker_entries(marker_path)
+    entries.append(entry)
+    marker_path.write_text(json.dumps(entries, indent=2) + "\n")
+
+
+def _network_owned_by_marker(workdir: Path, network: str) -> bool:
+    for entry in _read_marker_entries(_network_marker_path(workdir)):
+        if entry.get("kind") == "network" and entry.get("name") == network:
+            return True
+    return False
 
 
 def get_default_host_interface(cmds: Cmds) -> str:
@@ -84,38 +113,17 @@ def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
     return ""
 
 
-_KIVE_NET_OWNER = "user.kive.devel.created-by"
-
-
-def _network_config(cmds: Cmds, network: str) -> dict:
-    out = cmds.incus.output(["network", "show", network])
-    try:
-        data = yaml.safe_load(out)
-    except yaml.YAMLError as exc:
-        logger.error("Failed to parse network config for %s: %s", network, exc)
-        return {}
-    if not isinstance(data, dict):
-        logger.error("Expected a mapping from network show %s, got: %s", network, type(data).__name__)
-        return {}
-    return data.get("config", {})
-
-
-def _network_is_tagged(cmds: Cmds, network: str) -> bool:
-    config = _network_config(cmds, network)
-    return isinstance(config, dict) and config.get(_KIVE_NET_OWNER) == "utils/dev"
-
-
 def _cidr_in_use(cmds: Cmds, cidr: str) -> bool:
     out = cmds.ip.output(["route", "show", cidr])
     return bool(out.strip())
 
 
-def ensure_vm_network(cmds: Cmds, network: str, cidr: str) -> None:
+def ensure_vm_network(cmds: Cmds, network: str, cidr: str, workdir: Path) -> None:
     out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
     networks = [line.strip() for line in out.splitlines() if line.strip()]
 
     if network in networks:
-        if _network_is_tagged(cmds, network):
+        if _network_owned_by_marker(workdir, network):
             logger.debug("Managed network %s already exists and is owned by utils/dev.", network)
             return
         logger.error(
@@ -140,11 +148,33 @@ def ensure_vm_network(cmds: Cmds, network: str, cidr: str) -> None:
             f"ipv4.address={cidr}",
             "ipv4.nat=true",
             "ipv6.address=none",
-            f"{_KIVE_NET_OWNER}=utils/dev",
-            "user.kive.devel.project=Kive",
-            "user.kive.devel.kind=network",
         ]
     )
+
+    marker_path = _network_marker_path(workdir)
+    _write_marker_entry(marker_path, {
+        "type": "incus-network",
+        "name": network,
+        "created_by": "utils/dev",
+        "project": "Kive",
+        "kind": "network",
+    })
+    logger.info("Recorded managed network %s in %s", network, marker_path)
+
+    # Best-effort: tag the network in Incus for in-app visibility.
+    # Failure must not block build-vm.
+    try:
+        cmds.incus.run(
+            [
+                "network", "set", network,
+                "user.kive.devel.created-by=utils/dev",
+                "user.kive.devel.project=Kive",
+                "user.kive.devel.kind=network",
+            ],
+            check=False,
+        )
+    except Exception:
+        logger.debug("Best-effort network metadata set failed (non-fatal).")
 
 
 def _eth0_exists(cmds: Cmds, instance: str) -> bool:
@@ -168,13 +198,14 @@ def ensure_vm_nic(cmds: Cmds, instance: str, network: str, static_ip: str) -> bo
     return True
 
 
-def find_tagged_networks(cmds: Cmds) -> list[str]:
-    out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
+def find_tagged_networks(root: Path) -> list[str]:
     tagged = []
-    for line in out.splitlines():
-        name = line.strip()
-        if name and _network_is_tagged(cmds, name):
-            tagged.append(name)
+    for marker in root.rglob(_RESOURCE_MARKER):
+        for entry in _read_marker_entries(marker):
+            if entry.get("kind") == "network" and entry.get("created_by") == "utils/dev":
+                name = entry.get("name")
+                if name:
+                    tagged.append(name)
     if tagged:
         logger.info("Found tagged networks: %s", ", ".join(tagged))
     return tagged
