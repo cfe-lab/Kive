@@ -4,8 +4,8 @@
   become: true
   lineinfile:
     path: /etc/hosts
-    regexp: '^[0-9.]+\s+head(\s|$)'
-    line: "{{ ansible_host | default('127.0.0.1') }} head"
+    regexp: '^[0-9.]+\s+{{ slurmctlnode }}(\s|$)'
+    line: "{{ slurmctlnode_address | default('127.0.0.1') }} {{ slurmctlnode }}"
     create: true
 
 - name: install and start mariadb
