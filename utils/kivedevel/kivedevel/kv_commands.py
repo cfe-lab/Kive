@@ -55,33 +55,43 @@ class Command:
         check: bool = True,
         capture_output: bool = False,
         input: str | None = None,
+        timeout: float | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        if timeout is not None and timeout <= 0:
+            raise ValueError(f"timeout must be positive, got {timeout}")
         logger.debug("Running command: %s", shlex.join(self._argv(args, sudo=sudo)))
-        if capture_output:
-            result = subprocess.run(
-                self._argv(args, sudo=sudo),
-                check=False,
-                capture_output=True,
-                input=input,
-                text=True,
-            )
-        else:
-            if logger.isEnabledFor(logging.DEBUG):
+        try:
+            if capture_output:
                 result = subprocess.run(
                     self._argv(args, sudo=sudo),
                     check=False,
+                    capture_output=True,
                     input=input,
                     text=True,
+                    timeout=timeout,
                 )
             else:
-                result = subprocess.run(
-                    self._argv(args, sudo=sudo),
-                    check=False,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    input=input,
-                    text=True,
-                )
+                if logger.isEnabledFor(logging.DEBUG):
+                    result = subprocess.run(
+                        self._argv(args, sudo=sudo),
+                        check=False,
+                        input=input,
+                        text=True,
+                        timeout=timeout,
+                    )
+                else:
+                    result = subprocess.run(
+                        self._argv(args, sudo=sudo),
+                        check=False,
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        input=input,
+                        text=True,
+                        timeout=timeout,
+                    )
+        except subprocess.TimeoutExpired:
+            logger.error("Command timed out after %ss: %s", timeout, shlex.join(self._argv(args, sudo=sudo)))
+            raise
 
         if check and result.returncode != 0:
             logger.error("Command failed with exit code %s", result.returncode)
@@ -104,8 +114,8 @@ class Command:
 
         return result
 
-    def output(self, args: list[str], *, sudo: bool = False) -> str:
-        result = self.run(args, sudo=sudo, check=False, capture_output=True)
+    def output(self, args: list[str], *, sudo: bool = False, timeout: float | None = None) -> str:
+        result = self.run(args, sudo=sudo, check=False, capture_output=True, timeout=timeout)
         return result.stdout.strip()
 
     def ok(self, args: list[str], *, sudo: bool = False) -> bool:
