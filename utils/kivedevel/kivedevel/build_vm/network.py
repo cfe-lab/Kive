@@ -118,17 +118,38 @@ def _cidr_in_use(cmds: Cmds, cidr: str) -> bool:
     return bool(out.strip())
 
 
-def ensure_vm_network(cmds: Cmds, network: str, cidr: str, workdir: Path) -> None:
+def _derive_vm_ip_from_cidr(cidr: str) -> str:
+    base = cidr.rsplit(".", 1)[0]
+    return f"{base}.80"
+
+
+def _repair_bridge_nat(cmds: Cmds, bridge: str) -> None:
+    for key in ("ipv4.nat", "ipv4.routing", "ipv4.firewall"):
+        cmds.incus.run(["network", "set", bridge, f"{key}=true"], check=False)
+    cmds.ip.run(["sysctl", "-w", "net.ipv4.ip_forward=1"], check=False)
+
+
+def ensure_vm_network(cmds: Cmds, network: str, cidr: str, vm_ip: str, workdir: Path) -> tuple[str, str]:
     out = cmds.incus.output(["network", "list", "--format", "csv", "--columns", "n"])
     networks = [line.strip() for line in out.splitlines() if line.strip()]
 
     if network in networks:
         if network == "incusbr0":
             logger.debug("Using existing default bridge %s.", network)
-            return
+            _repair_bridge_nat(cmds, network)
+            actual_cidr = cmds.incus.output(["network", "get", network, "ipv4.address"]).strip()
+            if not actual_cidr:
+                logger.error(
+                    "Bridge %s has no ipv4.address configured.\n"
+                    "Run: utils/dev prepare-host --bridge incusbr0 --debug",
+                    network,
+                )
+                sys.exit(1)
+            actual_vm_ip = _derive_vm_ip_from_cidr(actual_cidr)
+            return actual_cidr, actual_vm_ip
         if _network_owned_by_marker(workdir, network):
             logger.debug("Managed network %s already exists and is owned by utils/dev.", network)
-            return
+            return cidr, vm_ip
         logger.error(
             "Network %s already exists but is not owned by utils/dev.\n"
             "Use --vm-network to specify a different network name.",
@@ -191,6 +212,8 @@ def ensure_vm_network(cmds: Cmds, network: str, cidr: str, workdir: Path) -> Non
         )
     except Exception:
         logger.debug("Best-effort network metadata set failed (non-fatal).")
+
+    return cidr, vm_ip
 
 
 def _eth0_exists(cmds: Cmds, instance: str) -> bool:
