@@ -8,6 +8,7 @@ from . import checks
 from . import enter_vm
 from . import local_install
 from .backends import incus_host, incus_network
+from .shared import default_root
 
 
 def main(argv: Sequence[str]) -> int:
@@ -15,8 +16,13 @@ def main(argv: Sequence[str]) -> int:
         prog="kivedevel",
         description="Development utilities for Kive.",
     )
+    parser.add_argument(
+        "--purge",
+        action="store_true",
+        default=False,
+        help="Purge all Kive development resources (shortcut for 'purge' subcommand)",
+    )
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
-    subparsers.required = True
 
     build_vm.register_subcommand(subparsers)
     checks.register_subcommands(subparsers)
@@ -25,7 +31,26 @@ def main(argv: Sequence[str]) -> int:
     incus_network.register_subcommand(subparsers)
     local_install.register_subcommand(subparsers)
 
+    if not argv:
+        parser.print_help()
+        return 0
+
     args = parser.parse_args(argv)
+
+    if args.purge:
+        from .build_vm.purge import run_purge as purge_func
+        purge_args = argparse.Namespace(
+            root=default_root(),
+            instances=[],
+            workdirs=[],
+            quiet=False,
+            verbose=False,
+            debug=True,
+            log_file=None,
+        )
+        purge_func(purge_args)
+        return 0
+
     args.func(args)
     return 0
 
