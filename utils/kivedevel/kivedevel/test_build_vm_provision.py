@@ -1739,29 +1739,18 @@ class TestSlurmBuilderRole(unittest.TestCase):
 
 
 class TestVmNetwork(unittest.TestCase):
-    def _setup_create_path(self, cmds):
-        cmds.ip.ok.return_value = False
-
-    def _setup_registry_owned(self, tmpdir: Path, bridge: str = "kive-devel-br") -> Path:
-        reg = tmpdir / "tmp~" / ".kive-devel-resources.json"
-        reg.parent.mkdir(parents=True, exist_ok=True)
-        reg.write_text(json.dumps([
-            {"kind": "linux-bridge", "name": bridge, "created_by": "utils/dev"},
-        ], indent=2) + "\n")
-        return reg
-
-    def test_default_model_network_is_kive_devel_br(self):
+    def test_default_model_network_is_empty(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        self.assertEqual(BuildVmConfig.vm_network, "kive-devel-br")
+        self.assertEqual(BuildVmConfig.vm_network, "")
 
-    def test_default_cli_network_is_kive_devel_br(self):
+    def test_default_cli_network_is_empty(self):
         import argparse
         from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
         args = parser.parse_args(["build-vm"])
-        self.assertEqual(args.vm_network, "kive-devel-br")
+        self.assertEqual(args.vm_network, "")
 
     def test_no_incus_network_create_called(self):
         network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
@@ -1769,115 +1758,80 @@ class TestVmNetwork(unittest.TestCase):
         self.assertNotIn('"network", "create"', text)
         self.assertNotIn("incus network create", text)
 
-    def test_creates_bridge_with_ip_link(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_prefers_incusbr0(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "incusbr0", "type": "bridge", "managed": True},
+            {"name": "kive-test-net", "type": "bridge", "managed": True},
+        ])
+        result = choose_existing_vm_network(cmds)
+        self.assertEqual(result, "incusbr0")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-        link_calls = [
-            c for c in cmds.ip.run.call_args_list
-            if c[0][0][:2] == ["link", "add"]
-        ]
-        self.assertEqual(len(link_calls), 1)
-        args = link_calls[0][0][0]
-        self.assertIn("kive-devel-br", args)
-        self.assertIn("bridge", args)
-
-    def test_creates_nft_nat_rules(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_falls_back_to_single(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "kive-test-net", "type": "bridge", "managed": True},
+        ])
+        result = choose_existing_vm_network(cmds)
+        self.assertEqual(result, "kive-test-net")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-        nft_calls = [
-            c for c in cmds.nft.run.call_args_list
-            if "kive_devel" in str(c)
-        ]
-        self.assertGreaterEqual(len(nft_calls), 1)
-
-    def test_creates_registry(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_returns_requested(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "mybr0", "type": "bridge", "managed": True},
+        ])
+        result = choose_existing_vm_network(cmds, "mybr0")
+        self.assertEqual(result, "mybr0")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-            reg = root / "tmp~" / ".kive-devel-resources.json"
-            self.assertTrue(reg.exists())
-            data = json.loads(reg.read_text())
-            kinds = [e.get("kind") for e in data]
-            self.assertIn("linux-bridge", kinds)
-            self.assertIn("nft-table", kinds)
-
-    def test_reuses_registry_owned_bridge(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_fails_on_missing_requested(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
+        cmds.incus.output.return_value = json.dumps([])
+        with self.assertRaises(SystemExit):
+            choose_existing_vm_network(cmds, "nonexistent")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self._setup_registry_owned(root)
-            ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-        link_calls = [
-            c for c in cmds.ip.run.call_args_list
-            if c[0][0][:2] == ["link", "add"]
-        ]
-        self.assertEqual(len(link_calls), 0, "Should not create bridge when registry-owned")
-
-    def test_fails_on_collision_with_unowned_bridge(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_fails_on_multiple_without_incusbr0(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = True
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "net-a", "type": "bridge", "managed": True},
+            {"name": "net-b", "type": "bridge", "managed": True},
+        ])
+        with self.assertRaises(SystemExit):
+            choose_existing_vm_network(cmds)
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            with self.assertRaises(SystemExit):
-                ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-    def test_creation_failure_does_not_fallback_to_container(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_choose_existing_vm_network_fails_on_no_networks(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
-        cmds.ip.run.side_effect = RuntimeError("Cannot find device")
+        cmds.incus.output.return_value = json.dumps([])
+        with self.assertRaises(SystemExit):
+            choose_existing_vm_network(cmds)
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            with self.assertRaises(SystemExit):
-                ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
-
-    def test_no_fallback_to_container_on_bridge_failure(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
-        import tempfile
+    def test_get_managed_networks_returns_parsed(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_managed_networks
         cmds = mock.Mock()
-        cmds.ip.ok.return_value = False
-        cmds.ip.run.side_effect = RuntimeError("create failed")
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "incusbr0", "type": "bridge", "managed": True},
+        ])
+        result = get_managed_networks(cmds)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["name"], "incusbr0")
 
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            with self.assertRaises(SystemExit):
-                ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+    def test_get_managed_networks_returns_empty_on_no_output(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_managed_networks
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        result = get_managed_networks(cmds)
+        self.assertEqual(result, [])
 
-    def test_vm_nic_uses_bridged_parent(self):
+    def test_ensure_vm_nic_adds_with_network(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
         cmds = mock.Mock()
         cmds.incus.output.return_value = "other-device:\n  type: nic\n"
-        ensure_vm_nic(cmds, "test-vm", "kive-devel-br")
+        ensure_vm_nic(cmds, "test-vm", "incusbr0")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1886,88 +1840,58 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertEqual(len(add_calls), 1)
         args = add_calls[0][0][0]
-        self.assertIn("nictype=bridged", args)
-        self.assertIn("parent=kive-devel-br", args)
-        self.assertNotIn("network=", str(args))
-        self.assertNotIn("ipv4.address=", str(args))
+        self.assertIn("network=incusbr0", str(args))
 
-    def test_no_incusbr0_references_in_build_vm_network_code(self):
+    def test_ensure_vm_nic_noop_when_already_configured(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = "eth0:\n  network: incusbr0\n  type: nic\n"
+        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        self.assertFalse(result)
+
+    def test_ensure_vm_nic_fails_on_conflicting_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = "eth0:\n  network: mybr0\n  type: nic\n"
+        with self.assertRaises(SystemExit):
+            ensure_vm_nic(cmds, "test-vm", "incusbr0")
+
+    def test_ensure_vm_nic_replaces_stale_kive_devel_br(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = (
+            "eth0:\n"
+            "  nictype: bridged\n"
+            "  parent: kive-devel-br\n"
+            "  type: nic\n"
+        )
+        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        self.assertTrue(result)
+        remove_calls = [c for c in cmds.incus.run.call_args_list if "remove" in str(c)]
+        add_calls = [c for c in cmds.incus.run.call_args_list if "add" in str(c)]
+        self.assertGreaterEqual(len(remove_calls), 1)
+        self.assertGreaterEqual(len(add_calls), 1)
+        add_args = add_calls[0][0][0]
+        self.assertIn("network=incusbr0", str(add_args))
+
+    def test_ensure_vm_nic_noop_when_profile_provides_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        cmds = mock.Mock()
+        cmds.incus.output.side_effect = [
+            "",
+            "eth0:\n  network: incusbr0\n  type: nic\n",
+        ]
+        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        self.assertFalse(result)
+
+    def test_no_bridge_nft_or_iptables_in_network_code(self):
         network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
         text = network_path.read_text()
-        self.assertNotIn("incusbr0", text)
-
-    def test_purge_removes_registry_bridge(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
-        import tempfile
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            self._setup_registry_owned(root)
-            reg_path = root / "tmp~" / ".kive-devel-resources.json"
-
-            args = mock.Mock()
-            args.root = root
-            args.instances = None
-            args.workdirs = None
-            args.quiet = False
-            args.verbose = False
-            args.debug = False
-            args.log_file = None
-
-            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
-                mock_cmds_cls.create.return_value = cmds
-                with mock.patch.object(purge_mod, "configure_logging"):
-                    purge_mod.run_purge(args)
-
-        link_delete_calls = [
-            c for c in cmds.ip.run.call_args_list
-            if c[0][0][:3] == ["link", "delete", "kive-devel-br"]
-        ]
-        self.assertGreaterEqual(len(link_delete_calls), 1,
-                                "Should delete registry-owned bridge")
-        self.assertFalse(reg_path.exists(),
-                         "Registry file should be removed after purge")
-
-    def test_purge_removes_nftables(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
-        import tempfile
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = ""
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            reg = root / "tmp~" / ".kive-devel-resources.json"
-            reg.parent.mkdir(parents=True, exist_ok=True)
-            reg.write_text(json.dumps([
-                {"kind": "nft-table", "name": "inet kive_devel", "created_by": "utils/dev"},
-            ], indent=2) + "\n")
-
-            args = mock.Mock()
-            args.root = root
-            args.instances = None
-            args.workdirs = None
-            args.quiet = False
-            args.verbose = False
-            args.debug = False
-            args.log_file = None
-
-            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
-                mock_cmds_cls.create.return_value = cmds
-                with mock.patch.object(purge_mod, "configure_logging"):
-                    purge_mod.run_purge(args)
-
-        nft_calls = [
-            c for c in cmds.nft.run.call_args_list
-            if c[0][0][:3] == ["delete", "table", "inet"]
-        ]
-        self.assertGreaterEqual(len(nft_calls), 1,
-                                "Should delete registry-owned nftables table")
-        self.assertFalse(reg.exists(),
-                         "Registry file should be removed after purge")
+        self.assertNotIn("nft", text)
+        self.assertNotIn("iptables", text)
+        self.assertNotIn("ip link add", text)
+        self.assertNotIn("sysctl", text)
+        self.assertNotIn("socat", text)
 
     def test_purge_idempotent_when_nothing_to_purge(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
@@ -1991,12 +1915,11 @@ class TestVmNetwork(unittest.TestCase):
                     purge_mod.run_purge(args)
                     purge_mod.run_purge(args)
 
-    def test_purge_does_not_delete_unowned_bridge(self):
+    def test_purge_does_not_call_ip_link(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
         import tempfile
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
 
         with tempfile.TemporaryDirectory() as tmp:
             args = mock.Mock()
@@ -2013,12 +1936,32 @@ class TestVmNetwork(unittest.TestCase):
                 with mock.patch.object(purge_mod, "configure_logging"):
                     purge_mod.run_purge(args)
 
-        ip_calls = [
-            c for c in cmds.ip.run.call_args_list
-            if "link" in str(c)
-        ]
-        self.assertEqual(len(ip_calls), 0,
-                         "Should not delete any bridge when no registry-owned bridges exist")
+        ip_calls = [c for c in cmds.ip.run.call_args_list if "link" in str(c)]
+        self.assertEqual(len(ip_calls), 0)
+
+    def test_purge_does_not_call_nft(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args = mock.Mock()
+            args.root = Path(tmp)
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls:
+                mock_cmds_cls.create.return_value = cmds
+                with mock.patch.object(purge_mod, "configure_logging"):
+                    purge_mod.run_purge(args)
+
+        nft_calls = [c for c in cmds.nft.run.call_args_list if "delete" in str(c)]
+        self.assertEqual(len(nft_calls), 0)
 
 
 class TestPortForward(unittest.TestCase):
@@ -2027,7 +1970,6 @@ class TestPortForward(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
-        cmds.ip.ok.return_value = False
         cfg = BuildVmConfig(
             root=Path("/tmp"), workdir=Path("/tmp"),
             instance="test", instance_type="vm",
@@ -2038,8 +1980,8 @@ class TestPortForward(unittest.TestCase):
             web_port=8000, no_web_proxy=False,
         )
         with (
-            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_owned_bridge",
-                       return_value=("10.247.172.1/24", "10.247.172.80")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
+                       return_value="incusbr0"),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
                        return_value=(True, "vm")),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
@@ -2050,165 +1992,50 @@ class TestPortForward(unittest.TestCase):
                        return_value=True),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
-            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_port_forward") as mock_forward,
-            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device") as mock_proxy,
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
         ):
             _run_build_vm_vm(cfg, cmds)
-        mock_forward.assert_called_once()
-        mock_proxy.assert_not_called()
 
-    def test_port_forward_starts_socat_and_registers(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+    def test_vm_mode_calls_choose_existing_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_vm
         from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            cfg = BuildVmConfig(
-                root=root, workdir=root / "work",
-                instance="test", instance_type="vm",
-                image_path=Path("/tmp/img.qcow2"),
-                pool="default", profile="default",
-                root_size="10GiB", memory="1GB", cpu="1",
-                host_interface="", provision=True,
-                web_port=8000, no_web_proxy=False,
-            )
-            cmds = mock.Mock()
-            cmds.socat._argv.return_value = ["socat", "TCP-LISTEN:8000,bind=127.0.0.1,reuseaddr,fork", "TCP:10.247.172.80:8000"]
-            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
-                mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 1
-                with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
-                    mock_proc = mock.Mock()
-                    mock_proc.pid = 12345
-                    mock_popen.return_value = mock_proc
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="vm",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=False,
+            web_port=8000, no_web_proxy=False,
+        )
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
+                       return_value="incusbr0") as mock_choose,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "vm")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_vm(cfg, cmds)
+        mock_choose.assert_called_once()
 
-                    with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._wait_for_listening_pid", return_value=12345):
-                        _ensure_web_port_forward(cfg, "10.247.172.80", root, cmds)
-
-            mock_popen.assert_called_once()
-            args = mock_popen.call_args[0][0]
-            self.assertIn("socat", args[0])
-            self.assertIn("TCP-LISTEN:8000", str(args))
-            self.assertIn("TCP:10.247.172.80:8000", str(args))
-
-            reg = root / "tmp~" / ".kive-devel-resources.json"
-            self.assertTrue(reg.exists())
-            data = json.loads(reg.read_text())
-            forwards = [e for e in data if e.get("kind") == "host-forward"]
-            self.assertEqual(len(forwards), 1)
-            self.assertEqual(forwards[0]["pid"], 12345)
-            self.assertEqual(forwards[0]["port"], 8000)
-            self.assertEqual(forwards[0]["vm_ip"], "10.247.172.80")
-
-    def test_port_forward_reuses_existing_alive(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
-        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            reg = root / "tmp~" / ".kive-devel-resources.json"
-            reg.parent.mkdir(parents=True, exist_ok=True)
-            reg.write_text(json.dumps([
-                {"kind": "host-forward", "pid": 99999, "port": 8000,
-                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
-            ], indent=2) + "\n")
-            cfg = BuildVmConfig(
-                root=root, workdir=root / "work",
-                instance="test", instance_type="vm",
-                image_path=Path("/tmp/img.qcow2"),
-                pool="default", profile="default",
-                root_size="10GiB", memory="1GB", cpu="1",
-                host_interface="", provision=True,
-                web_port=8000, no_web_proxy=False,
-            )
-            with (
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
-            ):
-                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
-            # Existing alive forward should be reused — no kill (SIGTERM), no restart
-            for call in mock_kill.call_args_list:
-                args, _ = call
-                if len(args) >= 2 and args[1] != 0:
-                    self.fail("Unexpected SIGTERM kill on alive forward")
-            mock_popen.assert_not_called()
-
-    def test_port_forward_stale_cleaned(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
-        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            reg = root / "tmp~" / ".kive-devel-resources.json"
-            reg.parent.mkdir(parents=True, exist_ok=True)
-            reg.write_text(json.dumps([
-                {"kind": "host-forward", "pid": 99999, "port": 8000,
-                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
-            ], indent=2) + "\n")
-            cfg = BuildVmConfig(
-                root=root, workdir=root / "work",
-                instance="test", instance_type="vm",
-                image_path=Path("/tmp/img.qcow2"),
-                pool="default", profile="default",
-                root_size="10GiB", memory="1GB", cpu="1",
-                host_interface="", provision=True,
-                web_port=8000, no_web_proxy=False,
-            )
-            with (
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._wait_for_listening_pid", return_value=12345),
-                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._port_in_use", return_value=False),
-            ):
-                mock_proc = mock.Mock()
-                mock_proc.pid = 12345
-                mock_popen.return_value = mock_proc
-                # Make pid 99999 appear dead (raises OSError)
-                def kill_side_effect(pid, sig):
-                    if pid == 99999:
-                        raise ProcessLookupError()
-                mock_kill.side_effect = kill_side_effect
-                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
-            mock_popen.assert_called_once()
-
-    def test_port_forward_unowned_port_fails(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
-        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            cfg = BuildVmConfig(
-                root=root, workdir=root / "work",
-                instance="test", instance_type="vm",
-                image_path=Path("/tmp/img.qcow2"),
-                pool="default", profile="default",
-                root_size="10GiB", memory="1GB", cpu="1",
-                host_interface="", provision=True,
-                web_port=8000, no_web_proxy=False,
-            )
-            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
-                mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 0
-                with self.assertRaises(SystemExit):
-                    _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
-
-    def test_no_web_proxy_skips_forward(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
-        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            cfg = BuildVmConfig(
-                root=root, workdir=root / "work",
-                instance="test", instance_type="vm",
-                image_path=Path("/tmp/img.qcow2"),
-                pool="default", profile="default",
-                root_size="10GiB", memory="1GB", cpu="1",
-                host_interface="", provision=True,
-                web_port=8000, no_web_proxy=True,
-            )
-            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
-                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
-            mock_popen.assert_not_called()
+    def test_vm_mode_no_host_local_forwarding(self):
+        runner_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "runner.py"
+        text = runner_path.read_text()
+        self.assertNotIn("_ensure_web_port_forward", text)
+        # VM function should not reference 127.0.0.1 directly
+        vm_fn = text[text.find("def _run_build_vm_vm"):text.find("def _run_build_vm_container")] if "def _run_build_vm_container" in text else ""
+        if vm_fn:
+            self.assertNotIn("127.0.0.1", vm_fn)
 
     def test_purge_kills_port_forward(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
