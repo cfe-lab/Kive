@@ -1643,7 +1643,7 @@ class TestVmNetwork(unittest.TestCase):
         self.assertIn("nictype=bridged", args)
         self.assertIn("parent=kive-devel-br", args)
         self.assertNotIn("network=", str(args))
-        self.assertNotIn("ipv4.address=", str(args))
+        self.assertIn("ipv4.address=10.247.172.80", str(args))
 
     def test_no_incusbr0_references_in_build_vm_network_code(self):
         network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
@@ -1660,6 +1660,7 @@ class TestVmNetwork(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             self._setup_registry_owned(root)
+            reg_path = root / "tmp~" / ".kive-devel-resources.json"
 
             args = mock.Mock()
             args.root = root
@@ -1681,6 +1682,8 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(link_delete_calls), 1,
                                 "Should delete registry-owned bridge")
+        self.assertFalse(reg_path.exists(),
+                         "Registry file should be removed after purge")
 
     def test_purge_removes_nftables(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
@@ -1717,6 +1720,8 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(nft_calls), 1,
                                 "Should delete registry-owned nftables table")
+        self.assertFalse(reg.exists(),
+                         "Registry file should be removed after purge")
 
     def test_purge_idempotent_when_nothing_to_purge(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
