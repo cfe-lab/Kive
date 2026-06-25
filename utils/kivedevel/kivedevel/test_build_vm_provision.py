@@ -184,6 +184,95 @@ class TestBuildVmProvision(unittest.TestCase):
 
             self.assertIn("transport failures", str(cm.exception).lower())
 
+    def test_vm_provision_does_not_abort_after_five_agent_not_running(self):
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 10:
+                return (None, "Error: VM agent isn't currently running")
+            return ("done", None)
+
+        with mock.patch.object(provision, "_probe_markers_via_file_pull", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+
+    def test_vm_provision_does_not_abort_after_five_websocket_errors(self):
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 10:
+                return (None, "Error: websocket: bad handshake")
+            return ("done", None)
+
+        with mock.patch.object(provision, "_probe_markers_via_file_pull", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+
+    def test_vm_provision_continues_until_done_marker(self):
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 3:
+                return ("none", None)
+            return ("done", None)
+
+        with mock.patch.object(provision, "_probe_markers_via_file_pull", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1, 2, 3, 4]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+
+    def test_vm_provision_fails_on_failed_marker_with_log(self):
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        def run_side_effect(cmd, **kwargs):
+            if "provision.log" in " ".join(cmd):
+                return MockRunResult(returncode=0, stdout="FAILED: ansible error", stderr="")
+            return MockRunResult(returncode=0, stdout="")
+
+        cmds.incus.run.side_effect = run_side_effect
+
+        def probe_side_effect(_cmds, _instance):
+            return ("failed", None)
+
+        with mock.patch.object(provision, "_probe_markers_via_file_pull", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    with self.assertRaises(RuntimeError) as cm:
+                        provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+
+        self.assertIn("FAILED: ansible error", str(cm.exception))
+
+    def test_vm_provision_uses_file_pull_not_exec(self):
+        """VM mode should call _probe_markers_via_file_pull, not _probe_markers."""
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        with mock.patch.object(provision, "_probe_markers_via_file_pull", return_value=("done", None)) as mock_fp:
+            with mock.patch.object(provision, "_probe_markers") as mock_exec:
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+
+        mock_fp.assert_called()
+        mock_exec.assert_not_called()
+
 
 class TestCommandTimeout(unittest.TestCase):
     def test_run_passes_timeout_to_subprocess(self):
@@ -270,13 +359,169 @@ class TestIsTransportFailure(unittest.TestCase):
         result = MockRunResult(returncode=0, stdout="", stderr="")
         self.assertFalse(provision._is_transport_failure(result))
 
-    def test_command_not_found_is_transport_failure(self):
-        result = MockRunResult(returncode=1, stdout="", stderr="not found")
+    def test_guest_command_error_not_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="Error: not found")
+        self.assertFalse(provision._is_transport_failure(result))
+
+    def test_guest_stderr_not_classified_as_transport(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="error: something from guest command")
+        self.assertFalse(provision._is_transport_failure(result))
+
+    def test_websocket_bad_handshake_is_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="Error: websocket: bad handshake")
+        self.assertTrue(provision._is_transport_failure(result))
+
+    def test_vm_agent_not_running_is_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="Error: VM agent isn't currently running")
+        self.assertTrue(provision._is_transport_failure(result))
+
+    def test_not_connected_is_transport_failure(self):
+        result = MockRunResult(returncode=1, stdout="", stderr="not connected")
         self.assertTrue(provision._is_transport_failure(result))
 
     def test_empty_stderr_is_not_transport_failure(self):
         result = MockRunResult(returncode=1, stdout="", stderr="")
         self.assertFalse(provision._is_transport_failure(result))
+
+
+class TestIsTransportStderr(unittest.TestCase):
+    def test_empty_is_not_transport(self):
+        self.assertFalse(provision._is_transport_stderr(""))
+
+    def test_connection_refused_is_transport(self):
+        self.assertTrue(provision._is_transport_stderr("connection refused"))
+
+    def test_websocket_bad_handshake_is_transport(self):
+        self.assertTrue(provision._is_transport_stderr("Error: websocket: bad handshake"))
+
+    def test_vm_agent_not_running_is_transport(self):
+        self.assertTrue(provision._is_transport_stderr("Error: VM agent isn't currently running"))
+
+    def test_not_connected_is_transport(self):
+        self.assertTrue(provision._is_transport_stderr("not connected"))
+
+    def test_not_found_file_not_transport(self):
+        """File-not-found from incus file pull is not a transport error."""
+        self.assertFalse(provision._is_transport_stderr("Error: Not Found"))
+
+    def test_guest_error_not_transport(self):
+        """Guest command errors are not transport failures."""
+        self.assertFalse(provision._is_transport_stderr("error: ansible-playbook failed"))
+
+
+class TestProbeMarkersViaFilePull(unittest.TestCase):
+    def test_returns_done_when_file_pull_succeeds(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="content")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertEqual(marker, "done")
+        self.assertIsNone(error)
+
+    def test_returns_done_preferred_over_later_markers(self):
+        """Done marker should match first, even if other markers also exist."""
+        instance = "vm-test"
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return MockRunResult(returncode=0, stdout="ok")
+            return MockRunResult(returncode=0, stdout="")
+
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = side_effect
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertEqual(marker, "done")
+
+    def test_returns_failed_on_second_attempt(self):
+        instance = "vm-test"
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
+            return MockRunResult(returncode=0, stdout="failed content")
+
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = side_effect
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertEqual(marker, "failed")
+
+    def test_returns_started_on_third_attempt(self):
+        instance = "vm-test"
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            return MockRunResult(returncode=0, stdout="started") if call_count == 3 else MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
+
+        cmds = mock.Mock()
+        cmds.incus.run.side_effect = side_effect
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertEqual(marker, "started")
+
+    def test_returns_none_with_transport_error(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="Error: VM agent isn't currently running")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertIsNone(marker)
+        self.assertIn("agent isn't currently running", error)
+
+    def test_returns_none_with_websocket_error(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="Error: websocket: bad handshake")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertIsNone(marker)
+        self.assertIn("websocket", error)
+
+    def test_returns_none_on_not_connected(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="not connected")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertIsNone(marker)
+        self.assertIn("not connected", error)
+
+    def test_returns_none_on_connection_refused(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="connection refused")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertIsNone(marker)
+        self.assertIn("connection refused", error)
+
+    def test_returns_none_when_none_exist(self):
+        instance = "vm-test"
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(returncode=1, stdout="", stderr="Error: Not Found")
+
+        marker, error = provision._probe_markers_via_file_pull(cmds, instance)
+
+        self.assertEqual(marker, "none")
+        self.assertIsNone(error)
 
 
 class TestValidateVmSlurmProbe(unittest.TestCase):
