@@ -369,7 +369,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     _ensure_web_port_forward(cfg, actual_vm_ip, cfg.root, cmds)
 
-    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
+    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision, bridge_name=cfg.vm_network)
 
     if cfg.provision and not cfg.no_web_proxy:
         print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")
