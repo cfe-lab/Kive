@@ -66,6 +66,45 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertNotIn("ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml\n        if [ $? -ne 0 ]", saved_user_data["value"])
         self.assertNotIn("cloud-init status --wait", saved_user_data["value"])
 
+    def test_provision_script_has_dns_config_and_staged_preflight(self):
+        cmds = mock.Mock()
+        saved_user_data = {}
+
+        def fake_set_instance_config_multiline(cmds_arg, instance_arg, key, value):
+            saved_user_data["value"] = value
+
+        with mock.patch.object(cloud_init, "set_instance_config_multiline", fake_set_instance_config_multiline):
+            with mock.patch.object(cloud_init, "find_ssh_pubkey", return_value=None):
+                with mock.patch.object(cloud_init, "generate_password_hash", return_value="hash"):
+                    cloud_init.ensure_user_data(cmds, "ci-smoke", provision=True)
+
+        value = saved_user_data["value"]
+        self.assertIn("resolvectl dns enp5s0", value)
+        self.assertIn("resolvectl default-route enp5s0", value)
+        self.assertIn("systemctl restart systemd-resolved", value)
+        self.assertIn("raw IP connectivity test", value)
+        self.assertIn("DNS resolution test", value)
+        self.assertIn("cannot reach the internet by IP", value)
+        self.assertIn("DNS resolution is broken", value)
+        self.assertIn("socket.create_connection((\"1.1.1.1\", 53)", value)
+
+    def test_user_data_includes_resolved_conf_write_file(self):
+        cmds = mock.Mock()
+        saved_user_data = {}
+
+        def fake_set_instance_config_multiline(cmds_arg, instance_arg, key, value):
+            saved_user_data["value"] = value
+
+        with mock.patch.object(cloud_init, "set_instance_config_multiline", fake_set_instance_config_multiline):
+            with mock.patch.object(cloud_init, "find_ssh_pubkey", return_value=None):
+                with mock.patch.object(cloud_init, "generate_password_hash", return_value="hash"):
+                    cloud_init.ensure_user_data(cmds, "ci-smoke", provision=True)
+
+        value = saved_user_data["value"]
+        self.assertIn("/etc/systemd/resolved.conf.d/99-kive-devel.conf", value)
+        self.assertIn("DNS=8.8.8.8 1.1.1.1", value)
+        self.assertIn("FallbackDNS=9.9.9.9", value)
+
     def test_generated_provision_script_has_timeout_bounds(self):
         cmds = mock.Mock()
         saved_user_data = {}
