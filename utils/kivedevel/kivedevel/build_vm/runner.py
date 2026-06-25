@@ -33,6 +33,26 @@ from .workspace import handle_workspace_attachment
 
 logger = logging.getLogger("kivedevel")
 
+_MAX_ETAG_RETRIES = 5
+_ETAG_BACKOFF = 1.0
+
+
+def _retry_on_etag(fn, max_retries=_MAX_ETAG_RETRIES, initial_delay=_ETAG_BACKOFF):
+    """Call *fn* and retry up to *max_retries* times if the error
+    contains ``ETag doesn't match``."""
+    import time as _time
+    for attempt in range(max_retries):
+        try:
+            return fn()
+        except subprocess.CalledProcessError as exc:
+            stderr = (exc.stderr or "") + (getattr(exc, "output", None) or "")
+            if "ETag doesn't match" in stderr and attempt < max_retries - 1:
+                delay = initial_delay * (attempt + 1)
+                logger.info("ETag mismatch on attempt %d/%d, retrying in %.1fs...", attempt + 1, max_retries, delay)
+                _time.sleep(delay)
+                continue
+            raise
+
 
 PROXY_DEVICE = "kive-web"
 GUEST_WEB_PORT = 8000
@@ -337,13 +357,15 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
             "Existing VMs may require recreation to apply updated login/agent settings."
         )
 
-    maybe_restart_after_config(cmds, cfg.instance, restart_required)
-
     out = cmds.incus.output(["config", "show", cfg.instance])
     if out and "kive-code:" not in out:
-        handle_workspace_attachment(cmds, cfg.instance, cfg.image_path, cfg.root, cfg.workdir, actual_instance_type)
+        _retry_on_etag(lambda: handle_workspace_attachment(
+            cmds, cfg.instance, cfg.image_path, cfg.root, cfg.workdir, actual_instance_type,
+        ))
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
+
+    maybe_restart_after_config(cmds, cfg.instance, restart_required)
 
     _ensure_web_port_forward(cfg, actual_vm_ip, cfg.root, cmds)
 
