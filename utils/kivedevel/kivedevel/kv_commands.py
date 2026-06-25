@@ -152,6 +152,11 @@ class Nft(Command):
     guix_package = "nftables"
 
 
+class Socat(Command):
+    exe = "socat"
+    guix_package = "socat"
+
+
 @dataclasses.dataclass(frozen=True)
 class Cmds:
     incus: Incus
@@ -160,6 +165,7 @@ class Cmds:
     qemu_nbd: QemuNbd
     ip: Ip
     nft: Nft
+    socat: Socat
     use_guix: bool
 
     @classmethod
@@ -176,9 +182,10 @@ class Cmds:
             qemu_nbd=QemuNbd(use_guix),
             ip=Ip(use_guix),
             nft=Nft(use_guix),
+            socat=Socat(use_guix),
             use_guix=use_guix,
         )
 
     def require_all(self) -> None:
-        for cmd in (self.incus, self.rsync, self.qemu_img, self.qemu_nbd):
+        for cmd in (self.incus, self.rsync, self.qemu_img, self.qemu_nbd, self.socat):
             cmd.require()

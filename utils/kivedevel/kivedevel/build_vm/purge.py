@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
+import signal
 import subprocess
 from pathlib import Path
 
@@ -222,9 +224,10 @@ def run_purge(args: argparse.Namespace) -> None:
                 len(remaining),
             )
 
-    # Phase 5: Remove owned bridges and NAT rules from the central registry.
+    # Phase 5: Remove owned bridges, NAT rules, port forwards, and registry.
     _remove_bridges(cmds, root)
     _remove_nftables(cmds, root)
+    _remove_port_forwards(root)
     _remove_registry(root)
 
     logger.info("Purge complete. All Kive development resources removed.")
@@ -260,6 +263,18 @@ def _remove_nftables(cmds: Cmds, root: Path) -> None:
             if table_name:
                 logger.info("Removing owned nftables table '%s'...", table_name)
                 cmds.nft.run(["delete", "table"] + table_name.split(), sudo=True, check=False)
+
+
+def _remove_port_forwards(root: Path) -> None:
+    for entry in _read_registry(root):
+        if entry.get("kind") == "host-forward":
+            pid = entry.get("pid")
+            if pid:
+                logger.info("Killing owned port forward (pid %d)...", pid)
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                except (OSError, ProcessLookupError):
+                    pass
 
 
 def _remove_registry(root: Path) -> None:

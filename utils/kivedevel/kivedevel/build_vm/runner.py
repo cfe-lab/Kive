@@ -1,15 +1,31 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
+import os
 import re
+import signal
+import socket
+import subprocess
+import sys
+from pathlib import Path
 
 from ..kv_commands import Cmds
 from .cloud_init import enable_network_config, ensure_user_data
 from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_storage_pool
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
-from .network import ensure_network_device, ensure_owned_bridge, ensure_vm_nic, get_default_host_interface, get_existing_network_parent
+from .network import (
+    _read_registry,
+    _register_resource,
+    _registry_path,
+    ensure_network_device,
+    ensure_owned_bridge,
+    ensure_vm_nic,
+    get_default_host_interface,
+    get_existing_network_parent,
+)
 from .provision import maybe_provision_instance
 from .workspace import handle_workspace_attachment
 
@@ -24,17 +40,112 @@ VM_CIDR = ""
 VM_IP = ""
 
 
-def _proxy_config(cfg: BuildVmConfig, vm_ip: str | None = None) -> dict[str, str]:
-    actual_vm_ip = vm_ip if vm_ip is not None else cfg.vm_ip
+def _port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except (OSError, ProcessLookupError):
+        return False
+
+
+def _find_owned_forward(reg: Path, port: int, vm_ip: str) -> int | None:
+    for entry in _read_registry(reg):
+        if (
+            entry.get("kind") == "host-forward"
+            and entry.get("port") == port
+            and entry.get("vm_ip") == vm_ip
+        ):
+            pid = entry.get("pid")
+            if pid and _pid_alive(pid):
+                return pid
+    return None
+
+
+def _find_owned_forward_by_port(reg: Path, port: int) -> int | None:
+    for entry in _read_registry(reg):
+        if entry.get("kind") == "host-forward" and entry.get("port") == port:
+            pid = entry.get("pid")
+            if pid:
+                return pid
+    return None
+
+
+def _kill_forward(pid: int) -> None:
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, ProcessLookupError):
+        pass
+
+
+def _remove_registry_entry(reg: Path, kind: str, port: int) -> None:
+    entries = _read_registry(reg)
+    entries = [e for e in entries if not (e.get("kind") == kind and e.get("port") == port)]
+    reg.write_text(json.dumps(entries, indent=2) + "\n")
+
+
+def _start_socat(port: int, vm_ip: str) -> int:
+    logger.info("Starting host port forward via socat (127.0.0.1:%d -> %s:%d)...", port, vm_ip, port)
+    proc = subprocess.Popen(
+        [
+            "socat",
+            f"TCP-LISTEN:{port},bind=127.0.0.1,reuseaddr,fork",
+            f"TCP:{vm_ip}:{port}",
+        ],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return proc.pid
+
+
+def _ensure_web_port_forward(cfg: BuildVmConfig, vm_ip: str, root: Path) -> None:
+    if cfg.no_web_proxy:
+        logger.debug("Web port forward disabled by --no-web-proxy.")
+        return
+
+    reg = _registry_path(root)
+    port = cfg.web_port
+
+    existing_pid = _find_owned_forward(reg, port, vm_ip)
+    if existing_pid is not None:
+        logger.debug("Host port forward for %d already running (pid %d).", port, existing_pid)
+        return
+
+    stale_pid = _find_owned_forward_by_port(reg, port)
+    if stale_pid is not None:
+        logger.info("Removing stale host forward (pid %d)...", stale_pid)
+        _kill_forward(stale_pid)
+        _remove_registry_entry(reg, "host-forward", port)
+
+    if _port_in_use(port):
+        logger.error(
+            "Port %d is already in use by a process not owned by utils/dev.\n"
+            "Choose a different port with --web-port or stop the other process.",
+            port,
+        )
+        sys.exit(1)
+
+    pid = _start_socat(port, vm_ip)
+    _register_resource(reg, {
+        "kind": "host-forward",
+        "pid": pid,
+        "port": port,
+        "vm_ip": vm_ip,
+        "created_by": "utils/dev",
+        "project": "Kive",
+    })
+
+
+def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
     config = {
         "listen": f"tcp:127.0.0.1:{cfg.web_port}",
         "type": "proxy",
+        "connect": f"tcp:127.0.0.1:{GUEST_WEB_PORT}",
     }
-    if cfg.instance_type == "vm":
-        config["connect"] = f"tcp:{actual_vm_ip}:{GUEST_WEB_PORT}"
-        config["nat"] = "true"
-    else:
-        config["connect"] = f"tcp:127.0.0.1:{GUEST_WEB_PORT}"
     return config
 
 
@@ -67,12 +178,12 @@ def _proxy_args(desired: dict[str, str]) -> list[str]:
     return args_list
 
 
-def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig, vm_ip: str | None = None) -> None:
+def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
 
-    desired = _proxy_config(cfg, vm_ip=vm_ip)
+    desired = _proxy_config(cfg)
     current = _current_proxy_config(cmds, cfg.instance)
 
     if current is None:
@@ -175,7 +286,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     )
 
     restart_required = False
-    added_nic = ensure_vm_nic(cmds, cfg.instance, cfg.vm_network, actual_vm_ip)
+    added_nic = ensure_vm_nic(cmds, cfg.instance, cfg.vm_network)
     if added_nic:
         restart_required = True
 
@@ -200,7 +311,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg, vm_ip=actual_vm_ip)
+    _ensure_web_port_forward(cfg, actual_vm_ip, cfg.root)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 

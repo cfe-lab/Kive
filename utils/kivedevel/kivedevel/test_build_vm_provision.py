@@ -1,5 +1,6 @@
 import inspect
 import json
+import signal
 import subprocess
 import sys
 import unittest
@@ -1631,7 +1632,7 @@ class TestVmNetwork(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
         cmds = mock.Mock()
         cmds.incus.output.return_value = "other-device:\n  type: nic\n"
-        ensure_vm_nic(cmds, "test-vm", "kive-devel-br", "10.247.172.80")
+        ensure_vm_nic(cmds, "test-vm", "kive-devel-br")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1643,7 +1644,7 @@ class TestVmNetwork(unittest.TestCase):
         self.assertIn("nictype=bridged", args)
         self.assertIn("parent=kive-devel-br", args)
         self.assertNotIn("network=", str(args))
-        self.assertIn("ipv4.address=10.247.172.80", str(args))
+        self.assertNotIn("ipv4.address=", str(args))
 
     def test_no_incusbr0_references_in_build_vm_network_code(self):
         network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
@@ -1773,6 +1774,257 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertEqual(len(ip_calls), 0,
                          "Should not delete any bridge when no registry-owned bridges exist")
+
+
+class TestPortForward(unittest.TestCase):
+    def test_vm_mode_does_not_call_incus_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_vm
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.ip.ok.return_value = False
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="vm",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=False,
+            web_port=8000, no_web_proxy=False,
+        )
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_owned_bridge",
+                       return_value=("10.247.172.1/24", "10.247.172.80")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "vm")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_port_forward") as mock_forward,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device") as mock_proxy,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_vm(cfg, cmds)
+        mock_forward.assert_called_once()
+        mock_proxy.assert_not_called()
+
+    def test_port_forward_starts_socat_and_registers(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = BuildVmConfig(
+                root=root, workdir=root / "work",
+                instance="test", instance_type="vm",
+                image_path=Path("/tmp/img.qcow2"),
+                pool="default", profile="default",
+                root_size="10GiB", memory="1GB", cpu="1",
+                host_interface="", provision=True,
+                web_port=8000, no_web_proxy=False,
+            )
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
+                mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 1
+                with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
+                    mock_proc = mock.Mock()
+                    mock_proc.pid = 12345
+                    mock_popen.return_value = mock_proc
+
+                    _ensure_web_port_forward(cfg, "10.247.172.80", root)
+
+            mock_popen.assert_called_once()
+            args = mock_popen.call_args[0][0]
+            self.assertIn("socat", args[0])
+            self.assertIn("TCP-LISTEN:8000", str(args))
+            self.assertIn("TCP:10.247.172.80:8000", str(args))
+
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            self.assertTrue(reg.exists())
+            data = json.loads(reg.read_text())
+            forwards = [e for e in data if e.get("kind") == "host-forward"]
+            self.assertEqual(len(forwards), 1)
+            self.assertEqual(forwards[0]["pid"], 12345)
+            self.assertEqual(forwards[0]["port"], 8000)
+            self.assertEqual(forwards[0]["vm_ip"], "10.247.172.80")
+
+    def test_port_forward_reuses_existing_alive(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "host-forward", "pid": 99999, "port": 8000,
+                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+            cfg = BuildVmConfig(
+                root=root, workdir=root / "work",
+                instance="test", instance_type="vm",
+                image_path=Path("/tmp/img.qcow2"),
+                pool="default", profile="default",
+                root_size="10GiB", memory="1GB", cpu="1",
+                host_interface="", provision=True,
+                web_port=8000, no_web_proxy=False,
+            )
+            with (
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
+            ):
+                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+            # Existing alive forward should be reused — no kill (SIGTERM), no restart
+            for call in mock_kill.call_args_list:
+                args, _ = call
+                if len(args) >= 2 and args[1] != 0:
+                    self.fail("Unexpected SIGTERM kill on alive forward")
+            mock_popen.assert_not_called()
+
+    def test_port_forward_stale_cleaned(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "host-forward", "pid": 99999, "port": 8000,
+                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+            cfg = BuildVmConfig(
+                root=root, workdir=root / "work",
+                instance="test", instance_type="vm",
+                image_path=Path("/tmp/img.qcow2"),
+                pool="default", profile="default",
+                root_size="10GiB", memory="1GB", cpu="1",
+                host_interface="", provision=True,
+                web_port=8000, no_web_proxy=False,
+            )
+            with (
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
+            ):
+                mock_proc = mock.Mock()
+                mock_proc.pid = 12345
+                mock_popen.return_value = mock_proc
+                # Make pid 99999 appear dead (raises OSError)
+                def kill_side_effect(pid, sig):
+                    if pid == 99999:
+                        raise ProcessLookupError()
+                mock_kill.side_effect = kill_side_effect
+                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+            mock_popen.assert_called_once()
+
+    def test_port_forward_unowned_port_fails(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = BuildVmConfig(
+                root=root, workdir=root / "work",
+                instance="test", instance_type="vm",
+                image_path=Path("/tmp/img.qcow2"),
+                pool="default", profile="default",
+                root_size="10GiB", memory="1GB", cpu="1",
+                host_interface="", provision=True,
+                web_port=8000, no_web_proxy=False,
+            )
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
+                mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 0
+                with self.assertRaises(SystemExit):
+                    _ensure_web_port_forward(cfg, "10.247.172.80", root)
+
+    def test_no_web_proxy_skips_forward(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            cfg = BuildVmConfig(
+                root=root, workdir=root / "work",
+                instance="test", instance_type="vm",
+                image_path=Path("/tmp/img.qcow2"),
+                pool="default", profile="default",
+                root_size="10GiB", memory="1GB", cpu="1",
+                host_interface="", provision=True,
+                web_port=8000, no_web_proxy=True,
+            )
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
+                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+            mock_popen.assert_not_called()
+
+    def test_purge_kills_port_forward(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "host-forward", "pid": 12345, "port": 8000,
+                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+
+            args = mock.Mock()
+            args.root = root
+            args.instances = None
+            args.workdirs = None
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            args.log_file = None
+
+            with (
+                mock.patch.object(purge_mod, "Cmds") as mock_cmds_cls,
+                mock.patch.object(purge_mod, "os") as mock_os,
+                mock.patch.object(purge_mod, "configure_logging"),
+            ):
+                mock_cmds_cls.create.return_value = cmds
+                purge_mod.run_purge(args)
+
+            mock_os.kill.assert_any_call(12345, signal.SIGTERM if hasattr(signal, "SIGTERM") else 0)
+
+    def test_container_still_uses_incus_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_container
+        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"),
+            instance="test", instance_type="container",
+            image_path=Path("/tmp/img.qcow2"),
+            pool="default", profile="default",
+            root_size="10GiB", memory="1GB", cpu="1",
+            host_interface="", provision=False,
+            web_port=8000, no_web_proxy=False,
+        )
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "container")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_network_device",
+                       return_value=False),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device") as mock_proxy,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_container(cfg, cmds)
+        mock_proxy.assert_called_once()
 
 
 class TestProfileRootDisk(unittest.TestCase):

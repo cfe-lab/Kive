@@ -245,18 +245,17 @@ def _eth0_exists(cmds: Cmds, instance: str) -> bool:
     return bool(re.search(r"^eth0\s*$", out, re.MULTILINE))
 
 
-def ensure_vm_nic(cmds: Cmds, instance: str, bridge_name: str, static_ip: str) -> bool:
+def ensure_vm_nic(cmds: Cmds, instance: str, bridge_name: str) -> bool:
     if _eth0_exists(cmds, instance):
         logger.debug("NIC eth0 already exists on %s.", instance)
         return False
-    logger.info("Adding NIC eth0 to %s (bridge=%s, ipv4.address=%s)...", instance, bridge_name, static_ip)
+    logger.info("Adding NIC eth0 to %s (bridge=%s)...", instance, bridge_name)
     cmds.incus.run(
         [
             "config", "device", "add",
             instance, "eth0", "nic",
             "nictype=bridged",
             f"parent={bridge_name}",
-            f"ipv4.address={static_ip}",
         ]
     )
     return True
