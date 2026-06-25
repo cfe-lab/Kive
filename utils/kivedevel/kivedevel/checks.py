@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import subprocess
 import sys
@@ -439,6 +440,140 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     return result
 
 
+_VM_API_PROBE_SCRIPT = """import json, sys
+from urllib.request import build_opener, HTTPCookieProcessor, HTTPError, Request
+from urllib.parse import urlencode
+from http.cookiejar import CookieJar
+
+LOGIN_URL = "http://127.0.0.1:8000/login/"
+DATASETS_URL = "http://127.0.0.1:8000/api/datasets/?limit=1"
+USERNAME = "kive"
+PASSWORD = "kive"
+
+def _req(url, data=None, opener=None, method=None):
+    if opener is None:
+        opener = build_opener()
+    headers = {"Referer": LOGIN_URL} if data else {}
+    req = Request(url, data=data, headers=headers)
+    if method:
+        req.method = method
+    try:
+        with opener.open(req, timeout=5) as r:
+            return r.status, r.read().decode("utf-8", errors="replace")
+    except HTTPError as e:
+        return e.code, e.read().decode("utf-8", errors="replace")
+    except Exception:
+        return None, None
+
+anon_status, _ = _req(DATASETS_URL)
+jar = CookieJar()
+opener = build_opener(HTTPCookieProcessor(jar))
+login_status, _ = _req(LOGIN_URL, opener=opener)
+csrf = next((c.value for c in jar if c.name == "csrftoken"), "")
+data = urlencode({"username": USERNAME, "password": PASSWORD, "csrfmiddlewaretoken": csrf}).encode()
+_, _ = _req(LOGIN_URL, data=data, opener=opener, method="POST")
+auth_status, auth_body = _req(DATASETS_URL, opener=opener)
+auth_json_ok = False
+auth_count = None
+if auth_status == 200:
+    try:
+        parsed = json.loads(auth_body)
+        items = parsed.get("results", parsed) if isinstance(parsed, dict) else parsed
+        if isinstance(items, list):
+            auth_count = len(items)
+        auth_json_ok = True
+    except Exception:
+        pass
+print(json.dumps({
+    "login_page_status": login_status,
+    "anon_datasets_status": anon_status,
+    "auth_datasets_status": auth_status,
+    "auth_json_ok": auth_json_ok,
+    "auth_count": auth_count,
+}))
+"""
+
+
+def _run_api_probe_via_exec(cmds: Cmds, instance: str) -> dict | None:
+    """Run the API probe script inside the VM via ``incus exec``.
+
+    Returns the same dict format as ``_run_api_probe``, or None on failure.
+    """
+    import tempfile
+    script_path = f"/var/tmp/_kive_api_probe_{os.getpid()}.py"
+    push_result = cmds.incus.run(
+        ["file", "push", "-", f"{instance}{script_path}"],
+        input=_VM_API_PROBE_SCRIPT,
+        check=False, capture_output=True, timeout=15,
+    )
+    if push_result.returncode != 0:
+        logger.debug("Failed to push API probe script to %s: %s", instance, push_result.stderr)
+        return None
+    try:
+        exec_result = cmds.incus.run(
+            ["exec", instance, "--", "python3", script_path],
+            check=False, capture_output=True, timeout=30,
+        )
+        if exec_result.returncode != 0:
+            logger.debug("API probe via exec failed on %s (rc=%s): %s",
+                         instance, exec_result.returncode, exec_result.stderr)
+            return None
+        out = (exec_result.stdout or "").strip()
+        if not out:
+            logger.debug("API probe via exec produced no output on %s", instance)
+            return None
+        data = json.loads(out)
+        if not isinstance(data, dict):
+            return None
+        return data
+    except (json.JSONDecodeError, ValueError, OSError) as exc:
+        logger.debug("API probe via exec parse error on %s: %s", instance, exc)
+        return None
+    except subprocess.TimeoutExpired:
+        logger.debug("API probe via exec timed out on %s", instance)
+        return None
+    finally:
+        cmds.incus.run(
+            ["file", "delete", f"{instance}{script_path}"],
+            check=False, timeout=10,
+        )
+
+
+def _check_api_probe_results(results: dict, instance: str) -> None:
+    """Validate probe results and log/exit on failure."""
+    login_page_status = int(results.get("login_page_status", 0))
+    anon_status = int(results.get("anon_datasets_status", 0))
+    auth_status = int(results.get("auth_datasets_status", 0))
+    auth_json_ok = bool(results.get("auth_json_ok", False))
+
+    if login_page_status != 200:
+        logger.error("Login page check failed: expected 200, got %s", login_page_status)
+        sys.exit(1)
+
+    if anon_status == auth_status:
+        logger.error(
+            "Authentication had no observable effect on /api/datasets/: status stayed %s",
+            auth_status,
+        )
+        sys.exit(1)
+
+    if auth_status != 200:
+        logger.error("Authenticated datasets request failed: expected 200, got %s", auth_status)
+        sys.exit(1)
+
+    if not auth_json_ok:
+        logger.error("Authenticated /api/datasets/ response was not valid JSON")
+        sys.exit(1)
+
+    logger.info(
+        "test-api checks passed for %s. anon=%s auth=%s dataset_count=%s",
+        instance,
+        anon_status,
+        auth_status,
+        results.get("auth_count"),
+    )
+
+
 def run_test_api(args: argparse.Namespace) -> None:
     workdir: Path = args.workdir.resolve()
     configure_logging(args, workdir)
@@ -447,6 +582,7 @@ def run_test_api(args: argparse.Namespace) -> None:
     cmds.incus.require()
 
     instance = args.instance
+    instance_type = getattr(args, "instance_type", "")
     if not instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
@@ -470,7 +606,7 @@ def run_test_api(args: argparse.Namespace) -> None:
         vm_ip = vm_ips[0] if vm_ips else ""
         
         if kind == "virtual-machine" and vm_ip:
-            # For unprov machines, attempt SSH startup if provisioned
+            # Attempt SSH startup if provisioned
             if _vm_looks_provisioned_for_primary_api(vm_ip):
                 logger.info(
                     "API not HTTP-reachable on %s, attempting SSH-based startup...",
@@ -486,9 +622,17 @@ def run_test_api(args: argparse.Namespace) -> None:
                         vm_ip,
                     )
             else:
+                logger.info(
+                    "No SSH-accessible API on %s; trying incus-exec based API probe...",
+                    vm_ip,
+                )
+                exec_results = _run_api_probe_via_exec(cmds, instance)
+                if exec_results is not None:
+                    _check_api_probe_results(exec_results, instance)
+                    return
                 logger.error(
-                    "No host-reachable API endpoint for VM instance %s. "
-                    "Run provisioning steps and verify Kive is installed, then rerun test-api.",
+                    "No host-reachable API endpoint for VM instance %s, "
+                    "and incus-exec API probe also failed.",
                     instance,
                 )
         elif kind == "container":
@@ -505,10 +649,51 @@ def run_test_api(args: argparse.Namespace) -> None:
             )
 
     if not base_url:
+        # Last resort: try incus-exec based probe for any instance type
+        exec_results = _run_api_probe_via_exec(cmds, instance)
+        if exec_results is not None:
+            _check_api_probe_results(exec_results, instance)
+            return
         logger.error("No reachable API endpoint for instance %s", instance)
         sys.exit(1)
 
     logger.info("Running API probe against %s...", base_url)
+    probe = _run_api_probe(base_url, username=args.username, password=args.password)
+
+    logger.debug("Probe result: %s", probe)
+
+    login_page_status = int(probe.get("login_page_status", 0))
+    anon_status = int(probe.get("anon_datasets_status", 0))
+    auth_status = int(probe.get("auth_datasets_status", 0))
+    auth_json_ok = bool(probe.get("auth_json_ok", False))
+
+    if login_page_status != 200:
+        logger.error("Login page check failed: expected 200, got %s", login_page_status)
+        sys.exit(1)
+
+    # Observable effect: authenticated session should change API behavior.
+    if anon_status == auth_status:
+        logger.error(
+            "Authentication had no observable effect on /api/datasets/: status stayed %s",
+            auth_status,
+        )
+        sys.exit(1)
+
+    if auth_status != 200:
+        logger.error("Authenticated datasets request failed: expected 200, got %s", auth_status)
+        sys.exit(1)
+
+    if not auth_json_ok:
+        logger.error("Authenticated /api/datasets/ response was not valid JSON")
+        sys.exit(1)
+
+    logger.info(
+        "test-api checks passed for %s. anon=%s auth=%s dataset_count=%s",
+        instance,
+        anon_status,
+        auth_status,
+        probe.get("auth_count"),
+    )
     probe = _run_api_probe(base_url, username=args.username, password=args.password)
 
     logger.debug("Probe result: %s", probe)
@@ -589,6 +774,12 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
         "--password",
         default="kive",
         help="Password for API auth probe (default: kive)",
+    )
+    test_api.add_argument(
+        "--instance-type",
+        choices=("vm", "container"),
+        default="",
+        help="Instance type hint for VM-exec fallback probe (default: auto-detect)",
     )
     test_api.add_argument(
         "--port",
