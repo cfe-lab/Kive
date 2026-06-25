@@ -182,8 +182,24 @@ def _create_owned_bridge(cmds: Cmds, root: Path, bridge: str, cidr: str) -> None
     logger.info("Registered owned bridge %s.", bridge)
 
 
+def _ensure_ip_forward() -> None:
+    """Check ``net.ipv4.ip_forward`` is enabled and fail early if not."""
+    import subprocess as _sp
+    result = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, check=False)
+    val = result.stdout.strip()
+    if val != "1":
+        logger.error(
+            "IP forwarding is disabled (net.ipv4.ip_forward=%s). "
+            "VM guests will not be able to reach the internet through the NAT.\n"
+            "Enable it with:  sudo sysctl -w net.ipv4.ip_forward=1",
+            val,
+        )
+        sys.exit(1)
+
+
 def _setup_host_nat(cmds: Cmds, root: Path, bridge_name: str, cidr: str) -> None:
     logger.info("Setting up NAT for bridge %s (%s)...", bridge_name, cidr)
+    _ensure_ip_forward()
     try:
         cmds.nft.run(["add", "table", "inet", "kive_devel"], sudo=True)
     except Exception:
