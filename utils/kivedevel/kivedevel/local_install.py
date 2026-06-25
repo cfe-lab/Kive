@@ -21,8 +21,10 @@ def _build_vm_args(
     instance_type: str,
     workdir: Path,
     debug: bool,
+    vm_network: str = "",
 ) -> argparse.Namespace:
     root = default_root()
+    no_web_proxy = instance_type != "container"
     return argparse.Namespace(
         instance=instance,
         instance_type=instance_type,
@@ -37,14 +39,12 @@ def _build_vm_args(
         host_interface="",
         provision=True,
         web_port=8000,
-        no_web_proxy=False,
+        no_web_proxy=no_web_proxy,
         quiet=False,
         verbose=False,
         debug=debug,
         log_file=None,
-        vm_network="kive-devel-br",
-        vm_cidr="10.247.172.1/24",
-        vm_ip="10.247.172.80",
+        vm_network=vm_network,
     )
 
 
@@ -68,6 +68,7 @@ def _test_api_args(
     instance: str,
     workdir: Path,
     debug: bool,
+    instance_type: str = "container",
 ) -> argparse.Namespace:
     return argparse.Namespace(
         instance=instance,
@@ -79,6 +80,7 @@ def _test_api_args(
         quiet=False,
         verbose=False,
         debug=debug,
+        instance_type=instance_type,
     )
 
 
@@ -88,11 +90,12 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
     instance: str = args.instance
     instance_type: str = args.instance_type
+    vm_network: str = getattr(args, "vm_network", "")
     debug: bool = getattr(args, "debug", False)
 
     workdir.mkdir(parents=True, exist_ok=True)
 
-    build_args = _build_vm_args(instance, instance_type, workdir, debug)
+    build_args = _build_vm_args(instance, instance_type, workdir, debug, vm_network)
     logger.info("Running: build-vm %s --instance-type %s --provision --workdir %s", instance, instance_type, workdir)
     run_build_vm(build_args)
 
@@ -100,7 +103,7 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
     checks.run_validate_vm(validate_args)
 
-    api_args = _test_api_args(instance, workdir, debug)
+    api_args = _test_api_args(instance, workdir, debug, instance_type=instance_type)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
     checks.run_test_api(api_args)
 
@@ -142,7 +145,7 @@ def _add_log_flags(parser: argparse.ArgumentParser) -> None:
     )
 
 
-def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
+def register_subcommand(subparsers) -> None:
     smoke = subparsers.add_parser(
         "smoke-local-install",
         help="Run the end-to-end local install smoke test (build-vm + validate-vm + test-api)",
@@ -155,14 +158,19 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     smoke.add_argument(
         "--instance-type",
         choices=("vm", "container"),
-        default="container",
-        help="Instance type (default: container)",
+        default="vm",
+        help="Instance type (default: vm)",
     )
     smoke.add_argument(
         "--workdir",
         type=Path,
         default=default_root() / "tmp~" / "build",
         help="Working directory (default: <root>/tmp~/build)",
+    )
+    smoke.add_argument(
+        "--vm-network",
+        default="",
+        help="Existing Incus managed network for VM NIC (default: auto-detect incusbr0)",
     )
     _add_log_flags(smoke)
     smoke.set_defaults(func=run_smoke_local_install)
