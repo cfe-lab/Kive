@@ -74,7 +74,8 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       cat /run/systemd/resolve/resolv.conf || true
       echo "--- raw IP connectivity test ---"
       if ! timeout --foreground 15s python3 -c 'import socket; socket.create_connection(("1.1.1.1", 53), timeout=10).close()'; then
-        echo "VM has static IP and route, but cannot reach the internet by IP; check host NAT/forwarding." >&2
+        echo "VM has static IP and route, but cannot reach the internet by IP." >&2
+        echo "Likely causes: host IPv4 forwarding disabled or nftables forward rules missing for kive-devel-br." >&2
         exit 1
       fi
       echo "--- DNS resolution test ---"
