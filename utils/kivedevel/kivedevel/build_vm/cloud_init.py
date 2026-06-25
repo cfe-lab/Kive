@@ -62,12 +62,33 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         cat /var/log/cloud-init.log /var/log/cloud-init-output.log 2>/dev/null || true
         exit 1
       fi
+      echo "=== configure DNS ==="
+      resolvectl dns enp5s0 8.8.8.8 1.1.1.1 || true
+      resolvectl default-route enp5s0 true || true
+      systemctl restart systemd-resolved || true
       echo "=== network preflight ==="
       ip addr || true
       ip route || true
       cat /etc/resolv.conf || true
-      getent hosts archive.ubuntu.com || true
-      getent ahostsv4 archive.ubuntu.com || true
+      resolvectl status || true
+      cat /run/systemd/resolve/resolv.conf || true
+      echo "--- raw IP connectivity test ---"
+      if ! timeout --foreground 15s python3 -c 'import socket; socket.create_connection(("1.1.1.1", 53), timeout=10).close()'; then
+        echo "VM has static IP and route, but cannot reach the internet by IP; check host NAT/forwarding." >&2
+        exit 1
+      fi
+      echo "--- DNS resolution test ---"
+      dns_ok=false
+      if timeout --foreground 15s python3 -c 'import socket; socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)'; then
+        dns_ok=true
+      fi
+      if [ "$dns_ok" = false ]; then
+        echo "VM has IP connectivity but DNS resolution is broken." >&2
+        cat /etc/resolv.conf
+        resolvectl status || true
+        exit 1
+      fi
+      echo "--- full TCP test to archive.ubuntu.com:80 ---"
       if ! timeout --foreground 30s python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
         echo "Network check failed or timed out: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)" >&2
         exit 1
@@ -202,6 +223,13 @@ write_files:
     content: |
       Acquire::ForceIPv4 "true";
       Acquire::Retries "3";
+  - path: /etc/systemd/resolved.conf.d/99-kive-devel.conf
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Resolve]
+      DNS=8.8.8.8 1.1.1.1
+      FallbackDNS=9.9.9.9
   - path: /etc/systemd/system/mount-kive-code.service
     owner: root:root
     permissions: '0644'
