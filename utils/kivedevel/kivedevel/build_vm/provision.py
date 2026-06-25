@@ -178,42 +178,6 @@ def _cloud_init_diagnostics(cmds: Cmds, instance: str) -> str:
     return "\n\n".join(diagnostics) if diagnostics else "No cloud-init diagnostics available."
 
 
-def _collect_host_diagnostics(cmds: Cmds, bridge_name: str = "kive-devel-br") -> str:
-    """Collect host-side networking diagnostics for debugging VM network issues."""
-    sections: list[str] = []
-
-    def _run(label: str, args: list[str]) -> None:
-        try:
-            r = subprocess.run(args, capture_output=True, text=True, timeout=10)
-            out = (r.stdout or "").strip()
-            err = (r.stderr or "").strip()
-            body = out if out else f"(stderr: {err})" if err else "(no output)"
-            sections.append(f"=== {label} ===\n{body}")
-        except Exception as exc:
-            sections.append(f"=== {label} ===\n(error: {exc})")
-
-    _run("sysctl net.ipv4.ip_forward", ["sysctl", "-n", "net.ipv4.ip_forward"])
-    _run(f"ip addr show {bridge_name}", ["ip", "addr", "show", bridge_name])
-    _run("ip route get 1.1.1.1", ["ip", "route", "get", "1.1.1.1"])
-
-    nft_table = cmds.nft.output(["list", "table", "inet", "kive_devel"], sudo=True) or "(table empty or not found)"
-    sections.append(f"=== nft list table inet kive_devel ===\n{nft_table}")
-
-    nft_ruleset = cmds.nft.output(["list", "ruleset"], sudo=True) or "(empty)"
-    if len(nft_ruleset) > 5000:
-        nft_ruleset = nft_ruleset[:5000] + "\n... (truncated)"
-    sections.append(f"=== nft list ruleset ===\n{nft_ruleset}")
-
-    sections.append(
-        "--- manual debug hints ---\n"
-        f"  incus exec {bridge_name.replace('-br', '-minimal')} -- ping -c1 10.247.172.1\n"
-        f"  incus exec {bridge_name.replace('-br', '-minimal')} -- ping -c1 1.1.1.1\n"
-        "  sudo tcpdump -ni kive-devel-br host 10.247.172.80\n"
-        "  sudo tcpdump -ni \"$(ip route get 1.1.1.1 | sed -n 's/.* dev \\([^ ]*\\).*/\\1/p')\" host 1.1.1.1"
-    )
-    return "\n\n".join(sections)
-
-
 def maybe_provision_instance(
     cmds: Cmds,
     instance: str,
@@ -221,7 +185,6 @@ def maybe_provision_instance(
     *,
     provision: bool,
     timeout: int = DEFAULT_PROVISION_TIMEOUT,
-    bridge_name: str = "kive-devel-br",
 ) -> None:
     if not provision:
         return
@@ -269,16 +232,14 @@ def maybe_provision_instance(
             log_body = (log_result.stdout or "").strip() if log_result.returncode == 0 else ""
             details = log_body or "Provisioning failed inside instance."
             diagnostics = _cloud_init_diagnostics(cmds, instance)
-            host_diag = _collect_host_diagnostics(cmds, bridge_name)
-            raise RuntimeError(f"{details}\n\n{diagnostics}\n\n=== host diagnostics ===\n{host_diag}")
+            raise RuntimeError(f"{details}\n\n{diagnostics}")
 
         if marker == "started" and time.monotonic() > start_time + PROVISION_STUCK_THRESHOLD:
             diagnostics = _cloud_init_diagnostics(cmds, instance)
-            host_diag = _collect_host_diagnostics(cmds, bridge_name)
             raise RuntimeError(
                 "Provisioning appears stuck: /var/lib/kive-provision/started exists, "
                 "but neither done nor failed appeared after 14 minutes."
-                f"\n\n{diagnostics}\n\n=== host diagnostics ===\n{host_diag}"
+                f"\n\n{diagnostics}"
             )
 
         if attempt % 10 == 0:
@@ -294,5 +255,4 @@ def maybe_provision_instance(
     log_body = (log_result.stdout or "").strip() if log_result.returncode == 0 else ""
     details = log_body or "Provisioning timed out waiting for /var/lib/kive-provision/done"
     diagnostics = _cloud_init_diagnostics(cmds, instance)
-    host_diag = _collect_host_diagnostics(cmds, bridge_name)
-    raise RuntimeError(f"{details}\n\n{diagnostics}\n\n=== host diagnostics ===\n{host_diag}")
+    raise RuntimeError(f"{details}\n\n{diagnostics}")
