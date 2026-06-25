@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -88,18 +89,51 @@ def _remove_registry_entry(reg: Path, kind: str, port: int) -> None:
     reg.write_text(json.dumps(entries, indent=2) + "\n")
 
 
+def _wait_for_listening_pid(port: int, timeout: float = 30.0) -> int:
+    """Wait for a process to start listening on *port* and return its PID.
+
+    Parses ``ss -tlnp`` output so it always returns the PID of the process
+    that actually holds the socket open (not a guix wrapper parent).
+    """
+    import time as _time
+    deadline = _time.monotonic() + timeout
+    pid_re = re.compile(r"pid=(\d+)")
+    while _time.monotonic() < deadline:
+        result = subprocess.run(
+            ["sudo", "ss", "-tlnp"],
+            capture_output=True, text=True, timeout=10,
+        )
+        for line in result.stdout.splitlines():
+            if f"127.0.0.1:{port}" not in line:
+                continue
+            m = pid_re.search(line)
+            if m:
+                return int(m.group(1))
+        _time.sleep(0.5)
+    raise TimeoutError(f"socat did not start listening on port {port} within {timeout}s")
+
+
 def _start_socat(port: int, vm_ip: str, cmds: Cmds) -> int:
     logger.info("Starting host port forward via socat (127.0.0.1:%d -> %s:%d)...", port, vm_ip, port)
-    socat_argv = cmds.socat._argv([
+    socat_args = [
         f"TCP-LISTEN:{port},bind=127.0.0.1,reuseaddr,fork",
         f"TCP:{vm_ip}:{port}",
-    ], sudo=False)
-    proc = subprocess.Popen(
-        socat_argv,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return proc.pid
+    ]
+    if shutil.which("socat") is not None:
+        subprocess.Popen(
+            ["socat"] + socat_args,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    else:
+        socat_argv = cmds.socat._argv(socat_args, sudo=False)
+        subprocess.Popen(
+            socat_argv,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    pid = _wait_for_listening_pid(port)
+    return pid
 
 
 def _ensure_web_port_forward(cfg: BuildVmConfig, vm_ip: str, root: Path, cmds: Cmds) -> None:
