@@ -224,9 +224,7 @@ def run_purge(args: argparse.Namespace) -> None:
                 len(remaining),
             )
 
-    # Phase 5: Remove owned bridges, NAT rules, port forwards, and registry.
-    _remove_bridges(cmds, root)
-    _remove_nftables(cmds, root)
+    # Phase 5: Remove port forwards and registry.
     _remove_port_forwards(root)
     _remove_registry(root)
 
@@ -242,27 +240,6 @@ def _read_registry(root: Path) -> list[dict]:
         return data if isinstance(data, list) else [data]
     except (json.JSONDecodeError, OSError):
         return []
-
-
-def _remove_bridges(cmds: Cmds, root: Path) -> list[str]:
-    bridges = []
-    for entry in _read_registry(root):
-        if entry.get("kind") == "linux-bridge":
-            name = entry.get("name")
-            if name:
-                bridges.append(name)
-                logger.info("Removing owned bridge '%s'...", name)
-                cmds.ip.run(["link", "delete", name], sudo=True, check=False)
-    return bridges
-
-
-def _remove_nftables(cmds: Cmds, root: Path) -> None:
-    for entry in _read_registry(root):
-        if entry.get("kind") == "nft-table":
-            table_name = entry.get("name")
-            if table_name:
-                logger.info("Removing owned nftables table '%s'...", table_name)
-                cmds.nft.run(["delete", "table"] + table_name.split(), sudo=True, check=False)
 
 
 def _remove_port_forwards(root: Path) -> None:
