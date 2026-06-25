@@ -11,62 +11,184 @@ from ..kv_commands import Cmds
 
 logger = logging.getLogger("kivedevel")
 
-_RESOURCE_MARKER = ".kive-devel-resource.json"
 
-
-def _registry_path(root: Path) -> Path:
-    return root / "tmp~" / ".kive-devel-resources.json"
-
-
-def _read_registry(path: Path) -> list[dict]:
-    if not path.exists():
+def get_managed_networks(cmds: Cmds) -> list[dict]:
+    """Return existing Incus managed bridge networks (JSON list from ``incus network list``)."""
+    out = cmds.incus.output(["network", "list", "--format", "json"])
+    if not out:
         return []
     try:
-        data = json.loads(path.read_text())
-        return data if isinstance(data, list) else [data]
+        networks = json.loads(out)
+        return networks if isinstance(networks, list) else []
     except (json.JSONDecodeError, OSError):
         return []
 
 
-def _register_resource(path: Path, entry: dict) -> None:
-    entries = _read_registry(path)
-    entries.append(entry)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(entries, indent=2) + "\n")
+def _network_names(networks: list[dict]) -> list[str]:
+    return [n.get("name", "") for n in networks if n.get("type") == "bridge"]
 
 
-def _registry_has(path: Path, kind: str, name: str) -> bool:
-    for entry in _read_registry(path):
-        if entry.get("kind") == kind and entry.get("name") == name:
+def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> str:
+    """Choose an existing Incus managed network for VM NIC attachment.
+
+    If *requested* is given and exists return it.
+    Otherwise prefer ``incusbr0``, or the only existing managed bridge.
+    Fail clearly if no usable network is found.
+    """
+    networks = get_managed_networks(cmds)
+    names = _network_names(networks)
+
+    if requested:
+        if requested in names:
+            return requested
+        available = ", ".join(names) if names else "(none)"
+        logger.error(
+            "Requested VM network '%s' does not exist or is not a managed bridge.\n"
+            "Available managed bridges: %s\n"
+            "This command does not create or repair host networking.",
+            requested, available,
+        )
+        sys.exit(1)
+
+    if "incusbr0" in names:
+        return "incusbr0"
+
+    if len(names) == 1:
+        return names[0]
+
+    if len(names) > 1:
+        logger.error(
+            "Multiple existing Incus managed bridges found (%s).\n\n"
+            "Local VM smoke install requires an existing Incus network with outbound "
+            "internet access.\n"
+            "Configure Incus networking outside Kive, or rerun with:\n\n"
+            "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
+            "This command does not create or repair host networking.",
+            ", ".join(names),
+        )
+        sys.exit(1)
+
+    logger.error(
+        "No usable existing Incus managed network found.\n\n"
+        "Local VM smoke install requires an existing Incus network with outbound "
+        "internet access.\n"
+        "Configure Incus networking outside Kive, or rerun with:\n\n"
+        "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
+        "This command does not create or repair host networking.",
+    )
+    sys.exit(1)
+
+
+def _parse_device_block(text: str, device: str) -> dict[str, str]:
+    """Parse a YAML-like device config block from ``incus config device show`` output.
+
+    Returns a dict of key → value for the named device, or empty dict if not found.
+    """
+    in_block = False
+    result: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        if not in_block:
+            if re.match(rf"^{re.escape(device)}:\s*$", line):
+                in_block = True
+            continue
+        if re.match(r"^\S", line):
+            break
+        m = re.match(r"^\s+(\S+):\s*(.*?)\s*$", line)
+        if m:
+            result[m.group(1)] = m.group(2)
+    return result
+
+
+def _eth0_config(cmds: Cmds, instance: str) -> dict[str, str]:
+    """Return eth0 device configuration from the instance's own devices.
+
+    Returns empty dict if eth0 is not configured directly on the instance.
+    """
+    out = cmds.incus.output(["config", "device", "show", instance])
+    return _parse_device_block(out, "eth0")
+
+
+def _eth0_config_expanded(cmds: Cmds, instance: str) -> dict[str, str]:
+    """Return eth0 device configuration from the expanded (profile-merged) view.
+
+    Returns empty dict if eth0 is not present even through profiles.
+    """
+    out = cmds.incus.output(["config", "show", "--expanded", instance])
+    return _parse_device_block(out, "eth0")
+
+
+def ensure_vm_nic(cmds: Cmds, instance: str, network_name: str) -> bool:
+    """Ensure the VM instance has an eth0 NIC attached to *network_name*.
+
+    Returns True if a change was made (instance restart required).
+    Cases handled:
+
+    1. No eth0 device at all — add via ``incus config device add ... network=NAME``.
+    2. eth0 exists through an expanded profile and provides usable networking — no-op.
+    3. eth0 already has ``network=NETWORK_NAME`` — no-op.
+    4. eth0 has a stale ``parent=kive-devel-br`` (old Kive-owned bridge) — replace.
+    5. eth0 has an unrelated user-controlled parent/network — fail clearly.
+    """
+    device = _eth0_config(cmds, instance)
+
+    if not device:
+        # eth0 not on the instance directly; check expanded (profile) view
+        expanded = _eth0_config_expanded(cmds, instance)
+        if expanded:
+            expanded_network = expanded.get("network", "")
+            expanded_parent = expanded.get("parent", "")
+            if expanded_network or expanded_parent:
+                logger.info(
+                    "eth0 provided by profile (network=%s, parent=%s); no instance-level change needed.",
+                    expanded_network, expanded_parent,
+                )
+                return False
+        logger.info("Adding NIC eth0 to %s (network=%s)...", instance, network_name)
+        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+        return True
+
+    existing_network = device.get("network", "")
+    existing_parent = device.get("parent", "")
+    existing_nictype = device.get("nictype", "")
+
+    if existing_network == network_name:
+        logger.debug("eth0 already has network=%s on %s.", network_name, instance)
+        return False
+
+    if existing_network and existing_network != network_name:
+        logger.error(
+            "eth0 on %s is already configured with network=%s (requested %s).\n"
+            "Use --vm-network %s to match the existing network, or purge and retry.",
+            instance, existing_network, network_name, existing_network,
+        )
+        sys.exit(1)
+
+    if existing_parent:
+        if existing_parent == "kive-devel-br":
+            logger.info("Replacing old Kive NIC on %s (parent=%s) with network=%s...",
+                        instance, existing_parent, network_name)
+            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
+            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
             return True
-    return False
 
+        logger.error(
+            "eth0 on %s has an unexpected parent=%s (nictype=%s).\n"
+            "Remove or reconfigure it manually, then retry.",
+            instance, existing_parent, existing_nictype,
+        )
+        sys.exit(1)
 
-def _network_marker_path(workdir: Path) -> Path:
-    return workdir / _RESOURCE_MARKER
+    if existing_nictype:
+        logger.info("Replacing unknown eth0 config on %s (nictype=%s) with network=%s...",
+                    instance, existing_nictype, network_name)
+        cmds.incus.run(["config", "device", "remove", instance, "eth0"])
+        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+        return True
 
-
-def _read_marker_entries(marker_path: Path) -> list[dict]:
-    if not marker_path.exists():
-        return []
-    try:
-        data = json.loads(marker_path.read_text())
-        return data if isinstance(data, list) else [data]
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def _write_marker_entry(marker_path: Path, entry: dict) -> None:
-    entries = _read_marker_entries(marker_path)
-    entries.append(entry)
-    marker_path.write_text(json.dumps(entries, indent=2) + "\n")
-
-
-def _network_owned_by_marker(workdir: Path, network: str) -> bool:
-    for entry in _read_marker_entries(_network_marker_path(workdir)):
-        if entry.get("kind") == "network" and entry.get("name") == network:
-            return True
-    return False
+    logger.info("Adding NIC eth0 to %s (network=%s)...", instance, network_name)
+    cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+    return True
 
 
 def get_default_host_interface(cmds: Cmds) -> str:
@@ -140,151 +262,5 @@ def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
     return ""
 
 
-def _owns_bridge(root: Path, bridge: str) -> bool:
-    return _registry_has(_registry_path(root), "linux-bridge", bridge)
-
-
-def _bridge_exists(cmds: Cmds, bridge: str) -> bool:
-    return cmds.ip.ok(["link", "show", bridge])
-
-
-def _create_owned_bridge(cmds: Cmds, root: Path, bridge: str, cidr: str) -> None:
-    logger.info("Creating owned bridge %s (%s)...", bridge, cidr)
-    try:
-        cmds.ip.run(["link", "add", bridge, "type", "bridge"], sudo=True)
-    except Exception:
-        logger.error("Failed to create bridge '%s'.", bridge)
-        sys.exit(1)
-
-    try:
-        cmds.ip.run(["addr", "add", cidr, "dev", bridge], sudo=True)
-    except Exception:
-        logger.error("Failed to add address %s to bridge '%s'.", cidr, bridge)
-        _delete_bridge(cmds, bridge)
-        sys.exit(1)
-
-    try:
-        cmds.ip.run(["link", "set", bridge, "up"], sudo=True)
-    except Exception:
-        logger.error("Failed to bring bridge '%s' up.", bridge)
-        _delete_bridge(cmds, bridge)
-        sys.exit(1)
-
-    reg = _registry_path(root)
-    _register_resource(reg, {
-        "type": "linux-bridge", "name": bridge,
-        "created_by": "utils/dev", "project": "Kive", "kind": "linux-bridge",
-    })
-    _register_resource(reg, {
-        "type": "bridge-ip", "name": cidr,
-        "created_by": "utils/dev", "project": "Kive", "kind": "bridge-ip",
-    })
-    logger.info("Registered owned bridge %s.", bridge)
-
-
-def _ensure_ip_forward() -> None:
-    """Check ``net.ipv4.ip_forward`` is enabled and fail early if not."""
-    import subprocess as _sp
-    result = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, check=False)
-    val = result.stdout.strip()
-    if val != "1":
-        logger.error(
-            "IP forwarding is disabled (net.ipv4.ip_forward=%s). "
-            "VM guests will not be able to reach the internet through the NAT.\n"
-            "Enable it with:  sudo sysctl -w net.ipv4.ip_forward=1",
-            val,
-        )
-        sys.exit(1)
-
-
-def _setup_host_nat(cmds: Cmds, root: Path, bridge_name: str, cidr: str) -> None:
-    logger.info("Setting up NAT for bridge %s (%s)...", bridge_name, cidr)
-    _ensure_ip_forward()
-    try:
-        cmds.nft.run(["add", "table", "inet", "kive_devel"], sudo=True)
-    except Exception:
-        logger.warning("nftables table 'kive_devel' may already exist (non-fatal).")
-
-    try:
-        cmds.nft.run([
-            "add", "chain", "inet", "kive_devel", "postrouting",
-            "{ type nat hook postrouting priority srcnat ; }",
-        ], sudo=True)
-    except Exception:
-        logger.warning("nftables chain 'kive_devel.postrouting' may already exist (non-fatal).")
-
-    try:
-        prefix_len = cidr.split("/")[1]
-        network_base = cidr.rsplit(".", 1)[0]
-        network = f"{network_base}.0/{prefix_len}"
-        cmds.nft.run([
-            "add", "rule", "inet", "kive_devel", "postrouting",
-            f"ip saddr {network} masquerade",
-        ], sudo=True)
-    except Exception:
-        logger.error("Failed to add NAT masquerade rule for %s.", network)
-        sys.exit(1)
-
-    reg = _registry_path(root)
-    _register_resource(reg, {
-        "type": "nft-table", "name": "inet kive_devel",
-        "created_by": "utils/dev", "project": "Kive", "kind": "nft-table",
-    })
-
-
-def _delete_bridge(cmds: Cmds, bridge: str) -> None:
-    logger.info("Deleting owned bridge %s...", bridge)
-    cmds.ip.run(["link", "delete", bridge], sudo=True, check=False)
-
-
-def ensure_owned_bridge(cmds: Cmds, root: Path, bridge_name: str, cidr: str, vm_ip: str, workdir: Path) -> tuple[str, str]:
-    if _owns_bridge(root, bridge_name):
-        logger.debug("Owned bridge %s already registered.", bridge_name)
-        return cidr, vm_ip
-
-    if _bridge_exists(cmds, bridge_name):
-        logger.error(
-            "Bridge '%s' already exists but is not recorded as owned by utils/dev.\n"
-            "Choose a different --vm-network name or remove the conflicting resource manually.",
-            bridge_name,
-        )
-        sys.exit(1)
-
-    _create_owned_bridge(cmds, root, bridge_name, cidr)
-    _setup_host_nat(cmds, root, bridge_name, cidr)
-
-    return cidr, vm_ip
-
-
-def _eth0_exists(cmds: Cmds, instance: str) -> bool:
-    out = cmds.incus.output(["config", "device", "list", instance])
-    return bool(re.search(r"^eth0\s*$", out, re.MULTILINE))
-
-
-def ensure_vm_nic(cmds: Cmds, instance: str, bridge_name: str) -> bool:
-    if _eth0_exists(cmds, instance):
-        logger.debug("NIC eth0 already exists on %s.", instance)
-        return False
-    logger.info("Adding NIC eth0 to %s (bridge=%s)...", instance, bridge_name)
-    cmds.incus.run(
-        [
-            "config", "device", "add",
-            instance, "eth0", "nic",
-            "nictype=bridged",
-            f"parent={bridge_name}",
-        ]
-    )
-    return True
-
-
 def find_tagged_networks(root: Path) -> list[str]:
-    tagged = []
-    for marker in root.rglob(_RESOURCE_MARKER):
-        for entry in _read_marker_entries(marker):
-            if entry.get("kind") == "network" and entry.get("created_by") == "utils/dev":
-                name = entry.get("name")
-                if name:
-                    tagged.append(name)
-    if tagged:
-        logger.info("Found tagged networks: %s", ", ".join(tagged))
-    return tagged
+    return []
