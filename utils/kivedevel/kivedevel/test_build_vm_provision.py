@@ -85,6 +85,10 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("raw IP connectivity test", value)
         self.assertIn("DNS resolution test", value)
         self.assertIn("cannot reach the internet by IP", value)
+        self.assertIn("Likely causes", value)
+        self.assertIn("IPv4 forwarding disabled", value)
+        self.assertIn("forward rules missing", value)
+        self.assertIn("kive-devel-br", value)
         self.assertIn("DNS resolution is broken", value)
         self.assertIn("socket.create_connection((\"1.1.1.1\", 53)", value)
 
@@ -1843,6 +1847,26 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertGreaterEqual(len(nft_calls), 1)
 
+    def test_creates_nft_forward_rules(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
+        import tempfile
+        cmds = mock.Mock()
+        cmds.ip.ok.return_value = False
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+        forward_calls = [
+            c for c in cmds.nft.run.call_args_list
+            if "forward" in " ".join(c[0][0])
+        ]
+        self.assertGreaterEqual(len(forward_calls), 1, "Expected at least one nft forward rule")
+        chain_create = any("add" in c[0][0] and "chain" in c[0][0] for c in forward_calls)
+        self.assertTrue(chain_create, "Expected forward chain to be created")
+        iif_rule = any("iifname" in " ".join(c[0][0]) and "kive-devel-br" in " ".join(c[0][0]) for c in forward_calls)
+        self.assertTrue(iif_rule, "Expected forward rule for iifname kive-devel-br")
+
     def test_creates_registry(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_owned_bridge
         import tempfile
@@ -1911,6 +1935,32 @@ class TestVmNetwork(unittest.TestCase):
             root = Path(tmp)
             with self.assertRaises(SystemExit):
                 ensure_owned_bridge(cmds, root, "kive-devel-br", "10.247.172.1/24", "10.247.172.80", Path(tmp))
+
+    def test_ensure_ip_forward_enables_when_disabled(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _ensure_ip_forward
+        import subprocess as _sp
+        real_run = _sp.run
+
+        def fake_read(args, **kwargs):
+            if args == ["sysctl", "-n", "net.ipv4.ip_forward"]:
+                return mock.Mock(stdout="0\n", returncode=0)
+            if args == ["sudo", "--", "sysctl", "-w", "net.ipv4.ip_forward=1"]:
+                return mock.Mock(stdout="", returncode=0)
+            return real_run(args, **kwargs)
+
+        with mock.patch("subprocess.run", side_effect=fake_read):
+            _ensure_ip_forward()
+
+    def test_ensure_ip_forward_skips_when_already_enabled(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _ensure_ip_forward
+
+        def fake_read(args, **kwargs):
+            if args == ["sysctl", "-n", "net.ipv4.ip_forward"]:
+                return mock.Mock(stdout="1\n", returncode=0)
+            raise AssertionError("Should not call sysctl -w when already enabled")
+
+        with mock.patch("subprocess.run", side_effect=fake_read):
+            _ensure_ip_forward()
 
     def test_vm_nic_uses_bridged_parent(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
