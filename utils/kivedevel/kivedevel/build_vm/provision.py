@@ -15,6 +15,14 @@ PROBE_TIMEOUT = 30
 DIAGNOSTICS_TIMEOUT = 60
 MAX_CONSECUTIVE_TRANSPORT_FAILURES = 5
 
+_KNOWN_TRANSPORT_ERRORS = [
+    "VM agent isn't currently running",
+    "websocket: bad handshake",
+    "connection refused",
+    "not connected",
+]
+
+
 def _pull_file(cmds: Cmds, instance: str, path: str) -> tuple[bool, str]:
     result = cmds.incus.run(["file", "pull", f"{instance}{path}", "-"], check=False, capture_output=True)
     if result.returncode == 0:
@@ -29,6 +37,40 @@ def _pull_file(cmds: Cmds, instance: str, path: str) -> tuple[bool, str]:
         stderr_text,
     )
     return False, stderr_text
+
+
+def _is_transport_stderr(stderr: str) -> bool:
+    """Check if *stderr* matches a known Incus transport/agent error."""
+    lower = stderr.strip().lower()
+    for err in _KNOWN_TRANSPORT_ERRORS:
+        if err.lower() in lower:
+            return True
+    return False
+
+
+def _is_transport_failure(result: subprocess.CompletedProcess[str]) -> bool:
+    return result.returncode != 0 and _is_transport_stderr(result.stderr or "")
+
+
+def _probe_markers_via_file_pull(cmds: Cmds, instance: str) -> tuple[str | None, str | None]:
+    """Probe marker files via ``incus file pull``.
+
+    Preferred for VM mode where ``incus exec`` may be unreliable
+    during early agent startup.
+    """
+    transport_errors: list[str] = []
+    for marker_name in ("done", "failed", "started"):
+        path = f"/var/lib/kive-provision/{marker_name}"
+        ok, body = _pull_file(cmds, instance, path)
+        if ok:
+            return marker_name, None
+        if _is_transport_stderr(body):
+            transport_errors.append(body)
+
+    if transport_errors:
+        return None, transport_errors[0]
+
+    return "none", None
 
 
 _BOUNDED_PROBE_SCRIPT = """
@@ -58,19 +100,6 @@ ps -ef 2>&1 || true
 echo '=== provision dir ==='
 ls -la /var/lib/kive-provision 2>&1 || true
 """
-
-
-def _is_transport_failure(result: subprocess.CompletedProcess[str]) -> bool:
-    stderr = (result.stderr or "").strip().lower()
-    return (
-        result.returncode != 0
-        and (
-            "connection refused" in stderr
-            or "no such host" in stderr
-            or "not found" in stderr
-            or "error: " in stderr
-        )
-    )
 
 
 def _probe_markers(cmds: Cmds, instance: str) -> tuple[str | None, str | None]:
@@ -167,21 +196,25 @@ def maybe_provision_instance(
     consecutive_transport_failures = 0
     while time.monotonic() < deadline:
         attempt += 1
-        marker, error = _probe_markers(cmds, instance)
+
+        if instance_type == "vm":
+            marker, error = _probe_markers_via_file_pull(cmds, instance)
+        else:
+            marker, error = _probe_markers(cmds, instance)
 
         if error:
             consecutive_transport_failures += 1
-            if consecutive_transport_failures >= MAX_CONSECUTIVE_TRANSPORT_FAILURES:
+            logger.debug(
+                "Marker probe failed on %s (attempt %s): %s",
+                instance, attempt, error,
+            )
+            if instance_type != "vm" and consecutive_transport_failures >= MAX_CONSECUTIVE_TRANSPORT_FAILURES:
                 diagnostics = _cloud_init_diagnostics(cmds, instance)
                 raise RuntimeError(
                     f"Provisioning aborted after {consecutive_transport_failures} "
                     f"consecutive transport failures on {instance}: {error}"
                     f"\n\n{diagnostics}"
                 )
-            logger.debug(
-                "Marker probe failed on %s (attempt %s/%s): %s",
-                instance, consecutive_transport_failures, MAX_CONSECUTIVE_TRANSPORT_FAILURES, error,
-            )
             time.sleep(PROVISION_POLL_INTERVAL)
             continue
         consecutive_transport_failures = 0
