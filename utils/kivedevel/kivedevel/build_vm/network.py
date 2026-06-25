@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import subprocess as _sp
 import sys
 from pathlib import Path
 
@@ -258,6 +259,164 @@ def _setup_host_nat(cmds: Cmds, root: Path, bridge_name: str, cidr: str) -> None
     })
 
 
+def _get_nft_json_list(cmds: Cmds) -> list[dict]:
+    """Return the parsed JSON output of ``nft --json list ruleset``."""
+    result = cmds.nft.run(["--json", "list", "ruleset"], sudo=True, capture_output=True, check=False)
+    if result.returncode != 0:
+        return []
+    try:
+        data = json.loads(result.stdout)
+        return data.get("nftables", [])
+    except (json.JSONDecodeError, AttributeError, OSError):
+        return []
+
+
+def _find_forward_chains_with_drop_policy(nft_json: list[dict]) -> list[dict]:
+    """Find forward base chains (type=filter, hook=forward) with ``policy drop``
+    in tables other than our owned ``inet kive_devel``."""
+    found: list[dict] = []
+    for item in nft_json:
+        table = item.get("table")
+        if not table:
+            continue
+        family = table.get("family", "")
+        table_name = table.get("name", "")
+        if family == "inet" and table_name == "kive_devel":
+            continue
+        for chain in table.get("chain", []):
+            if not isinstance(chain, dict):
+                continue
+            if chain.get("type") == "filter" and chain.get("hook") == "forward":
+                if chain.get("policy") == "drop":
+                    found.append({
+                        "family": family,
+                        "table": table_name,
+                        "chain": chain["name"],
+                    })
+    return found
+
+
+def _ensure_existing_forward_accept(cmds: Cmds, root: Path, bridge_name: str) -> None:
+    """Add accept rules to existing forward chains that would drop our traffic.
+
+    In nftables an ``accept`` verdict in one table's forward chain does not
+    prevent another table's forward chain from dropping forwarded packets
+    (`priority` only affects ordering, not override).  This function:
+
+    * adds an ``iifname <bridge_name> accept`` rule to each native nftables
+      forward base chain that has ``policy drop``
+    * adds an iptables FORWARD accept rule for the bridge (covers iptables-compat)
+    * adds a DOCKER-USER accept rule if the Docker user chain exists
+
+    Every rule is registered in the Kive resource registry for clean removal
+    during ``utils/dev purge``.
+    """
+    reg = _registry_path(root)
+
+    # --- native nftables: forward chains with policy drop ---
+    nft_json = _get_nft_json_list(cmds)
+    drop_chains = _find_forward_chains_with_drop_policy(nft_json)
+
+    if drop_chains:
+        logger.warning(
+            "Found %d forward chain(s) with policy drop that would block "
+            "forwarding from %s. Adding owned accept rules.",
+            len(drop_chains), bridge_name,
+        )
+
+    for info in drop_chains:
+        family = info["family"]
+        tbl = info["table"]
+        chn = info["chain"]
+        rule_name = f"{family}/{tbl}/{chn}"
+        if _registry_has(reg, "forward-rule", rule_name):
+            continue
+        try:
+            cmds.nft.run([
+                "add", "rule", family, tbl, chn,
+                "iifname", bridge_name, "accept",
+            ], sudo=True)
+            _register_resource(reg, {
+                "kind": "forward-rule",
+                "name": rule_name,
+                "family": family,
+                "table": tbl,
+                "chain": chn,
+                "bridge": bridge_name,
+            })
+            logger.info("Added accept rule to %s %s %s (policy drop)", family, tbl, chn)
+        except Exception as exc:
+            logger.warning("Failed to add accept rule to %s %s %s: %s", family, tbl, chn, exc)
+
+    def _try_iptables_cmd(args: list[str], check_: bool = False) -> _sp.CompletedProcess[str] | None:
+        """Run an iptables command safely — ``iptables`` may not be
+        available or installed on the host (e.g. inside a container)."""
+        try:
+            return _sp.run(["iptables"] + args, capture_output=True, timeout=10, check=check_)
+        except FileNotFoundError:
+            return None
+        except Exception:
+            return None
+
+    # --- iptables FORWARD chain ---
+    ipt_rule_name = "iptables/FORWARD"
+    if not _registry_has(reg, "forward-rule", ipt_rule_name):
+        ipt_check = _try_iptables_cmd(["-C", "FORWARD", "-i", bridge_name, "-j", "ACCEPT"])
+        if ipt_check is not None and ipt_check.returncode != 0:
+            added = _try_iptables_cmd(["-I", "FORWARD", "1", "-i", bridge_name, "-j", "ACCEPT"], check_=True)
+            if added is not None:
+                _register_resource(reg, {
+                    "kind": "forward-rule",
+                    "name": ipt_rule_name,
+                    "family": "",
+                    "table": "iptables",
+                    "chain": "FORWARD",
+                    "bridge": bridge_name,
+                })
+                logger.info("Added accept rule to iptables FORWARD for %s", bridge_name)
+            else:
+                logger.warning("Failed to add iptables FORWARD accept rule for %s", bridge_name)
+        elif ipt_check is not None:
+            logger.debug("iptables FORWARD already has accept rule for %s", bridge_name)
+        else:
+            logger.debug("iptables not available on this host; skipping FORWARD rule")
+    else:
+        logger.debug("iptables FORWARD accept rule already registered for %s", bridge_name)
+
+    # --- Docker DOCKER-USER chain ---
+    docker_rule_name = "iptables/DOCKER-USER"
+    if not _registry_has(reg, "forward-rule", docker_rule_name):
+        docker_exists = _try_iptables_cmd(["-nL", "DOCKER-USER"])
+        if docker_exists is not None and docker_exists.returncode == 0:
+            docker_check = _try_iptables_cmd(["-C", "DOCKER-USER", "-i", bridge_name, "-j", "ACCEPT"])
+            if docker_check is not None and docker_check.returncode != 0:
+                added = _try_iptables_cmd(["-I", "DOCKER-USER", "1", "-i", bridge_name, "-j", "ACCEPT"], check_=True)
+                if added is not None:
+                    _register_resource(reg, {
+                        "kind": "forward-rule",
+                        "name": docker_rule_name,
+                        "family": "",
+                        "table": "iptables",
+                        "chain": "DOCKER-USER",
+                        "bridge": bridge_name,
+                    })
+                    logger.info("Added accept rule to DOCKER-USER for %s", bridge_name)
+            elif docker_check is not None:
+                logger.debug("DOCKER-USER already has accept rule for %s; registering", bridge_name)
+                _register_resource(reg, {
+                    "kind": "forward-rule",
+                    "name": docker_rule_name,
+                    "family": "",
+                    "table": "iptables",
+                    "chain": "DOCKER-USER",
+                    "bridge": bridge_name,
+                })
+        elif docker_exists is not None:
+            logger.debug("DOCKER-USER chain does not exist; skipping")
+        else:
+            logger.debug("iptables not available on this host; skipping DOCKER-USER rule")
+
+
 def _delete_bridge(cmds: Cmds, bridge: str) -> None:
     logger.info("Deleting owned bridge %s...", bridge)
     cmds.ip.run(["link", "delete", bridge], sudo=True, check=False)
@@ -278,6 +437,7 @@ def ensure_owned_bridge(cmds: Cmds, root: Path, bridge_name: str, cidr: str, vm_
 
     _create_owned_bridge(cmds, root, bridge_name, cidr)
     _setup_host_nat(cmds, root, bridge_name, cidr)
+    _ensure_existing_forward_accept(cmds, root, bridge_name)
 
     return cidr, vm_ip
 
