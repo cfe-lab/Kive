@@ -1828,6 +1828,8 @@ class TestPortForward(unittest.TestCase):
                 host_interface="", provision=True,
                 web_port=8000, no_web_proxy=False,
             )
+            cmds = mock.Mock()
+            cmds.socat._argv.return_value = ["socat", "TCP-LISTEN:8000,bind=127.0.0.1,reuseaddr,fork", "TCP:10.247.172.80:8000"]
             with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
                 mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 1
                 with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
@@ -1835,7 +1837,7 @@ class TestPortForward(unittest.TestCase):
                     mock_proc.pid = 12345
                     mock_popen.return_value = mock_proc
 
-                    _ensure_web_port_forward(cfg, "10.247.172.80", root)
+                    _ensure_web_port_forward(cfg, "10.247.172.80", root, cmds)
 
             mock_popen.assert_called_once()
             args = mock_popen.call_args[0][0]
@@ -1877,7 +1879,7 @@ class TestPortForward(unittest.TestCase):
                 mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
                 mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
             ):
-                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
             # Existing alive forward should be reused — no kill (SIGTERM), no restart
             for call in mock_kill.call_args_list:
                 args, _ = call
@@ -1918,7 +1920,7 @@ class TestPortForward(unittest.TestCase):
                     if pid == 99999:
                         raise ProcessLookupError()
                 mock_kill.side_effect = kill_side_effect
-                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
             mock_popen.assert_called_once()
 
     def test_port_forward_unowned_port_fails(self):
@@ -1939,7 +1941,7 @@ class TestPortForward(unittest.TestCase):
             with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.socket.socket") as mock_socket:
                 mock_socket.return_value.__enter__.return_value.connect_ex.return_value = 0
                 with self.assertRaises(SystemExit):
-                    _ensure_web_port_forward(cfg, "10.247.172.80", root)
+                    _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
 
     def test_no_web_proxy_skips_forward(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_port_forward
@@ -1957,7 +1959,7 @@ class TestPortForward(unittest.TestCase):
                 web_port=8000, no_web_proxy=True,
             )
             with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen:
-                _ensure_web_port_forward(cfg, "10.247.172.80", root)
+                _ensure_web_port_forward(cfg, "10.247.172.80", root, mock.Mock())
             mock_popen.assert_not_called()
 
     def test_purge_kills_port_forward(self):

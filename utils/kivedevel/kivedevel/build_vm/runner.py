@@ -88,21 +88,21 @@ def _remove_registry_entry(reg: Path, kind: str, port: int) -> None:
     reg.write_text(json.dumps(entries, indent=2) + "\n")
 
 
-def _start_socat(port: int, vm_ip: str) -> int:
+def _start_socat(port: int, vm_ip: str, cmds: Cmds) -> int:
     logger.info("Starting host port forward via socat (127.0.0.1:%d -> %s:%d)...", port, vm_ip, port)
+    socat_argv = cmds.socat._argv([
+        f"TCP-LISTEN:{port},bind=127.0.0.1,reuseaddr,fork",
+        f"TCP:{vm_ip}:{port}",
+    ], sudo=False)
     proc = subprocess.Popen(
-        [
-            "socat",
-            f"TCP-LISTEN:{port},bind=127.0.0.1,reuseaddr,fork",
-            f"TCP:{vm_ip}:{port}",
-        ],
+        socat_argv,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     return proc.pid
 
 
-def _ensure_web_port_forward(cfg: BuildVmConfig, vm_ip: str, root: Path) -> None:
+def _ensure_web_port_forward(cfg: BuildVmConfig, vm_ip: str, root: Path, cmds: Cmds) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web port forward disabled by --no-web-proxy.")
         return
@@ -129,7 +129,7 @@ def _ensure_web_port_forward(cfg: BuildVmConfig, vm_ip: str, root: Path) -> None
         )
         sys.exit(1)
 
-    pid = _start_socat(port, vm_ip)
+    pid = _start_socat(port, vm_ip, cmds)
     _register_resource(reg, {
         "kind": "host-forward",
         "pid": pid,
@@ -311,7 +311,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
-    _ensure_web_port_forward(cfg, actual_vm_ip, cfg.root)
+    _ensure_web_port_forward(cfg, actual_vm_ip, cfg.root, cmds)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 
