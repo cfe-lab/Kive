@@ -4,7 +4,6 @@ import argparse
 import json
 import logging
 import os
-import re
 import signal
 import subprocess
 from pathlib import Path
@@ -225,11 +224,9 @@ def run_purge(args: argparse.Namespace) -> None:
                 len(remaining),
             )
 
-    # Phase 5: Remove owned bridges, NAT rules, forward rules added to foreign
-    # chains, port forwards, and registry.
+    # Phase 5: Remove owned bridges, NAT rules, port forwards, and registry.
     _remove_bridges(cmds, root)
     _remove_nftables(cmds, root)
-    _remove_forward_rules(cmds, root)
     _remove_port_forwards(root)
     _remove_registry(root)
 
@@ -266,51 +263,6 @@ def _remove_nftables(cmds: Cmds, root: Path) -> None:
             if table_name:
                 logger.info("Removing owned nftables table '%s'...", table_name)
                 cmds.nft.run(["delete", "table"] + table_name.split(), sudo=True, check=False)
-
-
-def _remove_forward_rules(cmds: Cmds, root: Path) -> None:
-    """Remove forward accept rules that were added to foreign chains.
-    
-    Handles both nftables native chains (by handle) and iptables rules
-    (by specification with ``-D``).
-    """
-    for entry in _read_registry(root):
-        if entry.get("kind") != "forward-rule":
-            continue
-        family = entry.get("family", "")
-        table_name = entry.get("table", "")
-        chain_name = entry.get("chain", "")
-        bridge_name = entry.get("bridge", "kive-devel-br")
-
-        if table_name == "iptables":
-            logger.info("Removing iptables rule: %s -i %s -j ACCEPT", chain_name, bridge_name)
-            subprocess.run(
-                ["iptables", "-D", chain_name, "-i", bridge_name, "-j", "ACCEPT"],
-                capture_output=True, timeout=10, check=False,
-            )
-        else:
-            logger.info("Removing forward rule from %s %s %s", family, table_name, chain_name)
-            try:
-                list_out = cmds.nft.output(
-                    ["-a", "list", "chain", family, table_name, chain_name],
-                    sudo=True,
-                ) or ""
-                pattern = re.compile(
-                    rf'iifname\s+"{re.escape(bridge_name)}"\s+accept\s+#\s+handle\s+(\d+)',
-                    re.IGNORECASE,
-                )
-                m = pattern.search(list_out)
-                if m:
-                    handle = m.group(1)
-                    cmds.nft.run(
-                        ["delete", "rule", family, table_name, chain_name, "handle", handle],
-                        sudo=True, check=False,
-                    )
-                    logger.info("Deleted forward rule handle %s from %s %s %s", handle, family, table_name, chain_name)
-                else:
-                    logger.debug("No matching forward rule found in %s %s %s", family, table_name, chain_name)
-            except Exception as exc:
-                logger.warning("Failed to remove forward rule from %s %s %s: %s", family, table_name, chain_name, exc)
 
 
 def _remove_port_forwards(root: Path) -> None:
