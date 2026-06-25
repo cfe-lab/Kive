@@ -39,8 +39,9 @@ class TestBuildVmProvision(unittest.TestCase):
             return ("failed", None)
 
         with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
-            with self.assertRaises(RuntimeError) as cm:
-                provision.maybe_provision_instance(cmds, instance, "container", provision=True)
+            with mock.patch.object(provision, "_collect_host_diagnostics", return_value=""):
+                with self.assertRaises(RuntimeError) as cm:
+                    provision.maybe_provision_instance(cmds, instance, "container", provision=True)
 
         self.assertIn("FAILED: ansible error", str(cm.exception))
 
@@ -197,8 +198,9 @@ class TestBuildVmProvision(unittest.TestCase):
         with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
             with mock.patch.object(provision.time, "monotonic", side_effect=fake_monotonic):
                 with mock.patch.object(provision.time, "sleep", return_value=None):
-                    with self.assertRaises(RuntimeError) as cm:
-                        provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=900)
+                    with mock.patch.object(provision, "_collect_host_diagnostics", return_value=""):
+                        with self.assertRaises(RuntimeError) as cm:
+                            provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=900)
 
         self.assertIn("Provisioning appears stuck", str(cm.exception))
 
@@ -298,8 +300,9 @@ class TestBuildVmProvision(unittest.TestCase):
         with mock.patch.object(provision, "_probe_markers_via_file_pull", side_effect=probe_side_effect):
             with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1]):
                 with mock.patch.object(provision.time, "sleep", return_value=None):
-                    with self.assertRaises(RuntimeError) as cm:
-                        provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
+                    with mock.patch.object(provision, "_collect_host_diagnostics", return_value=""):
+                        with self.assertRaises(RuntimeError) as cm:
+                            provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
 
         self.assertIn("FAILED: ansible error", str(cm.exception))
 
@@ -2108,6 +2111,237 @@ class TestVmNetwork(unittest.TestCase):
         ]
         self.assertEqual(len(ip_calls), 0,
                          "Should not delete any bridge when no registry-owned bridges exist")
+
+    def test_find_forward_chains_with_drop_policy_ignores_kive_devel(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _find_forward_chains_with_drop_policy
+        nft_json = [
+            {
+                "table": {
+                    "family": "inet",
+                    "name": "kive_devel",
+                    "chain": [{
+                        "family": "inet",
+                        "name": "forward",
+                        "table": "kive_devel",
+                        "type": "filter",
+                        "hook": "forward",
+                        "prio": 0,
+                        "policy": "drop",
+                    }],
+                },
+            },
+            {
+                "table": {
+                    "family": "inet",
+                    "name": "filter",
+                    "chain": [{
+                        "family": "inet",
+                        "name": "FORWARD",
+                        "table": "filter",
+                        "type": "filter",
+                        "hook": "forward",
+                        "prio": 0,
+                        "policy": "drop",
+                    }],
+                },
+            },
+        ]
+        result = _find_forward_chains_with_drop_policy(nft_json)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["table"], "filter")
+        self.assertEqual(result[0]["chain"], "FORWARD")
+
+    def test_find_forward_chains_with_drop_policy_empty_on_no_drop(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _find_forward_chains_with_drop_policy
+        nft_json = [
+            {
+                "table": {
+                    "family": "inet",
+                    "name": "filter",
+                    "chain": [{
+                        "family": "inet",
+                        "name": "FORWARD",
+                        "table": "filter",
+                        "type": "filter",
+                        "hook": "forward",
+                        "prio": 0,
+                        "policy": "accept",
+                    }],
+                },
+            },
+        ]
+        result = _find_forward_chains_with_drop_policy(nft_json)
+        self.assertEqual(result, [])
+
+    def test_get_nft_json_list_returns_parsed(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _get_nft_json_list
+        cmds = mock.Mock()
+        cmds.nft.run.return_value = MockRunResult(
+            returncode=0,
+            stdout=json.dumps({"nftables": [{"table": {"name": "test"}}]}),
+        )
+        result = _get_nft_json_list(cmds)
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0]["table"]["name"], "test")
+
+    def test_get_nft_json_list_returns_empty_on_failure(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _get_nft_json_list
+        cmds = mock.Mock()
+        cmds.nft.run.return_value = MockRunResult(returncode=1, stdout="error")
+        result = _get_nft_json_list(cmds)
+        self.assertEqual(result, [])
+
+    def test_ensure_existing_forward_accept_adds_nft_rule(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _ensure_existing_forward_accept
+        import tempfile
+        cmds = mock.Mock()
+        nft_rules_json = json.dumps({
+            "nftables": [{
+                "table": {
+                    "family": "inet",
+                    "name": "filter",
+                    "chain": [{
+                        "family": "inet",
+                        "name": "FORWARD",
+                        "table": "filter",
+                        "type": "filter",
+                        "hook": "forward",
+                        "prio": 0,
+                        "policy": "drop",
+                    }],
+                },
+            }],
+        })
+        cmds.nft.run.return_value = MockRunResult(returncode=0, stdout=nft_rules_json)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            bridge = "kive-devel-br"
+            _ensure_existing_forward_accept(cmds, root, bridge)
+
+            # Should have added rule to inet filter FORWARD
+            nft_add_calls = [
+                c for c in cmds.nft.run.call_args_list
+                if c[0][0][0] == "add" and c[0][0][1] == "rule" and c[0][0][2] == "inet"
+            ]
+            self.assertGreaterEqual(len(nft_add_calls), 1)
+            args = nft_add_calls[0][0][0]
+            self.assertIn("filter", args)
+            self.assertIn("FORWARD", args)
+            self.assertIn("accept", args)
+
+            # Should be registered in registry
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            self.assertTrue(reg.exists())
+            data = json.loads(reg.read_text())
+            rules = [e for e in data if e.get("kind") == "forward-rule"]
+            self.assertGreaterEqual(len(rules), 1)
+
+    def test_ensure_existing_forward_accept_skips_when_registered(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import _ensure_existing_forward_accept
+        import tempfile
+        cmds = mock.Mock()
+        # nft --json returns an empty ruleset so the drop-chain code is skipped
+        cmds.nft.run.return_value = MockRunResult(returncode=0, stdout=json.dumps({"nftables": []}))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # Pre-register the iptables FORWARD rule
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "forward-rule", "name": "iptables/FORWARD", "family": "", "table": "iptables", "chain": "FORWARD", "bridge": "kive-devel-br"},
+            ], indent=2) + "\n")
+
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._sp") as mock_sp:
+                _ensure_existing_forward_accept(cmds, root, "kive-devel-br")
+
+            # Should NOT call iptables -I since rule is already registered
+            iptables_insert_calls = [
+                c for c in mock_sp.run.call_args_list
+                if "iptables" in str(c) and "-I" in str(c)
+            ]
+            self.assertEqual(len(iptables_insert_calls), 0)
+
+    def test_remove_forward_rules_nft_handle(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+        cmds.nft.output.return_value = (
+            'chain FORWARD {\n'
+            '    type filter hook forward priority filter; policy drop;\n'
+            '    iifname "kive-devel-br" accept # handle 42\n'
+            '}'
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "forward-rule", "name": "inet/filter/FORWARD",
+                 "family": "inet", "table": "filter", "chain": "FORWARD",
+                 "bridge": "kive-devel-br"},
+            ], indent=2) + "\n")
+
+            purge_mod._remove_forward_rules(cmds, root)
+
+        delete_calls = [
+            c for c in cmds.nft.run.call_args_list
+            if "delete" in c[0][0] and "rule" in c[0][0]
+        ]
+        self.assertGreaterEqual(len(delete_calls), 1)
+        args = delete_calls[0][0][0]
+        self.assertIn("handle", args)
+        self.assertIn("42", args)
+
+    def test_remove_forward_rules_iptables(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm import purge as purge_mod
+        import tempfile
+        cmds = mock.Mock()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "forward-rule", "name": "iptables/FORWARD",
+                 "family": "", "table": "iptables", "chain": "FORWARD",
+                 "bridge": "kive-devel-br"},
+            ], indent=2) + "\n")
+
+            with mock.patch.object(purge_mod, "subprocess") as mock_sp:
+                purge_mod._remove_forward_rules(cmds, root)
+
+            iptables_delete_calls = [
+                c for c in mock_sp.run.call_args_list
+                if "iptables" in str(c) and "-D" in str(c)
+            ]
+            self.assertEqual(len(iptables_delete_calls), 1)
+
+    def test_host_diagnostics_included_in_failed_marker(self):
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        def run_side_effect(cmd, **kwargs):
+            if "provision.log" in " ".join(cmd):
+                return MockRunResult(returncode=0, stdout="cannot reach the internet by IP", stderr="")
+            return MockRunResult(returncode=1, stdout="", stderr="")
+
+        cmds.incus.run.side_effect = run_side_effect
+
+        def probe_side_effect(_cmds, _instance):
+            return ("failed", None)
+
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with mock.patch.object(provision, "_collect_host_diagnostics", return_value="HOST-DIAG-CONTENT"):
+                with self.assertRaises(RuntimeError) as cm:
+                    provision.maybe_provision_instance(cmds, instance, "container", provision=True)
+
+        exc_text = str(cm.exception)
+        self.assertIn("cannot reach the internet by IP", exc_text)
+        self.assertIn("=== host diagnostics ===", exc_text)
+        self.assertIn("HOST-DIAG-CONTENT", exc_text)
 
 
 class TestPortForward(unittest.TestCase):
