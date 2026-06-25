@@ -1837,7 +1837,8 @@ class TestPortForward(unittest.TestCase):
                     mock_proc.pid = 12345
                     mock_popen.return_value = mock_proc
 
-                    _ensure_web_port_forward(cfg, "10.247.172.80", root, cmds)
+                    with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._wait_for_listening_pid", return_value=12345):
+                        _ensure_web_port_forward(cfg, "10.247.172.80", root, cmds)
 
             mock_popen.assert_called_once()
             args = mock_popen.call_args[0][0]
@@ -1911,6 +1912,8 @@ class TestPortForward(unittest.TestCase):
             with (
                 mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.os.kill") as mock_kill,
                 mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.subprocess.Popen") as mock_popen,
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._wait_for_listening_pid", return_value=12345),
+                mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._port_in_use", return_value=False),
             ):
                 mock_proc = mock.Mock()
                 mock_proc.pid = 12345
