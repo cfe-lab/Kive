@@ -1840,66 +1840,6 @@ class TestVmNetwork(unittest.TestCase):
         result = get_existing_bridges(cmds)
         self.assertEqual(result, [])
 
-    def test_check_vm_network_target_usable_managed_with_ipv4_true(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
-            check_vm_network_target_usable, VmNicTarget,
-        )
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = "10.247.172.1/24"
-        result = check_vm_network_target_usable(cmds, VmNicTarget(name="mybr0", managed=True))
-        self.assertTrue(result)
-
-    def test_check_vm_network_target_usable_managed_no_ipv4_false(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
-            check_vm_network_target_usable, VmNicTarget,
-        )
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = "none"
-        result = check_vm_network_target_usable(cmds, VmNicTarget(name="mybr0", managed=True))
-        self.assertFalse(result)
-
-    def test_check_vm_network_target_usable_unmanaged_bridge_with_ipv4_true(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
-            check_vm_network_target_usable, VmNicTarget,
-        )
-        cmds = mock.Mock()
-        with mock.patch(
-            "Kive.utils.kivedevel.kivedevel.build_vm.network._bridge_has_ipv4",
-            return_value=True,
-        ):
-            result = check_vm_network_target_usable(cmds, VmNicTarget(name="incusbr0", managed=False))
-        self.assertTrue(result)
-
-    def test_check_vm_network_target_usable_unmanaged_bridge_no_ipv4_false(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
-            check_vm_network_target_usable, VmNicTarget,
-        )
-        cmds = mock.Mock()
-        with mock.patch(
-            "Kive.utils.kivedevel.kivedevel.build_vm.network._bridge_has_ipv4",
-            return_value=False,
-        ):
-            result = check_vm_network_target_usable(cmds, VmNicTarget(name="incusbr0", managed=False))
-        self.assertFalse(result)
-
-    def test_bridge_has_ipv4_returns_true_on_global_inet(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import _bridge_has_ipv4
-        with mock.patch("subprocess.run") as mock_run:
-            mock_run.return_value = mock.Mock(
-                returncode=0,
-                stdout="2: incusbr0: ...\n    inet 10.247.172.1/24 scope global incusbr0\n",
-            )
-            self.assertTrue(_bridge_has_ipv4("incusbr0"))
-
-    def test_bridge_has_ipv4_returns_false_on_no_inet(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import _bridge_has_ipv4
-        with mock.patch("subprocess.run") as mock_run:
-            mock_run.return_value = mock.Mock(
-                returncode=0,
-                stdout="2: incusbr0: ...\n    inet6 fe80::.../64 scope link\n",
-            )
-            self.assertFalse(_bridge_has_ipv4("incusbr0"))
-
     def test_ensure_vm_nic_managed_adds_with_network(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
@@ -2081,8 +2021,6 @@ class TestPortForward(unittest.TestCase):
         with (
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
                        return_value=nic_target),
-            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.check_vm_network_target_usable",
-                       return_value=True),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
                        return_value=(True, "vm")),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
@@ -2116,8 +2054,6 @@ class TestPortForward(unittest.TestCase):
         with (
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
                        return_value=nic_target) as mock_choose,
-            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.check_vm_network_target_usable",
-                       return_value=True),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
                        return_value=(True, "vm")),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
