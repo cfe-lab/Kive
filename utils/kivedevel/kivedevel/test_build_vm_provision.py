@@ -1758,7 +1758,7 @@ class TestVmNetwork(unittest.TestCase):
         self.assertNotIn('"network", "create"', text)
         self.assertNotIn("incus network create", text)
 
-    def test_choose_existing_vm_network_prefers_incusbr0(self):
+    def test_choose_existing_vm_network_prefers_incusbr0_managed(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
         cmds.incus.output.return_value = json.dumps([
@@ -1766,25 +1766,38 @@ class TestVmNetwork(unittest.TestCase):
             {"name": "kive-test-net", "type": "bridge", "managed": True},
         ])
         result = choose_existing_vm_network(cmds)
-        self.assertEqual(result, "incusbr0")
+        self.assertEqual(result.name, "incusbr0")
+        self.assertTrue(result.managed)
 
-    def test_choose_existing_vm_network_falls_back_to_single(self):
+    def test_choose_existing_vm_network_falls_back_to_single_managed(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
         cmds.incus.output.return_value = json.dumps([
             {"name": "kive-test-net", "type": "bridge", "managed": True},
         ])
         result = choose_existing_vm_network(cmds)
-        self.assertEqual(result, "kive-test-net")
+        self.assertEqual(result.name, "kive-test-net")
+        self.assertTrue(result.managed)
 
-    def test_choose_existing_vm_network_returns_requested(self):
+    def test_choose_existing_vm_network_returns_requested_managed(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
         cmds.incus.output.return_value = json.dumps([
             {"name": "mybr0", "type": "bridge", "managed": True},
         ])
         result = choose_existing_vm_network(cmds, "mybr0")
-        self.assertEqual(result, "mybr0")
+        self.assertEqual(result.name, "mybr0")
+        self.assertTrue(result.managed)
+
+    def test_choose_existing_vm_network_returns_requested_unmanaged(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "mybr0", "type": "bridge", "managed": False},
+        ])
+        result = choose_existing_vm_network(cmds, "mybr0")
+        self.assertEqual(result.name, "mybr0")
+        self.assertFalse(result.managed)
 
     def test_choose_existing_vm_network_fails_on_missing_requested(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
@@ -1810,28 +1823,28 @@ class TestVmNetwork(unittest.TestCase):
         with self.assertRaises(SystemExit):
             choose_existing_vm_network(cmds)
 
-    def test_get_managed_networks_returns_parsed(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_managed_networks
+    def test_get_existing_bridges_returns_parsed(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_existing_bridges
         cmds = mock.Mock()
         cmds.incus.output.return_value = json.dumps([
             {"name": "incusbr0", "type": "bridge", "managed": True},
         ])
-        result = get_managed_networks(cmds)
+        result = get_existing_bridges(cmds)
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0]["name"], "incusbr0")
 
-    def test_get_managed_networks_returns_empty_on_no_output(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_managed_networks
+    def test_get_existing_bridges_returns_empty_on_no_output(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import get_existing_bridges
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
-        result = get_managed_networks(cmds)
+        result = get_existing_bridges(cmds)
         self.assertEqual(result, [])
 
-    def test_ensure_vm_nic_adds_with_network(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+    def test_ensure_vm_nic_managed_adds_with_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = "other-device:\n  type: nic\n"
-        ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=True))
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -1842,22 +1855,45 @@ class TestVmNetwork(unittest.TestCase):
         args = add_calls[0][0][0]
         self.assertIn("network=incusbr0", str(args))
 
-    def test_ensure_vm_nic_noop_when_already_configured(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+    def test_ensure_vm_nic_unmanaged_adds_with_parent(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = "other-device:\n  type: nic\n"
+        ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=False))
+
+        add_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if c[0][0][:4] == ["config", "device", "add", "test-vm"]
+               and "eth0" in c[0][0]
+        ]
+        self.assertEqual(len(add_calls), 1)
+        args = add_calls[0][0][0]
+        self.assertIn("nictype=bridged", str(args))
+        self.assertIn("parent=incusbr0", str(args))
+
+    def test_ensure_vm_nic_managed_noop_when_matching_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = "eth0:\n  network: incusbr0\n  type: nic\n"
-        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        result = ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=True))
+        self.assertFalse(result)
+
+    def test_ensure_vm_nic_unmanaged_noop_when_matching_parent(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = "eth0:\n  nictype: bridged\n  parent: incusbr0\n  type: nic\n"
+        result = ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=False))
         self.assertFalse(result)
 
     def test_ensure_vm_nic_fails_on_conflicting_network(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = "eth0:\n  network: mybr0\n  type: nic\n"
         with self.assertRaises(SystemExit):
-            ensure_vm_nic(cmds, "test-vm", "incusbr0")
+            ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=True))
 
     def test_ensure_vm_nic_replaces_stale_kive_devel_br(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = (
             "eth0:\n"
@@ -1865,23 +1901,24 @@ class TestVmNetwork(unittest.TestCase):
             "  parent: kive-devel-br\n"
             "  type: nic\n"
         )
-        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        target = VmNicTarget(name="incusbr0", managed=False)
+        result = ensure_vm_nic(cmds, "test-vm", target)
         self.assertTrue(result)
         remove_calls = [c for c in cmds.incus.run.call_args_list if "remove" in str(c)]
         add_calls = [c for c in cmds.incus.run.call_args_list if "add" in str(c)]
         self.assertGreaterEqual(len(remove_calls), 1)
         self.assertGreaterEqual(len(add_calls), 1)
         add_args = add_calls[0][0][0]
-        self.assertIn("network=incusbr0", str(add_args))
+        self.assertIn("parent=incusbr0", str(add_args))
 
     def test_ensure_vm_nic_noop_when_profile_provides_network(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.side_effect = [
             "",
             "eth0:\n  network: incusbr0\n  type: nic\n",
         ]
-        result = ensure_vm_nic(cmds, "test-vm", "incusbr0")
+        result = ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="incusbr0", managed=True))
         self.assertFalse(result)
 
     def test_no_bridge_nft_or_iptables_in_network_code(self):
@@ -1979,9 +2016,11 @@ class TestPortForward(unittest.TestCase):
             host_interface="", provision=False,
             web_port=8000, no_web_proxy=False,
         )
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import VmNicTarget
+        nic_target = VmNicTarget(name="incusbr0", managed=True)
         with (
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
-                       return_value="incusbr0"),
+                       return_value=nic_target),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
                        return_value=(True, "vm")),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
@@ -1999,6 +2038,7 @@ class TestPortForward(unittest.TestCase):
     def test_vm_mode_calls_choose_existing_network(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_vm
         from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
         cfg = BuildVmConfig(
@@ -2010,9 +2050,10 @@ class TestPortForward(unittest.TestCase):
             host_interface="", provision=False,
             web_port=8000, no_web_proxy=False,
         )
+        nic_target = VmNicTarget(name="incusbr0", managed=True)
         with (
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.choose_existing_vm_network",
-                       return_value="incusbr0") as mock_choose,
+                       return_value=nic_target) as mock_choose,
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
                        return_value=(True, "vm")),
             mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
