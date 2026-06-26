@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import re
@@ -12,8 +13,25 @@ from ..kv_commands import Cmds
 logger = logging.getLogger("kivedevel")
 
 
-def get_managed_networks(cmds: Cmds) -> list[dict]:
-    """Return existing Incus managed bridge networks (JSON list from ``incus network list``)."""
+@dataclasses.dataclass(frozen=True)
+class VmNicTarget:
+    """Describes how to attach a VM NIC to an existing bridge.
+
+    ``managed=True`` means the bridge is an Incus-managed network and should
+    be attached via ``network=NAME``.
+
+    ``managed=False`` means the bridge is an unmanaged host bridge and should
+    be attached via ``nictype=bridged parent=NAME``.
+    """
+    name: str
+    managed: bool
+
+
+def get_existing_bridges(cmds: Cmds) -> list[dict]:
+    """Return existing Incus-visible bridge networks (JSON list from ``incus network list``).
+
+    Each entry has at least ``name``, ``type``, and ``managed`` fields.
+    """
     out = cmds.incus.output(["network", "list", "--format", "json"])
     if not out:
         return []
@@ -24,53 +42,76 @@ def get_managed_networks(cmds: Cmds) -> list[dict]:
         return []
 
 
-def _network_names(networks: list[dict]) -> list[str]:
-    return [n.get("name", "") for n in networks if n.get("type") == "bridge"]
+def _preferred_bridge_name(bridges: list[dict]) -> str | None:
+    """Return the name of the preferred bridge, or ``None``.
 
-
-def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> str:
-    """Choose an existing Incus managed network for VM NIC attachment.
-
-    If *requested* is given and exists return it.
-    Otherwise prefer ``incusbr0``, or the only existing managed bridge.
-    Fail clearly if no usable network is found.
+    Prefers ``incusbr0`` (whether managed or unmanaged).  Falls back to the
+    single existing bridge.  Returns ``None`` if ambiguous or absent.
     """
-    networks = get_managed_networks(cmds)
-    names = _network_names(networks)
+    names = [b.get("name", "") for b in bridges if b.get("type") == "bridge"]
+    if not names:
+        return None
+    if "incusbr0" in names:
+        return "incusbr0"
+    if len(names) == 1:
+        return names[0]
+    return None
+
+
+def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNicTarget:
+    """Choose an existing bridge for VM NIC attachment.
+
+    Returns a ``VmNicTarget`` that encodes whether the bridge is an
+    Incus-managed network (``managed=True``) or an unmanaged host bridge
+    (``managed=False``).
+
+    The caller uses ``target.managed`` to decide between:
+
+    * ``network=NAME`` (managed)
+    * ``nictype=bridged parent=NAME`` (unmanaged)
+    """
+    bridges = get_existing_bridges(cmds)
+    bridge_map: dict[str, dict] = {}
+    for b in bridges:
+        name = b.get("name", "")
+        if b.get("type") == "bridge" and name:
+            bridge_map[name] = b
 
     if requested:
-        if requested in names:
-            return requested
-        available = ", ".join(names) if names else "(none)"
+        info = bridge_map.get(requested)
+        if info is not None:
+            managed = bool(info.get("managed", False))
+            return VmNicTarget(name=requested, managed=managed)
+        available = ", ".join(bridge_map) if bridge_map else "(none)"
         logger.error(
-            "Requested VM network '%s' does not exist or is not a managed bridge.\n"
-            "Available managed bridges: %s\n"
+            "Requested VM network '%s' does not exist or is not a bridge.\n"
+            "Available bridges: %s\n"
             "This command does not create or repair host networking.",
             requested, available,
         )
         sys.exit(1)
 
-    if "incusbr0" in names:
-        return "incusbr0"
+    preferred = _preferred_bridge_name(bridges)
+    if preferred is not None:
+        info = bridge_map[preferred]
+        managed = bool(info.get("managed", False))
+        return VmNicTarget(name=preferred, managed=managed)
 
-    if len(names) == 1:
-        return names[0]
-
-    if len(names) > 1:
+    if len(bridge_map) > 1:
         logger.error(
-            "Multiple existing Incus managed bridges found (%s).\n\n"
-            "Local VM smoke install requires an existing Incus network with outbound "
+            "Multiple existing bridges found (%s).\n\n"
+            "Local VM smoke install requires an existing bridge with outbound "
             "internet access.\n"
             "Configure Incus networking outside Kive, or rerun with:\n\n"
             "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
             "This command does not create or repair host networking.",
-            ", ".join(names),
+            ", ".join(bridge_map),
         )
         sys.exit(1)
 
     logger.error(
-        "No usable existing Incus managed network found.\n\n"
-        "Local VM smoke install requires an existing Incus network with outbound "
+        "No usable existing bridge found.\n\n"
+        "Local VM smoke install requires an existing bridge with outbound "
         "internet access.\n"
         "Configure Incus networking outside Kive, or rerun with:\n\n"
         "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
@@ -101,93 +142,96 @@ def _parse_device_block(text: str, device: str) -> dict[str, str]:
 
 
 def _eth0_config(cmds: Cmds, instance: str) -> dict[str, str]:
-    """Return eth0 device configuration from the instance's own devices.
-
-    Returns empty dict if eth0 is not configured directly on the instance.
-    """
+    """Return eth0 device configuration from the instance's own devices."""
     out = cmds.incus.output(["config", "device", "show", instance])
     return _parse_device_block(out, "eth0")
 
 
 def _eth0_config_expanded(cmds: Cmds, instance: str) -> dict[str, str]:
-    """Return eth0 device configuration from the expanded (profile-merged) view.
-
-    Returns empty dict if eth0 is not present even through profiles.
-    """
+    """Return eth0 device configuration from the expanded (profile-merged) view."""
     out = cmds.incus.output(["config", "show", "--expanded", instance])
     return _parse_device_block(out, "eth0")
 
 
-def ensure_vm_nic(cmds: Cmds, instance: str, network_name: str) -> bool:
-    """Ensure the VM instance has an eth0 NIC attached to *network_name*.
+def _nic_args(target: VmNicTarget) -> list[str]:
+    """Return the ``incus config device add`` arguments for the given target."""
+    if target.managed:
+        return ["nic", f"network={target.name}"]
+    return ["nic", "nictype=bridged", f"parent={target.name}"]
+
+
+def ensure_vm_nic(cmds: Cmds, instance: str, target: VmNicTarget) -> bool:
+    """Ensure the VM instance has an eth0 NIC matching *target*.
 
     Returns True if a change was made (instance restart required).
-    Cases handled:
 
-    1. No eth0 device at all — add via ``incus config device add ... network=NAME``.
-    2. eth0 exists through an expanded profile and provides usable networking — no-op.
-    3. eth0 already has ``network=NETWORK_NAME`` — no-op.
-    4. eth0 has a stale ``parent=kive-devel-br`` (old Kive-owned bridge) — replace.
-    5. eth0 has an unrelated user-controlled parent/network — fail clearly.
+    * No eth0 → add using the target's mode.
+    * Profile-provided eth0 with matching network/parent → no-op.
+    * Existing eth0 with ``network=NAME`` and target is managed same NAME → no-op.
+    * Existing eth0 with ``parent=NAME`` and target is unmanaged same NAME → no-op.
+    * Existing stale ``parent=kive-devel-br`` → replace (for stopped instances).
+    * Existing unrelated network/parent → fail clearly.
     """
     device = _eth0_config(cmds, instance)
 
     if not device:
-        # eth0 not on the instance directly; check expanded (profile) view
         expanded = _eth0_config_expanded(cmds, instance)
         if expanded:
-            expanded_network = expanded.get("network", "")
-            expanded_parent = expanded.get("parent", "")
-            if expanded_network or expanded_parent:
+            en = expanded.get("network", "")
+            ep = expanded.get("parent", "")
+            if en or ep:
                 logger.info(
                     "eth0 provided by profile (network=%s, parent=%s); no instance-level change needed.",
-                    expanded_network, expanded_parent,
+                    en, ep,
                 )
                 return False
-        logger.info("Adding NIC eth0 to %s (network=%s)...", instance, network_name)
-        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+        logger.info("Adding NIC eth0 to %s (%s)...", instance, " ".join(_nic_args(target)))
+        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", *_nic_args(target)[1:]])
         return True
 
     existing_network = device.get("network", "")
     existing_parent = device.get("parent", "")
     existing_nictype = device.get("nictype", "")
 
-    if existing_network == network_name:
-        logger.debug("eth0 already has network=%s on %s.", network_name, instance)
-        return False
+    if target.managed:
+        if existing_network == target.name:
+            logger.debug("eth0 already has network=%s on %s.", target.name, instance)
+            return False
+        if existing_network and existing_network != target.name:
+            logger.error(
+                "eth0 on %s is already configured with network=%s (requested %s).\n"
+                "Use --vm-network %s to match the existing network, or purge and retry.",
+                instance, existing_network, target.name, existing_network,
+            )
+            sys.exit(1)
+    else:
+        if existing_parent == target.name:
+            logger.debug("eth0 already has parent=%s on %s.", target.name, instance)
+            return False
+        if existing_parent and existing_parent != target.name and existing_parent != "kive-devel-br":
+            logger.error(
+                "eth0 on %s is already configured with parent=%s (requested %s).\n"
+                "Use --vm-network %s to match, or purge and retry.",
+                instance, existing_parent, target.name, existing_parent,
+            )
+            sys.exit(1)
 
-    if existing_network and existing_network != network_name:
-        logger.error(
-            "eth0 on %s is already configured with network=%s (requested %s).\n"
-            "Use --vm-network %s to match the existing network, or purge and retry.",
-            instance, existing_network, network_name, existing_network,
-        )
-        sys.exit(1)
-
-    if existing_parent:
-        if existing_parent == "kive-devel-br":
-            logger.info("Replacing old Kive NIC on %s (parent=%s) with network=%s...",
-                        instance, existing_parent, network_name)
-            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
-            return True
-
-        logger.error(
-            "eth0 on %s has an unexpected parent=%s (nictype=%s).\n"
-            "Remove or reconfigure it manually, then retry.",
-            instance, existing_parent, existing_nictype,
-        )
-        sys.exit(1)
-
-    if existing_nictype:
-        logger.info("Replacing unknown eth0 config on %s (nictype=%s) with network=%s...",
-                    instance, existing_nictype, network_name)
+    if existing_parent == "kive-devel-br":
+        logger.info("Replacing old Kive NIC on %s (parent=%s) with %s...",
+                    instance, existing_parent, " ".join(_nic_args(target)))
         cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", *_nic_args(target)[1:]])
         return True
 
-    logger.info("Adding NIC eth0 to %s (network=%s)...", instance, network_name)
-    cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={network_name}"])
+    if existing_nictype and not existing_parent and not existing_network:
+        logger.info("Replacing unknown eth0 config on %s (nictype=%s) with %s...",
+                    instance, existing_nictype, " ".join(_nic_args(target)))
+        cmds.incus.run(["config", "device", "remove", instance, "eth0"])
+        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", *_nic_args(target)[1:]])
+        return True
+
+    logger.info("Adding NIC eth0 to %s (%s)...", instance, " ".join(_nic_args(target)))
+    cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", *_nic_args(target)[1:]])
     return True
 
 

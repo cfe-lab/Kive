@@ -13,6 +13,7 @@ from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_st
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import (
+    VmNicTarget,
     choose_existing_vm_network,
     ensure_network_device,
     ensure_vm_nic,
@@ -176,8 +177,9 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
-    network_name = choose_existing_vm_network(cmds, cfg.vm_network or None)
-    logger.info("Using existing Incus network %s for %s.", network_name, cfg.instance)
+    nic_target = choose_existing_vm_network(cmds, cfg.vm_network or None)
+    mode = "managed" if nic_target.managed else "host bridge"
+    logger.info("Using existing %s %s for %s.", mode, nic_target.name, cfg.instance)
 
     created_new_instance, actual_instance_type = ensure_instance(
         cmds,
@@ -189,7 +191,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     )
 
     restart_required = False
-    added_nic = ensure_vm_nic(cmds, cfg.instance, network_name)
+    added_nic = ensure_vm_nic(cmds, cfg.instance, nic_target)
     if added_nic:
         restart_required = True
 
