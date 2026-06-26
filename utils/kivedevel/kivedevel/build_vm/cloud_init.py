@@ -67,26 +67,22 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       ip route || true
       cat /etc/resolv.conf || true
 
-      IFACE="$(ip -4 route show default | awk '{print $5; exit}')"
-
-      if [ -z "$IFACE" ]; then
-        echo "No IPv4 default route found." >&2
-        echo "The instance did not receive usable DHCP/gateway configuration." >&2
-        ip addr >&2 || true
-        ip route >&2 || true
+      IFACE=enp5s0
+      if ! ip -4 addr show dev "$IFACE" 2>/dev/null | grep -q ' inet '; then
+        echo "VM network interface $IFACE is up, but no IPv4 DHCP lease was received." >&2
+        echo "The host bridge or Incus network likely does not provide DHCP." >&2
         exit 1
       fi
 
-      if ! ip -4 addr show dev "$IFACE" 2>/dev/null | grep -q ' inet '; then
-        echo "Default-route interface $IFACE has no IPv4 address." >&2
-        ip addr >&2 || true
-        ip route >&2 || true
+      if ! ip route | grep -q '^default '; then
+        echo "VM has an IPv4 address but no default route." >&2
+        echo "The host bridge likely has no upstream NAT or gateway." >&2
         exit 1
       fi
 
       if ! timeout --foreground 15s python3 -c 'import socket; socket.create_connection(("1.1.1.1", 53), timeout=10).close()'; then
-        echo "Instance has IPv4/default route but cannot reach the internet by IP." >&2
-        echo "Likely causes: missing NAT, forwarding disabled, or egress firewall." >&2
+        echo "VM has IPv4 and default route but cannot reach the internet by IP." >&2
+        echo "Likely causes: host IPv4 forwarding disabled, missing NAT, or egress firewall." >&2
         exit 1
       fi
       echo "--- raw IP connectivity OK ---"
@@ -94,14 +90,14 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       getent hosts archive.ubuntu.com || true
       getent ahostsv4 archive.ubuntu.com || true
       if ! timeout --foreground 15s python3 -c 'import socket; socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)'; then
-        echo "Instance has IP connectivity but DNS resolution is broken." >&2
-        cat /etc/resolv.conf >&2 || true
+        echo "VM has IP connectivity but DNS resolution is broken." >&2
+        cat /etc/resolv.conf >&2
         exit 1
       fi
       echo "--- DNS resolution OK ---"
 
-      if ! timeout --foreground 30s python3 -c 'import socket; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; socket.create_connection(addr, timeout=10).close()'; then
-        echo "Instance resolved archive.ubuntu.com but cannot connect to archive.ubuntu.com:80." >&2
+      if ! timeout --foreground 30s python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
+        echo "Network check failed or timed out: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)" >&2
         exit 1
       fi
       echo "--- TCP egress OK ---"

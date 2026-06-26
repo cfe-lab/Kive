@@ -42,24 +42,33 @@ def get_existing_bridges(cmds: Cmds) -> list[dict]:
         return []
 
 
-def _managed_bridge_names(bridges: list[dict]) -> list[str]:
-    """Return names of Incus-managed bridges (``managed == True``)."""
-    return [
-        b.get("name", "") for b in bridges
-        if b.get("type") == "bridge" and b.get("managed") is True
-    ]
+def _preferred_bridge_name(bridges: list[dict]) -> str | None:
+    """Return the name of the preferred bridge, or ``None``.
+
+    Prefers ``incusbr0`` (whether managed or unmanaged).  Falls back to the
+    single existing bridge.  Returns ``None`` if ambiguous or absent.
+    """
+    names = [b.get("name", "") for b in bridges if b.get("type") == "bridge"]
+    if not names:
+        return None
+    if "incusbr0" in names:
+        return "incusbr0"
+    if len(names) == 1:
+        return names[0]
+    return None
 
 
 def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNicTarget:
     """Choose an existing bridge for VM NIC attachment.
 
-    Auto-detection only considers **managed** Incus networks (where Incus
-    provides DHCP + NAT).  Unmanaged host bridges are never auto-selected
-    because they may lack DHCP/NAT/outbound internet.
+    Returns a ``VmNicTarget`` that encodes whether the bridge is an
+    Incus-managed network (``managed=True``) or an unmanaged host bridge
+    (``managed=False``).
 
-    If a bridge is explicitly requested via ``--vm-network NAME`` the
-    request is accepted regardless of the managed flag, but a warning is
-    logged for unmanaged bridges.
+    The caller uses ``target.managed`` to decide between:
+
+    * ``network=NAME`` (managed)
+    * ``nictype=bridged parent=NAME`` (unmanaged)
     """
     bridges = get_existing_bridges(cmds)
     bridge_map: dict[str, dict] = {}
@@ -72,14 +81,6 @@ def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNi
         info = bridge_map.get(requested)
         if info is not None:
             managed = bool(info.get("managed", False))
-            if not managed:
-                logger.warning(
-                    "Bridge %s is not an Incus-managed network. "
-                    "Kive cannot guarantee DHCP, NAT, or outbound internet on "
-                    "unmanaged host bridges. The guest preflight will verify "
-                    "connectivity before provisioning.",
-                    requested,
-                )
             return VmNicTarget(name=requested, managed=managed)
         available = ", ".join(bridge_map) if bridge_map else "(none)"
         logger.error(
@@ -90,33 +91,18 @@ def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNi
         )
         sys.exit(1)
 
-    managed_names = _managed_bridge_names(bridges)
+    preferred = _preferred_bridge_name(bridges)
+    if preferred is not None:
+        info = bridge_map[preferred]
+        managed = bool(info.get("managed", False))
+        return VmNicTarget(name=preferred, managed=managed)
 
-    if "incusbr0" in managed_names:
-        return VmNicTarget(name="incusbr0", managed=True)
-
-    if len(managed_names) == 1:
-        return VmNicTarget(name=managed_names[0], managed=True)
-
-    if len(managed_names) > 1:
+    if len(bridge_map) > 1:
         logger.error(
-            "Multiple Incus-managed networks found (%s).\n\n"
-            "Local VM smoke install requires an existing Incus-managed network "
-            "with outbound internet access.\n"
+            "Multiple existing bridges found (%s).\n\n"
+            "Local VM smoke install requires an existing bridge with outbound "
+            "internet access.\n"
             "Configure Incus networking outside Kive, or rerun with:\n\n"
-            "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
-            "This command does not create or repair host networking.",
-            ", ".join(managed_names),
-        )
-        sys.exit(1)
-
-    if bridge_map:
-        logger.error(
-            "No Incus-managed network found. Only unmanaged host bridges are "
-            "available (%s).\n\n"
-            "Local VM smoke install requires an Incus-managed network with "
-            "outbound internet access.\n"
-            "If you have a host bridge that provides DHCP/NAT, rerun with:\n\n"
             "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
             "This command does not create or repair host networking.",
             ", ".join(bridge_map),
@@ -125,8 +111,8 @@ def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNi
 
     logger.error(
         "No usable existing bridge found.\n\n"
-        "Local VM smoke install requires an existing Incus-managed network with "
-        "outbound internet access.\n"
+        "Local VM smoke install requires an existing bridge with outbound "
+        "internet access.\n"
         "Configure Incus networking outside Kive, or rerun with:\n\n"
         "  utils/dev smoke-local-install --vm-network NAME --debug\n\n"
         "This command does not create or repair host networking.",
@@ -155,14 +141,15 @@ def _bridge_has_ipv4(bridge_name: str) -> bool:
 
 
 def check_vm_network_target_usable(cmds: Cmds, target: VmNicTarget) -> bool:
-    """Verify the selected NIC target is likely to provide IPv4 connectivity.
+    """Verify that the selected NIC target can provide IPv4 connectivity.
 
-    For **managed** Incus networks: checks that ``ipv4.address`` is
-    configured (Incus provides DHCP + NAT automatically).
+    For managed Incus networks: checks that ``ipv4.address`` is configured
+    on the network (Incus provides DHCP + NAT automatically).
 
-    For **unmanaged** host bridges: host-side checks are unreliable — the
-    guest preflight is authoritative.  Returns ``True`` with a warning so
-    the guest can validate at runtime.
+    For unmanaged host bridges: checks that the bridge has a global-scope
+    IPv4 address (indicating it is connected to a network with DHCP/NAT).
+
+    Returns ``True`` if usable, ``False`` otherwise.
     """
     if target.managed:
         ipv4 = cmds.incus.output(["network", "get", target.name, "ipv4.address"])
@@ -174,12 +161,15 @@ def check_vm_network_target_usable(cmds: Cmds, target: VmNicTarget) -> bool:
         )
         return False
 
-    logger.info(
-        "Unmanaged host bridge %s — Kive cannot verify DHCP/NAT from the host. "
-        "The guest network preflight will validate connectivity.",
+    if _bridge_has_ipv4(target.name):
+        return True
+
+    logger.warning(
+        "Bridge %s is not an Incus-managed network and has no global IPv4 address.\n"
+        "Attaching a VM to it will not provide DHCP, NAT, or outbound internet.",
         target.name,
     )
-    return True
+    return False
 
 
 def _parse_device_block(text: str, device: str) -> dict[str, str]:
