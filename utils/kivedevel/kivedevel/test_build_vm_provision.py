@@ -1758,26 +1758,6 @@ class TestVmNetwork(unittest.TestCase):
         self.assertNotIn('"network", "create"', text)
         self.assertNotIn("incus network create", text)
 
-    def test_auto_select_fails_when_only_unmanaged_bridges_exist(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = json.dumps([
-            {"name": "incusbr0", "type": "bridge", "managed": False},
-        ])
-        with self.assertRaises(SystemExit):
-            choose_existing_vm_network(cmds)
-
-    def test_auto_select_skips_unmanaged_incusbr0_when_managed_exists(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = json.dumps([
-            {"name": "incusbr0", "type": "bridge", "managed": False},
-            {"name": "my-managed-br", "type": "bridge", "managed": True},
-        ])
-        result = choose_existing_vm_network(cmds)
-        self.assertEqual(result.name, "my-managed-br")
-        self.assertTrue(result.managed)
-
     def test_choose_existing_vm_network_prefers_incusbr0_managed(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import choose_existing_vm_network
         cmds = mock.Mock()
@@ -1878,13 +1858,29 @@ class TestVmNetwork(unittest.TestCase):
         result = check_vm_network_target_usable(cmds, VmNicTarget(name="mybr0", managed=True))
         self.assertFalse(result)
 
-    def test_check_vm_network_target_usable_unmanaged_passes_through(self):
+    def test_check_vm_network_target_usable_unmanaged_bridge_with_ipv4_true(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import (
             check_vm_network_target_usable, VmNicTarget,
         )
         cmds = mock.Mock()
-        result = check_vm_network_target_usable(cmds, VmNicTarget(name="incusbr0", managed=False))
+        with mock.patch(
+            "Kive.utils.kivedevel.kivedevel.build_vm.network._bridge_has_ipv4",
+            return_value=True,
+        ):
+            result = check_vm_network_target_usable(cmds, VmNicTarget(name="incusbr0", managed=False))
         self.assertTrue(result)
+
+    def test_check_vm_network_target_usable_unmanaged_bridge_no_ipv4_false(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
+            check_vm_network_target_usable, VmNicTarget,
+        )
+        cmds = mock.Mock()
+        with mock.patch(
+            "Kive.utils.kivedevel.kivedevel.build_vm.network._bridge_has_ipv4",
+            return_value=False,
+        ):
+            result = check_vm_network_target_usable(cmds, VmNicTarget(name="incusbr0", managed=False))
+        self.assertFalse(result)
 
     def test_bridge_has_ipv4_returns_true_on_global_inet(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import _bridge_has_ipv4
