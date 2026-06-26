@@ -6,7 +6,7 @@
     repo: ppa:deadsnakes/ppa
   register: deadsnakes_ppa
   until: deadsnakes_ppa is succeeded
-  retries: 20
+  retries: 5
   delay: 30
 
 - name: install the version of Python required by kive
