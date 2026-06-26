@@ -14,6 +14,7 @@ from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import (
     VmNicTarget,
+    check_vm_network_target_usable,
     choose_existing_vm_network,
     ensure_network_device,
     ensure_vm_nic,
@@ -178,6 +179,18 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
     nic_target = choose_existing_vm_network(cmds, cfg.vm_network or None)
+    if not check_vm_network_target_usable(cmds, nic_target):
+        mode = "Incus-managed" if nic_target.managed else "host bridge"
+        logger.error(
+            "Bridge %s exists, but it is not usable as a VM network.\n\n"
+            "%s %s does not provide DHCP, NAT, or outbound internet for VMs.\n\n"
+            "Local VM smoke install requires an existing bridge with DHCP/NAT/outbound internet.\n"
+            "This command does not create or repair host networking.\n\n"
+            "Configure Incus networking outside Kive, or rerun with --vm-network NAME "
+            "for a bridge that provides DHCP/NAT.",
+            nic_target.name, mode, nic_target.name,
+        )
+        sys.exit(1)
     mode = "managed" if nic_target.managed else "host bridge"
     logger.info("Using existing %s %s for %s.", mode, nic_target.name, cfg.instance)
 

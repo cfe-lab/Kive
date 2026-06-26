@@ -120,6 +120,58 @@ def choose_existing_vm_network(cmds: Cmds, requested: str | None = None) -> VmNi
     sys.exit(1)
 
 
+def _bridge_has_ipv4(bridge_name: str) -> bool:
+    """Check whether a host bridge has an IPv4 address.
+
+    Uses ``ip -4 addr show dev <name>``.  Returns ``True`` if at least one
+    ``inet`` address (not link-local) is present.
+    """
+    import subprocess as _sp
+    try:
+        r = _sp.run(["ip", "-4", "addr", "show", "dev", bridge_name],
+                    capture_output=True, text=True, timeout=10, check=False)
+        if r.returncode != 0:
+            return False
+        for line in r.stdout.splitlines():
+            if "inet " in line and "scope global" in line:
+                return True
+        return False
+    except Exception:
+        return False
+
+
+def check_vm_network_target_usable(cmds: Cmds, target: VmNicTarget) -> bool:
+    """Verify that the selected NIC target can provide IPv4 connectivity.
+
+    For managed Incus networks: checks that ``ipv4.address`` is configured
+    on the network (Incus provides DHCP + NAT automatically).
+
+    For unmanaged host bridges: checks that the bridge has a global-scope
+    IPv4 address (indicating it is connected to a network with DHCP/NAT).
+
+    Returns ``True`` if usable, ``False`` otherwise.
+    """
+    if target.managed:
+        ipv4 = cmds.incus.output(["network", "get", target.name, "ipv4.address"])
+        if ipv4 and ipv4 != "none":
+            return True
+        logger.warning(
+            "Managed network %s has no IPv4 address configured (ipv4.address=%s).",
+            target.name, ipv4 or "(empty)",
+        )
+        return False
+
+    if _bridge_has_ipv4(target.name):
+        return True
+
+    logger.warning(
+        "Bridge %s is not an Incus-managed network and has no global IPv4 address.\n"
+        "Attaching a VM to it will not provide DHCP, NAT, or outbound internet.",
+        target.name,
+    )
+    return False
+
+
 def _parse_device_block(text: str, device: str) -> dict[str, str]:
     """Parse a YAML-like device config block from ``incus config device show`` output.
 
