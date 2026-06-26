@@ -11,6 +11,7 @@ logger = logging.getLogger("kivedevel")
 DEFAULT_PROVISION_TIMEOUT = 900
 PROVISION_STUCK_THRESHOLD = 840
 PROVISION_POLL_INTERVAL = 2
+PROVISION_POLL_INTERVAL_AFTER_STARTED = 10
 PROBE_TIMEOUT = 30
 DIAGNOSTICS_TIMEOUT = 60
 MAX_CONSECUTIVE_TRANSPORT_FAILURES = 5
@@ -194,6 +195,7 @@ def maybe_provision_instance(
     deadline = start_time + timeout
     attempt = 0
     consecutive_transport_failures = 0
+    started_seen = False
     while time.monotonic() < deadline:
         attempt += 1
 
@@ -203,19 +205,25 @@ def maybe_provision_instance(
             marker, error = _probe_markers(cmds, instance)
 
         if error:
-            consecutive_transport_failures += 1
-            logger.debug(
-                "Marker probe failed on %s (attempt %s): %s",
-                instance, attempt, error,
-            )
-            if instance_type != "vm" and consecutive_transport_failures >= MAX_CONSECUTIVE_TRANSPORT_FAILURES:
-                diagnostics = _cloud_init_diagnostics(cmds, instance)
-                raise RuntimeError(
-                    f"Provisioning aborted after {consecutive_transport_failures} "
-                    f"consecutive transport failures on {instance}: {error}"
-                    f"\n\n{diagnostics}"
+            if started_seen:
+                logger.debug(
+                    "Transient transport failure on %s (attempt %s): %s",
+                    instance, attempt, error,
                 )
-            time.sleep(PROVISION_POLL_INTERVAL)
+            else:
+                consecutive_transport_failures += 1
+                logger.debug(
+                    "Marker probe failed on %s (attempt %s): %s",
+                    instance, attempt, error,
+                )
+                if instance_type != "vm" and consecutive_transport_failures >= MAX_CONSECUTIVE_TRANSPORT_FAILURES:
+                    diagnostics = _cloud_init_diagnostics(cmds, instance)
+                    raise RuntimeError(
+                        f"Provisioning aborted after {consecutive_transport_failures} "
+                        f"consecutive transport failures on {instance}: {error}"
+                        f"\n\n{diagnostics}"
+                    )
+            time.sleep(PROVISION_POLL_INTERVAL_AFTER_STARTED if started_seen else PROVISION_POLL_INTERVAL)
             continue
         consecutive_transport_failures = 0
 
@@ -234,18 +242,20 @@ def maybe_provision_instance(
             diagnostics = _cloud_init_diagnostics(cmds, instance)
             raise RuntimeError(f"{details}\n\n{diagnostics}")
 
-        if marker == "started" and time.monotonic() > start_time + PROVISION_STUCK_THRESHOLD:
-            diagnostics = _cloud_init_diagnostics(cmds, instance)
-            raise RuntimeError(
-                "Provisioning appears stuck: /var/lib/kive-provision/started exists, "
-                "but neither done nor failed appeared after 14 minutes."
-                f"\n\n{diagnostics}"
-            )
+        if marker == "started":
+            started_seen = True
+            if time.monotonic() > start_time + PROVISION_STUCK_THRESHOLD:
+                diagnostics = _cloud_init_diagnostics(cmds, instance)
+                raise RuntimeError(
+                    "Provisioning appears stuck: /var/lib/kive-provision/started exists, "
+                    "but neither done nor failed appeared after 14 minutes."
+                    f"\n\n{diagnostics}"
+                )
 
         if attempt % 10 == 0:
             logger.debug("Provision polling attempt %s for %s (marker=%s): no done/failed yet", attempt, instance, marker)
 
-        time.sleep(PROVISION_POLL_INTERVAL)
+        time.sleep(PROVISION_POLL_INTERVAL_AFTER_STARTED if started_seen else PROVISION_POLL_INTERVAL)
 
     log_result = cmds.incus.run(
         ["file", "pull", f"{instance}/var/log/kive-provision.log", "-"],
