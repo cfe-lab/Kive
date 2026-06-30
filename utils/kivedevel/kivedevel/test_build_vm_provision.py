@@ -1245,7 +1245,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
         args.image_name = "test.qcow2"
         args.pool = "default"
         args.profile = "default"
-        args.root_size = "10GiB"
+        args.root_size = "60GiB"
         args.memory = "1GB"
         args.cpu = "1"
         args.host_interface = ""
@@ -1264,7 +1264,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=8000, no_web_proxy=False,
         )
@@ -1281,7 +1281,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=18000, no_web_proxy=False,
         )
@@ -1299,7 +1299,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=8000, no_web_proxy=False,
         )
@@ -1323,7 +1323,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=8000, no_web_proxy=True,
         )
@@ -1346,7 +1346,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=8000, no_web_proxy=False,
         )
@@ -1371,7 +1371,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=True,
             web_port=18000, no_web_proxy=False,
         )
@@ -1401,7 +1401,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
         args.image_name = "test.qcow2"
         args.pool = "default"
         args.profile = "default"
-        args.root_size = "10GiB"
+        args.root_size = "60GiB"
         args.memory = "1GB"
         args.cpu = "1"
         args.host_interface = ""
@@ -1450,7 +1450,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
         args.image_name = "test.qcow2"
         args.pool = "default"
         args.profile = "default"
-        args.root_size = "10GiB"
+        args.root_size = "60GiB"
         args.memory = "1GB"
         args.cpu = "1"
         args.host_interface = ""
@@ -1499,7 +1499,7 @@ class TestBuildVmWebProxy(unittest.TestCase):
         args.image_name = "test.qcow2"
         args.pool = "default"
         args.profile = "default"
-        args.root_size = "10GiB"
+        args.root_size = "60GiB"
         args.memory = "1GB"
         args.cpu = "1"
         args.host_interface = ""
@@ -2012,7 +2012,7 @@ class TestPortForward(unittest.TestCase):
             instance="test", instance_type="vm",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=False,
             web_port=8000, no_web_proxy=False,
         )
@@ -2046,7 +2046,7 @@ class TestPortForward(unittest.TestCase):
             instance="test", instance_type="vm",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=False,
             web_port=8000, no_web_proxy=False,
         )
@@ -2123,7 +2123,7 @@ class TestPortForward(unittest.TestCase):
             instance="test", instance_type="container",
             image_path=Path("/tmp/img.qcow2"),
             pool="default", profile="default",
-            root_size="10GiB", memory="1GB", cpu="1",
+            root_size="60GiB", memory="1GB", cpu="1",
             host_interface="", provision=False,
             web_port=8000, no_web_proxy=False,
         )
@@ -2156,7 +2156,7 @@ class TestProfileRootDisk(unittest.TestCase):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
         cmds = self._make_cmds(output_yaml="{}")
 
-        ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+        ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -2166,16 +2166,35 @@ class TestProfileRootDisk(unittest.TestCase):
         args_list = add_calls[0][0][0]
         self.assertIn("pool=pool1", args_list)
         self.assertIn("path=/", args_list)
-        self.assertIn("size=10GiB", args_list)
+        self.assertIn("size=60GiB", args_list)
 
     def test_null_devices_output_fails(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
         cmds = self._make_cmds(output_yaml="null")
 
         with self.assertRaises(SystemExit):
-            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
-    def test_existing_root_disk_is_idempotent(self):
+    def test_existing_root_disk_is_idempotent_when_size_match(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
+        devices_yaml = """\
+root:
+  path: /
+  pool: default
+  size: 60GiB
+  type: disk
+"""
+        cmds = self._make_cmds(output_yaml=devices_yaml)
+
+        ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
+
+        add_calls = [
+            c for c in cmds.incus.run.call_args_list
+            if "device" in c[0][0] and "add" in c[0][0]
+        ]
+        self.assertEqual(len(add_calls), 0)
+
+    def test_existing_root_disk_enlarged_when_too_small(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
         devices_yaml = """\
 root:
@@ -2186,13 +2205,18 @@ root:
 """
         cmds = self._make_cmds(output_yaml=devices_yaml)
 
-        ensure_profile_with_root_disk(cmds, "default", "default", "10GiB")
+        with self.assertLogs("kivedevel", level="INFO") as logs:
+            ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
 
-        add_calls = [
+        self.assertTrue(
+            any("enlarging" in msg.lower() for msg in logs.output),
+            "Expected log message about enlarging root disk",
+        )
+        set_calls = [
             c for c in cmds.incus.run.call_args_list
-            if "device" in c[0][0] and "add" in c[0][0]
+            if c[0][0][:6] == ["profile", "device", "set", "default", "root", "size"]
         ]
-        self.assertEqual(len(add_calls), 0)
+        self.assertGreaterEqual(len(set_calls), 1)
 
     def test_other_devices_no_root_adds_root_disk(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.incus import ensure_profile_with_root_disk
@@ -2204,7 +2228,7 @@ data:
 """
         cmds = self._make_cmds(output_yaml=devices_yaml)
 
-        ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+        ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -2223,7 +2247,7 @@ root:
         cmds = self._make_cmds(output_yaml=devices_yaml)
 
         with self.assertRaises(SystemExit):
-            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -2236,7 +2260,7 @@ root:
         cmds = self._make_cmds(output_yaml="not: valid: yaml: [")
 
         with self.assertRaises(SystemExit):
-            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
         add_calls = [
             c for c in cmds.incus.run.call_args_list
@@ -2249,7 +2273,7 @@ root:
         cmds = self._make_cmds(output_yaml="{}")
 
         with self.assertLogs("kivedevel", level="INFO") as logs:
-            ensure_profile_with_root_disk(cmds, "default", "pool1", "10GiB")
+            ensure_profile_with_root_disk(cmds, "default", "pool1", "60GiB")
 
         self.assertTrue(any("Adding root disk" in msg for msg in logs.output))
 
@@ -2259,15 +2283,15 @@ root:
 root:
   path: /
   pool: default
-  size: 10GiB
+  size: 60GiB
   type: disk
 """
         cmds = self._make_cmds(output_yaml=devices_yaml)
 
         with self.assertLogs("kivedevel", level="DEBUG") as logs:
-            ensure_profile_with_root_disk(cmds, "default", "default", "10GiB")
+            ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
 
-        self.assertTrue(any("already has a valid root disk" in msg for msg in logs.output))
+        self.assertTrue(any("already has" in msg for msg in logs.output))
 
     def test_runner_calls_ensure_profile_before_ensure_instance(self):
         runner_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "runner.py"
