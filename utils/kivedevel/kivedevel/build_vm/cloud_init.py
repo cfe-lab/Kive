@@ -169,33 +169,19 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
           echo "Slurm node head is not usable:" >&2
           echo "$SCONTROL" >&2
           echo "$SINFO" >&2
-          grep -n 'NodeName\|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
+          grep -nE 'NodeName|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
           tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
           exit 1
         fi
 
-        JOBID="$(sbatch --partition=debug --wrap='true' 2>&1 | awk '{print $NF}')"
-        if [ -z "$JOBID" ]; then
-          echo "sbatch failed" >&2
-          exit 1
-        fi
-        for _ in $(seq 1 15); do
-          JOB_STATE="$(sacct -j "$JOBID" --format=State --noheader 2>/dev/null | tr -d ' ' || true)"
-          if echo "$JOB_STATE" | grep -q '^COMPLETED$'; then
-            echo "Slurm test job $JOBID completed."
-            break
-          fi
-          if echo "$JOB_STATE" | grep -q '^PENDING\|^RUNNING'; then
-            sleep 2
-            continue
-          fi
-          echo "Slurm test job $JOBID unexpected state: $JOB_STATE" >&2
+        echo "Running test Slurm job via srun..."
+        if ! timeout --foreground 120s srun --partition=debug --nodes=1 --ntasks=1 /bin/true 2>&1; then
+          echo "Slurm test job failed:" >&2
+          scontrol show node head >&2 || true
+          sinfo -Nel >&2 || true
           squeue -a >&2 || true
-          exit 1
-        done
-        if ! echo "$JOB_STATE" | grep -q '^COMPLETED$'; then
-          echo "Slurm test job $JOBID did not complete within timeout." >&2
-          squeue -a >&2 || true
+          sacct --format=JobID,State,ExitCode --brief 2>/dev/null | tail -5 >&2 || true
+          grep -nE 'NodeName|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
           tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
           exit 1
         fi
