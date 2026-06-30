@@ -53,16 +53,20 @@ mod_wsgi_tarball: "mod_wsgi-4.9.4.tar.gz"
 mod_wsgi_basename: "mod_wsgi-4.9.4"
 mod_wsgi_sha256_checksum: "8e762662ea5b01afc386bbcfbaa079748eb6203ab1d6d3a3dac9237f5666cfc9"
 # - Nodes to tell Slurm about (with hostname and memory in MB)
+# IMPORTANT: for the single-node local dev VM, CoresPerSocket must equal the
+# configured CPU count so that CPUs == Sockets * CoresPerSocket * ThreadsPerCore.
+# RealMemory intentionally uses headroom below the Incus memory limit (8GiB)
+# because slurmd reports slightly less memory than configured (about 7927 MB)
+# and Slurm drains nodes whose reported memory is below configured RealMemory.
 slurmctlnode: head
 slurmctlnode_address: 127.0.0.1
-slurmnodes:
-    - name: head
-      cpus: "4"
-      memory: "8000"
 slurm_nodes:
   - name: head
     cpus: "4"
-    memory: "8000"
+    memory: "7000"
+    sockets: 1
+    cores_per_socket: 4
+    threads_per_core: 1
 kive_db_subnet: 127.0.0.1/32
 barman_password: fixme-barman-dev
 streaming_barman_password: fixme-streaming-barman-dev
