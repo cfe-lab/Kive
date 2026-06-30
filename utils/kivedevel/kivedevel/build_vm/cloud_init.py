@@ -159,6 +159,48 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
           exit 1
         fi
 
+        echo "=== Slurm readiness check ==="
+        SINFO="$(sinfo -Nel 2>&1 || true)"
+        SCONTROL="$(scontrol show node head 2>&1 || true)"
+        echo "$SCONTROL"
+        echo "$SINFO"
+
+        if echo "$SCONTROL" | grep -qiE 'down|drain|invalid_reg'; then
+          echo "Slurm node head is not usable:" >&2
+          echo "$SCONTROL" >&2
+          echo "$SINFO" >&2
+          grep -n 'NodeName\|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
+          tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
+          exit 1
+        fi
+
+        JOBID="$(sbatch --partition=debug --wrap='true' 2>&1 | awk '{print $NF}')"
+        if [ -z "$JOBID" ]; then
+          echo "sbatch failed" >&2
+          exit 1
+        fi
+        for _ in $(seq 1 15); do
+          JOB_STATE="$(sacct -j "$JOBID" --format=State --noheader 2>/dev/null | tr -d ' ' || true)"
+          if echo "$JOB_STATE" | grep -q '^COMPLETED$'; then
+            echo "Slurm test job $JOBID completed."
+            break
+          fi
+          if echo "$JOB_STATE" | grep -q '^PENDING\|^RUNNING'; then
+            sleep 2
+            continue
+          fi
+          echo "Slurm test job $JOBID unexpected state: $JOB_STATE" >&2
+          squeue -a >&2 || true
+          exit 1
+        done
+        if ! echo "$JOB_STATE" | grep -q '^COMPLETED$'; then
+          echo "Slurm test job $JOBID did not complete within timeout." >&2
+          squeue -a >&2 || true
+          tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
+          exit 1
+        fi
+        echo "--- Slurm readiness OK ---"
+
         touch "$STATE_DIR/done"
       } >>"$LOG_FILE" 2>&1
 """
