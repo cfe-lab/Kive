@@ -58,7 +58,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument("--pool", default="default", help="Incus storage pool (default: default)")
     parser.add_argument("--profile", default="default", help="Incus profile (default: default)")
-    parser.add_argument("--root-size", default="10GiB", help="Root disk size (default: 10GiB)")
+    parser.add_argument("--root-size", default="60GiB", help="Root disk size (default: 60GiB)")
     parser.add_argument("--memory", default="8GiB", help="VM memory limit (default: 8GiB)")
     parser.add_argument("--cpu", default="4", help="VM CPU count (default: 4)")
     parser.add_argument(

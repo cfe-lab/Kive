@@ -13,7 +13,7 @@ class BuildVmConfig:
     instance_type: str = "vm"
     pool: str = "default"
     profile: str = "default"
-    root_size: str = "10GiB"
+    root_size: str = "60GiB"
     memory: str = "8GiB"
     cpu: str = "4"
     host_interface: str = ""
