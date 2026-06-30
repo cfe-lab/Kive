@@ -1164,11 +1164,51 @@ class TestBuildVmParser(unittest.TestCase):
 class TestBuildVmDefaults(unittest.TestCase):
     REPO_ROOT = Path(__file__).resolve().parents[4] / "Kive"
 
-    def test_dev_env_vars_slurm_node_cpus_match_vm_default(self):
+    def test_dev_env_vars_slurm_node_topology_valid(self):
         dev_vars_path = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
         text = dev_vars_path.read_text()
         self.assertIn("cpus: \"4\"", text)
-        self.assertIn("memory: \"8000\"", text)
+        self.assertIn("memory: \"7000\"", text)
+        self.assertIn("cores_per_socket: 4", text)
+        self.assertIn("sockets: 1", text)
+        self.assertIn("threads_per_core: 1", text)
+        self.assertNotIn("memory: \"8000\"", text)
+
+    def test_dev_env_vars_realmemory_has_headroom(self):
+        """RealMemory must be well below the 8GiB VM limit because slurmd
+        reports about 7927 MB and Slurm drains nodes whose reported memory
+        is below configured RealMemory."""
+        dev_vars_path = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
+        import yaml
+        data = yaml.safe_load(dev_vars_path.read_text())
+        self.assertIsNotNone(data)
+        nodes = data.get("slurm_nodes", [])
+        self.assertTrue(len(nodes) > 0)
+        for node in nodes:
+            memory = int(node.get("memory", "0"))
+            self.assertLess(memory, 8000, f"RealMemory {memory} >= 8000 leaves no headroom")
+
+    def test_dev_env_vars_cpus_equal_sockets_times_cores(self):
+        dev_vars_path = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
+        import yaml
+        data = yaml.safe_load(dev_vars_path.read_text())
+        self.assertIsNotNone(data)
+        nodes = data.get("slurm_nodes", [])
+        self.assertTrue(len(nodes) > 0)
+        for node in nodes:
+            cpus = int(node.get("cpus", "0"))
+            sockets = int(node.get("sockets", "1"))
+            cores = int(node.get("cores_per_socket", "1"))
+            threads = int(node.get("threads_per_core", "1"))
+            self.assertEqual(
+                cpus, sockets * cores * threads,
+                f"CPUs={cpus} != Sockets={sockets} * CoresPerSocket={cores} * ThreadsPerCore={threads}",
+            )
+
+    def test_dev_env_vars_no_longer_has_typo_slurmnodes(self):
+        dev_vars_path = self.REPO_ROOT / "dev-env" / "dev_env_vars.yml"
+        text = dev_vars_path.read_text()
+        self.assertNotIn("slurmnodes", text)
 
     def test_workflow_ci_passes_instance_type_container(self):
         workflow_path = self.REPO_ROOT / ".github" / "workflows" / "build-and-test.yml"
