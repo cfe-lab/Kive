@@ -47,6 +47,64 @@ def ensure_storage_pool(cmds: Cmds, pool: str) -> None:
         logger.warning("Could not create storage pool: %s", exc)
 
 
+_SIZE_RE = re.compile(r"^(\d+)\s*(?:GiB|[gG][bB])?$")
+
+
+def _parse_gib(text: str) -> int | None:
+    """Parse a size string like ``10GiB``, ``60GiB``, ``10GB``, or ``10``
+    and return the value in GiB.  Returns ``None`` if unparseable."""
+    m = _SIZE_RE.match(text.strip())
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _incus_profile_device_set(cmds: Cmds, profile: str, device: str, key: str, value: str) -> None:
+    """Set a profile device property via ``incus profile device set``."""
+    cmds.incus.run(["profile", "device", "set", profile, device, key, value])
+
+
+def _ensure_root_size(cmds: Cmds, profile: str, root_device: dict, requested_size: str) -> None:
+    """Ensure the root disk has at least *requested_size*.
+
+    * If the root disk has no size, set it to *requested_size*.
+    * If it has a parsable size smaller than *requested_size*, update it.
+    * If it has a parsable size >= *requested_size*, no-op.
+    * If the existing size is unparseable, log a warning and skip.
+    """
+    existing_raw = root_device.get("size", "").strip()
+    if not existing_raw:
+        logger.info(
+            "Root disk in profile %s has no explicit size; setting to %s.",
+            profile, requested_size,
+        )
+        _incus_profile_device_set(cmds, profile, "root", "size", requested_size)
+        return
+
+    existing_gib = _parse_gib(existing_raw)
+    requested_gib = _parse_gib(requested_size)
+
+    if existing_gib is not None and requested_gib is not None:
+        if existing_gib >= requested_gib:
+            logger.debug(
+                "Root disk in profile %s already has %s (>= requested %s).",
+                profile, existing_raw, requested_size,
+            )
+            return
+        logger.info(
+            "Root disk in profile %s is %s — enlarging to %s.",
+            profile, existing_raw, requested_size,
+        )
+        _incus_profile_device_set(cmds, profile, "root", "size", requested_size)
+        return
+
+    logger.warning(
+        "Root disk in profile %s has unparseable size %r; "
+        "keeping existing size. Requested was %s.",
+        profile, existing_raw, requested_size,
+    )
+
+
 def ensure_profile_with_root_disk(cmds: Cmds, profile: str, pool: str, root_size: str) -> None:
     if not cmds.incus.ok(["profile", "show", profile]):
         logger.info("Profile %s not found. Creating it...", profile)
@@ -74,7 +132,7 @@ def ensure_profile_with_root_disk(cmds: Cmds, profile: str, pool: str, root_size
     root_device = devices.get("root")
     if root_device is not None:
         if isinstance(root_device, dict) and root_device.get("type") == "disk" and root_device.get("path") == "/":
-            logger.debug("Profile %s already has a valid root disk device.", profile)
+            _ensure_root_size(cmds, profile, root_device, root_size)
             return
         logger.error(
             "Profile %s has a device named 'root' that is not a disk at /.\n"
