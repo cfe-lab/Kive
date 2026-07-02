@@ -220,6 +220,98 @@ class TestBuildVmProvision(unittest.TestCase):
                 with mock.patch.object(provision.time, "sleep", return_value=None):
                     provision.maybe_provision_instance(cmds, instance, "vm", provision=True, timeout=60)
 
+    def test_container_aborts_on_pre_start_transport_failures(self):
+        """Before 'started' is ever seen, 5 consecutive transport failures abort."""
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        def probe_side_effect(_cmds, _instance):
+            return (None, "connection refused")
+
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=[0, 1, 2, 3, 4, 5, 6]):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    with self.assertRaises(RuntimeError) as cm:
+                        provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=60)
+            self.assertIn("transport failures", str(cm.exception).lower())
+
+    def test_container_does_not_abort_on_post_start_transport_failures(self):
+        """After 'started' has been seen, transport failures are tolerated."""
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return ("started", None)
+            if call_count <= 12:
+                return (None, "connection refused")
+            return ("done", None)
+
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            monotonic_values = list(range(0, 15))
+            with mock.patch.object(provision.time, "monotonic", side_effect=monotonic_values):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=60)
+        self.assertGreater(call_count, 7, "Should have tolerated >5 post-start transport failures")
+
+    def test_container_post_start_eventual_failed_marker(self):
+        """After 'started', a 'failed' marker still raises."""
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        def run_side_effect(cmd, **kwargs):
+            if "provision.log" in " ".join(cmd):
+                return MockRunResult(returncode=0, stdout="FAILED inside", stderr="")
+            return MockRunResult(returncode=0, stdout="")
+
+        cmds.incus.run.side_effect = run_side_effect
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 3:
+                return ("started", None)
+            return ("failed", None)
+
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            with mock.patch.object(provision.time, "monotonic", side_effect=list(range(20))):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    with self.assertRaises(RuntimeError) as cm:
+                        provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=60)
+        self.assertIn("FAILED inside", str(cm.exception))
+
+    def test_provision_does_not_abort_when_started_seen_then_transport_fails(self):
+        """Explicit regression: 'started' observed many times, then 5+ transport
+        failures must NOT abort.  This is the exact CI pattern that broke."""
+        instance = "ci-smoke"
+        cmds = mock.Mock()
+
+        call_count = 0
+
+        def probe_side_effect(_cmds, _instance):
+            nonlocal call_count
+            call_count += 1
+            if call_count <= 3:
+                return ("started", None)
+            if call_count <= 3 + 10:
+                return (None, "probe timed out")
+            return ("done", None)
+
+        with mock.patch.object(provision, "_probe_markers", side_effect=probe_side_effect):
+            monotonic_values = list(range(0, 20))
+            with mock.patch.object(provision.time, "monotonic", side_effect=monotonic_values):
+                with mock.patch.object(provision.time, "sleep", return_value=None):
+                    provision.maybe_provision_instance(cmds, instance, "container", provision=True, timeout=60)
+
+        # Should have reached done without RuntimeError
+        self.assertGreater(call_count, 3 + 5, "Should have tolerated >5 post-start transport failures")
+
     def test_vm_provision_continues_until_done_marker(self):
         instance = "ci-smoke"
         cmds = mock.Mock()
