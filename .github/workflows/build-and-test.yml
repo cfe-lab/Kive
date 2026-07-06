@@ -117,9 +117,3 @@ jobs:
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
         run: sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev smoke-local-install --instance ci-smoke --instance-type container --workdir "$BUILD_VM_WORKDIR" --debug
-
-      - name: Cleanup local install smoke test
-        if: always()
-        env:
-          BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
-        run: sudo --preserve-env=PATH,BUILD_VM_WORKDIR utils/dev cleanup-local-install --instance ci-smoke --workdir "$BUILD_VM_WORKDIR"
