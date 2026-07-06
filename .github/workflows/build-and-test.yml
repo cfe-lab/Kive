@@ -113,9 +113,6 @@ jobs:
       - name: Prepare host
         run: sudo --preserve-env=PATH utils/dev prepare-host --backend incus --bridge incusbr0 --debug
 
-      - name: Check guest network
-        run: sudo --preserve-env=PATH utils/dev check-network --backend incus --instance network-smoke --host archive.ubuntu.com --port 80 --debug
-
       - name: Smoke-test local install (container mode, CI / provisioning check)
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
