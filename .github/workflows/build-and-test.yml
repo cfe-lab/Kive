@@ -110,9 +110,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y incus rsync qemu-utils iproute2 socat
 
-      - name: Prepare host
-        run: sudo --preserve-env=PATH utils/dev prepare-host --backend incus --bridge incusbr0 --debug
-
       - name: Smoke-test local install (container mode, CI / provisioning check)
         env:
           BUILD_VM_WORKDIR: ${{ runner.temp }}/kive-build-vm
