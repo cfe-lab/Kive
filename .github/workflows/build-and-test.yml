@@ -107,10 +107,8 @@ jobs:
 
       - name: Prepare host
         run: |
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
-            utils/dev prepare-host --debug
+          sudo utils/dev prepare-host --debug
 
       - name: Smoke-test local install
         run: |
-          sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
-            utils/dev smoke-local-install --instance-type container --debug
+          sudo utils/dev smoke-local-install --instance-type container --debug
