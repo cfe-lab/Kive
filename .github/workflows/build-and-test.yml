@@ -105,6 +105,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y incus rsync qemu-utils iproute2 socat
 
+      - name: Prepare host
+        run: |
+          sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
+            utils/dev prepare-host --debug
+
       - name: Smoke-test local install
         run: |
           sudo --preserve-env=PATH,BUILD_VM_WORKDIR \
