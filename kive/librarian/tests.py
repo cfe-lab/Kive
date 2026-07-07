@@ -1172,6 +1172,77 @@ baz
         with dataset.dataset_file:
             self.assertEqual(dataset.dataset_file.read(), self.raw_file_contents)
 
+    def test_create_from_upload_omits_save_in_db_retains_file(self):
+        """Omitting save_in_db for a direct file upload must retain the file."""
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+            data = dict(
+                self.data_to_serialize,
+                dataset_file=File(f, name="hello.txt"),
+            )
+            ds = DatasetSerializer(data=data, context=self.duck_context)
+            self.assertTrue(ds.is_valid(), msg=ds.errors)
+            dataset = ds.save()
+        dataset.refresh_from_db()
+        self.assertTrue(bool(dataset.dataset_file),
+                        "dataset_file must be set when save_in_db is omitted")
+        self.assertGreater(dataset.get_filesize(), 0)
+        self.assertTrue(dataset.has_data())
+        self.assertFalse(dataset.is_purged)
+        self.assertTrue(dataset.uploaded)
+
+    def test_create_from_upload_explicit_save_in_db_true(self):
+        """Explicit save_in_db=true retains the file."""
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+            data = dict(
+                self.data_to_serialize,
+                dataset_file=File(f, name="hello.txt"),
+                save_in_db=True,
+            )
+            ds = DatasetSerializer(data=data, context=self.duck_context)
+            self.assertTrue(ds.is_valid(), msg=ds.errors)
+            dataset = ds.save()
+        dataset.refresh_from_db()
+        self.assertTrue(bool(dataset.dataset_file))
+        self.assertTrue(dataset.has_data())
+
+    def test_create_from_upload_explicit_save_in_db_false(self):
+        """Explicit save_in_db=false discards the file (preserved behavior)."""
+        with tempfile.TemporaryFile() as f:
+            f.write(self.raw_file_contents)
+            f.seek(0)
+            data = dict(
+                self.data_to_serialize,
+                dataset_file=File(f, name="hello.txt"),
+                save_in_db=False,
+            )
+            ds = DatasetSerializer(data=data, context=self.duck_context)
+            self.assertTrue(ds.is_valid(), msg=ds.errors)
+            dataset = ds.save()
+        dataset.refresh_from_db()
+        self.assertFalse(bool(dataset.dataset_file))
+        self.assertFalse(dataset.has_data())
+        self.assertTrue(dataset.is_purged)
+
+    def test_create_from_external_omits_save_in_db_does_not_retain(self):
+        """Omitting save_in_db for an external file path must not retain a DB copy
+        (existing external-file default preserved)."""
+        data = dict(
+            self.data_to_serialize,
+            externalfiledirectory=self.efd.name,
+            external_path=os.path.basename(self.ext_fn),
+        )
+        ds = DatasetSerializer(data=data, context=self.duck_context)
+        self.assertTrue(ds.is_valid(), msg=ds.errors)
+        dataset = ds.save()
+        dataset.refresh_from_db()
+        self.assertFalse(bool(dataset.dataset_file),
+                         "External dataset without save_in_db should not retain file")
+        self.assertEqual(dataset.external_path, os.path.basename(self.ext_fn))
+
 
 # noinspection DuplicatedCode
 class ExternalFileDirectoryApiMockTests(BaseTestCases.ApiTestCase):
