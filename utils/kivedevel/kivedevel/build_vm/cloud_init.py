@@ -272,8 +272,20 @@ def enable_network_config(
     cidr: str | None = None,
     gateway: str | None = None,
 ) -> bool:
-    logger.info("Configuring cloud-init network config for %s...", instance)
+    """Set cloud-init network config for the instance.
+
+    For VM mode, we skip setting network config entirely and let the Ubuntu
+    cloud image use its default DHCP behavior on the attached NIC.
+
+    For container mode, write a DHCP config for ``eth0``.
+
+    Returns True if a change was made.
+    """
     if instance_type == "vm":
+        current = cmds.incus.output(["config", "get", instance, "user.network-config"]).strip()
+        if not current:
+            logger.debug("No network-config set for %s — cloud-init defaults to DHCP.", instance)
+            return False
         if static_ip and cidr and gateway:
             network_config = f"""\
 version: 2
@@ -288,18 +300,18 @@ ethernets:
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
-        else:
-            network_config = """\
-version: 2
-ethernets:
-  enp5s0:
-    dhcp4: true
-    dhcp6: false
-    nameservers:
-      addresses: [8.8.8.8,1.1.1.1]
-"""
-    else:
-        network_config = """\
+            if current.rstrip() == network_config.rstrip():
+                return False
+            _set_network_config(cmds, instance, network_config)
+            return True
+        if current:
+            logger.debug("Removing stale network-config from %s.", instance)
+            cmds.incus.run(["config", "unset", instance, "user.network-config"])
+            return True
+        return False
+
+    # Container mode: write DHCP config for eth0
+    network_config = """\
 version: 2
 ethernets:
   eth0:
@@ -308,11 +320,16 @@ ethernets:
     nameservers:
       addresses: [8.8.8.8,1.1.1.1]
 """
+    current = cmds.incus.output(["config", "get", instance, "user.network-config"]).strip()
+    if current.rstrip() == network_config.rstrip():
+        return False
+    _set_network_config(cmds, instance, network_config)
+    return True
 
+
+def _set_network_config(cmds: Cmds, instance: str, config: str) -> None:
     try:
-        yaml.safe_load(network_config)
+        yaml.safe_load(config)
     except Exception as exc:
         raise RuntimeError(f"Generated invalid cloud-init network config for {instance}: {exc}") from exc
-
-    set_instance_config_multiline(cmds, instance, "user.network-config", network_config)
-    return True
+    set_instance_config_multiline(cmds, instance, "user.network-config", config)

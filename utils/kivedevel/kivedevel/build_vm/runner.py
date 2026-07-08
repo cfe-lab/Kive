@@ -14,12 +14,13 @@ from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import (
     VmNicTarget,
-    check_vm_network_target_usable,
-    choose_existing_vm_network,
+    ensure_managed_vm_network,
     ensure_network_device,
     ensure_vm_nic,
     get_default_host_interface,
     get_existing_network_parent,
+    print_network_diagnostics,
+    wait_vm_dhcp_lease,
 )
 from .provision import maybe_provision_instance
 from .workspace import handle_workspace_attachment
@@ -178,21 +179,9 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
-    nic_target = choose_existing_vm_network(cmds, cfg.vm_network or None)
-    if not check_vm_network_target_usable(cmds, nic_target):
-        mode = "Incus-managed" if nic_target.managed else "host bridge"
-        logger.error(
-            "Bridge %s exists, but it is not usable as a VM network.\n\n"
-            "%s %s does not provide DHCP, NAT, or outbound internet for VMs.\n\n"
-            "Local VM smoke install requires an existing bridge with DHCP/NAT/outbound internet.\n"
-            "This command does not create or repair host networking.\n\n"
-            "Configure Incus networking outside Kive, or rerun with --vm-network NAME "
-            "for a bridge that provides DHCP/NAT.",
-            nic_target.name, mode, nic_target.name,
-        )
-        sys.exit(1)
-    mode = "managed" if nic_target.managed else "host bridge"
-    logger.info("Using existing %s %s for %s.", mode, nic_target.name, cfg.instance)
+    nic_target = ensure_managed_vm_network(cmds, cfg.vm_network or None)
+    bridge_name = nic_target.name
+    logger.info("Using managed Incus bridge %s for %s.", bridge_name, cfg.instance)
 
     created_new_instance, actual_instance_type = ensure_instance(
         cmds,
@@ -229,6 +218,19 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
     maybe_restart_after_config(cmds, cfg.instance, restart_required)
+
+    if cfg.provision:
+        logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
+        ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
+        if ip is None:
+            print_network_diagnostics(cmds, cfg.instance, bridge_name)
+            logger.error(
+                "VM %s did not receive a DHCP lease on %s. "
+                "Check the bridge configuration and Incus network health.",
+                cfg.instance, bridge_name,
+            )
+            sys.exit(1)
+        logger.info("VM %s has IP %s.", cfg.instance, ip)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 
