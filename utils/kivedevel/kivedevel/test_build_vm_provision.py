@@ -59,7 +59,7 @@ class TestBuildVmProvision(unittest.TestCase):
         self.assertIn("touch \"$STATE_DIR/started\"", saved_user_data["value"])
         self.assertIn("trap mark_failed_on_exit EXIT", saved_user_data["value"])
         self.assertIn("if [ \"$status\" -ne 0 ] && [ ! -f \"$STATE_DIR/done\" ]; then", saved_user_data["value"])
-        self.assertIn("timeout --foreground 30s python3 -c", saved_user_data["value"])
+        self.assertIn("timeout --foreground 15s python3 -c", saved_user_data["value"])
         self.assertIn("apt-get install -y ansible curl openssh-server", saved_user_data["value"])
         self.assertIn("if ! systemctl enable --now ssh; then", saved_user_data["value"])
         self.assertNotIn("packages:\n  - ansible\n  - curl\n  - openssh-server", saved_user_data["value"])
@@ -78,7 +78,7 @@ class TestBuildVmProvision(unittest.TestCase):
                 with mock.patch.object(cloud_init, "generate_password_hash", return_value="hash"):
                     cloud_init.ensure_user_data(cmds, "ci-smoke", provision=True)
 
-        self.assertIn("timeout --foreground 30s python3", saved_user_data["value"])
+        self.assertIn("timeout --foreground 15s python3", saved_user_data["value"])
         self.assertIn("timeout --foreground 180s apt-get update", saved_user_data["value"])
         self.assertIn("timeout --foreground 300s apt-get install -y ansible curl openssh-server", saved_user_data["value"])
         self.assertIn("export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg", saved_user_data["value"])
@@ -1924,14 +1924,18 @@ class TestVmNetwork(unittest.TestCase):
         cmds = mock.Mock()
         # get_existing_bridges is called twice (once in ensure, once in _managed_bridge_info)
         net_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
+        cidr_val = "10.166.248.1/24"
         cmds.incus.output.side_effect = [
             net_json,       # get_existing_bridges (ensure)
             net_json,       # get_existing_bridges (_managed_bridge_info)
             "auto",         # network get ipv4.address
             "false",        # network get ipv4.nat
             "2001:db8::1",  # network get ipv6.address
+            cidr_val,       # _get_bridge_cidr
         ]
-        ensure_managed_vm_network(cmds, None)
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_ip_forward"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_egress_nftables"):
+                ensure_managed_vm_network(cmds, None)
         set_calls = [c for c in cmds.incus.run.call_args_list
                      if c[0][0][:3] == ["network", "set", "kive-lab-br"]]
         self.assertGreaterEqual(len(set_calls), 2)
@@ -2040,8 +2044,10 @@ class TestVmNetwork(unittest.TestCase):
         ]
         result = ensure_vm_nic(cmds, "test-vm", VmNicTarget(name="kive-lab-br"))
         self.assertTrue(result)
-        add_calls = [c for c in cmds.incus.run.call_args_list if "add" in str(c)]
-        self.assertGreaterEqual(len(add_calls), 1)
+        override_calls = [c for c in cmds.incus.run.call_args_list if "override" in str(c)]
+        set_calls = [c for c in cmds.incus.run.call_args_list if c[0][0][:5] == ["config", "device", "set", "test-vm", "eth0"]]
+        self.assertGreaterEqual(len(override_calls), 1)
+        self.assertGreaterEqual(len(set_calls), 1)
 
     def test_ensure_vm_nic_profile_matching_network_noop(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_vm_nic, VmNicTarget
