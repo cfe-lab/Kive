@@ -113,6 +113,7 @@ def ensure_managed_vm_network(cmds: Cmds, requested: str | None) -> VmNicTarget:
             sys.exit(1)
 
     _ensure_incus_network_create(cmds, name)
+    _repair_managed_bridge(cmds, name)
     return VmNicTarget(name=name)
 
 
@@ -145,61 +146,88 @@ def _get_bridge_cidr(cmds: Cmds, name: str) -> str | None:
     return raw if "/" in raw else None
 
 
-def _ensure_host_egress_nftables(cmds: Cmds, bridge_name: str, cidr: str) -> None:
-    """Add nftables rules for forwarding and NAT for the bridge CIDR.
+def _ensure_host_egress_iptables(cmds: Cmds, bridge_name: str, cidr: str) -> None:
+    """Add iptables rules for forwarding and NAT for the bridge CIDR.
 
-    Creates/owns the table ``inet kive_egress`` by flushing any existing
-    content and recreating the rules.  This guarantees idempotency and
-    avoids duplicate rule accumulation.
-
-    Contains:
-    - a ``forward`` chain (filter hook forward, policy accept) with accept
-      rules for ``iifname`` and ``oifname`` with ``ct state established,related``.
-    - a ``postrouting`` chain (nat hook postrouting) with masquerade for
-      the bridge CIDR.
+    Uses idempotent ``-C`` checks before ``-I`` insertion.  Handles:
+    * DOCKER-USER ingress/return forwarding (if Docker chain exists).
+    * FORWARD ingress/return forwarding.
+    * POSTROUTING masquerade for bridge CIDR to non-bridge destinations.
     """
-    table = "inet kive_egress"
+    import subprocess as _sp
 
-    def _nft(args: list[str]) -> bool:
-        try:
-            r = cmds.nft.run(args, sudo=True, check=False, capture_output=True)
-            return r.returncode == 0
-        except FileNotFoundError:
-            return False
+    def _ipt(cmd: list[str]) -> int:
+        return _sp.run(["iptables"] + cmd, capture_output=True, text=True, timeout=15, check=False).returncode
 
-    # Delete the table if it exists, then recreate cleanly.
-    _nft(["delete", "table", table])
-    _nft(["add", "table", table])
-    _nft([
-        "add", "chain", table, "forward",
-        "{ type filter hook forward priority filter ; policy accept ; }",
-    ])
-    _nft(["add", "rule", table, "forward", "iifname", bridge_name, "accept"])
-    _nft([
-        "add", "rule", table, "forward",
-        "oifname", bridge_name, "ct state established,related", "accept",
-    ])
-    _nft([
-        "add", "chain", table, "postrouting",
-        "{ type nat hook postrouting priority srcnat ; }",
-    ])
-    _nft([
-        "add", "rule", table, "postrouting",
-        "ip", "saddr", cidr, "masquerade",
-    ])
+    # DOCKER-USER
+    if _ipt(["-nL", "DOCKER-USER"]) == 0:
+        if _ipt(["-C", "DOCKER-USER", "-i", bridge_name, "-j", "ACCEPT"]) != 0:
+            _ipt(["-I", "DOCKER-USER", "1", "-i", bridge_name, "-j", "ACCEPT"])
+        if _ipt(["-C", "DOCKER-USER", "-o", bridge_name, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"]) != 0:
+            _ipt(["-I", "DOCKER-USER", "1", "-o", bridge_name, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+
+    # FORWARD ingress/return
+    if _ipt(["-C", "FORWARD", "-i", bridge_name, "-j", "ACCEPT"]) != 0:
+        _ipt(["-I", "FORWARD", "1", "-i", bridge_name, "-j", "ACCEPT"])
+    if _ipt(["-C", "FORWARD", "-o", bridge_name, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"]) != 0:
+        _ipt(["-I", "FORWARD", "1", "-o", bridge_name, "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+
+    # POSTROUTING masquerade
+    _add_masquerade_rule(bridge_name, cidr)
+
+
+def _add_masquerade_rule(bridge_name: str, cidr: str) -> None:
+    """Add iptables masquerade for *cidr* to non-*cidr* destinations, if not present."""
+    import subprocess as _sp
+    import ipaddress
+    try:
+        net = ipaddress.ip_network(cidr, strict=False)
+        netcidr = net.with_prefixlen
+    except ValueError:
+        logger.warning("Cannot parse CIDR %s for masquerade rule.", cidr)
+        return
+    check = _sp.run(
+        ["iptables", "-t", "nat", "-C", "POSTROUTING",
+         "-s", netcidr, "!", "-d", netcidr, "-j", "MASQUERADE"],
+        capture_output=True, text=True, timeout=15, check=False,
+    )
+    if check.returncode != 0:
+        _sp.run(
+            ["iptables", "-t", "nat", "-I", "POSTROUTING", "1",
+             "-s", netcidr, "!", "-d", netcidr, "-j", "MASQUERADE"],
+            capture_output=True, text=True, timeout=15, check=False,
+        )
+
+
+def _verify_host_egress(cmds: Cmds, bridge_name: str) -> None:
+    """Log host-side egress diagnostics in debug mode."""
+    import subprocess as _sp
+    logger.info("=== Host egress verification ===")
+    try:
+        r = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, timeout=10)
+        logger.info("ip_forward: %s", r.stdout.strip())
+    except Exception:
+        pass
+    logger.info("incus network show %s:\n%s", bridge_name,
+                cmds.incus.output(["network", "show", bridge_name]) or "(empty)")
+    for table in ("filter", "nat"):
+        out = _sp.run(["iptables", "-t", table, "-S"], capture_output=True, text=True, timeout=10, check=False)
+        if out.stdout:
+            logger.info("iptables -t %s -S:\n%s", table, out.stdout.strip())
 
 
 def _repair_managed_bridge(cmds: Cmds, name: str) -> None:
-    """Ensure a managed bridge has IPv4, NAT, and host egress enabled."""
+    """Ensure a managed bridge has IPv4, NAT, routing, firewall, and host egress enabled."""
     ipv4 = cmds.incus.output(["network", "get", name, "ipv4.address"])
     if not ipv4 or ipv4 == "none":
         logger.info("Setting ipv4.address=auto on %s...", name)
         cmds.incus.run(["network", "set", name, "ipv4.address", "auto"])
 
-    nat = cmds.incus.output(["network", "get", name, "ipv4.nat"])
-    if nat != "true":
-        logger.info("Setting ipv4.nat=true on %s...", name)
-        cmds.incus.run(["network", "set", name, "ipv4.nat", "true"])
+    for key, val in [("ipv4.nat", "true"), ("ipv4.routing", "true"), ("ipv4.firewall", "true")]:
+        current = cmds.incus.output(["network", "get", name, key])
+        if current != val:
+            logger.info("Setting %s=%s on %s...", key, val, name)
+            cmds.incus.run(["network", "set", name, key, val])
 
     ipv6 = cmds.incus.output(["network", "get", name, "ipv6.address"])
     if ipv6 and ipv6 != "none":
@@ -209,8 +237,9 @@ def _repair_managed_bridge(cmds: Cmds, name: str) -> None:
     _ensure_host_ip_forward()
     cidr = _get_bridge_cidr(cmds, name)
     if cidr:
-        _ensure_host_egress_nftables(cmds, name, cidr)
-        logger.info("Host egress forwarding enabled for %s (%s).", name, cidr)
+        _ensure_host_egress_iptables(cmds, name, cidr)
+        logger.info("Host egress forwarding rules added for %s (%s).", name, cidr)
+        _verify_host_egress(cmds, name)
     else:
         logger.warning("Could not determine bridge CIDR for %s; host egress rules not added.", name)
 
