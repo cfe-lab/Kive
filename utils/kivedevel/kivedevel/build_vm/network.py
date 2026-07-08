@@ -118,12 +118,20 @@ def ensure_managed_vm_network(cmds: Cmds, requested: str | None) -> VmNicTarget:
 
 def _ensure_host_ip_forward() -> None:
     import subprocess as _sp
-    r = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, timeout=10)
+    try:
+        r = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, timeout=10)
+    except (_sp.TimeoutExpired, OSError) as exc:
+        logger.warning("Could not check ip_forward: %s", exc)
+        return
     val = r.stdout.strip()
     if val == "1":
         return
     logger.info("Enabling net.ipv4.ip_forward (was %s) — required for VM egress.", val)
-    _sp.run(["sudo", "--", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True, capture_output=True, text=True)
+    try:
+        _sp.run(["sudo", "--", "sysctl", "-w", "net.ipv4.ip_forward=1"],
+                check=True, capture_output=True, text=True, timeout=15)
+    except (_sp.TimeoutExpired, OSError) as exc:
+        logger.warning("Could not enable ip_forward (sudo may require password): %s", exc)
 
 
 def _get_bridge_cidr(cmds: Cmds, name: str) -> str | None:
@@ -140,23 +148,27 @@ def _get_bridge_cidr(cmds: Cmds, name: str) -> str | None:
 def _ensure_host_egress_nftables(cmds: Cmds, bridge_name: str, cidr: str) -> None:
     """Add nftables rules for forwarding and NAT for the bridge CIDR.
 
-    Creates a table ``inet kive_egress`` if it does not exist, with:
+    Creates/owns the table ``inet kive_egress`` by flushing any existing
+    content and recreating the rules.  This guarantees idempotency and
+    avoids duplicate rule accumulation.
+
+    Contains:
     - a ``forward`` chain (filter hook forward, policy accept) with accept
       rules for ``iifname`` and ``oifname`` with ``ct state established,related``.
     - a ``postrouting`` chain (nat hook postrouting) with masquerade for
       the bridge CIDR.
-
-    All operations are idempotent (``nft add`` fails gracefully if the
-    element already exists).
     """
     table = "inet kive_egress"
 
-    def _nft(args: list[str]) -> None:
+    def _nft(args: list[str]) -> bool:
         try:
-            cmds.nft.run(args, sudo=True, check=False, capture_output=True)
+            r = cmds.nft.run(args, sudo=True, check=False, capture_output=True)
+            return r.returncode == 0
         except FileNotFoundError:
-            pass
+            return False
 
+    # Delete the table if it exists, then recreate cleanly.
+    _nft(["delete", "table", table])
     _nft(["add", "table", table])
     _nft([
         "add", "chain", table, "forward",

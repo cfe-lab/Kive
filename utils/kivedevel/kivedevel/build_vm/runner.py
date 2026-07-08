@@ -253,6 +253,23 @@ python3 -c 'import socket; addr=socket.getaddrinfo("archive.ubuntu.com",80,socke
 """
 
 
+_KNOWN_TRANSPORT_ERRORS = [
+    "VM agent isn't currently running",
+    "websocket: bad handshake",
+    "connection refused",
+    "not connected",
+]
+
+
+def _is_transport_error(stderr: str) -> bool:
+    """Check if *stderr* matches a known Incus transport/agent error."""
+    lower = stderr.strip().lower()
+    for err in _KNOWN_TRANSPORT_ERRORS:
+        if err.lower() in lower:
+            return True
+    return False
+
+
 def _check_vm_egress(cmds: Cmds, instance: str) -> None:
     """Run a bounded egress check inside the VM via ``incus exec``.
 
@@ -279,7 +296,24 @@ def _check_vm_egress(cmds: Cmds, instance: str) -> None:
         logger.warning("VM egress check skipped (incus exec unavailable): %s", exc)
         return
 
-    output = (result.stdout or "") + (result.stderr or "")
+    stderr = (result.stderr or "").strip()
+    if result.returncode != 0:
+        if _is_transport_error(stderr):
+            logger.info(
+                "VM egress check skipped: incus exec transport unavailable (%s). "
+                "The guest provision script will verify connectivity.",
+                stderr,
+            )
+            return
+        output = (result.stdout or "") + stderr
+        logger.warning(
+            "VM egress command exited %s but no transport error detected. "
+            "Output:\n%s",
+            result.returncode, output,
+        )
+        return
+
+    output = (result.stdout or "") + stderr
     if "raw IPv4 egress OK" not in output:
         logger.error(
             "VM %s has DHCP lease but cannot reach the internet by IP.\n"
