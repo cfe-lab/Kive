@@ -116,8 +116,72 @@ def ensure_managed_vm_network(cmds: Cmds, requested: str | None) -> VmNicTarget:
     return VmNicTarget(name=name)
 
 
+def _ensure_host_ip_forward() -> None:
+    import subprocess as _sp
+    r = _sp.run(["sysctl", "-n", "net.ipv4.ip_forward"], capture_output=True, text=True, timeout=10)
+    val = r.stdout.strip()
+    if val == "1":
+        return
+    logger.info("Enabling net.ipv4.ip_forward (was %s) — required for VM egress.", val)
+    _sp.run(["sudo", "--", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True, capture_output=True, text=True)
+
+
+def _get_bridge_cidr(cmds: Cmds, name: str) -> str | None:
+    """Return the CIDR (e.g. ``10.166.248.1/24``) of an Incus managed bridge."""
+    raw = cmds.incus.output(["network", "get", name, "ipv4.address"])
+    if not raw or raw == "none":
+        return None
+    raw = raw.strip()
+    # incus may return "10.166.248.1/24" or "10.166.248.1/24 dhcp"
+    raw = raw.split()[0]
+    return raw if "/" in raw else None
+
+
+def _ensure_host_egress_nftables(cmds: Cmds, bridge_name: str, cidr: str) -> None:
+    """Add nftables rules for forwarding and NAT for the bridge CIDR.
+
+    Creates a table ``inet kive_egress`` if it does not exist, with:
+    - a ``forward`` chain (filter hook forward, policy accept) with accept
+      rules for ``iifname`` and ``oifname`` with ``ct state established,related``.
+    - a ``postrouting`` chain (nat hook postrouting) with masquerade for
+      the bridge CIDR.
+
+    All operations are idempotent (``nft add`` fails gracefully if the
+    element already exists).
+    """
+    import subprocess as _sp
+    table = "inet kive_egress"
+
+    def _nft(args: list[str]) -> None:
+        _sp.run(["nft"] + args, capture_output=True, text=True, timeout=10, check=False)
+
+    # Table
+    _nft(["add", "table", table])
+
+    # Forward chain (filter)
+    _nft([
+        "add", "chain", table, "forward",
+        "{ type filter hook forward priority filter ; policy accept ; }",
+    ])
+    _nft(["add", "rule", table, "forward", "iifname", bridge_name, "accept"])
+    _nft([
+        "add", "rule", table, "forward",
+        "oifname", bridge_name, "ct state established,related", "accept",
+    ])
+
+    # Postrouting chain (NAT)
+    _nft([
+        "add", "chain", table, "postrouting",
+        "{ type nat hook postrouting priority srcnat ; }",
+    ])
+    _nft([
+        "add", "rule", table, "postrouting",
+        "ip", "saddr", cidr, "masquerade",
+    ])
+
+
 def _repair_managed_bridge(cmds: Cmds, name: str) -> None:
-    """Ensure a managed bridge has IPv4 and NAT enabled."""
+    """Ensure a managed bridge has IPv4, NAT, and host egress enabled."""
     ipv4 = cmds.incus.output(["network", "get", name, "ipv4.address"])
     if not ipv4 or ipv4 == "none":
         logger.info("Setting ipv4.address=auto on %s...", name)
@@ -132,6 +196,14 @@ def _repair_managed_bridge(cmds: Cmds, name: str) -> None:
     if ipv6 and ipv6 != "none":
         logger.info("Setting ipv6.address=none on %s...", name)
         cmds.incus.run(["network", "set", name, "ipv6.address", "none"])
+
+    _ensure_host_ip_forward()
+    cidr = _get_bridge_cidr(cmds, name)
+    if cidr:
+        _ensure_host_egress_nftables(cmds, name, cidr)
+        logger.info("Host egress forwarding enabled for %s (%s).", name, cidr)
+    else:
+        logger.warning("Could not determine bridge CIDR for %s; host egress rules not added.", name)
 
 
 def _parse_device_block(text: str, device: str) -> dict[str, str]:
@@ -245,18 +317,23 @@ def ensure_vm_nic(cmds: Cmds, instance: str, target: VmNicTarget) -> bool:
             )
             return False
 
-        if expanded_nictype == "macvlan" or expanded_parent:
+        if expanded_parent or expanded_nictype:
             logger.info(
-                "Profile eth0 uses %s; overriding with instance-level network=%s.",
+                "Profile eth0 uses %s; overriding with network=%s.",
                 _device_config_str(expanded), target_network,
             )
         else:
             logger.info(
-                "Profile eth0 has network=%s; overriding with instance-level network=%s.",
+                "Profile eth0 has network=%s; overriding with network=%s.",
                 expanded_network, target_network,
             )
 
-        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
+        cmds.incus.run(["config", "device", "override", instance, "eth0"])
+        cmds.incus.run(["config", "device", "set", instance, "eth0", "network", target_network])
+        if expanded_parent:
+            cmds.incus.run(["config", "device", "unset", instance, "eth0", "parent"], check=False)
+        if expanded_nictype:
+            cmds.incus.run(["config", "device", "unset", instance, "eth0", "nictype"], check=False)
         return True
 
     logger.info("Adding NIC eth0 to %s (network=%s)...", instance, target_network)
@@ -264,14 +341,25 @@ def ensure_vm_nic(cmds: Cmds, instance: str, target: VmNicTarget) -> bool:
     return True
 
 
+def _vm_mac_address(cmds: Cmds, instance: str) -> str | None:
+    """Return the MAC address of the VM's eth0, if available from expanded config."""
+    expanded = _eth0_config_expanded(cmds, instance)
+    hwaddr = expanded.get("hwaddr", "")
+    return hwaddr if hwaddr else None
+
+
 def wait_vm_dhcp_lease(cmds: Cmds, instance: str, bridge_name: str, timeout: float = 120) -> str | None:
     """Wait for a DHCP lease on *bridge_name* associated with *instance*.
 
-    Polls ``incus network list-leases``.  Returns the IPv4 address or None.
+    Matches by MAC address (preferred) or hostname.  Returns the IPv4
+    address or None.
     """
     import time as _time
     deadline = _time.monotonic() + timeout
     last_error = ""
+    mac = _vm_mac_address(cmds, instance)
+    if mac:
+        logger.debug("VM %s has MAC %s; matching leases by MAC.", instance, mac)
     while _time.monotonic() < deadline:
         try:
             out = cmds.incus.output(["network", "list-leases", bridge_name, "--format", "json"])
@@ -279,10 +367,15 @@ def wait_vm_dhcp_lease(cmds: Cmds, instance: str, bridge_name: str, timeout: flo
                 leases = json.loads(out)
                 if isinstance(leases, list):
                     for lease in leases:
-                        if lease.get("hostname", "").startswith(instance):
+                        if mac and lease.get("hwaddr", "").lower() == mac.lower():
                             ip = lease.get("address", "")
                             if ip:
-                                logger.info("VM %s got DHCP lease %s on %s.", instance, ip, bridge_name)
+                                logger.info("VM %s got DHCP lease %s on %s (by MAC).", instance, ip, bridge_name)
+                                return ip
+                        if not mac and lease.get("hostname", "").startswith(instance):
+                            ip = lease.get("address", "")
+                            if ip:
+                                logger.info("VM %s got DHCP lease %s on %s (by hostname).", instance, ip, bridge_name)
                                 return ip
         except (json.JSONDecodeError, OSError) as exc:
             last_error = str(exc)
