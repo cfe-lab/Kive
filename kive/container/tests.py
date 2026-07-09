@@ -4703,28 +4703,51 @@ class RunContainerMultiInputTests(TestCase):
                 self.assertEqual(b'sample1_wg fasta data\n', f.read(),
                                  f'Unexpected content in {staged}')
 
+    def test_fill_sandbox_with_duplicate_dataset_names(self):
+        user = User.objects.first()
+        ds1 = self._create_dataset(user, 'sample.txt', b'first\n')
+        ds2 = self._create_dataset(user, 'sample.txt', b'second\n')
+
+        run = ContainerRun.objects.create(user=user, app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=ds1,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=ds2,
+            multi_position=2)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_dup_names_')
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = sorted(os.listdir(input_dir))
+        self.assertEqual(2, len(staged_files))
+        self.assertEqual(2, len(set(staged_files)))
+
     def test_command_paths_match_staged_files(self):
         run = ContainerRun.objects.create(user=User.objects.first(),
                                           app=self.app)
 
-        ContainerDataset.objects.create(
+        cd1 = ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_a,
             multi_position=1)
-        ContainerDataset.objects.create(
+        cd2 = ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_b,
             multi_position=2)
-        ContainerDataset.objects.create(
+        cd3 = ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=3)
-        ContainerDataset.objects.create(
-            run=run, argument=self.arg_inputs, dataset=self.ds_d,
+        cd4 = ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=4)
-        ContainerDataset.objects.create(
+        cd5 = ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_e,
             multi_position=5)
 
         handler = runcontainer.Command()
-        run.create_sandbox(prefix='test_multi_e2e_')
+        run.create_sandbox(prefix='test_paths_e2e_')
 
         handler.fill_sandbox(run)
 
@@ -4732,14 +4755,23 @@ class RunContainerMultiInputTests(TestCase):
         staged_files = set(os.listdir(input_dir))
 
         cds = list(run.datasets.order_by('multi_position'))
-        kw_paths = list(runcontainer.Command._format_kw_args(cds))
+        kw_tokens = list(runcontainer.Command._format_kw_args(cds))
 
-        for token in kw_paths:
-            if token.startswith('/mnt/input/'):
-                staged_name = os.path.basename(token)
-                self.assertIn(
-                    staged_name, staged_files,
-                    f'Command references {staged_name} but it was not staged.')
+        self.assertEqual('--inputs', kw_tokens[0])
 
-        self.assertEqual(5, len(staged_files),
-                         f'Expected 5 staged files, got {len(staged_files)}')
+        input_paths = [
+            token for token in kw_tokens
+            if token.startswith('/mnt/input/')
+        ]
+
+        expected_paths = [
+            '/mnt/input/' + runcontainer.Command._sandbox_input_filename(cd)
+            for cd in cds
+        ]
+
+        self.assertEqual(expected_paths, input_paths)
+
+        for staged_name in (os.path.basename(p) for p in input_paths):
+            self.assertIn(
+                staged_name, staged_files,
+                f'Command references {staged_name} but it was not staged.')
