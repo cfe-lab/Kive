@@ -170,7 +170,7 @@ def register_subcommand(subparsers) -> None:
     smoke.add_argument(
         "--vm-network",
         default="",
-        help="Existing Incus managed network for VM NIC (default: auto-detect incusbr0)",
+        help="Existing Incus managed network for VM NIC (default: auto-detect kive-lab-br)",
     )
     _add_log_flags(smoke)
     smoke.set_defaults(func=run_smoke_local_install)
