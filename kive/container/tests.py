@@ -33,7 +33,7 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from unittest.mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
-from rest_framework.test import force_authenticate
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from container.management.commands import purge, runcontainer
 # import container.models as cm
@@ -4468,13 +4468,18 @@ class ContainerArgumentTests(TestCase):
 
 
 @skipIfDBFeature('is_mocked')
-class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
+class ContainerRunCreateValidationTests(TestCase):
     """Validate that API-created runs enforce multi_position rules."""
 
     def setUp(self):
         super().setUp()
-        user = User.objects.first()
-        self.assertIsNotNone(user)
+        self.factory = APIRequestFactory()
+        self.kive_user = User.objects.first()
+        self.assertIsNotNone(self.kive_user)
+        self.list_path = reverse("containerrun-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        user = self.kive_user
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         self.app = ContainerApp.objects.create(container=container, name='test')
@@ -4503,6 +4508,8 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
         content_file2 = ContentFile('data2')
         self.dataset2.dataset_file.save('file2.csv', content_file2)
 
+        self.run = ContainerRun.objects.create(user=user, app=self.app)
+
         self.app_url = rest_reverse('containerapp-detail',
                                     kwargs=dict(pk=self.app.pk))
         self.opt_multiple_arg_url = rest_reverse(
@@ -4521,7 +4528,7 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
 
     def test_fixed_positional_input_staging_and_command(self):
         cd = ContainerDataset.objects.create(
-            run=None,
+            run=self.run,
             argument=self.fixed_arg,
             dataset=self.dataset1,
         )
@@ -4530,7 +4537,7 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
 
     def test_optional_single_staging_and_command_consistent(self):
         cd = ContainerDataset.objects.create(
-            run=None,
+            run=self.run,
             argument=self.opt_single_arg,
             dataset=self.dataset1,
         )
@@ -4539,10 +4546,8 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
         self.assertNotEqual(self.dataset1.name, staged_name)
 
     def test_serializer_rejects_missing_multi_position(self):
-        list_path = reverse("containerrun-list")
-        list_view, _, _ = resolve(list_path)
         request = self.factory.post(
-            list_path,
+            self.list_path,
             dict(
                 app=self.app_url,
                 datasets=[
@@ -4553,15 +4558,13 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
             format="json",
         )
         force_authenticate(request, user=self.kive_user)
-        response = list_view(request).render()
+        response = self.list_view(request).render()
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         self.assertIn('multi_position', str(response.data))
 
     def test_serializer_rejects_multi_position_on_non_multiple(self):
-        list_path = reverse("containerrun-list")
-        list_view, _, _ = resolve(list_path)
         request = self.factory.post(
-            list_path,
+            self.list_path,
             dict(
                 app=self.app_url,
                 datasets=[
@@ -4573,15 +4576,13 @@ class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
             format="json",
         )
         force_authenticate(request, user=self.kive_user)
-        response = list_view(request).render()
+        response = self.list_view(request).render()
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         self.assertIn('multi_position', str(response.data))
 
     def test_serializer_rejects_duplicate_multi_position(self):
-        list_path = reverse("containerrun-list")
-        list_view, _, _ = resolve(list_path)
         request = self.factory.post(
-            list_path,
+            self.list_path,
             dict(
                 app=self.app_url,
                 datasets=[
