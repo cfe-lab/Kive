@@ -1469,6 +1469,12 @@ class ContainerDataset(models.Model):
                     'argument__type',
                     'argument__position',
                     'argument__name')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['run', 'argument', 'multi_position'],
+                condition=models.Q(multi_position__isnull=False),
+                name='unique_run_arg_multi_position'),
+        ]
 
     def find_rerun_dataset(self):
         """ Find the dataset, or the matching dataset from a rerun.
