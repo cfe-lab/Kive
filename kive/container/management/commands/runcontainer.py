@@ -79,6 +79,24 @@ class Command(BaseCommand):
                     run.state))
         return run
 
+    @staticmethod
+    def _sandbox_input_filename(container_dataset: ContainerDataset) -> str:
+        argtype = container_dataset.argument.argtype
+        if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
+            base_name = container_dataset.name or container_dataset.dataset.name
+            name, extension = os.path.splitext(base_name)
+            return f"{name}_{container_dataset.id}{extension}"
+        return container_dataset.argument.name
+
+    @staticmethod
+    def _sandbox_input_filename(container_dataset: ContainerDataset) -> str:
+        argtype = container_dataset.argument.argtype
+        if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
+            base_name = container_dataset.name or container_dataset.dataset.name
+            name, extension = os.path.splitext(base_name)
+            return f"{name}_{container_dataset.id}{extension}"
+        return container_dataset.argument.name
+
     def fill_sandbox(self, run):
         if not run.sandbox_path:
             # This should only be needed during tests.
