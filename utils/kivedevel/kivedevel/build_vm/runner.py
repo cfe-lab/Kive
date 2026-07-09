@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import platform
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -177,8 +179,39 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
     return actual_instance_type
 
 
+def qemu_system_command_for_host() -> str | None:
+    """Return the QEMU system emulator binary for the host architecture, or None."""
+    machine = platform.machine().lower()
+    candidates_by_arch = {
+        "x86_64": ["qemu-system-x86_64"],
+        "amd64": ["qemu-system-x86_64"],
+        "aarch64": ["qemu-system-aarch64"],
+        "arm64": ["qemu-system-aarch64"],
+    }
+    for candidate in candidates_by_arch.get(machine, []):
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
+def _check_vm_capability() -> None:
+    """Fail early if the host cannot run Incus VM instances."""
+    if qemu_system_command_for_host() is None:
+        logger.error(
+            "Incus VM mode requires a QEMU system emulator for %s, "
+            "but none was found.\n\n"
+            "On Ubuntu, install the package:\n"
+            "  sudo apt-get install qemu-system-x86\n\n"
+            "For CI or lightweight testing without VMs, use:\n"
+            "  utils/dev smoke-local-install --instance-type container\n",
+            platform.machine(),
+        )
+        sys.exit(1)
+
+
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
+    _check_vm_capability()
     nic_target = ensure_managed_vm_network(cmds, cfg.vm_network or None)
     bridge_name = nic_target.name
     logger.info("Using managed Incus bridge %s for %s.", bridge_name, cfg.instance)
