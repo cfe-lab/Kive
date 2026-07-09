@@ -84,8 +84,7 @@ def validate_incus_bridge_config(cmds: Cmds, name: str) -> None:
             "Existing Incus network %s has ipv4.address=%s, but Kive expects %s.\n\n"
             "Kive will not change the address of an existing Incus bridge because\n"
             "existing VMs may retain stale DHCP leases/routes.\n\n"
-            "Delete stale VMs and recreate the bridge manually, or set\n"
-            "KIVE_VM_BRIDGE_CIDR to the existing subnet.\n\n"
+            "Delete stale VMs and recreate the bridge manually.\n\n"
             "Commands to clean up stale state:\n"
             "  incus list -c n --format csv | xargs -r incus delete -f\n"
             "  incus network delete %s\n"
@@ -242,8 +241,8 @@ def check_cidr_conflict(cidr: str) -> None:
                         if dev != DEFAULT_VM_BRIDGE:
                             logger.error(
                                 "CIDR %s overlaps with existing route %s (dev %s).\n"
-                                "This will cause IP conflicts.  Set KIVE_VM_BRIDGE_CIDR\n"
-                                "to a different subnet or remove the conflicting route.",
+                                "This will cause IP conflicts.  Remove the conflicting\n"
+                                "route or choose a different subnet.",
                                 cidr, route_net_str, dev,
                             )
                             sys.exit(1)
@@ -296,22 +295,14 @@ def ensure_managed_vm_network(cmds: Cmds, requested: str | None) -> VmNicTarget:
     Returns a ``VmNicTarget(name=..., managed=True)``.
 
     * If *requested* is given, ensure exactly that managed network exists.
-    * Otherwise, prefer an existing ``kive-lab-br`` or ``incusbr0``.
-    * Otherwise create the default ``kive-lab-br``.
+    * Otherwise, use the default ``kive-lab-br``, creating it if missing.
+      Existing ``incusbr0`` is ignored unless explicitly requested.
     * Validates existing bridge config; fails on address mismatch.
     """
     if requested:
         name = requested
     else:
-        bridges = get_existing_bridges(cmds)
-        names = [b.get("name", "") for b in bridges
-                 if b.get("type") == "bridge" and b.get("managed") is True]
-        if DEFAULT_VM_BRIDGE in names:
-            name = DEFAULT_VM_BRIDGE
-        elif "incusbr0" in names:
-            name = "incusbr0"
-        else:
-            name = DEFAULT_VM_BRIDGE
+        name = DEFAULT_VM_BRIDGE
 
     info = _managed_bridge_info(cmds, name)
     if info is not None:
