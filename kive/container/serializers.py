@@ -334,50 +334,82 @@ class ContainerRunSerializer(AccessControlSerializer,
                             'start_time',
                             'end_time')
 
-    def validate_datasets(self, datasets):
-        app = self.initial_data.get('app')
-        app_obj = None
-        if app is not None:
-            try:
-                app_obj = ContainerApp.objects.get(pk=app.split('/')[-2])
-            except (ContainerApp.DoesNotExist, IndexError, ValueError):
-                pass
+    def validate(self, data):
+        data = super().validate(data)
 
-        seen_run_arg = set()
-        seen_run_arg_pos = set()
+        app = data.get("app")
+        original_run = data.get("original_run")
+        if app is None and original_run is not None:
+            app = original_run.app
+
+        datasets = data.get("datasets", [])
+        self._validate_dataset_bindings(app, datasets)
+
+        return data
+
+    @staticmethod
+    def _validate_dataset_bindings(app, datasets):
+        seen_single_args = set()
+        seen_multi_positions = set()
+
         for item in datasets:
-            argument = item.get('argument')
-            dataset = item.get('dataset')
+            argument = item.get("argument")
+            dataset = item.get("dataset")
+            multi_position = item.get("multi_position")
+
             if argument is None:
                 continue
-            if app_obj is not None and argument.app_id != app_obj.pk:
-                raise serializers.ValidationError(
-                    f'Argument "{argument.name}" does not belong to the run\'s app.')
+
+            if app is not None and argument.app_id != app.pk:
+                raise serializers.ValidationError({
+                    "datasets": [
+                        f'Argument "{argument.name}" does not belong to the run\'s app.'
+                    ]
+                })
+
             if argument.type == ContainerArgument.INPUT and dataset is not None:
                 if not dataset.has_data():
-                    raise serializers.ValidationError(
-                        f'Dataset "{dataset.name}" has no data.')
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Dataset "{dataset.name}" has no data.'
+                        ]
+                    })
+
             argtype = argument.argtype
-            multi_position = item.get('multi_position')
-            run_arg_key = (argument.pk, multi_position)
+
             if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
                 if multi_position is None:
-                    raise serializers.ValidationError(
-                        'multi_position is required for a multi-valued input.')
-                if run_arg_key in seen_run_arg_pos:
-                    raise serializers.ValidationError(
-                        f'Duplicate multi_position {multi_position} for argument "{argument.name}".')
-                seen_run_arg_pos.add(run_arg_key)
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            "multi_position is required for a multi-valued input."
+                        ]
+                    })
+
+                key = (argument.pk, multi_position)
+                if key in seen_multi_positions:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Duplicate multi_position {multi_position} for argument "{argument.name}".'
+                        ]
+                    })
+                seen_multi_positions.add(key)
+
             else:
                 if multi_position is not None:
-                    raise serializers.ValidationError(
-                        'multi_position should be None for single-valued argtype.')
-                run_arg_base = (argument.pk,)
-                if run_arg_base in seen_run_arg:
-                    raise serializers.ValidationError(
-                        f'Multiple datasets for single-valued argument "{argument.name}" are not allowed.')
-                seen_run_arg.add(run_arg_base)
-        return datasets
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            "multi_position should be None for single-valued argtype."
+                        ]
+                    })
+
+                key = argument.pk
+                if key in seen_single_args:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Multiple datasets for single-valued argument "{argument.name}" are not allowed.'
+                        ]
+                    })
+                seen_single_args.add(key)
 
     def create(self, validated_data):
         """Create a Run and the inputs it contains."""
