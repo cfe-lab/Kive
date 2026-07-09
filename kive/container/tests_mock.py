@@ -18,7 +18,8 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+    ContainerArgument, ContainerArgumentType, ContainerRun, ContainerDataset, \
+    ZipHandler, TarHandler
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
