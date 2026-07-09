@@ -149,16 +149,15 @@ def _ensure_host_egress_nftables(cmds: Cmds, bridge_name: str, cidr: str) -> Non
     All operations are idempotent (``nft add`` fails gracefully if the
     element already exists).
     """
-    import subprocess as _sp
     table = "inet kive_egress"
 
     def _nft(args: list[str]) -> None:
-        _sp.run(["nft"] + args, capture_output=True, text=True, timeout=10, check=False)
+        try:
+            cmds.nft.run(args, sudo=True, check=False, capture_output=True)
+        except FileNotFoundError:
+            pass
 
-    # Table
     _nft(["add", "table", table])
-
-    # Forward chain (filter)
     _nft([
         "add", "chain", table, "forward",
         "{ type filter hook forward priority filter ; policy accept ; }",
@@ -168,8 +167,6 @@ def _ensure_host_egress_nftables(cmds: Cmds, bridge_name: str, cidr: str) -> Non
         "add", "rule", table, "forward",
         "oifname", bridge_name, "ct state established,related", "accept",
     ])
-
-    # Postrouting chain (NAT)
     _nft([
         "add", "chain", table, "postrouting",
         "{ type nat hook postrouting priority srcnat ; }",
