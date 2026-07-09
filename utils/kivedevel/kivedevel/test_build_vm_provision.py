@@ -1925,7 +1925,6 @@ class TestVmNetwork(unittest.TestCase):
         # get_existing_bridges is called twice (once in ensure, once in _managed_bridge_info)
         net_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
         cidr_val = "10.166.248.1/24"
-        # ipv4.routing and ipv4.firewall checks each consume an entry
         cmds.incus.output.side_effect = [
             net_json,       # get_existing_bridges (ensure)
             net_json,       # get_existing_bridges (_managed_bridge_info)
@@ -1934,12 +1933,8 @@ class TestVmNetwork(unittest.TestCase):
             "true",         # network get ipv4.routing
             "true",         # network get ipv4.firewall
             "2001:db8::1",  # network get ipv6.address
-            cidr_val,       # _get_bridge_cidr
         ]
-        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_ip_forward"):
-            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_egress_iptables"):
-                with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._verify_host_egress"):
-                    ensure_managed_vm_network(cmds, None)
+        ensure_managed_vm_network(cmds, None)
         set_calls = [c for c in cmds.incus.run.call_args_list
                      if c[0][0][:3] == ["network", "set", "kive-lab-br"]]
         self.assertGreaterEqual(len(set_calls), 2)
@@ -2078,6 +2073,18 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.output.return_value = json.dumps([])
         result = wait_vm_dhcp_lease(cmds, "kive-minimal", "kive-lab-br", timeout=0.1)
         self.assertIsNone(result)
+
+    def test_network_code_does_not_call_subprocess_iptables(self):
+        network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
+        text = network_path.read_text()
+        self.assertNotIn('"iptables"', text)
+        self.assertNotIn("'iptables'", text)
+
+    def test_network_code_does_not_call_subprocess_sysctl(self):
+        network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
+        text = network_path.read_text()
+        self.assertNotIn('"sysctl"', text)
+        self.assertNotIn("'sysctl'", text)
 
     def test_vm_cloud_init_does_not_set_network_config_by_default(self):
         from Kive.utils.kivedevel.kivedevel.build_vm import cloud_init
