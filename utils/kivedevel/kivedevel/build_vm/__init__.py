@@ -87,10 +87,10 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument(
         "--vm-network",
-        default="",
+        default="kive-lab-br",
         metavar="NAME",
-        help="Existing Incus managed network for VM NIC "
-        "(default: auto-detect incusbr0 or the only existing managed bridge).",
+        help="Managed Incus bridge for VM NIC (default: kive-lab-br). "
+        "Created automatically if it does not exist.",
     )
     parser.add_argument(
         "--vm-cidr",
