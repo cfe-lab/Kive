@@ -3158,9 +3158,11 @@ Line 3
 
         datasets = []
 
-        def make_dataset(arg, multi_position=None):
+        def make_dataset(arg, cd_id, multi_position=None):
             dataset = unittest.mock.Mock()
+            dataset.id = cd_id
             dataset.argument = arg
+            dataset.name = ''
             dataset.dataset.name = arg.name
             if multi_position is not None:
                 dataset.dataset.name += str(multi_position)
@@ -3169,10 +3171,10 @@ Line 3
 
         for arg in (a for a in args if a.type == ContainerArgument.INPUT):
             if arg.allow_multiple:
-                make_dataset(arg, multi_position=0)
-                make_dataset(arg, multi_position=1)
+                make_dataset(arg, 101, multi_position=0)
+                make_dataset(arg, 102, multi_position=1)
             else:
-                make_dataset(arg)
+                make_dataset(arg, 100)
 
         mock_run = unittest.mock.Mock()
         mock_run.app = app
@@ -3190,9 +3192,10 @@ Line 3
         self.assertEqual(
             command_args,
             [
-                "--optional_input", "/mnt/input/optional_input",
-                "--multiple_optional_input", "/mnt/input/multiple_optional_input0",
-                "/mnt/input/multiple_optional_input1", "--",
+                "--optional_input", "/mnt/input/optional_input_100",
+                "--multiple_optional_input",
+                "/mnt/input/multiple_optional_input0_101",
+                "/mnt/input/multiple_optional_input1_102", "--",
                 "/mnt/input/positional_input", "/mnt/output/positional_output"
             ],
         )
@@ -4462,3 +4465,269 @@ class ContainerArgumentTests(TestCase):
         for expected_type, kwargs in specs:
             arg = ContainerArgument(name="test_arg", **kwargs)
             self.assertEqual(expected_type, arg.argtype)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerRunCreateValidationTests(BaseTestCases.ApiTestCase):
+    """Validate that API-created runs enforce multi_position rules."""
+
+    def setUp(self):
+        super().setUp()
+        user = User.objects.first()
+        self.assertIsNotNone(user)
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.app = ContainerApp.objects.create(container=container, name='test')
+        self.opt_multiple_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='inputs',
+            position=None,
+            allow_multiple=True,
+        )
+        self.opt_single_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='opt',
+            position=None,
+            allow_multiple=False,
+        )
+        self.fixed_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='fixed_in',
+            position=0,
+            allow_multiple=False,
+        )
+        self.dataset1 = Dataset.objects.create(user=user)
+        content_file = ContentFile('data1')
+        self.dataset1.dataset_file.save('file1.csv', content_file)
+        self.dataset2 = Dataset.objects.create(user=user)
+        content_file2 = ContentFile('data2')
+        self.dataset2.dataset_file.save('file2.csv', content_file2)
+
+        self.app_url = rest_reverse('containerapp-detail',
+                                    kwargs=dict(pk=self.app.pk))
+        self.opt_multiple_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.opt_multiple_arg.pk))
+        self.opt_single_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.opt_single_arg.pk))
+        self.fixed_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.fixed_arg.pk))
+        self.dataset1_url = rest_reverse('dataset-detail',
+                                         kwargs=dict(pk=self.dataset1.pk))
+        self.dataset2_url = rest_reverse('dataset-detail',
+                                         kwargs=dict(pk=self.dataset2.pk))
+
+    def test_fixed_positional_input_staging_and_command(self):
+        cd = ContainerDataset.objects.create(
+            run=None,
+            argument=self.fixed_arg,
+            dataset=self.dataset1,
+        )
+        staged_name = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('fixed_in', staged_name)
+
+    def test_optional_single_staging_and_command_consistent(self):
+        cd = ContainerDataset.objects.create(
+            run=None,
+            argument=self.opt_single_arg,
+            dataset=self.dataset1,
+        )
+        staged_name = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertIn(str(cd.id), staged_name)
+        self.assertNotEqual(self.dataset1.name, staged_name)
+
+    def test_serializer_rejects_missing_multi_position(self):
+        list_path = reverse("containerrun-list")
+        list_view, _, _ = resolve(list_path)
+        request = self.factory.post(
+            list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('multi_position', str(response.data))
+
+    def test_serializer_rejects_multi_position_on_non_multiple(self):
+        list_path = reverse("containerrun-list")
+        list_view, _, _ = resolve(list_path)
+        request = self.factory.post(
+            list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_single_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('multi_position', str(response.data))
+
+    def test_serializer_rejects_duplicate_multi_position(self):
+        list_path = reverse("containerrun-list")
+        list_view, _, _ = resolve(list_path)
+        request = self.factory.post(
+            list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset2_url,
+                         multi_position=1),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('duplicate', str(response.data).lower())
+
+    def test_serializer_allows_same_dataset_different_positions(self):
+        list_path = reverse("containerrun-list")
+        list_view, _, _ = resolve(list_path)
+        request = self.factory.post(
+            list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=2),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = list_view(request).render()
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
+                         msg=f"Expected 201, got {response.status_code}: {response.data}")
+
+
+@skipIfDBFeature('is_mocked')
+class RunContainerMultiInputTests(TestCase):
+    """End-to-end tests for optional-multiple input support."""
+
+    def setUp(self):
+        super().setUp()
+        user = User.objects.first()
+        self.assertIsNotNone(user)
+
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.app = ContainerApp.objects.create(container=container, name='collation')
+        self.app.write_inputs('--inputs*')
+        self.app.write_outputs('output')
+
+        self.arg_inputs = self.app.arguments.get(
+            name='inputs', type=ContainerArgument.INPUT)
+
+        content_a = b'sample1_cascade data\n'
+        content_b = b'sample2_cascade data\n'
+        content_c = b'sample1_wg fasta data\n'
+        content_d = b'sample2_wg fasta data\n'
+        content_e = b'metadata info\n'
+
+        self.ds_a = self._create_dataset(user, 'sample1_cascade.csv', content_a)
+        self.ds_b = self._create_dataset(user, 'sample2_cascade.csv', content_b)
+        self.ds_c = self._create_dataset(user, 'sample1_wg.fasta', content_c)
+        self.ds_d = self._create_dataset(user, 'sample2_wg.fasta', content_c)
+        self.ds_e = self._create_dataset(user, 'metadata.csv', content_e)
+
+    @staticmethod
+    def _create_dataset(user, name, content):
+        dataset = Dataset.objects.create(user=user, name=name)
+        content_file = ContentFile(content)
+        dataset.dataset_file.save(name, content_file)
+        return dataset
+
+    def test_fill_sandbox_with_duplicate_dataset(self):
+        run = ContainerRun.objects.create(user=User.objects.first(),
+                                          app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_d,
+            multi_position=2)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_multimulti_')
+
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = [
+            f for f in os.listdir(input_dir)
+            if os.path.isfile(os.path.join(input_dir, f))
+        ]
+        self.assertEqual(2, len(staged_files),
+                         f'Expected 2 staged files, got {staged_files}')
+
+        for staged in staged_files:
+            staged_path = os.path.join(input_dir, staged)
+            with open(staged_path, 'rb') as f:
+                self.assertEqual(b'sample1_wg fasta data\n', f.read(),
+                                 f'Unexpected content in {staged}')
+
+    def test_command_paths_match_staged_files(self):
+        run = ContainerRun.objects.create(user=User.objects.first(),
+                                          app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_a,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_b,
+            multi_position=2)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=3)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_d,
+            multi_position=4)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_e,
+            multi_position=5)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_multi_e2e_')
+
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = set(os.listdir(input_dir))
+
+        cds = list(run.datasets.order_by('multi_position'))
+        kw_paths = list(runcontainer.Command._format_kw_args(cds))
+
+        for token in kw_paths:
+            if token.startswith('/mnt/input/'):
+                staged_name = os.path.basename(token)
+                self.assertIn(
+                    staged_name, staged_files,
+                    f'Command references {staged_name} but it was not staged.')
+
+        self.assertEqual(5, len(staged_files),
+                         f'Expected 5 staged files, got {len(staged_files)}')
