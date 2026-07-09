@@ -1105,3 +1105,129 @@ class RunContainerMockTests(TestCase):
             ],
             any_order=True,
         )
+
+
+class SandboxInputFilenameTests(TestCase):
+    def test_fixed_input_returns_argument_name(self):
+        cd = Mock()
+        cd.argument.argtype = ContainerArgumentType.FIXED_INPUT
+        cd.argument.name = 'input_txt'
+        result = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('input_txt', result)
+
+    def test_optional_input_includes_container_dataset_id(self):
+        cd = Mock()
+        cd.id = 42
+        cd.name = ''
+        cd.dataset.name = 'sample.txt'
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        result = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('sample_42.txt', result)
+
+    def test_optional_multiple_includes_container_dataset_id(self):
+        cd = Mock()
+        cd.id = 99
+        cd.name = ''
+        cd.dataset.name = 'data.csv'
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+        result = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('data_99.csv', result)
+
+    def test_same_dataset_different_ids_gives_different_filenames(self):
+        cd1 = Mock()
+        cd1.id = 10
+        cd1.name = ''
+        cd1.dataset.name = 'sample.txt'
+        cd1.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+        cd2 = Mock()
+        cd2.id = 11
+        cd2.name = ''
+        cd2.dataset.name = 'sample.txt'
+        cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+        self.assertNotEqual(
+            runcontainer.Command._sandbox_input_filename(cd1),
+            runcontainer.Command._sandbox_input_filename(cd2),
+        )
+
+    def test_duplicate_dataset_names_different_ids(self):
+        cd1 = Mock()
+        cd1.id = 10
+        cd1.name = ''
+        cd1.dataset.name = 'file.txt'
+        cd1.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        cd2 = Mock()
+        cd2.id = 20
+        cd2.name = ''
+        cd2.dataset.name = 'file.txt'
+        cd2.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        self.assertNotEqual(
+            runcontainer.Command._sandbox_input_filename(cd1),
+            runcontainer.Command._sandbox_input_filename(cd2),
+        )
+
+    def test_prefers_container_dataset_name(self):
+        cd = Mock()
+        cd.id = 42
+        cd.name = 'custom.csv'
+        cd.dataset.name = 'original.txt'
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        result = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('custom_42.csv', result)
+
+    def test_no_extension(self):
+        cd = Mock()
+        cd.id = 7
+        cd.name = ''
+        cd.dataset.name = 'data'
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        result = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual('data_7', result)
+
+
+class RunContainerFormatKwArgsTests(TestCase):
+    def _make_cd(self, cd_id, argument, multi_position, ds_name):
+        cd = Mock()
+        cd.id = cd_id
+        cd.name = ''
+        cd.argument = argument
+        cd.multi_position = multi_position
+        cd.dataset = Mock()
+        cd.dataset.name = ds_name
+        return cd
+
+    def test_optional_multiple_ordered_by_multi_position(self):
+        arg_inputs = Mock()
+        arg_inputs.name = 'inputs'
+        arg_inputs.type = ContainerArgument.INPUT
+        arg_inputs.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+
+        cds = [
+            self._make_cd(101, arg_inputs, 3, 'c.csv'),
+            self._make_cd(102, arg_inputs, 1, 'a.csv'),
+            self._make_cd(103, arg_inputs, 2, 'b.csv'),
+        ]
+
+        paths = list(runcontainer.Command._format_kw_args(cds))
+        expected_order = [
+            '--inputs',
+            '/mnt/input/a_102.csv',
+            '/mnt/input/b_103.csv',
+            '/mnt/input/c_101.csv',
+        ]
+        self.assertEqual(expected_order, paths)
+
+    def test_optional_single_uses_same_helper(self):
+        arg_input = Mock()
+        arg_input.name = 'input'
+        arg_input.type = ContainerArgument.INPUT
+        arg_input.argtype = ContainerArgumentType.OPTIONAL_INPUT
+
+        cd = self._make_cd(201, arg_input, None, 'sample.txt')
+
+        paths = list(runcontainer.Command._format_kw_args([cd]))
+        expected_filename = runcontainer.Command._sandbox_input_filename(cd)
+        self.assertEqual([
+            '--input',
+            f'/mnt/input/{expected_filename}',
+        ], paths)
+        self.assertNotIn('/mnt/input/sample.txt', paths)
