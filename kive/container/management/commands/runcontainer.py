@@ -199,22 +199,15 @@ class Command(BaseCommand):
     @staticmethod
     def _format_kw_args(
             containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
-        def argument_sort_key(arg):
-            return (
-                arg.position is None,
-                arg.position if arg.position is not None else 0,
-                arg.name,
-                arg.pk or 0,
-            )
+        from collections import OrderedDict
 
-        arguments = sorted(
-            {cd.argument for cd in containerdatasets},
-            key=argument_sort_key,
-        )
+        grouped = OrderedDict()
+        for cd in containerdatasets:
+            grouped.setdefault(cd.argument, []).append(cd)
 
-        for arg in arguments:
+        for arg, argcontainerdatasets in grouped.items():
             argcontainerdatasets = sorted(
-                [cd for cd in containerdatasets if cd.argument == arg],
+                argcontainerdatasets,
                 key=lambda cd: (
                     cd.multi_position if cd.multi_position is not None else 0,
                     cd.pk or 0,
