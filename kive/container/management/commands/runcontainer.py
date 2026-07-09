@@ -199,18 +199,27 @@ class Command(BaseCommand):
     @staticmethod
     def _format_kw_args(
             containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
-        def sort_by_position(
-            cds: typing.List[ContainerDataset]
-        ) -> typing.List[ContainerDataset]:
-            return sorted(
-                cds,
-                key=lambda d: d.multi_position or 0)
+        def argument_sort_key(arg):
+            return (
+                arg.position is None,
+                arg.position if arg.position is not None else 0,
+                arg.name,
+                arg.pk or 0,
+            )
 
-        grouped = {
-            arg: sort_by_position([d for d in containerdatasets if d.argument == arg])
-            for arg in set(d.argument for d in containerdatasets)
-        }
-        for arg, argcontainerdatasets in grouped.items():
+        arguments = sorted(
+            {cd.argument for cd in containerdatasets},
+            key=argument_sort_key,
+        )
+
+        for arg in arguments:
+            argcontainerdatasets = sorted(
+                [cd for cd in containerdatasets if cd.argument == arg],
+                key=lambda cd: (
+                    cd.multi_position if cd.multi_position is not None else 0,
+                    cd.pk or 0,
+                ),
+            )
             if arg.type == ContainerArgument.INPUT:
                 datasetfolder = "/mnt/input"
             else:
