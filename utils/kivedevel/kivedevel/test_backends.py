@@ -400,5 +400,45 @@ class TestIncusNetworkCheckReadiness(unittest.TestCase):
         self.assertGreaterEqual(len(delete_calls), 1)
 
 
+ 
+
+class TestPrepareHostDefaults(unittest.TestCase):
+    """Verify prepare-host CLI and preseed defaults."""
+
+    def test_prepare_host_default_bridge_is_kive_lab_br(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["prepare-host", "--backend", "incus"])
+        self.assertEqual(args.bridge, "kive-lab-br")
+
+    def test_prepare_host_preseed_uses_kive_lab_cidr(self):
+        from Kive.utils.kivedevel.kivedevel.backends.incus_host import (
+            DEFAULT_VM_BRIDGE_CIDR,
+        )
+        preseed = f"""config: {{}}
+networks:
+- name: kive-lab-br
+  type: bridge
+  config:
+    ipv4.address: {DEFAULT_VM_BRIDGE_CIDR}
+    ipv4.nat: "true"
+    ipv6.address: none
+"""
+        self.assertIn("10.77.77.1/24", preseed)
+        self.assertNotIn("auto", preseed.splitlines()[6])
+
+    def test_prepare_host_default_bridge_is_not_incusbr0(self):
+        import argparse
+        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["prepare-host", "--backend", "incus"])
+        self.assertNotEqual(args.bridge, "incusbr0")
+
+
 if __name__ == "__main__":
     unittest.main()

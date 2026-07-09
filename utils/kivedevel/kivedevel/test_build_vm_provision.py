@@ -1925,11 +1925,18 @@ class TestVmNetwork(unittest.TestCase):
             {"name": "incusbr0", "type": "bridge", "managed": True},
         ]), "kive-lab-br")
 
-    def test_ensure_managed_vm_network_uses_incusbr0_fallback(self):
+    def test_ensure_managed_vm_network_ignores_incusbr0_by_default(self):
         cmds = mock.Mock()
-        self._mock_bridge_selection(cmds, json.dumps([
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
+            ensure_managed_vm_network, DEFAULT_VM_BRIDGE, DEFAULT_VM_BRIDGE_CIDR,
+        )
+        cmds.incus.output.return_value = json.dumps([
             {"name": "incusbr0", "type": "bridge", "managed": True},
-        ]), "incusbr0")
+        ])
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_incus_network_create"):
+                result = ensure_managed_vm_network(cmds, None)
+        self.assertEqual(result.name, DEFAULT_VM_BRIDGE)
 
     def test_ensure_managed_vm_network_respects_requested(self):
         cmds = mock.Mock()
@@ -1941,6 +1948,17 @@ class TestVmNetwork(unittest.TestCase):
             with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
                 result = ensure_managed_vm_network(cmds, "mybr")
         self.assertEqual(result.name, "mybr")
+
+    def test_ensure_managed_vm_network_explicit_incusbr0_still_works(self):
+        cmds = mock.Mock()
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "incusbr0", "type": "bridge", "managed": True},
+        ])
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_incus_bridge_config"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+                result = ensure_managed_vm_network(cmds, "incusbr0")
+        self.assertEqual(result.name, "incusbr0")
 
     def test_ensure_managed_vm_network_repairs_bridge(self):
         cmds = mock.Mock()
