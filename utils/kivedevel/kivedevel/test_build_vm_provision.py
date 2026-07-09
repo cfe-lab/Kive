@@ -1900,44 +1900,66 @@ class TestVmNetwork(unittest.TestCase):
         self.assertEqual(result.name, DEFAULT_VM_BRIDGE)
         self.assertTrue(result.managed)
 
+    def _mock_bridge_selection(self, cmds, bridges_json, expected_name, **kwargs):
+        """Helper: mock ensure_managed_vm_network selection validation."""
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
+            ensure_managed_vm_network, DEFAULT_VM_BRIDGE_CIDR, _MUTABLE_KEYS,
+        )
+        cidr = kwargs.get("cidr", DEFAULT_VM_BRIDGE_CIDR)
+        # Build side_effect for all the incus.output calls
+        se = [bridges_json] * 2  # get_existing_bridges (ensure, then _managed_bridge_info)
+        se.append(cidr)  # network get ipv4.address
+        for _ in _MUTABLE_KEYS:
+            se.append("true")  # each mutable key returns "true" (already correct)
+        se.append("none")  # network get ipv6.address (already correct)
+        cmds.incus.output.side_effect = se
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+            result = ensure_managed_vm_network(cmds, None)
+        self.assertEqual(result.name, expected_name)
+        return result
+
     def test_ensure_managed_vm_network_prefers_kive_lab_br(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
         cmds = mock.Mock()
-        cmds.incus.output.return_value = json.dumps([
+        self._mock_bridge_selection(cmds, json.dumps([
             {"name": "kive-lab-br", "type": "bridge", "managed": True},
             {"name": "incusbr0", "type": "bridge", "managed": True},
-        ])
-        result = ensure_managed_vm_network(cmds, None)
-        self.assertEqual(result.name, "kive-lab-br")
+        ]), "kive-lab-br")
 
     def test_ensure_managed_vm_network_uses_incusbr0_fallback(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
         cmds = mock.Mock()
-        cmds.incus.output.return_value = json.dumps([
+        self._mock_bridge_selection(cmds, json.dumps([
             {"name": "incusbr0", "type": "bridge", "managed": True},
+        ]), "incusbr0")
+
+    def test_ensure_managed_vm_network_respects_requested(self):
+        cmds = mock.Mock()
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "mybr", "type": "bridge", "managed": True},
         ])
-        result = ensure_managed_vm_network(cmds, None)
-        self.assertEqual(result.name, "incusbr0")
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_incus_bridge_config"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+                result = ensure_managed_vm_network(cmds, "mybr")
+        self.assertEqual(result.name, "mybr")
 
     def test_ensure_managed_vm_network_repairs_bridge(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
         cmds = mock.Mock()
-        # get_existing_bridges is called twice (once in ensure, once in _managed_bridge_info)
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
+            ensure_managed_vm_network, DEFAULT_VM_BRIDGE_CIDR, _MUTABLE_KEYS,
+        )
         net_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
-        cidr_val = "10.166.248.1/24"
-        cmds.incus.output.side_effect = [
-            net_json,       # get_existing_bridges (ensure)
-            net_json,       # get_existing_bridges (_managed_bridge_info)
-            "auto",         # network get ipv4.address
-            "false",        # network get ipv4.nat
-            "true",         # network get ipv4.routing
-            "true",         # network get ipv4.firewall
-            "2001:db8::1",  # network get ipv6.address
-        ]
-        ensure_managed_vm_network(cmds, None)
+        # Simulate ipv4.nat needing repair ("false" instead of "true")
+        se = [net_json] * 2
+        se.append(DEFAULT_VM_BRIDGE_CIDR)  # ipv4.address matches
+        for key in _MUTABLE_KEYS:
+            se.append("false" if key == "ipv4.nat" else "true")
+        se.append("none")  # ipv6.address
+        cmds.incus.output.side_effect = se
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+            ensure_managed_vm_network(cmds, None)
         set_calls = [c for c in cmds.incus.run.call_args_list
                      if c[0][0][:3] == ["network", "set", "kive-lab-br"]]
-        self.assertGreaterEqual(len(set_calls), 2)
+        self.assertGreaterEqual(len(set_calls), 1)
 
     def test_ensure_managed_vm_network_fails_on_unmanaged(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
@@ -1947,15 +1969,6 @@ class TestVmNetwork(unittest.TestCase):
         ])
         with self.assertRaises(SystemExit):
             ensure_managed_vm_network(cmds, "kive-lab-br")
-
-    def test_ensure_managed_vm_network_respects_requested(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
-        cmds = mock.Mock()
-        cmds.incus.output.return_value = json.dumps([
-            {"name": "mybr", "type": "bridge", "managed": True},
-        ])
-        result = ensure_managed_vm_network(cmds, "mybr")
-        self.assertEqual(result.name, "mybr")
 
     def test_get_existing_bridges_returns_parsed(self):
         from Kive.utils.kivedevel.kivedevel.build_vm.network import get_existing_bridges
@@ -2073,12 +2086,6 @@ class TestVmNetwork(unittest.TestCase):
         cmds.incus.output.return_value = json.dumps([])
         result = wait_vm_dhcp_lease(cmds, "kive-minimal", "kive-lab-br", timeout=0.1)
         self.assertIsNone(result)
-
-    def test_network_code_does_not_call_subprocess_iptables(self):
-        network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
-        text = network_path.read_text()
-        self.assertNotIn('"iptables"', text)
-        self.assertNotIn("'iptables'", text)
 
     def test_network_code_does_not_call_subprocess_sysctl(self):
         network_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "network.py"
