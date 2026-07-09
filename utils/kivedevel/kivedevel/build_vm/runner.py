@@ -232,12 +232,72 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
             sys.exit(1)
         logger.info("VM %s has IP %s.", cfg.instance, ip)
 
+        logger.info("Checking VM network egress via incus exec...")
+        _check_vm_egress(cmds, cfg.instance)
+
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 
     if cfg.provision:
         print(f"VM {cfg.instance} provisioned. Use incus exec {cfg.instance} -- bash to connect.")
 
     return actual_instance_type
+
+
+_VM_EGRESS_CHECK_SCRIPT = """
+ip addr
+ip route
+cat /etc/resolv.conf
+getent ahostsv4 archive.ubuntu.com
+python3 -c 'import socket; sock=socket.create_connection(("1.1.1.1",443), timeout=10); sock.close()' && echo "raw IPv4 egress OK"
+python3 -c 'import socket; addr=socket.getaddrinfo("archive.ubuntu.com",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()' && echo "archive.ubuntu.com:80 OK"
+"""
+
+
+def _check_vm_egress(cmds: Cmds, instance: str) -> None:
+    """Run a bounded egress check inside the VM via ``incus exec``.
+
+    Server-side (build-vm host) runs this after DHCP lease is confirmed
+    but before full provisioning begins.  It distinguishes:
+    * DHCP lease present but guest TCP egress failed,
+    * raw IPv4 TCP fails,
+    * DNS works but TCP fails,
+    * ``incus exec``/agent unavailable.
+
+    If ``incus exec`` is unavailable, this is reported without blocking
+    provisioning (the provision script inside the guest will do its own
+    checks).
+    """
+    try:
+        result = cmds.incus.run(
+            ["exec", instance, "--", "sh", "-c", _VM_EGRESS_CHECK_SCRIPT],
+            check=False, capture_output=True, timeout=60,
+        )
+    except subprocess.TimeoutExpired:
+        logger.warning("VM egress check timed out (incus exec may be slow on first boot).")
+        return
+    except Exception as exc:
+        logger.warning("VM egress check skipped (incus exec unavailable): %s", exc)
+        return
+
+    output = (result.stdout or "") + (result.stderr or "")
+    if "raw IPv4 egress OK" not in output:
+        logger.error(
+            "VM %s has DHCP lease but cannot reach the internet by IP.\n"
+            "This likely means host forwarding/NAT/firewall is blocking egress "
+            "from the Incus bridge.\n%s",
+            instance, output,
+        )
+        sys.exit(1)
+
+    if "archive.ubuntu.com:80 OK" not in output:
+        logger.warning(
+            "VM %s has raw IP egress but cannot reach archive.ubuntu.com:80. "
+            "This may be a transient DNS or routing issue.\n%s",
+            instance, output,
+        )
+        return
+
+    logger.info("VM egress check passed.")
 
 
 def run_build_vm(args: argparse.Namespace) -> None:

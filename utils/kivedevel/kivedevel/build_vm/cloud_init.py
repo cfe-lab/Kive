@@ -65,13 +65,21 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       echo "=== network preflight ==="
       ip addr || true
       ip route || true
+      resolvectl status || true
       cat /etc/resolv.conf || true
-      getent hosts archive.ubuntu.com || true
-      getent ahostsv4 archive.ubuntu.com || true
-      if ! timeout --foreground 30s python3 -c 'import socket,sys; addr=socket.getaddrinfo("archive.ubuntu.com", 80, socket.AF_INET, socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
-        echo "Network check failed or timed out: cannot open TCP connection to archive.ubuntu.com:80 from inside $(hostname)" >&2
+
+      if ! timeout --foreground 15s python3 -c 'import socket; sock=socket.create_connection(("1.1.1.1",443), timeout=10); sock.close()'; then
+        echo "raw IPv4 egress failed; likely host forwarding/NAT/firewall." >&2
         exit 1
       fi
+      echo "--- raw IPv4 egress OK ---"
+
+      getent ahostsv4 archive.ubuntu.com || true
+      if ! timeout --foreground 15s python3 -c 'import socket; addr=socket.getaddrinfo("archive.ubuntu.com",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
+        echo "DNS resolution worked but TCP egress to archive.ubuntu.com:80 failed." >&2
+        exit 1
+      fi
+      echo "--- TCP egress to archive.ubuntu.com OK ---"
       echo "=== apt install prerequisites ==="
       export DEBIAN_FRONTEND=noninteractive
       if ! timeout --foreground 180s apt-get update; then
@@ -274,41 +282,27 @@ def enable_network_config(
 ) -> bool:
     """Set cloud-init network config for the instance.
 
-    For VM mode, we skip setting network config entirely and let the Ubuntu
-    cloud image use its default DHCP behavior on the attached NIC.
+    For VM mode: skip network config entirely and let the Ubuntu cloud image
+    use its default DHCP behavior on the attached NIC.  The static IP path
+    (``--vm-ip`` / ``--vm-cidr``) has been removed — VMs always use DHCP.
 
-    For container mode, write a DHCP config for ``eth0``.
+    For container mode: write a DHCP config for ``eth0``.
 
     Returns True if a change was made.
     """
     if instance_type == "vm":
+        if static_ip or cidr or gateway:
+            logger.error(
+                "Static VM IP configuration (--vm-ip / --vm-cidr) is no longer supported. "
+                "VMs always use DHCP from the Incus managed bridge."
+            )
+            sys.exit(1)
         current = cmds.incus.output(["config", "get", instance, "user.network-config"]).strip()
         if not current:
-            logger.debug("No network-config set for %s — cloud-init defaults to DHCP.", instance)
             return False
-        if static_ip and cidr and gateway:
-            network_config = f"""\
-version: 2
-ethernets:
-  enp5s0:
-    dhcp4: false
-    addresses:
-      - {static_ip}/{cidr.split("/")[1]}
-    routes:
-      - to: default
-        via: {gateway}
-    nameservers:
-      addresses: [8.8.8.8,1.1.1.1]
-"""
-            if current.rstrip() == network_config.rstrip():
-                return False
-            _set_network_config(cmds, instance, network_config)
-            return True
-        if current:
-            logger.debug("Removing stale network-config from %s.", instance)
-            cmds.incus.run(["config", "unset", instance, "user.network-config"])
-            return True
-        return False
+        logger.debug("Removing stale network-config from %s.", instance)
+        cmds.incus.run(["config", "unset", instance, "user.network-config"])
+        return True
 
     # Container mode: write DHCP config for eth0
     network_config = """\
