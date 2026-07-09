@@ -1925,17 +1925,21 @@ class TestVmNetwork(unittest.TestCase):
         # get_existing_bridges is called twice (once in ensure, once in _managed_bridge_info)
         net_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
         cidr_val = "10.166.248.1/24"
+        # ipv4.routing and ipv4.firewall checks each consume an entry
         cmds.incus.output.side_effect = [
             net_json,       # get_existing_bridges (ensure)
             net_json,       # get_existing_bridges (_managed_bridge_info)
             "auto",         # network get ipv4.address
             "false",        # network get ipv4.nat
+            "true",         # network get ipv4.routing
+            "true",         # network get ipv4.firewall
             "2001:db8::1",  # network get ipv6.address
             cidr_val,       # _get_bridge_cidr
         ]
         with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_ip_forward"):
-            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_egress_nftables"):
-                ensure_managed_vm_network(cmds, None)
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_host_egress_iptables"):
+                with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._verify_host_egress"):
+                    ensure_managed_vm_network(cmds, None)
         set_calls = [c for c in cmds.incus.run.call_args_list
                      if c[0][0][:3] == ["network", "set", "kive-lab-br"]]
         self.assertGreaterEqual(len(set_calls), 2)
