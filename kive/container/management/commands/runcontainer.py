@@ -107,19 +107,17 @@ class Command(BaseCommand):
             raise RuntimeError('Inputs missing from reruns.')
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
-        for dataset in run.datasets.all():
-            if dataset.argument.argtype in (
-                    ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
-                    ContainerArgumentType.OPTIONAL_INPUT):
-                unique_filename = dataset.dataset.unique_filename()
-                target_path = os.path.join(input_path, unique_filename)
-                if os.path.exists(target_path):
-                    raise RuntimeError(
-                        "Supposedly unique output file already exists: {}".
-                        format(unique_filename))
-            else:
-                target_path = os.path.join(input_path, dataset.argument.name)
-            source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
+        for container_dataset in run.datasets.all():
+            target_path = os.path.join(
+                input_path,
+                self._sandbox_input_filename(container_dataset),
+            )
+            if os.path.exists(target_path):
+                raise RuntimeError(
+                    "File already exists in sandbox input: {}".format(
+                        target_path))
+            source_file = container_dataset.dataset.get_open_file_handle(
+                raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
         os.mkdir(os.path.join(run.full_sandbox_path, 'output'))
