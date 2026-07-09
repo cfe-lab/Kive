@@ -103,7 +103,24 @@ jobs:
       - name: Install build-vm runtime dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y incus rsync qemu-utils iproute2 socat
+          sudo apt-get install -y \
+            incus \
+            rsync \
+            qemu-utils \
+            qemu-system-x86 \
+            ovmf \
+            iproute2 \
+            socat
+
+      - name: QEMU diagnostics
+        run: |
+          echo "=== QEMU diagnostics ==="
+          command -v qemu-system-x86_64 || true
+          qemu-system-x86_64 --version || true
+          echo "=== KVM ==="
+          ls -l /dev/kvm || true
+          echo "=== Incus ==="
+          incus info || true
 
       - name: Prepare host
         run: |
