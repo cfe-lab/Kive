@@ -4736,19 +4736,19 @@ class RunContainerMultiInputTests(TestCase):
         run = ContainerRun.objects.create(user=User.objects.first(),
                                           app=self.app)
 
-        cd1 = ContainerDataset.objects.create(
+        ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_a,
             multi_position=1)
-        cd2 = ContainerDataset.objects.create(
+        ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_b,
             multi_position=2)
-        cd3 = ContainerDataset.objects.create(
+        ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=3)
-        cd4 = ContainerDataset.objects.create(
+        ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=4)
-        cd5 = ContainerDataset.objects.create(
+        ContainerDataset.objects.create(
             run=run, argument=self.arg_inputs, dataset=self.ds_e,
             multi_position=5)
 
