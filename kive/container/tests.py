@@ -1956,6 +1956,12 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.test_app = ContainerApp.objects.create(container=container, name='test')
         self.test_arg = self.test_app.arguments.create(type=ContainerArgument.INPUT)
         self.dataset = Dataset.create_empty(user=user)
+        self.dataset.name = "batch_api_input.txt"
+        self.dataset.dataset_file.save(
+            "batch_api_input.txt",
+            ContentFile(b"batch api input\n"),
+            save=True,
+        )
         self.test_run = self.test_app.runs.create(user=user, batch=self.test_batch)
         self.test_run.datasets.create(argument=self.test_arg, dataset=self.dataset)
 
