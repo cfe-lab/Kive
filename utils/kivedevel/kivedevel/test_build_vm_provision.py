@@ -2308,6 +2308,59 @@ class TestPortForward(unittest.TestCase):
         mock_proxy.assert_called_once()
 
 
+class TestVmEgressCheck(unittest.TestCase):
+    def _make_cmds(self, returncode=0, stdout="", stderr=""):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=returncode, stdout=stdout, stderr=stderr,
+        )
+        return cmds
+
+    def test_transport_error_websocket_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: websocket: bad handshake")
+        _check_vm_egress(cmds, "test-vm")  # Should not raise SystemExit
+
+    def test_transport_error_agent_not_running_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: VM agent isn't currently running")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_transport_error_connection_refused_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: connection refused")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_transport_error_not_connected_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: not connected")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_non_transport_error_does_not_abort(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stdout="some network output", stderr="exit code 1")
+        _check_vm_egress(cmds, "test-vm")  # Should not raise SystemExit for non-transport errors
+
+    def test_successful_egress_returns(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        stdout = (
+            "1: lo: ...\n"
+            "2: enp5s0: ... inet 10.166.248.88/24 ...\n"
+            "default via 10.166.248.1 dev enp5s0\n"
+            "raw IPv4 egress OK\n"
+            "archive.ubuntu.com:80 OK\n"
+        )
+        cmds = self._make_cmds(returncode=0, stdout=stdout)
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_fails_on_missing_raw_ipv4(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        stdout = "1: lo: ...\nraw IPv4 egress missing\n"
+        cmds = self._make_cmds(returncode=0, stdout=stdout)
+        with self.assertRaises(SystemExit):
+            _check_vm_egress(cmds, "test-vm")
+
+
 class TestProfileRootDisk(unittest.TestCase):
     def _make_cmds(self, ok_return: bool = True, output_yaml: str = ""):
         cmds = mock.Mock()
