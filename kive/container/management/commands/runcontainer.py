@@ -81,7 +81,7 @@ class Command(BaseCommand):
         return run
 
     @staticmethod
-    def _sandbox_input_filename(container_dataset: ContainerDataset) -> str:
+    def _sandbox_argument_filename(container_dataset: ContainerDataset) -> str:
         argtype = container_dataset.argument.argtype
         if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
             base_name = container_dataset.name or container_dataset.dataset.name
@@ -102,7 +102,7 @@ class Command(BaseCommand):
         for container_dataset in run.datasets.all():
             target_path = os.path.join(
                 input_path,
-                self._sandbox_input_filename(container_dataset),
+                self._sandbox_argument_filename(container_dataset),
             )
             if os.path.exists(target_path):
                 raise RuntimeError(
@@ -219,7 +219,7 @@ class Command(BaseCommand):
             yield "--{}".format(arg.name)
             yield from (os.path.join(
                 datasetfolder,
-                Command._sandbox_input_filename(cd))
+                Command._sandbox_argument_filename(cd))
                         for cd in argcontainerdatasets)
 
     @staticmethod

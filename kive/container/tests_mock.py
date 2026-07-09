@@ -1112,7 +1112,7 @@ class SandboxInputFilenameTests(TestCase):
         cd = Mock()
         cd.argument.argtype = ContainerArgumentType.FIXED_INPUT
         cd.argument.name = 'input_txt'
-        result = runcontainer.Command._sandbox_input_filename(cd)
+        result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('input_txt', result)
 
     def test_optional_input_includes_container_dataset_id(self):
@@ -1121,7 +1121,7 @@ class SandboxInputFilenameTests(TestCase):
         cd.name = ''
         cd.dataset.name = 'sample.txt'
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
-        result = runcontainer.Command._sandbox_input_filename(cd)
+        result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('sample_42.txt', result)
 
     def test_optional_multiple_includes_container_dataset_id(self):
@@ -1130,7 +1130,7 @@ class SandboxInputFilenameTests(TestCase):
         cd.name = ''
         cd.dataset.name = 'data.csv'
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        result = runcontainer.Command._sandbox_input_filename(cd)
+        result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('data_99.csv', result)
 
     def test_same_dataset_different_ids_gives_different_filenames(self):
@@ -1145,8 +1145,8 @@ class SandboxInputFilenameTests(TestCase):
         cd2.dataset.name = 'sample.txt'
         cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         self.assertNotEqual(
-            runcontainer.Command._sandbox_input_filename(cd1),
-            runcontainer.Command._sandbox_input_filename(cd2),
+            runcontainer.Command._sandbox_argument_filename(cd1),
+            runcontainer.Command._sandbox_argument_filename(cd2),
         )
 
     def test_duplicate_dataset_names_different_ids(self):
@@ -1161,8 +1161,8 @@ class SandboxInputFilenameTests(TestCase):
         cd2.dataset.name = 'file.txt'
         cd2.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
         self.assertNotEqual(
-            runcontainer.Command._sandbox_input_filename(cd1),
-            runcontainer.Command._sandbox_input_filename(cd2),
+            runcontainer.Command._sandbox_argument_filename(cd1),
+            runcontainer.Command._sandbox_argument_filename(cd2),
         )
 
     def test_prefers_container_dataset_name(self):
@@ -1171,7 +1171,7 @@ class SandboxInputFilenameTests(TestCase):
         cd.name = 'custom.csv'
         cd.dataset.name = 'original.txt'
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
-        result = runcontainer.Command._sandbox_input_filename(cd)
+        result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('custom_42.csv', result)
 
     def test_no_extension(self):
@@ -1180,7 +1180,7 @@ class SandboxInputFilenameTests(TestCase):
         cd.name = ''
         cd.dataset.name = 'data'
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
-        result = runcontainer.Command._sandbox_input_filename(cd)
+        result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('data_7', result)
 
 
@@ -1225,7 +1225,7 @@ class RunContainerFormatKwArgsTests(TestCase):
         cd = self._make_cd(201, arg_input, None, 'sample.txt')
 
         paths = list(runcontainer.Command._format_kw_args([cd]))
-        expected_filename = runcontainer.Command._sandbox_input_filename(cd)
+        expected_filename = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual([
             '--input',
             f'/mnt/input/{expected_filename}',

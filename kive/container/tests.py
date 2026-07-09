@@ -4538,7 +4538,7 @@ class ContainerRunCreateValidationTests(TestCase):
             argument=self.fixed_arg,
             dataset=self.dataset1,
         )
-        staged_name = runcontainer.Command._sandbox_input_filename(cd)
+        staged_name = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('fixed_in', staged_name)
 
     def test_optional_single_staging_and_command_consistent(self):
@@ -4547,7 +4547,7 @@ class ContainerRunCreateValidationTests(TestCase):
             argument=self.opt_single_arg,
             dataset=self.dataset1,
         )
-        staged_name = runcontainer.Command._sandbox_input_filename(cd)
+        staged_name = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertIn(str(cd.id), staged_name)
         self.assertNotEqual(self.dataset1.name, staged_name)
 
@@ -4771,7 +4771,7 @@ class RunContainerMultiInputTests(TestCase):
         ]
 
         expected_paths = [
-            '/mnt/input/' + runcontainer.Command._sandbox_input_filename(cd)
+            '/mnt/input/' + runcontainer.Command._sandbox_argument_filename(cd)
             for cd in cds
         ]
 
