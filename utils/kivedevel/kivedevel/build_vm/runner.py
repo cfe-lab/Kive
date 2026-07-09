@@ -316,10 +316,18 @@ def _check_vm_egress(cmds: Cmds, instance: str) -> None:
     output = (result.stdout or "") + stderr
     if "raw IPv4 egress OK" not in output:
         logger.error(
-            "VM %s has DHCP lease but cannot reach the internet by IP.\n"
-            "This likely means host forwarding/NAT/firewall is blocking egress "
-            "from the Incus bridge.\n%s",
-            instance, output,
+            "VM %s has DHCP and a default route, but raw IPv4 egress failed.\n"
+            "The Incus managed bridge is not providing outbound connectivity.\n"
+            "Check the incusd daemon environment and Incus networking backend.\n\n"
+            "Diagnostics:\n"
+            "  incus network show kive-lab-br\n"
+            "  incus network list-leases kive-lab-br\n"
+            "  incus config show --expanded %s\n"
+            "  incus info\n"
+            "  dnsmasq --version\n"
+            "  nft --version\n"
+            "  iptables --version\n",
+            instance, instance,
         )
         sys.exit(1)
 
