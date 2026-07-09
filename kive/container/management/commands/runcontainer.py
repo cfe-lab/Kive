@@ -8,6 +8,7 @@ from subprocess import call
 import sys
 from traceback import format_exception_only
 import typing
+from collections import OrderedDict
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -199,8 +200,6 @@ class Command(BaseCommand):
     @staticmethod
     def _format_kw_args(
             containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
-        from collections import OrderedDict
-
         grouped = OrderedDict()
         for cd in containerdatasets:
             grouped.setdefault(cd.argument, []).append(cd)
