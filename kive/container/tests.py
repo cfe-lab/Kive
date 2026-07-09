@@ -4597,15 +4597,13 @@ class ContainerRunCreateValidationTests(TestCase):
             format="json",
         )
         force_authenticate(request, user=self.kive_user)
-        response = list_view(request).render()
+        response = self.list_view(request).render()
         self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
         self.assertIn('duplicate', str(response.data).lower())
 
     def test_serializer_allows_same_dataset_different_positions(self):
-        list_path = reverse("containerrun-list")
-        list_view, _, _ = resolve(list_path)
         request = self.factory.post(
-            list_path,
+            self.list_path,
             dict(
                 app=self.app_url,
                 datasets=[
@@ -4620,9 +4618,21 @@ class ContainerRunCreateValidationTests(TestCase):
             format="json",
         )
         force_authenticate(request, user=self.kive_user)
-        response = list_view(request).render()
+        response = self.list_view(request).render()
         self.assertEqual(status.HTTP_201_CREATED, response.status_code,
                          msg=f"Expected 201, got {response.status_code}: {response.data}")
+        run = ContainerRun.objects.get(pk=response.data["id"])
+        self.assertEqual(2, run.datasets.count())
+        self.assertEqual(
+            [1, 2],
+            list(run.datasets.order_by("multi_position")
+                 .values_list("multi_position", flat=True)),
+        )
+        self.assertEqual(
+            [self.dataset1.pk, self.dataset1.pk],
+            list(run.datasets.order_by("multi_position")
+                 .values_list("dataset_id", flat=True)),
+        )
 
 
 @skipIfDBFeature('is_mocked')
@@ -4646,13 +4656,11 @@ class RunContainerMultiInputTests(TestCase):
         content_a = b'sample1_cascade data\n'
         content_b = b'sample2_cascade data\n'
         content_c = b'sample1_wg fasta data\n'
-        content_d = b'sample2_wg fasta data\n'
         content_e = b'metadata info\n'
 
         self.ds_a = self._create_dataset(user, 'sample1_cascade.csv', content_a)
         self.ds_b = self._create_dataset(user, 'sample2_cascade.csv', content_b)
         self.ds_c = self._create_dataset(user, 'sample1_wg.fasta', content_c)
-        self.ds_d = self._create_dataset(user, 'sample2_wg.fasta', content_c)
         self.ds_e = self._create_dataset(user, 'metadata.csv', content_e)
 
     @staticmethod
@@ -4662,7 +4670,7 @@ class RunContainerMultiInputTests(TestCase):
         dataset.dataset_file.save(name, content_file)
         return dataset
 
-    def test_fill_sandbox_with_duplicate_dataset(self):
+    def test_fill_sandbox_with_same_dataset_twice(self):
         run = ContainerRun.objects.create(user=User.objects.first(),
                                           app=self.app)
 
@@ -4670,11 +4678,11 @@ class RunContainerMultiInputTests(TestCase):
             run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=1)
         ContainerDataset.objects.create(
-            run=run, argument=self.arg_inputs, dataset=self.ds_d,
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
             multi_position=2)
 
         handler = runcontainer.Command()
-        run.create_sandbox(prefix='test_multimulti_')
+        run.create_sandbox(prefix='test_same_ds_')
 
         handler.fill_sandbox(run)
 
@@ -4685,6 +4693,9 @@ class RunContainerMultiInputTests(TestCase):
         ]
         self.assertEqual(2, len(staged_files),
                          f'Expected 2 staged files, got {staged_files}')
+        self.assertEqual(
+            len(staged_files), len(set(staged_files)),
+            'Staged filenames are not distinct')
 
         for staged in staged_files:
             staged_path = os.path.join(input_dir, staged)
