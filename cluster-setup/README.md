@@ -1,6 +1,13 @@
 # CfE Cluster Setup
 
-This directory contains code and instructions for setting up a multi-host compute cluster.
+This directory contains code and instructions for setting up a production
+multi-host compute cluster for Kive.
+
+> For **local development**, see [dev-env/README.md](../dev-env/README.md)
+> instead. The local tooling is Incus-based and fully automated. This guide is
+> for production deployments.
+
+---
 
 ## Deployment to Octomore
 
@@ -225,6 +232,44 @@ From here, you can lock and expire the `ubuntu` user and start using one of the 
 if you have one.  Make sure that your uploaded `cluster-setup` directory is accessible by
 the account you're using if you do so.  The `lock_bootstrap_user.yaml` playbook can do this;
 modify the `user_name` variable if necessary.
+
+### Configuration variable reference
+
+Important Ansible variables for production deployment. See role defaults
+in `deployment/roles/kive_server/defaults/main.yml` for the exhaustive list.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `kive_tls_mode` | `provided` | `provided` or `self_signed` |
+| `kive_ssl_certificate_src` | — | Controller path to chained certificate file |
+| `kive_ssl_key_src` | — | Controller path to private key file |
+| `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate |
+| `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key |
+| `postgresql_version` | `16` | PostgreSQL major version |
+| `slurm_version` | `24.05` | Slurm source version |
+| `kive_user` | `kive` | System user for Kive runtime |
+| `kive_home` | `/usr/local/share/Kive` | Kive installation directory |
+
+### TLS certificate rotation
+
+To update TLS certificates on an existing production server without
+re-running the full playbook:
+
+```sh
+cd cluster-setup/deployment
+ansible-playbook -i inventory update_ssl_certs.yaml
+```
+
+This playbook copies new certificate and key files from the controller paths
+(`kive_ssl_certificate_src`, `kive_ssl_key_src`) to the target and restarts
+Apache.
+
+Verify the updated certificate:
+
+```sh
+echo | openssl s_client -connect your-server:443 -servername your-server \
+  2>/dev/null | openssl x509 -noout -dates -subject -issuer
+```
 
 ### Configure TLS for the web server
 
@@ -567,6 +612,15 @@ From `./deployment`, you can run Ansible commands against the inventoried
 hosts (including the head node).
 
 ### Architecture (for lack of a better name)
+
+## See also
+
+- [dev-env/README.md](../dev-env/README.md) — Local development environment
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — Contributing guide
+- [INSTALL.md](../INSTALL.md) — Manual / legacy installation
+- `deployment/README.md` — Deployment playbook details
+
+---
 
 Ansible executes *tasks* against one or more managed machines. Tasks may also
 depend on *variables*, *files*, or *templates*. These can also be grouped into *roles*,
