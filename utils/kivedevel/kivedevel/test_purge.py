@@ -1,0 +1,185 @@
+"""Tests for purge lifecycle: instance discovery, workdir cleanup, network removal."""
+
+from __future__ import annotations
+
+import json
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from Kive.utils.kivedevel.kivedevel._test_helpers import (
+    MockRunResult,
+    add_source_path,
+    make_cmds,
+)
+
+add_source_path()
+
+_PURGE = "Kive.utils.kivedevel.kivedevel.build_vm.purge"
+
+
+class TestFindTaggedInstances(unittest.TestCase):
+    """Discovery of tagged instances for purge."""
+
+    def setUp(self):
+        self.cmds = make_cmds()
+
+    def _import(self):
+        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        import importlib
+        importlib.reload(p)
+        return p
+
+    def test_returns_matching_instances(self):
+        purge = self._import()
+        self.cmds.incus.output.side_effect = [
+            "test-vm\nother-instance\n",
+            "user.kive.devel.created-by: utils/dev\n",
+            "",
+        ]
+        result = purge._find_tagged_instances(self.cmds)
+        self.assertEqual(result, ["test-vm"])
+
+    def test_returns_empty_when_none_found(self):
+        purge = self._import()
+        self.cmds.incus.output.side_effect = [
+            "test-vm\n",
+            "",
+        ]
+        result = purge._find_tagged_instances(self.cmds)
+        self.assertEqual(result, [])
+
+
+class TestFindMarkedWorkdirs(unittest.TestCase):
+    """Discovery of marked workdirs for purge."""
+
+    def setUp(self):
+        self.root = Path("/tmp/test_purge_root")
+        self.marker_path = self.root / ".kive-devel-resource.json"
+
+    def _import(self):
+        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        import importlib
+        importlib.reload(p)
+        return p
+
+    def test_accepts_created_by_underscore(self):
+        purge = self._import()
+        self.marker_path.parent.mkdir(parents=True, exist_ok=True)
+        self.marker_path.write_text(json.dumps({"created_by": "utils/dev", "kind": "build-workdir"}))
+        with mock.patch.object(Path, "rglob", return_value=[self.marker_path]):
+            result = purge._find_marked_workdirs(self.root)
+            self.assertEqual(len(result), 1)
+        self.marker_path.unlink()
+
+    def test_accepts_old_hyphen_key(self):
+        purge = self._import()
+        self.marker_path.parent.mkdir(parents=True, exist_ok=True)
+        self.marker_path.write_text(json.dumps({"created-by": "utils/dev", "kind": "build-workdir"}))
+        with mock.patch.object(Path, "rglob", return_value=[self.marker_path]):
+            result = purge._find_marked_workdirs(self.root)
+            self.assertEqual(len(result), 1)
+        self.marker_path.unlink()
+
+    def test_rejects_unknown_creator(self):
+        purge = self._import()
+        self.marker_path.parent.mkdir(parents=True, exist_ok=True)
+        self.marker_path.write_text(json.dumps({"created_by": "other", "kind": "build-workdir"}))
+        with mock.patch.object(Path, "rglob", return_value=[self.marker_path]):
+            result = purge._find_marked_workdirs(self.root)
+            self.assertEqual(len(result), 0)
+        self.marker_path.unlink()
+
+    def test_returns_empty_when_no_marker(self):
+        purge = self._import()
+        with mock.patch.object(Path, "rglob", return_value=[]):
+            result = purge._find_marked_workdirs(self.root)
+            self.assertEqual(len(result), 0)
+
+
+class TestPurge(unittest.TestCase):
+    """End-to-end purge behaviour with mocked incus."""
+
+    def setUp(self):
+        self.cmds = make_cmds()
+
+    def _import(self):
+        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        import importlib
+        importlib.reload(p)
+        return p
+
+    def _make_args(self, **overrides):
+        import argparse
+        args = argparse.Namespace()
+        args.root = Path("/tmp")
+        args.instances = None
+        args.workdirs = None
+        args.quiet = False
+        args.verbose = False
+        args.debug = False
+        args.log_file = None
+        for k, v in overrides.items():
+            setattr(args, k, v)
+        return args
+
+    def test_purge_idempotent_when_nothing_to_purge(self):
+        purge = self._import()
+        self.cmds.incus.output.return_value = ""
+        purge.run_purge(self._make_args())
+
+    def test_deletes_tagged_instances_and_marked_workdirs(self):
+        purge = self._import()
+        self.cmds.incus.output.side_effect = [
+            "test-vm\n",
+            "user.kive.devel.created-by: utils/dev\n",
+        ]
+        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
+            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
+                with mock.patch.object(purge, "_check_legacy_skipped"):
+                    with mock.patch.object(purge, "_detach_stale_nbd"):
+                        with mock.patch.object(purge, "_remove_port_forwards"):
+                            with mock.patch.object(purge, "_remove_registry"):
+                                purge.run_purge(self._make_args())
+        delete_calls = [
+            c for c in self.cmds.incus.run.call_args_list
+            if c[0][0][:2] == ["delete", "-f"]
+        ]
+        self.assertGreaterEqual(len(delete_calls), 1)
+
+    def test_remove_device_before_delete(self):
+        purge = self._import()
+        call_log = []
+
+        def capture(*args, **kwargs):
+            call_log.append(("run", args))
+            return MockRunResult(returncode=0)
+
+        self.cmds.incus.run.side_effect = capture
+        self.cmds.incus.output.side_effect = [
+            "test-vm\n",
+            "user.kive.devel.created-by: utils/dev\n",
+            "kive-code:\n",
+        ]
+        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
+            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
+                with mock.patch.object(purge, "_check_legacy_skipped"):
+                    with mock.patch.object(purge, "_detach_stale_nbd"):
+                        with mock.patch.object(purge, "_remove_port_forwards"):
+                            with mock.patch.object(purge, "_remove_registry"):
+                                purge.run_purge(self._make_args())
+
+    def test_purge_removes_web_proxy_device(self):
+        purge = self._import()
+        self.cmds.incus.output.side_effect = [
+            "test-vm\n",
+            "user.kive.devel.created-by: utils/dev\n",
+            "kive-web:\n",
+        ]
+        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
+            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
+                with mock.patch.object(purge, "_check_legacy_skipped"):
+                    with mock.patch.object(purge, "_detach_stale_nbd"):
+                        with mock.patch.object(purge, "_remove_port_forwards"):
+                            with mock.patch.object(purge, "_remove_registry"):
+                                purge.run_purge(self._make_args())
