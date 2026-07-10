@@ -10,6 +10,7 @@ from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
     make_cmds,
+    make_config,
 )
 
 add_source_path()
@@ -186,6 +187,136 @@ class TestEnsureVmNic(unittest.TestCase):
         ]
         result = ensure_vm_nic(self.cmds, "test-vm", self._target())
         self.assertFalse(result)
+
+
+class TestPortForward(unittest.TestCase):
+    """VM mode does not use incus proxy device."""
+
+    def test_vm_mode_does_not_call_incus_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_vm
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import VmNicTarget
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cfg = make_config()
+        nic_target = VmNicTarget(name="kive-lab-br", managed=True)
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_managed_vm_network",
+                       return_value=nic_target),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "vm")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_vm(cfg, cmds)
+
+    def test_vm_mode_calls_ensure_managed_vm_network(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_vm
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import VmNicTarget
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cfg = make_config()
+        nic_target = VmNicTarget(name="kive-lab-br", managed=True)
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_managed_vm_network",
+                       return_value=nic_target) as mock_choose,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "vm")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_vm_nic",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_vm(cfg, cmds)
+        mock_choose.assert_called_once()
+
+    def test_container_still_uses_web_proxy(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _run_build_vm_container
+        cmds = mock.Mock()
+        cmds.incus.output.return_value = ""
+        cfg = make_config(instance_type="container")
+        with (
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_instance",
+                       return_value=(True, "container")),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_network_device",
+                       return_value=False),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.ensure_user_data",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.enable_network_config",
+                       return_value=True),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_restart_after_config"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.handle_workspace_attachment"),
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner._ensure_web_proxy_device") as mock_proxy,
+            mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.runner.maybe_provision_instance"),
+        ):
+            _run_build_vm_container(cfg, cmds)
+        mock_proxy.assert_called_once()
+
+
+class TestVmEgressCheck(unittest.TestCase):
+    """Egress check transport error handling and success/failure."""
+
+    def _make_cmds(self, returncode=0, stdout="", stderr=""):
+        cmds = mock.Mock()
+        cmds.incus.run.return_value = MockRunResult(
+            returncode=returncode, stdout=stdout, stderr=stderr,
+        )
+        return cmds
+
+    def test_transport_error_websocket_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: websocket: bad handshake")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_transport_error_agent_not_running_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: VM agent isn't currently running")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_transport_error_connection_refused_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: connection refused")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_transport_error_not_connected_skips(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stderr="Error: not connected")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_non_transport_error_does_not_abort(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        cmds = self._make_cmds(returncode=1, stdout="some network output", stderr="exit code 1")
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_successful_egress_returns(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        stdout = (
+            "1: lo: ...\n"
+            "2: enp5s0: ... inet 10.166.248.88/24 ...\n"
+            "default via 10.166.248.1 dev enp5s0\n"
+            "raw IPv4 egress OK\n"
+            "archive.ubuntu.com:80 OK\n"
+        )
+        cmds = self._make_cmds(returncode=0, stdout=stdout)
+        _check_vm_egress(cmds, "test-vm")
+
+    def test_fails_on_missing_raw_ipv4(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_egress
+        stdout = "1: lo: ...\nraw IPv4 egress missing\n"
+        cmds = self._make_cmds(returncode=0, stdout=stdout)
+        with self.assertRaises(SystemExit):
+            _check_vm_egress(cmds, "test-vm")
 
 
 class TestWaitVmDhcpLease(unittest.TestCase):

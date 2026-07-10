@@ -169,6 +169,34 @@ class TestPurge(unittest.TestCase):
                             with mock.patch.object(purge, "_remove_registry"):
                                 purge.run_purge(self._make_args())
 
+    def test_purge_kills_port_forward(self):
+        purge = self._import()
+        import tempfile
+        import signal
+        import json
+        cmds = make_cmds()
+        cmds.incus.run.return_value = MockRunResult(returncode=0)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            reg = root / "tmp~" / ".kive-devel-resources.json"
+            reg.parent.mkdir(parents=True, exist_ok=True)
+            reg.write_text(json.dumps([
+                {"kind": "host-forward", "pid": 12345, "port": 8000,
+                 "vm_ip": "10.247.172.80", "created_by": "utils/dev"},
+            ], indent=2) + "\n")
+
+            args = self._make_args(root=root)
+            with (
+                mock.patch.object(purge, "Cmds") as mock_cmds_cls,
+                mock.patch.object(purge, "os") as mock_os,
+                mock.patch.object(purge, "configure_logging"),
+            ):
+                mock_cmds_cls.create.return_value = cmds
+                purge.run_purge(args)
+
+            mock_os.kill.assert_any_call(12345, signal.SIGTERM)
+
     def test_purge_removes_web_proxy_device(self):
         purge = self._import()
         self.cmds.incus.output.side_effect = [
