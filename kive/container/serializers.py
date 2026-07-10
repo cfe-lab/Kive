@@ -13,7 +13,7 @@ from librarian.models import Dataset
 class ContainerFamilySerializer(AccessControlSerializer,
                                 serializers.ModelSerializer):
     absolute_url = URLField(source='get_absolute_url', read_only=True)
-    num_containers = serializers.IntegerField()
+    num_containers = serializers.IntegerField(read_only=True)
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerfamily-removal-plan')
     containers = serializers.HyperlinkedIdentityField(

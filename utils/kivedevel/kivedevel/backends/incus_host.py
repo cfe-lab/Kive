@@ -6,6 +6,11 @@ import argparse
 import logging
 import subprocess
 
+from ..build_vm.network import (
+    DEFAULT_VM_BRIDGE,
+    DEFAULT_VM_BRIDGE_CIDR,
+    ensure_managed_vm_network,
+)
 from ..kv_commands import Cmds
 from ..shared import configure_console_logging
 
@@ -203,12 +208,13 @@ def run_prepare_host(args: argparse.Namespace) -> None:
         _run(["systemctl", "start", unit], check=False)
 
     # Initialize Incus with dir-backed storage pool, bridge network, default profile.
+    # If Incus is already initialized the preseed is a no-op; that is fine.
     preseed = f"""config: {{}}
 networks:
 - name: {bridge}
   type: bridge
   config:
-    ipv4.address: auto
+    ipv4.address: {DEFAULT_VM_BRIDGE_CIDR}
     ipv4.nat: "true"
     ipv6.address: none
 storage_pools:
@@ -229,6 +235,11 @@ profiles:
 """
     cmds.incus.run(["admin", "init", "--preseed"], input=preseed, check=False)
     cmds.incus.run(["info"], check=False)
+
+    # Ensure the Kive managed bridge exists with correct configuration.
+    # This handles the case where Incus was already initialized and the
+    # preseed above was a no-op.
+    ensure_managed_vm_network(cmds, bridge)
 
     if debug:
         _print_diagnostics(cmds, bridge)
@@ -271,8 +282,8 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument(
         "--bridge",
-        default="incusbr0",
-        help="Backend bridge network (default: incusbr0)",
+        default=DEFAULT_VM_BRIDGE,
+        help="Backend bridge network (default: kive-lab-br)",
     )
     _add_log_flags(parser)
     parser.set_defaults(func=run_prepare_host)

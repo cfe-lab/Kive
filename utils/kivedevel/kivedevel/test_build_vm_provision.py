@@ -1925,11 +1925,18 @@ class TestVmNetwork(unittest.TestCase):
             {"name": "incusbr0", "type": "bridge", "managed": True},
         ]), "kive-lab-br")
 
-    def test_ensure_managed_vm_network_uses_incusbr0_fallback(self):
+    def test_ensure_managed_vm_network_ignores_incusbr0_by_default(self):
         cmds = mock.Mock()
-        self._mock_bridge_selection(cmds, json.dumps([
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import (
+            ensure_managed_vm_network, DEFAULT_VM_BRIDGE, DEFAULT_VM_BRIDGE_CIDR,
+        )
+        cmds.incus.output.return_value = json.dumps([
             {"name": "incusbr0", "type": "bridge", "managed": True},
-        ]), "incusbr0")
+        ])
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network._ensure_incus_network_create"):
+                result = ensure_managed_vm_network(cmds, None)
+        self.assertEqual(result.name, DEFAULT_VM_BRIDGE)
 
     def test_ensure_managed_vm_network_respects_requested(self):
         cmds = mock.Mock()
@@ -1941,6 +1948,17 @@ class TestVmNetwork(unittest.TestCase):
             with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
                 result = ensure_managed_vm_network(cmds, "mybr")
         self.assertEqual(result.name, "mybr")
+
+    def test_ensure_managed_vm_network_explicit_incusbr0_still_works(self):
+        cmds = mock.Mock()
+        from Kive.utils.kivedevel.kivedevel.build_vm.network import ensure_managed_vm_network
+        cmds.incus.output.return_value = json.dumps([
+            {"name": "incusbr0", "type": "bridge", "managed": True},
+        ])
+        with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_incus_bridge_config"):
+            with mock.patch("Kive.utils.kivedevel.kivedevel.build_vm.network.validate_live_bridge_address"):
+                result = ensure_managed_vm_network(cmds, "incusbr0")
+        self.assertEqual(result.name, "incusbr0")
 
     def test_ensure_managed_vm_network_repairs_bridge(self):
         cmds = mock.Mock()
@@ -2180,6 +2198,52 @@ class TestVmNetwork(unittest.TestCase):
 
         nft_calls = [c for c in cmds.nft.run.call_args_list if "delete" in str(c)]
         self.assertEqual(len(nft_calls), 0)
+
+
+class TestVmCapabilityCheck(unittest.TestCase):
+    """Verify the VM preflight capability check."""
+
+    def test_qemu_found_for_x86_64(self):
+        with mock.patch("platform.machine", return_value="x86_64"):
+            with mock.patch("shutil.which", return_value="/usr/bin/qemu-system-x86_64"):
+                from Kive.utils.kivedevel.kivedevel.build_vm.runner import qemu_system_command_for_host
+                result = qemu_system_command_for_host()
+                self.assertEqual(result, "/usr/bin/qemu-system-x86_64")
+
+    def test_qemu_missing_for_x86_64(self):
+        with mock.patch("platform.machine", return_value="x86_64"):
+            with mock.patch("shutil.which", return_value=None):
+                from Kive.utils.kivedevel.kivedevel.build_vm.runner import qemu_system_command_for_host
+                result = qemu_system_command_for_host()
+                self.assertIsNone(result)
+
+    def test_check_vm_capability_passes_when_qemu_present(self):
+        with mock.patch("platform.machine", return_value="x86_64"):
+            with mock.patch("shutil.which", return_value="/usr/bin/qemu-system-x86_64"):
+                from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_capability
+                try:
+                    _check_vm_capability()
+                except SystemExit:
+                    self.fail("_check_vm_capability raised SystemExit when QEMU is present")
+
+    def test_check_vm_capability_fails_when_qemu_missing(self):
+        with mock.patch("platform.machine", return_value="x86_64"):
+            with mock.patch("shutil.which", return_value=None):
+                from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_capability
+                with self.assertRaises(SystemExit):
+                    _check_vm_capability()
+
+    def test_container_mode_does_not_check_qemu(self):
+        from Kive.utils.kivedevel.kivedevel.build_vm.runner import (
+            _run_build_vm_vm, _run_build_vm_container,
+        )
+        # Container mode entry point must not call the VM capability check.
+        import inspect
+        src = inspect.getsource(_run_build_vm_container)
+        self.assertNotIn("_check_vm_capability", src)
+        # VM mode entry point must call it.
+        src_vm = inspect.getsource(_run_build_vm_vm)
+        self.assertIn("_check_vm_capability", src_vm)
 
 
 class TestPortForward(unittest.TestCase):
