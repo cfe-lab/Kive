@@ -3,17 +3,18 @@
 from __future__ import annotations
 
 import json
+import sys
 import unittest
+from pathlib import Path
 from unittest import mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
     make_cmds,
     make_config,
 )
-
-add_source_path()
 
 _NET = "Kive.utils.kivedevel.kivedevel.build_vm.network"
 
@@ -86,7 +87,7 @@ class TestEnsureManagedVmNetwork(unittest.TestCase):
     def test_repairs_mutable_keys(self):
         net = self._import()
         bridges_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
-        se = [bridges_json] * 2
+        se = [bridges_json]
         se.append(net.DEFAULT_VM_BRIDGE_CIDR)
         for key in net._MUTABLE_KEYS:
             se.append("false" if key == "ipv4.nat" else "true")
@@ -118,7 +119,7 @@ class TestEnsureManagedVmNetwork(unittest.TestCase):
         for name in names:
             bridges.append({"name": name, "type": "bridge", "managed": True})
         bridges_json = json.dumps(bridges)
-        se = [bridges_json] * 2
+        se = [bridges_json]
         se.append(net.DEFAULT_VM_BRIDGE_CIDR)
         for _ in net._MUTABLE_KEYS:
             se.append("true")

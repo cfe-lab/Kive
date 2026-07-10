@@ -7,13 +7,16 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
     make_cmds,
 )
 
-add_source_path()
 
 _PURGE = "Kive.utils.kivedevel.kivedevel.build_vm.purge"
 
@@ -130,17 +133,17 @@ class TestPurge(unittest.TestCase):
 
     def test_deletes_tagged_instances_and_marked_workdirs(self):
         purge = self._import()
-        self.cmds.incus.output.side_effect = [
-            "test-vm\n",
-            "user.kive.devel.created-by: utils/dev\n",
-        ]
-        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
-                with mock.patch.object(purge, "_check_legacy_skipped"):
-                    with mock.patch.object(purge, "_detach_stale_nbd"):
-                        with mock.patch.object(purge, "_remove_port_forwards"):
-                            with mock.patch.object(purge, "_remove_registry"):
-                                purge.run_purge(self._make_args())
+        self.cmds.incus.output.return_value = ""
+        with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
+            with mock.patch.object(purge, "_check_legacy_skipped"):
+                with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
+                    with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
+                        with mock.patch.object(purge, "_detach_stale_nbd"):
+                            with mock.patch.object(purge, "_remove_port_forwards"):
+                                with mock.patch.object(purge, "_remove_registry"):
+                                    with mock.patch.object(purge, "Cmds") as mock_cmds_cls:
+                                        mock_cmds_cls.create.return_value = self.cmds
+                                        purge.run_purge(self._make_args())
         delete_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if c[0][0][:2] == ["delete", "-f"]

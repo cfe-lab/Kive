@@ -6,6 +6,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
@@ -13,7 +17,6 @@ from Kive.utils.kivedevel.kivedevel._test_helpers import (
     make_config,
 )
 
-add_source_path()
 
 _RUNNER = "Kive.utils.kivedevel.kivedevel.build_vm.runner"
 
@@ -41,8 +44,8 @@ class TestWebProxyDevice(unittest.TestCase):
 
     def test_skipped_when_no_web_proxy(self):
         ensure = self._import_ensure()
-        self.cfg.no_web_proxy = True
-        ensure(self.cmds, self.cfg)
+        cfg = make_config(no_web_proxy=True)
+        ensure(self.cmds, cfg)
         add_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "add" in str(c) and "proxy" in str(c)

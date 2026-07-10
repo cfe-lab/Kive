@@ -6,13 +6,16 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
     make_cmds,
 )
 
-add_source_path()
 
 
 class TestEnsureInstance(unittest.TestCase):
@@ -71,29 +74,35 @@ class TestVmCapabilityCheck(unittest.TestCase):
     """QEMU system emulator detection for VM mode."""
 
     def test_qemu_found_for_x86_64(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import qemu_system_command_for_host
-        with mock.patch("platform.machine", return_value="x86_64"):
-            with mock.patch("shutil.which", return_value="/usr/bin/qemu-system-x86_64"):
-                self.assertEqual(qemu_system_command_for_host(), "/usr/bin/qemu-system-x86_64")
+        import Kive.utils.kivedevel.kivedevel.build_vm.runner as runner_mod
+        with mock.patch.object(runner_mod, "shutil") as mock_shutil:
+            mock_shutil.which.return_value = "/usr/bin/qemu-system-x86_64"
+            with mock.patch("platform.machine", return_value="x86_64"):
+                result = runner_mod.qemu_system_command_for_host()
+                self.assertEqual(result, "qemu-system-x86_64")
+                mock_shutil.which.assert_called_once_with("qemu-system-x86_64")
 
     def test_qemu_missing_for_x86_64(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import qemu_system_command_for_host
-        with mock.patch("platform.machine", return_value="x86_64"):
-            with mock.patch("shutil.which", return_value=None):
-                self.assertIsNone(qemu_system_command_for_host())
+        import Kive.utils.kivedevel.kivedevel.build_vm.runner as runner_mod
+        with mock.patch.object(runner_mod, "shutil") as mock_shutil:
+            mock_shutil.which.return_value = None
+            with mock.patch("platform.machine", return_value="x86_64"):
+                self.assertIsNone(runner_mod.qemu_system_command_for_host())
 
     def test_check_vm_capability_passes_when_qemu_present(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_capability
-        with mock.patch("platform.machine", return_value="x86_64"):
-            with mock.patch("shutil.which", return_value="/usr/bin/qemu-system-x86_64"):
+        import Kive.utils.kivedevel.kivedevel.build_vm.runner as runner_mod
+        with mock.patch.object(runner_mod, "shutil") as mock_shutil:
+            mock_shutil.which.return_value = "/usr/bin/qemu-system-x86_64"
+            with mock.patch("platform.machine", return_value="x86_64"):
                 try:
-                    _check_vm_capability()
+                    runner_mod._check_vm_capability()
                 except SystemExit:
                     self.fail("_check_vm_capability raised SystemExit when QEMU is present")
 
     def test_check_vm_capability_fails_when_qemu_missing(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _check_vm_capability
-        with mock.patch("platform.machine", return_value="x86_64"):
-            with mock.patch("shutil.which", return_value=None):
+        import Kive.utils.kivedevel.kivedevel.build_vm.runner as runner_mod
+        with mock.patch.object(runner_mod, "shutil") as mock_shutil:
+            mock_shutil.which.return_value = None
+            with mock.patch("platform.machine", return_value="x86_64"):
                 with self.assertRaises(SystemExit):
-                    _check_vm_capability()
+                    runner_mod._check_vm_capability()

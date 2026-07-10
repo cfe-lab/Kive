@@ -6,13 +6,16 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
     make_cmds,
 )
 
-add_source_path()
 
 
 class TestValidateVm(unittest.TestCase):
@@ -30,10 +33,15 @@ class TestValidateVm(unittest.TestCase):
     def test_validate_vm_fails_when_instance_missing(self):
         checks = self._import()
         with mock.patch.object(checks, "instance_exists", return_value=False):
-            with mock.patch.object(checks, "instance_is_running", return_value=True):
-                args = mock.Mock(workdir=Path("/tmp"), instance="test", instance_type="vm")
-                with self.assertRaises(SystemExit):
-                    checks.run_validate_vm(args)
+            args = mock.Mock(spec=[])
+            args.workdir = Path("/tmp")
+            args.instance = "test"
+            args.instance_type = "vm"
+            args.quiet = False
+            args.verbose = False
+            args.debug = False
+            with self.assertRaises(SystemExit):
+                checks.run_validate_vm(args)
 
 
 class TestSingularityProbeFatal(unittest.TestCase):

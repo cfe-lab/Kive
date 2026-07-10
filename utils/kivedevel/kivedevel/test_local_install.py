@@ -6,28 +6,36 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
 )
 
-add_source_path()
 
 
 class TestSmokeLocalInstall(unittest.TestCase):
     """smoke-local-install orchestrates build-vm, validate-vm, test-api in sequence."""
 
+    def _make_args(self, **overrides) -> mock.Mock:
+        args = mock.Mock(spec=[])
+        args.workdir = Path("/tmp")
+        args.instance = "ci-smoke"
+        args.instance_type = "vm"
+        args.vm_network = ""
+        args.quiet = False
+        args.verbose = False
+        args.debug = False
+        for k, v in overrides.items():
+            setattr(args, k, v)
+        return args
+
     def test_invokes_build_then_validate_then_test_api(self):
         from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install
-        args = mock.Mock(
-            workdir=Path("/tmp"),
-            instance="ci-smoke",
-            instance_type="vm",
-            vm_network="",
-            quiet=False,
-            verbose=False,
-            debug=False,
-        )
+        args = self._make_args()
         call_order = []
 
         with mock.patch(
@@ -51,15 +59,7 @@ class TestSmokeLocalInstall(unittest.TestCase):
 
     def test_failure_in_build_stops_sequence(self):
         from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install
-        args = mock.Mock(
-            workdir=Path("/tmp"),
-            instance="ci-smoke",
-            instance_type="vm",
-            vm_network="",
-            quiet=False,
-            verbose=False,
-            debug=False,
-        )
+        args = self._make_args()
 
         with mock.patch(
             "Kive.utils.kivedevel.kivedevel.local_install.run_build_vm",

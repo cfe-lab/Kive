@@ -39,7 +39,6 @@ def make_config(instance: str = "test", instance_type: str = "vm", **overrides) 
         web_port=8000,
         no_web_proxy=False,
         vm_network="kive-lab-br",
-        image_name="kive-code.qcow2",
     )
     params.update(overrides)
     return BuildVmConfig(**params)

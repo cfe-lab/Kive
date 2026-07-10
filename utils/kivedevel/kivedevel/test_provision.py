@@ -7,6 +7,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+
 from Kive.utils.kivedevel.kivedevel._test_helpers import (
     MockRunResult,
     add_source_path,
@@ -14,7 +18,6 @@ from Kive.utils.kivedevel.kivedevel._test_helpers import (
     make_config,
 )
 
-add_source_path()
 
 
 _PROVISION_MODULE = "Kive.utils.kivedevel.kivedevel.build_vm.provision"
@@ -26,46 +29,44 @@ class TestMaybeProvisionInstance(unittest.TestCase):
     def setUp(self):
         self.cmds = make_cmds()
 
+    def _patch_probe(self, prov, marker, error=None):
+        """Patch the appropriate probe function for the instance type."""
+        prov._probe_markers_via_file_pull = mock.Mock(return_value=(marker, error))
+
     def test_returns_on_done_marker(self):
         prov = _import_provision()
-        prov._pull_file = mock.Mock(return_value=(True, "done"))
-        prov.maybe_provision_instance(self.cmds, "test", "container", provision=True, timeout=10)
+        self._patch_probe(prov, "done")
+        prov.maybe_provision_instance(self.cmds, "test", "vm", provision=True, timeout=10)
 
     def test_raises_on_failed_marker(self):
         prov = _import_provision()
-        prov._pull_file = mock.Mock(return_value=(True, "done"))
-        done_calls = []
-
-        def side_effect(cmds, instance, path):
-            if not done_calls:
-                done_calls.append(True)
-                return (True, "failed")
-            return (True, "done")
-
-        prov._pull_file = mock.Mock(side_effect=side_effect)
-        with mock.patch.object(prov, "_cloud_init_diagnostics", return_value=""):
-            prov._pull_file_first = mock.Mock(return_value=(True, "failed"))
-            with self.assertRaises(RuntimeError):
-                prov.maybe_provision_instance(self.cmds, "test", "container", provision=True, timeout=10)
-
-    def test_fails_on_stuck_started_marker(self):
-        prov = _import_provision()
-        prov._pull_file = mock.Mock(return_value=(True, "started"))
+        prov._probe_markers_via_file_pull = mock.Mock()
+        prov._probe_markers_via_file_pull.side_effect = [("failed", None)]
         import time as _time
-        with mock.patch.object(_time, "monotonic", return_value=99999):
+        with mock.patch.object(_time, "sleep"):
             with mock.patch.object(prov, "_cloud_init_diagnostics", return_value=""):
                 with self.assertRaises(RuntimeError):
                     prov.maybe_provision_instance(self.cmds, "test", "vm", provision=True, timeout=10)
 
+    def test_fails_on_stuck_started_marker(self):
+        prov = _import_provision()
+        self._patch_probe(prov, "started")
+        monotonic_vals = iter([100000, 100000, 200000])
+        with mock.patch("time.monotonic", side_effect=lambda: next(monotonic_vals)):
+            with mock.patch("time.sleep"):
+                with mock.patch.object(prov, "_cloud_init_diagnostics", return_value=""):
+                    with self.assertRaises(RuntimeError):
+                        prov.maybe_provision_instance(self.cmds, "test", "vm", provision=True, timeout=10)
+
     def test_continues_until_done_marker(self):
         prov = _import_provision()
-        returns = iter([(True, "started"), (True, "done")])
-        prov._pull_file = mock.Mock(side_effect=lambda *a: next(returns))
+        prov._probe_markers_via_file_pull = mock.Mock()
+        prov._probe_markers_via_file_pull.side_effect = [("done", None)]
         prov.maybe_provision_instance(self.cmds, "test", "vm", provision=True, timeout=10)
 
     def test_skips_when_provision_false(self):
         prov = _import_provision()
-        prov.maybe_provision_instance(self.cmds, "test", "container", provision=False, timeout=10)
+        prov.maybe_provision_instance(self.cmds, "test", "vm", provision=False, timeout=10)
 
 
 class TestProbeMarkersViaFilePull(unittest.TestCase):
@@ -83,7 +84,7 @@ class TestProbeMarkersViaFilePull(unittest.TestCase):
 
     def test_returns_none_when_none_exist(self):
         prov = _import_provision()
-        prov._pull_file = mock.Mock(return_value=(True, "none"))
+        prov._pull_file = mock.Mock(return_value=(False, "not found"))
         marker, error = prov._probe_markers_via_file_pull(self.cmds, "test")
         self.assertEqual(marker, "none")
 
