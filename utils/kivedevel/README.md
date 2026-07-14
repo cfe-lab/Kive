@@ -498,7 +498,7 @@ utils/kivedevel/
 | Host OS | Ubuntu 24.04 (Noble) |
 | Guest OS | Ubuntu 24.04 (Noble) cloud image |
 | `kivedevel` Python | 3.13 |
-| Kive Python | 3.9 |
+| Kive Python | 3.10 (provisioned) |
 | PostgreSQL | 16 (guest) |
 | Slurm | 23.02.5 (source-built) |
 | Incus | Latest from Ubuntu repos |

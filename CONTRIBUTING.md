@@ -22,7 +22,10 @@ Quick start:
 # Install host dependencies (Ubuntu 24.04)
 sudo apt-get update
 sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
-  iproute2 socat uv
+  iproute2 socat
+
+# Install uv (Python project manager) — https://docs.astral.sh/uv/
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Prepare the host, build the instance, and enter it
 sudo --preserve-env=PATH utils/dev prepare-host
@@ -158,10 +161,10 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
 1. **Prepare for downtime.** Verify that no active runs are in progress (as
    an administrator, check the Runs page under the User portal). Stop the web
    server and scheduled jobs:
-   ```sh
-   sudo systemctl stop httpd
-   sudo systemctl stop kive_purge.timer kive_purge_synch.timer
-   ```
+    ```sh
+    sudo systemctl stop apache2
+    sudo systemctl stop kive_purge.timer kive_purge_synch.timer
+    ```
 2. **Back up the database and media.**
    ```sh
    sudo su postgres -c 'pg_dump kive | gzip > ~/db_dump_$(date +%Y%m%d).sql.gz'
@@ -172,7 +175,7 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
 3. **Update the code and dependencies.**
    ```sh
    ssh user@server
-   cd /usr/local/share/Kive/kive
+   cd /usr/local/share/Kive
    git fetch
    git checkout tags/vX.Y
    sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
@@ -182,22 +185,28 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    preparation phase.
 5. **Run database migrations.**
    ```sh
-   cd /usr/local/share/Kive/kive
-   ./manage.py migrate
+   sudo -u kive bash -c 'source /opt/venv_kive/bin/activate && \
+     source /etc/kive_dev_vars && \
+     cd /usr/local/share/Kive/kive && \
+     python manage.py migrate'
    ```
 6. **Deploy static assets.**
+   The production server uses the environment variable `KIVE_STATIC_ROOT` to
+   locate the static directory. Deploy to that path:
    ```sh
-   cd /usr/local/share/Kive
-   sudo rm -rf static
-   sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
-   sudo tar --no-same-owner -xzf static_root.tar.gz
-   sudo mv static_root static
-   sudo rm static_root.tar.gz
+   ssh user@server
+   STATIC_ROOT=$(sudo -u kive bash -c 'source /etc/kive_dev_vars && echo $KIVE_STATIC_ROOT')
+   sudo rm -rf "$STATIC_ROOT"
+   sudo wget -O /tmp/static_root.tar.gz \
+     https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
+   sudo tar --no-same-owner -xzf /tmp/static_root.tar.gz -C "$(dirname "$STATIC_ROOT")"
+   sudo mv "$(dirname "$STATIC_ROOT")/static_root" "$STATIC_ROOT"
+   sudo rm /tmp/static_root.tar.gz
    ```
    See `cluster-setup/README.md` for production deployment details.
 7. **Restart services.**
    ```sh
-   sudo systemctl start httpd
+   sudo systemctl start apache2
    sudo systemctl start kive_purge.timer kive_purge_synch.timer
    ```
 8. **Update the Kive API library if needed.**

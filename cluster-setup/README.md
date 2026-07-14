@@ -235,11 +235,12 @@ modify the `user_name` variable if necessary.
 
 ### Configuration variable reference
 
-Important Ansible variables for production deployment. See role defaults
-in `deployment/roles/kive_server/defaults/main.yml` for the exhaustive list.
+Important Ansible variables for production deployment. The primary source is
+the group-variable template at `deployment/group_vars/all.yml`. Role defaults
+in `deployment/roles/kive_server/defaults/main.yml` provide TLS-only defaults.
 
-| Variable | Default | Description | Source |
-|----------|---------|-------------|-------|
+| Variable | Default (group vars) | Description | Set in |
+|----------|----------------------|-------------|--------|
 | `kive_tls_mode` | `provided` | `provided` or `self_signed` | role defaults |
 | `kive_ssl_certificate_src` | — | Controller path to chained certificate file | group vars |
 | `kive_ssl_key_src` | — | Controller path to private key file | group vars |
@@ -247,8 +248,8 @@ in `deployment/roles/kive_server/defaults/main.yml` for the exhaustive list.
 | `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key | role defaults |
 | `kive_db_version` | `16` | PostgreSQL major version | group vars |
 | `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename | group vars |
-| `kive_root` | `/usr/local/share/Kive` | Kive installation directory | role defaults |
-| `kive_httpd_user` | `www-data` | Apache / httpd system user | role defaults |
+| `kive_root` | `/usr/local/share/Kive` | Kive installation directory | group vars |
+| `kive_httpd_user` | `kive` | Apache / httpd system user | group vars |
 
 ### TLS certificate rotation
 

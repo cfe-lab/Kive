@@ -68,8 +68,12 @@ Ubuntu 24.04:
 
 ```sh
 sudo apt-get update
+# Install system packages
 sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
-  iproute2 socat uv
+  iproute2 socat
+
+# Install uv (Python project manager) — https://docs.astral.sh/uv/
+curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
 **Note:** The development tooling (`utils/dev`) itself manages its Python
@@ -290,9 +294,9 @@ utils/dev purge --instance my-instance --workdir /path/to/workdir
 | Firewall: `FORWARD` | Accept rules for bridge traffic | Yes |
 | Firewall: `DOCKER-USER` | Accept rules for bridge traffic | Yes |
 | Firewall: `POSTROUTING` | MASQUERADE rule for bridge CIDR | Yes |
-| Incus bridge | `kive-lab-br` (10.77.77.1/24) | No (remove manually) |
-| Incus storage pool | `default` (dir-backed) | No |
-| Default profile | NIC, root disk | No |
+| Incus bridge | `kive-lab-br` (10.77.77.1/24) | Yes |
+| Incus storage pool | `default` (dir-backed) | Yes |
+| Default profile | NIC, root disk | Yes |
 
 ### Viewing current state
 
