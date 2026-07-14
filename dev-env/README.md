@@ -68,12 +68,15 @@ Ubuntu 24.04:
 
 ```sh
 sudo apt-get update
-# Install system packages
+# Install system packages (curl is needed for the uv installer)
 sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
-  iproute2 socat
+  iproute2 socat curl
 
 # Install uv (Python project manager) — https://docs.astral.sh/uv/
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to the current shell's PATH (or log out and back in)
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 **Note:** The development tooling (`utils/dev`) itself manages its Python

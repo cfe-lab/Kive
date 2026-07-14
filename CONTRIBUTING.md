@@ -22,10 +22,13 @@ Quick start:
 # Install host dependencies (Ubuntu 24.04)
 sudo apt-get update
 sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
-  iproute2 socat
+  iproute2 socat curl
 
 # Install uv (Python project manager) — https://docs.astral.sh/uv/
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Add uv to the current shell's PATH (or log out and back in)
+export PATH="$HOME/.local/bin:$PATH"
 
 # Prepare the host, build the instance, and enter it
 sudo --preserve-env=PATH utils/dev prepare-host
@@ -158,13 +161,22 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
 > **Warning:** The following steps modify a live production system. Have a
 > rollback plan and ensure backups are current before proceeding.
 
+All commands below run **on the production server**. Establish an SSH
+connection first:
+
+```sh
+ssh user@server
+```
+
+Then run the remaining steps on the server.
+
 1. **Prepare for downtime.** Verify that no active runs are in progress (as
    an administrator, check the Runs page under the User portal). Stop the web
    server and scheduled jobs:
-    ```sh
-    sudo systemctl stop apache2
-    sudo systemctl stop kive_purge.timer kive_purge_synch.timer
-    ```
+   ```sh
+   sudo systemctl stop apache2
+   sudo systemctl stop kive_purge.timer kive_purge_synch.timer
+   ```
 2. **Back up the database and media.**
    ```sh
    sudo su postgres -c 'pg_dump kive | gzip > ~/db_dump_$(date +%Y%m%d).sql.gz'
@@ -174,7 +186,6 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
 
 3. **Update the code and dependencies.**
    ```sh
-   ssh user@server
    cd /usr/local/share/Kive
    git fetch
    git checkout tags/vX.Y
@@ -185,21 +196,20 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    preparation phase.
 5. **Run database migrations.**
    ```sh
-   sudo -u kive bash -c 'source /opt/venv_kive/bin/activate && \
-     source /etc/kive_dev_vars && \
-     cd /usr/local/share/Kive/kive && \
-     python manage.py migrate'
+   sudo -u kive bash -l -c 'cd /usr/local/share/Kive/kive && python manage.py migrate'
    ```
+   The login shell (`-l`) sources `/home/kive/.bash_profile`, which sets the
+   `KIVE_DB_*` environment variables and activates the virtual environment.
+
 6. **Deploy static assets.**
-   The production server uses the environment variable `KIVE_STATIC_ROOT` to
-   locate the static directory. Deploy to that path:
+   Read the static root from the Kive user's environment, then deploy:
    ```sh
-   ssh user@server
-   STATIC_ROOT=$(sudo -u kive bash -c 'source /etc/kive_dev_vars && echo $KIVE_STATIC_ROOT')
+   STATIC_ROOT=$(sudo -u kive bash -l -c 'echo $KIVE_STATIC_ROOT')
    sudo rm -rf "$STATIC_ROOT"
    sudo wget -O /tmp/static_root.tar.gz \
      https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
-   sudo tar --no-same-owner -xzf /tmp/static_root.tar.gz -C "$(dirname "$STATIC_ROOT")"
+   sudo tar --no-same-owner -xzf /tmp/static_root.tar.gz \
+     -C "$(dirname "$STATIC_ROOT")"
    sudo mv "$(dirname "$STATIC_ROOT")/static_root" "$STATIC_ROOT"
    sudo rm /tmp/static_root.tar.gz
    ```
@@ -211,8 +221,7 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    ```
 8. **Update the Kive API library if needed.**
    ```sh
-   cd /usr/local/share/Kive/api
-   pip install -e .
+   sudo /opt/venv_kive/bin/python -m pip install -e /usr/local/share/Kive/api
    ```
 
 ## See also
