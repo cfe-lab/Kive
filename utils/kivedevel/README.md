@@ -32,7 +32,8 @@ utils/dev [--purge] COMMAND [options]
 |--------|-------------|
 | `--purge` | Purge all resources (shortcut, overrides subcommand) |
 
-All subcommands accept `--quiet`, `--verbose`, and `--debug` for log control.
+Most subcommands accept `--quiet`, `--verbose`, and `--debug` for log control.
+(Exceptions are noted in the individual command descriptions.)
 
 ---
 
@@ -46,13 +47,13 @@ Create and provision an Incus development instance.
 utils/dev build-vm [options]
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--instance` | `kive-minimal` | Incus instance name |
+| Argument / Option | Default | Description |
+|-------------------|---------|-------------|
+| `instance` | `kive-minimal` | Instance name (positional, optional) |
 | `--instance-type` | `vm` | `vm` or `container` |
 | `--vm-network` | `kive-lab-br` | Managed Incus bridge for VM NIC |
 | `--host-interface` | (auto-detect) | Host interface for container NIC |
-| `--provision` / `--no-provision` | `--provision` | Run provisioning after creation |
+| `--no-provision` | (provision enabled) | Skip provisioning after creation |
 | `--web-port` | `8000` | Host port for the web proxy |
 | `--no-web-proxy` | `false` | Skip proxy device creation |
 | `--workdir` | `<root>/tmp~/build` | Working directory |
@@ -62,7 +63,6 @@ utils/dev build-vm [options]
 | `--profile` | `default` | Incus profile |
 | `--pool` | `default` | Incus storage pool |
 | `--image-name` | `kive-code.qcow2` | Workspace image filename |
-| `--image-path` | `<workdir>/<image-name>` | Workspace image path |
 | `--root` | (repository root) | Kive source checkout path |
 
 **Requires `sudo`:** No (Incus operations are user-level).
@@ -460,7 +460,7 @@ uv run --project utils/kivedevel --extra test --frozen \
 uv run --project utils/kivedevel --extra test --frozen \
   python -m pytest utils/kivedevel/kivedevel/ --flake8
 
-uv run --project utils/kivedevel --frozen \
+uv run --project utils/kivedevel --extra dev --frozen \
   python -m mypy utils/kivedevel/kivedevel/
 ```
 
@@ -500,7 +500,7 @@ utils/kivedevel/
 | `kivedevel` Python | 3.13 |
 | Kive Python | 3.9 |
 | PostgreSQL | 16 (guest) |
-| Slurm | 24.05 (source-built) |
+| Slurm | 23.02.5 (source-built) |
 | Incus | Latest from Ubuntu repos |
 | QEMU / KVM | 8.x |
 | Ansible | 11.x |

@@ -25,7 +25,7 @@ sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
   iproute2 socat uv
 
 # Prepare the host, build the instance, and enter it
-utils/dev prepare-host
+sudo --preserve-env=PATH utils/dev prepare-host
 utils/dev build-vm
 utils/dev enter-vm
 ```
@@ -157,6 +157,16 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    ./manage.py migrate
    ```
    See `cluster-setup/README.md` for production deployment details.
+8. Deploy static assets on the production server:
+   ```sh
+   # Download the static archive attached to the GitHub release
+   cd /usr/local/share/Kive
+   sudo rm -rf static
+   sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
+   sudo tar --no-same-owner -xzf static_root.tar.gz
+   sudo mv static_root static
+   sudo rm static_root.tar.gz
+   ```
 8. Update the Kive API library if needed:
    ```sh
    cd /usr/local/share/Kive/api

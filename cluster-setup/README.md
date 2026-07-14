@@ -246,7 +246,7 @@ in `deployment/roles/kive_server/defaults/main.yml` for the exhaustive list.
 | `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate |
 | `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key |
 | `postgresql_version` | `16` | PostgreSQL major version |
-| `slurm_version` | `24.05` | Slurm source version |
+| `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename |
 | `kive_user` | `kive` | System user for Kive runtime |
 | `kive_home` | `/usr/local/share/Kive` | Kive installation directory |
 
@@ -257,12 +257,19 @@ re-running the full playbook:
 
 ```sh
 cd cluster-setup/deployment
-ansible-playbook -i inventory update_ssl_certs.yaml
+
+# Replace with your actual inventory file (e.g. inventory_octomore.ini)
+ansible-playbook -i inventory_octomore.ini update_ssl_certs.yaml \
+  -e kive_ssl_certificate_src=/path/to/new/fullchain.pem \
+  -e kive_ssl_key_src=/path/to/new/privkey.pem \
+  -e kive_ssl_cert_path=/etc/ssl/certs/kive.crt \
+  -e kive_ssl_key_path=/etc/ssl/private/kive.key
 ```
 
 This playbook copies new certificate and key files from the controller paths
-(`kive_ssl_certificate_src`, `kive_ssl_key_src`) to the target and restarts
-Apache.
+(`kive_ssl_certificate_src`, `kive_ssl_key_src`) to the target and reloads
+Apache (the playbook uses `systemd` with `state: reloaded`, not a full
+restart).
 
 Verify the updated certificate:
 
@@ -613,15 +620,6 @@ hosts (including the head node).
 
 ### Architecture (for lack of a better name)
 
-## See also
-
-- [dev-env/README.md](../dev-env/README.md) — Local development environment
-- [CONTRIBUTING.md](../CONTRIBUTING.md) — Contributing guide
-- [INSTALL.md](../INSTALL.md) — Manual / legacy installation
-- `deployment/README.md` — Deployment playbook details
-
----
-
 Ansible executes *tasks* against one or more managed machines. Tasks may also
 depend on *variables*, *files*, or *templates*. These can also be grouped into *roles*,
 which we make use of in this project to help organize our code.
@@ -686,3 +684,12 @@ for development and debugging.
 - [blockinfile](https://docs.ansible.com/ansible/latest/modules/blockinfile_module.html#blockinfile-module)
 - [git](https://docs.ansible.com/ansible/latest/modules/git_module.html#git-module)
 - [unarchive](https://docs.ansible.com/ansible/latest/modules/unarchive_module.html)
+
+---
+
+## See also
+
+- [dev-env/README.md](../dev-env/README.md) — Local development environment
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — Contributing guide
+- [INSTALL.md](../INSTALL.md) — Manual / legacy installation
+- `deployment/README.md` — Deployment playbook details
