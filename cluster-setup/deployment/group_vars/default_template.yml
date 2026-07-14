@@ -23,7 +23,7 @@ kive_python_executable: python3.7
 # Settings for network services running on the head node,
 # e.g. firewall, NFS, and PostgreSQL.
 nfs_export_to_hosts: 192.168.64.0/255.255.255.0
-kive_db_version: 16
+kive_db_version: 14  # Ubuntu 22.04 (Jammy) ships PostgreSQL 14
 kive_db_host: 192.168.64.9
 kive_db_subnet: 192.168.64.0/24
 

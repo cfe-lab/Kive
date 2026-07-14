@@ -235,9 +235,13 @@ modify the `user_name` variable if necessary.
 
 ### Configuration variable reference
 
-Important Ansible variables for production deployment. The primary source is
-the group-variable template at `deployment/group_vars/all.yml`. Role defaults
-in `deployment/roles/kive_server/defaults/main.yml` provide TLS-only defaults.
+Important Ansible variables for production deployment. Group-variable
+templates such as `deployment/group_vars/default_template.yml` (for testing)
+and `deployment/group_vars/octomore_template.yaml` (for production) define
+environment-specific values. Copy the relevant template to `all.yml` for your
+target. Role defaults in `deployment/roles/kive_server/defaults/main.yml`
+provide fallback values (including TLS, PostgreSQL version, etc.). Group vars
+override role defaults.
 
 | Variable | Default (group vars) | Description | Set in |
 |----------|----------------------|-------------|--------|
@@ -246,7 +250,7 @@ in `deployment/roles/kive_server/defaults/main.yml` provide TLS-only defaults.
 | `kive_ssl_key_src` | — | Controller path to private key file | group vars |
 | `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate | role defaults |
 | `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key | role defaults |
-| `kive_db_version` | `16` | PostgreSQL major version | group vars |
+| `kive_db_version` | `14` | PostgreSQL major version (adjust to target OS) | role defaults / group vars |
 | `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename | group vars |
 | `kive_root` | `/usr/local/share/Kive` | Kive installation directory | group vars |
 | `kive_httpd_user` | `kive` | Apache / httpd system user | group vars |

@@ -79,6 +79,19 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
+### Incus permissions
+
+After installing Incus, add your user to the `incus-admin` group and start
+a new login session:
+
+```sh
+sudo usermod -aG incus-admin "$USER"
+exec newgrp incus-admin
+```
+
+> **Warning:** Members of `incus-admin` have effectively root-level control
+> over the Incus daemon.
+
 **Note:** The development tooling (`utils/dev`) itself manages its Python
 dependencies via `uv` — you do not need to install Python packages manually.
 
@@ -92,6 +105,10 @@ The recommended sequence for setting up a development environment:
 > All other commands run without privilege escalation.
 
 ```sh
+# 0. Sync development tool dependencies as your user first, so the venv
+#    (utils/kivedevel/.venv) is user-owned and can be updated later.
+uv sync --project utils/kivedevel
+
 # 1. Prepare the host: initialise Incus, create the Kive bridge, configure
 #    IP forwarding and firewall rules.
 sudo --preserve-env=PATH utils/dev prepare-host

@@ -30,6 +30,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Add uv to the current shell's PATH (or log out and back in)
 export PATH="$HOME/.local/bin:$PATH"
 
+# Sync development tool dependencies as your user (avoids root-owned .venv)
+uv sync --project utils/kivedevel
+
 # Prepare the host, build the instance, and enter it
 sudo --preserve-env=PATH utils/dev prepare-host
 utils/dev build-vm
@@ -175,7 +178,8 @@ Then run the remaining steps on the server.
    server and scheduled jobs:
    ```sh
    sudo systemctl stop apache2
-   sudo systemctl stop kive_purge.timer kive_purge_synch.timer
+   sudo systemctl stop kive_purge.timer kive_purge_synch.timer \
+     kive_purge.service kive_purge_synch.service
    ```
 2. **Back up the database and media.**
    ```sh
