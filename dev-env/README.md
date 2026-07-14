@@ -254,7 +254,11 @@ This removes:
 
 ### Removing the bridge manually
 
+Before deleting the bridge, remove or reconfigure the default profile's NIC
+that references it:
+
 ```sh
+incus profile device remove default eth0
 incus network delete kive-lab-br
 sudo ip link delete kive-lab-br
 ```
@@ -286,7 +290,7 @@ utils/dev purge --instance my-instance --workdir /path/to/workdir
 | Firewall: `FORWARD` | Accept rules for bridge traffic | Yes |
 | Firewall: `DOCKER-USER` | Accept rules for bridge traffic | Yes |
 | Firewall: `POSTROUTING` | MASQUERADE rule for bridge CIDR | Yes |
-| Incus bridge | `kive-lab-br` (10.77.77.1/24) | Removed on purge |
+| Incus bridge | `kive-lab-br` (10.77.77.1/24) | No (remove manually) |
 | Incus storage pool | `default` (dir-backed) | No |
 | Default profile | NIC, root disk | No |
 

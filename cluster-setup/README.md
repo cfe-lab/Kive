@@ -238,17 +238,17 @@ modify the `user_name` variable if necessary.
 Important Ansible variables for production deployment. See role defaults
 in `deployment/roles/kive_server/defaults/main.yml` for the exhaustive list.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `kive_tls_mode` | `provided` | `provided` or `self_signed` |
-| `kive_ssl_certificate_src` | — | Controller path to chained certificate file |
-| `kive_ssl_key_src` | — | Controller path to private key file |
-| `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate |
-| `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key |
-| `postgresql_version` | `16` | PostgreSQL major version |
-| `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename |
-| `kive_user` | `kive` | System user for Kive runtime |
-| `kive_home` | `/usr/local/share/Kive` | Kive installation directory |
+| Variable | Default | Description | Source |
+|----------|---------|-------------|-------|
+| `kive_tls_mode` | `provided` | `provided` or `self_signed` | role defaults |
+| `kive_ssl_certificate_src` | — | Controller path to chained certificate file | group vars |
+| `kive_ssl_key_src` | — | Controller path to private key file | group vars |
+| `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate | role defaults |
+| `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key | role defaults |
+| `kive_db_version` | `16` | PostgreSQL major version | group vars |
+| `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename | group vars |
+| `kive_root` | `/usr/local/share/Kive` | Kive installation directory | role defaults |
+| `kive_httpd_user` | `www-data` | Apache / httpd system user | role defaults |
 
 ### TLS certificate rotation
 
@@ -259,7 +259,7 @@ re-running the full playbook:
 cd cluster-setup/deployment
 
 # Replace with your actual inventory file (e.g. inventory_octomore.ini)
-ansible-playbook -i inventory_octomore.ini update_ssl_certs.yaml \
+sudo ansible-playbook -i inventory_octomore.ini update_ssl_certs.yaml \
   -e kive_ssl_certificate_src=/path/to/new/fullchain.pem \
   -e kive_ssl_key_src=/path/to/new/privkey.pem \
   -e kive_ssl_cert_path=/etc/ssl/certs/kive.crt \

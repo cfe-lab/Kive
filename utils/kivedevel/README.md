@@ -44,7 +44,7 @@ Most subcommands accept `--quiet`, `--verbose`, and `--debug` for log control.
 Create and provision an Incus development instance.
 
 ```
-utils/dev build-vm [options]
+utils/dev build-vm [instance] [options]
 ```
 
 | Argument / Option | Default | Description |
@@ -79,7 +79,7 @@ failure, `SystemExit` on configuration errors.
 ```sh
 utils/dev build-vm
 utils/dev build-vm --instance-type container --no-provision
-utils/dev build-vm --instance my-dev --vm-network my-bridge
+utils/dev build-vm my-dev --vm-network my-bridge
 ```
 
 ---
@@ -181,8 +181,8 @@ utils/dev prepare-host [options]
 **Examples:**
 
 ```sh
-utils/dev prepare-host
-utils/dev prepare-host --bridge my-bridge
+sudo --preserve-env=PATH utils/dev prepare-host
+sudo --preserve-env=PATH utils/dev prepare-host --bridge my-bridge
 ```
 
 ---
@@ -451,14 +451,14 @@ uv run --project utils/kivedevel --extra test --frozen \
 
 # Fast unit tests only (no database, no Incus)
 uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/ -k "not slow"
+  python -m pytest utils/kivedevel/kivedevel/ -m "not slow"
 ```
 
 ### Linting and type checking
 
 ```sh
-uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/ --flake8
+uv run --project utils/kivedevel --extra dev --frozen \
+  ruff check utils/kivedevel/kivedevel/
 
 uv run --project utils/kivedevel --extra dev --frozen \
   python -m mypy utils/kivedevel/kivedevel/

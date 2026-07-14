@@ -136,8 +136,9 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
 2. Check if the `kiveapi` package needs a version bump by looking for new
    commits in the `api/` folder.
 3. Check that all issues in the current milestone are closed.
-4. Collect and package static files:
+4. Build front-end bundles and collect static files:
    ```sh
+   npm install
    cd kive
    ./manage.py collectstatic -c --no-input
    cd ..
@@ -148,18 +149,44 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    environment variables.
 6. [Create a release](https://github.com/cfe-lab/Kive/releases) on GitHub.
    Use `vX.Y` as the tag. Attach `static_root.tar.gz` to the release.
-7. Deploy to the production server:
+
+### Production deployment
+
+> **Warning:** The following steps modify a live production system. Have a
+> rollback plan and ensure backups are current before proceeding.
+
+1. **Prepare for downtime.** Verify that no active runs are in progress (as
+   an administrator, check the Runs page under the User portal). Stop the web
+   server and scheduled jobs:
+   ```sh
+   sudo systemctl stop httpd
+   sudo systemctl stop kive_purge.timer kive_purge_synch.timer
+   ```
+2. **Back up the database and media.**
+   ```sh
+   sudo su postgres -c 'pg_dump kive | gzip > ~/db_dump_$(date +%Y%m%d).sql.gz'
+   ```
+   Also back up the Kive media directories (`ContainerLogs`, `Containers`,
+   `Datasets`) and the current installation at `/usr/local/share/Kive`.
+
+3. **Update the code and dependencies.**
    ```sh
    ssh user@server
    cd /usr/local/share/Kive/kive
    git fetch
    git checkout tags/vX.Y
+   sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
+   ```
+4. **Apply any new configuration.** Follow the release notes for this version.
+   Pay attention to new environment variables identified in step 5 of the
+   preparation phase.
+5. **Run database migrations.**
+   ```sh
+   cd /usr/local/share/Kive/kive
    ./manage.py migrate
    ```
-   See `cluster-setup/README.md` for production deployment details.
-8. Deploy static assets on the production server:
+6. **Deploy static assets.**
    ```sh
-   # Download the static archive attached to the GitHub release
    cd /usr/local/share/Kive
    sudo rm -rf static
    sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
@@ -167,7 +194,13 @@ The CI workflow (`.github/workflows/build-and-test.yml`) runs:
    sudo mv static_root static
    sudo rm static_root.tar.gz
    ```
-8. Update the Kive API library if needed:
+   See `cluster-setup/README.md` for production deployment details.
+7. **Restart services.**
+   ```sh
+   sudo systemctl start httpd
+   sudo systemctl start kive_purge.timer kive_purge_synch.timer
+   ```
+8. **Update the Kive API library if needed.**
    ```sh
    cd /usr/local/share/Kive/api
    pip install -e .
