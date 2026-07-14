@@ -165,7 +165,9 @@ utils/dev prepare-host [options]
 | `--backend` | `incus` | Backend type (only `incus` is supported) |
 | `--bridge` | `kive-lab-br` | Bridge network name |
 
-**Requires `sudo`:** Yes (for systemctl and iptables).
+**Requires `sudo`:** The command internally uses `sudo` for individual
+privileged operations (systemctl, sysctl, iptables). The `utils/dev`
+wrapper itself runs without privilege escalation.
 
 **Resources modified:**
 - Enables `incus.service` and `incus.socket`
@@ -181,8 +183,8 @@ utils/dev prepare-host [options]
 **Examples:**
 
 ```sh
-sudo --preserve-env=PATH utils/dev prepare-host
-sudo --preserve-env=PATH utils/dev prepare-host --bridge my-bridge
+utils/dev prepare-host
+utils/dev prepare-host --bridge my-bridge
 ```
 
 ---

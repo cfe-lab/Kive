@@ -18,7 +18,9 @@ from ..shared import configure_console_logging
 logger = logging.getLogger("kivedevel.backends.incus_host")
 
 
-def _run(cmd: list[str], *, check: bool = True, **kwargs) -> subprocess.CompletedProcess[str]:
+def _run(cmd: list[str], *, check: bool = True, sudo: bool = False, **kwargs) -> subprocess.CompletedProcess[str]:
+    if sudo:
+        cmd = ["sudo", "--"] + cmd
     logger.debug("Running: %s", " ".join(cmd))
     result = subprocess.run(cmd, check=check, capture_output=True, text=True, **kwargs)
     if logger.isEnabledFor(logging.DEBUG):
@@ -42,9 +44,9 @@ def _print_diagnostics(cmds: Cmds, bridge: str) -> None:
 
 
 def _enable_ipv4_forwarding() -> None:
-    _run(["sysctl", "-w", "net.ipv4.ip_forward=1"])
-    _run(["sysctl", "-w", "net.ipv4.conf.all.forwarding=1"], check=False)
-    _run(["sysctl", "-w", "net.ipv4.conf.default.forwarding=1"], check=False)
+    _run(["sysctl", "-w", "net.ipv4.ip_forward=1"], sudo=True)
+    _run(["sysctl", "-w", "net.ipv4.conf.all.forwarding=1"], sudo=True, check=False)
+    _run(["sysctl", "-w", "net.ipv4.conf.default.forwarding=1"], sudo=True, check=False)
 
 
 def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
@@ -54,88 +56,46 @@ def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
 
 
 def _add_bridge_forwarding_rules(bridge: str) -> None:
-    docker_chain = _run(["iptables", "-nL", "DOCKER-USER"], check=False)
+    docker_chain = _run(["iptables", "-nL", "DOCKER-USER"], sudo=True, check=False)
     if docker_chain.returncode == 0:
         accept_in = _run(
             ["iptables", "-C", "DOCKER-USER", "-i", bridge, "-j", "ACCEPT"],
-            check=False,
+            sudo=True, check=False,
         )
         if accept_in.returncode != 0:
-            _run(["iptables", "-I", "DOCKER-USER", "1", "-i", bridge, "-j", "ACCEPT"])
+            _run(["iptables", "-I", "DOCKER-USER", "1", "-i", bridge, "-j", "ACCEPT"],
+                 sudo=True)
 
         accept_out = _run(
-            [
-                "iptables",
-                "-C",
-                "DOCKER-USER",
-                "-o",
-                bridge,
-                "-m",
-                "conntrack",
-                "--ctstate",
-                "RELATED,ESTABLISHED",
-                "-j",
-                "ACCEPT",
-            ],
-            check=False,
+            ["iptables", "-C", "DOCKER-USER", "-o", bridge,
+             "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+            sudo=True, check=False,
         )
         if accept_out.returncode != 0:
             _run(
-                [
-                    "iptables",
-                    "-I",
-                    "DOCKER-USER",
-                    "1",
-                    "-o",
-                    bridge,
-                    "-m",
-                    "conntrack",
-                    "--ctstate",
-                    "RELATED,ESTABLISHED",
-                    "-j",
-                    "ACCEPT",
-                ]
+                ["iptables", "-I", "DOCKER-USER", "1", "-o", bridge,
+                 "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+                sudo=True,
             )
 
     fwd_in = _run(
         ["iptables", "-C", "FORWARD", "-i", bridge, "-j", "ACCEPT"],
-        check=False,
+        sudo=True, check=False,
     )
     if fwd_in.returncode != 0:
-        _run(["iptables", "-I", "FORWARD", "1", "-i", bridge, "-j", "ACCEPT"])
+        _run(["iptables", "-I", "FORWARD", "1", "-i", bridge, "-j", "ACCEPT"],
+             sudo=True)
 
     fwd_out = _run(
-        [
-            "iptables",
-            "-C",
-            "FORWARD",
-            "-o",
-            bridge,
-            "-m",
-            "conntrack",
-            "--ctstate",
-            "RELATED,ESTABLISHED",
-            "-j",
-            "ACCEPT",
-        ],
-        check=False,
+        ["iptables", "-C", "FORWARD", "-o", bridge,
+         "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+        sudo=True, check=False,
     )
     if fwd_out.returncode != 0:
         _run(
-            [
-                "iptables",
-                "-I",
-                "FORWARD",
-                "1",
-                "-o",
-                bridge,
-                "-m",
-                "conntrack",
-                "--ctstate",
-                "RELATED,ESTABLISHED",
-                "-j",
-                "ACCEPT",
-            ]
+            ["iptables", "-I", "FORWARD", "1", "-o", bridge,
+             "-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "-j", "ACCEPT"],
+            sudo=True,
         )
 
 
@@ -144,47 +104,24 @@ def _add_masquerade_fallback(cmds: Cmds, bridge: str) -> None:
     if not cidr4:
         return
     result = _run(
-        [
-            "python3",
-            "-c",
-            "import ipaddress,sys; net=ipaddress.ip_network(sys.argv[1], strict=False); print(net.with_prefixlen)",
-            cidr4,
-        ],
+        ["python3", "-c",
+         "import ipaddress,sys; net=ipaddress.ip_network(sys.argv[1], strict=False); print(net.with_prefixlen)",
+         cidr4],
         check=False,
     )
     if result.returncode != 0:
         return
     netcidr = result.stdout.strip()
     check = _run(
-        [
-            "iptables",
-            "-t",
-            "nat",
-            "-C",
-            "POSTROUTING",
-            "-s",
-            netcidr,
-            "!", "-d", netcidr,
-            "-j",
-            "MASQUERADE",
-        ],
-        check=False,
+        ["iptables", "-t", "nat", "-C", "POSTROUTING",
+         "-s", netcidr, "!", "-d", netcidr, "-j", "MASQUERADE"],
+        sudo=True, check=False,
     )
     if check.returncode != 0:
         _run(
-            [
-                "iptables",
-                "-t",
-                "nat",
-                "-I",
-                "POSTROUTING",
-                "1",
-                "-s",
-                netcidr,
-                "!", "-d", netcidr,
-                "-j",
-                "MASQUERADE",
-            ]
+            ["iptables", "-t", "nat", "-I", "POSTROUTING", "1",
+             "-s", netcidr, "!", "-d", netcidr, "-j", "MASQUERADE"],
+            sudo=True,
         )
 
 
@@ -204,8 +141,8 @@ def run_prepare_host(args: argparse.Namespace) -> None:
 
     # Start and enable Incus service/socket (forgiving).
     for unit in ("incus.service", "incus.socket"):
-        _run(["systemctl", "enable", "--now", unit], check=False)
-        _run(["systemctl", "start", unit], check=False)
+        _run(["systemctl", "enable", "--now", unit], sudo=True, check=False)
+        _run(["systemctl", "start", unit], sudo=True, check=False)
 
     # Initialize Incus with dir-backed storage pool, bridge network, default profile.
     # If Incus is already initialized the preseed is a no-op; that is fine.

@@ -101,17 +101,17 @@ dependencies via `uv` — you do not need to install Python packages manually.
 
 The recommended sequence for setting up a development environment:
 
-> **Note:** `prepare-host` requires `sudo` for systemctl and iptables commands.
-> All other commands run without privilege escalation.
+> **Note:** All commands run without privilege escalation. `prepare-host`
+> internally uses `sudo` only for the individual privileged operations
+> (systemctl, sysctl, iptables).
 
 ```sh
-# 0. Sync development tool dependencies as your user first, so the venv
-#    (utils/kivedevel/.venv) is user-owned and can be updated later.
+# 0. Sync development tool dependencies.
 uv sync --project utils/kivedevel
 
 # 1. Prepare the host: initialise Incus, create the Kive bridge, configure
 #    IP forwarding and firewall rules.
-sudo --preserve-env=PATH utils/dev prepare-host
+utils/dev prepare-host
 
 # 2. Build the development instance (creates a VM by default).
 utils/dev build-vm
