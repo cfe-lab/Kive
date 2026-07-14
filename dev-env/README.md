@@ -81,10 +81,13 @@ dependencies via `uv` — you do not need to install Python packages manually.
 
 The recommended sequence for setting up a development environment:
 
+> **Note:** `prepare-host` requires `sudo` for systemctl and iptables commands.
+> All other commands run without privilege escalation.
+
 ```sh
 # 1. Prepare the host: initialise Incus, create the Kive bridge, configure
 #    IP forwarding and firewall rules.
-utils/dev prepare-host
+sudo --preserve-env=PATH utils/dev prepare-host
 
 # 2. Build the development instance (creates a VM by default).
 utils/dev build-vm
@@ -237,15 +240,24 @@ This removes:
 
 - **Incus instances** tagged with `user.kive.devel.created-by: utils/dev`
 - **Build directories** marked with `.kive-devel-resource.json`
-- **Managed networks** tagged with `kind: network`
+- **Managed networks** tagged via marker files with `kind: network`
 - **Port forwards** registered in the resource registry
 
 ### What is intentionally not removed
 
-- The `incusbr0` default bridge (unless explicitly requested)
+- The `kive-lab-br` bridge (not tagged by `prepare-host`; remove manually if needed)
+- The `incusbr0` default bridge
+- The `default` Incus storage pool and profile
 - Firewall rules (IP forwarding, iptables `FORWARD`, `DOCKER-USER`)
 - `sysctl` changes
 - System packages
+
+### Removing the bridge manually
+
+```sh
+incus network delete kive-lab-br
+sudo ip link delete kive-lab-br
+```
 
 ### Idempotence
 
