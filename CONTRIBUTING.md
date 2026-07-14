@@ -30,11 +30,13 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Add uv to the current shell's PATH (or log out and back in)
 export PATH="$HOME/.local/bin:$PATH"
 
-# Sync development tool dependencies as your user (avoids root-owned .venv)
-uv sync --project utils/kivedevel
+# Add your user to the incus-admin group and start a new login session
+sudo usermod -aG incus-admin "$USER"
+exec newgrp incus-admin
 
-# Prepare the host, build the instance, and enter it
-sudo --preserve-env=PATH utils/dev prepare-host
+# (After the new session starts:) Sync venv and run
+uv sync --project utils/kivedevel
+utils/dev prepare-host
 utils/dev build-vm
 utils/dev enter-vm
 ```
@@ -191,8 +193,8 @@ Then run the remaining steps on the server.
 3. **Update the code and dependencies.**
    ```sh
    cd /usr/local/share/Kive
-   git fetch
-   git checkout tags/vX.Y
+   sudo git fetch
+   sudo git checkout tags/vX.Y
    sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
    ```
 4. **Apply any new configuration.** Follow the release notes for this version.
