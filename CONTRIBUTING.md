@@ -202,15 +202,16 @@ Then run the remaining steps on the server.
    preparation phase.
 5. **Run database migrations.**
    ```sh
-   sudo -u kive bash -l -c 'cd /usr/local/share/Kive/kive && python manage.py migrate'
+   sudo -iu kive bash -c 'cd /usr/local/share/Kive/kive && python manage.py migrate'
    ```
-   The login shell (`-l`) sources `/home/kive/.bash_profile`, which sets the
+   `sudo -i` (login) ensures `HOME` is set to `/home/kive`, which causes
+   Bash to source `/home/kive/.bash_profile`.  That profile sets the
    `KIVE_DB_*` environment variables and activates the virtual environment.
 
 6. **Deploy static assets.**
    Read the static root from the Kive user's environment, then deploy:
    ```sh
-   STATIC_ROOT=$(sudo -u kive bash -l -c 'echo $KIVE_STATIC_ROOT')
+   STATIC_ROOT=$(sudo -iu kive bash -c 'printf "%s\n" "$KIVE_STATIC_ROOT"')
    sudo rm -rf "$STATIC_ROOT"
    sudo wget -O /tmp/static_root.tar.gz \
      https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz

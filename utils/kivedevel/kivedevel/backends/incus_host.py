@@ -34,13 +34,13 @@ def _run(cmd: list[str], *, check: bool = True, sudo: bool = False, **kwargs) ->
 def _print_diagnostics(cmds: Cmds, bridge: str) -> None:
     logger.info("=== host networking diagnostics ===")
     cmds.incus.run(["network", "show", bridge], check=False)
-    sysctl_val = _run(["sysctl", "net.ipv4.ip_forward"], check=False)
+    sysctl_val = _run(["sysctl", "net.ipv4.ip_forward"], sudo=True, check=False)
     logger.info("ip_forward: %s", sysctl_val.stdout.strip() if sysctl_val.returncode == 0 else "unknown")
     cmds.ip.run(["addr"], check=False)
     cmds.ip.run(["route"], check=False)
-    _run(["iptables", "-S"], check=False)
-    _run(["iptables", "-t", "nat", "-S"], check=False)
-    _run(["nft", "list", "ruleset"], check=False)
+    _run(["iptables", "-S"], sudo=True, check=False)
+    _run(["iptables", "-t", "nat", "-S"], sudo=True, check=False)
+    _run(["nft", "list", "ruleset"], sudo=True, check=False)
 
 
 def _enable_ipv4_forwarding() -> None:
