@@ -405,7 +405,7 @@ in container mode it uses `incus exec`.
 | Type | qcow2 disk image | Host directory bind-mount |
 | Create | `qemu-img create -f qcow2` | `mkdir` + `rsync` |
 | Mount | `qemu-nbd` + `sudo mount` | Incus disk device |
-| Update | Rebuild required (`rsync` on next build) | Live (bind mount) |
+| Update | `utils/dev reload` (explicit) | `utils/dev reload` (explicit) |
 | Location | `<workdir>/kive-code.qcow2` | `<workdir>/kive-code-host/` |
 | Exclusion | `tmp/` and own workdir | Same |
 
