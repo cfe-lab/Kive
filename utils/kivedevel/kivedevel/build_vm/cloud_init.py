@@ -34,7 +34,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       User=kive
       Group=kive
       WorkingDirectory=/usr/local/share/Kive/kive
-      EnvironmentFile=/tmp/kive_dev_vars
+      EnvironmentFile=/etc/kive/kive-dev.env
       ExecStart=/opt/venv_kive/bin/python manage.py runserver --noreload 0.0.0.0:8000
       Restart=on-failure
       RestartSec=5
@@ -169,6 +169,10 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
         echo "ENV after sourcing dev vars:"
         env | sort
+        mkdir -p /etc/kive
+        sed 's/^export //' /tmp/kive_dev_vars > /etc/kive/kive-dev.env
+        sed -i 's|EnvironmentFile=/tmp/kive_dev_vars|EnvironmentFile=/etc/kive/kive-dev.env|' \
+          /etc/systemd/system/kive-dev-web.service
         systemctl daemon-reload
         systemctl enable --now kive-dev-web.service
         echo "kive-dev-web.service started"
