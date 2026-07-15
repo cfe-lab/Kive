@@ -134,6 +134,7 @@ utils/dev enter-vm
 | `build-vm` | Creates an Incus instance (VM or container), attaches the network, runs cloud-init provisioning. |
 | `validate-vm` | Checks instance state, required devices, Slurm and Singularity probes. |
 | `test-api` | Probes the Kive API: login page, anonymous vs authenticated access, dataset endpoint. |
+| `reload` | Copies the host working tree into a running instance and restarts web services. |
 | `enter-vm` | Opens an interactive shell inside the instance. |
 
 ### First-time setup with container mode
@@ -204,11 +205,18 @@ The shell opens as `ubuntu` user. The Kive source tree appears at
 
 ### Source synchronisation
 
-- **VM mode:** The workspace is a qcow2 disk image attached to the VM.
-  Changes on the host are synchronised via `rsync` during build; they are
-  **not** live-synced. Re-run `utils/dev build-vm` to update.
-- **Container mode:** The workspace is a host directory bind-mounted at
-  `/mnt/kive-code/`. Source changes on the host are immediately visible.
+Source code is explicitly reloaded from the host into the running instance:
+
+```sh
+utils/dev reload [instance]
+```
+
+This copies the complete host working tree (including uncommitted and
+untracked files) into `/usr/local/share/Kive` inside the guest, then
+restarts the Kive web services. Deleted files are propagated.
+
+Both VM and container modes use the same explicit reload workflow. There
+is no automatic or live synchronisation.
 
 ### Starting Kive services
 
@@ -239,15 +247,33 @@ security exception or use HTTP on port 8000 for local access.
 
 ---
 
-## Rebuilding and updating
+## Updating source code
+
+For source-only changes (Python, templates, configuration):
+
+```sh
+utils/dev reload [instance]
+```
+
+This copies the current host working tree (including uncommitted and untracked
+files) into `/usr/local/share/Kive` inside the running instance, then restarts
+the Kive web services. Deleted files are propagated. The instance itself
+stays running.
+
+## Rebuilding
+
+For changes that affect provisioning (Ansible, dependencies, database schema,
+system packages):
 
 | Situation | Action |
 |-----------|--------|
-| Application source changed | `utils/dev build-vm` — re-runs provisioning |
 | Ansible / cloud-init changed | `utils/dev build-vm` — reprovisions |
 | Dependencies changed | `utils/dev build-vm` — reprovisions |
 | Instance already exists | `build-vm` detects it and reconfigures |
 | Stale provisioning state | `utils/dev purge && utils/dev build-vm` |
+
+Reload does **not** install dependencies, run database migrations, or
+reprovision the instance. Those changes require `utils/dev build-vm`.
 
 The tool does **not** automatically detect stale provisioning. When in doubt,
 run `utils/dev purge` and rebuild from scratch.

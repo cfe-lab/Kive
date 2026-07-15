@@ -43,12 +43,17 @@ utils/dev enter-vm
 
 ### Editor workflow
 
-Source code lives on the host at the repository checkout. Edits are visible
-inside the development instance as follows:
+Source code lives on the host at the repository checkout. After editing
+files, copy the working tree into the running development instance:
 
-- **VM mode:** Changes are synchronised on the next `utils/dev build-vm` run.
-- **Container mode:** The source tree is bind-mounted at `/mnt/kive-code/`;
-  changes are visible immediately.
+```sh
+utils/dev reload [instance]
+```
+
+This copies all changes (including uncommitted and untracked files) into
+`/usr/local/share/Kive` inside the guest and restarts the web services.
+Deleted files are propagated. Both VM and container modes use this
+explicit reload workflow.
 
 ### Dependency management
 
