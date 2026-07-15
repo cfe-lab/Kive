@@ -149,8 +149,10 @@ class TestReloadSnapshot(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             workdir = Path(tmp)
-            with mock.patch.object(rl, "_workspace_rsync_args",
-                                    return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(workdir / "snap") + "/"]):
+            with mock.patch(
+                "Kive.utils.kivedevel.kivedevel.build_vm.workspace._workspace_rsync_args",
+                return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(workdir / "snap") + "/"],
+            ):
                 snapshot = rl._host_source_snapshot(cmds, workdir, workdir)
             self.assertTrue(str(snapshot).startswith(str(workdir)))
             self.assertGreaterEqual(len(cmds.rsync.run.call_args_list), 1)
