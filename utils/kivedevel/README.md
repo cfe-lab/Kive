@@ -21,6 +21,7 @@ utils/dev [--purge] COMMAND [options]
 | `enter-vm` | Open an interactive shell in an existing instance |
 | `smoke-local-install` | Run `build-vm` + `validate-vm` + `test-api` in sequence |
 | `cleanup-local-install` | Delete an instance and remove its workdir |
+| `reload` | Copy the host working tree into a running instance and restart web services |
 | `purge` | Remove all resources created by `utils/dev` |
 | `--purge` | Shortcut for the `purge` subcommand |
 
@@ -273,6 +274,52 @@ utils/dev cleanup-local-install [options]
 |--------|---------|-------------|
 | `--instance` | `ci-smoke` | Instance to delete |
 | `--workdir` | `<root>/tmp~/build` | Workdir to remove |
+
+---
+
+### `reload`
+
+Copy the host working tree into a running development instance and restart
+web services.
+
+```
+utils/dev reload [instance] [options]
+```
+
+| Argument / Option | Default | Description |
+|-------------------|---------|-------------|
+| `instance` | `kive-minimal` | Instance name (positional, optional) |
+| `--root` | (repository root) | Source repository root to snapshot |
+| `--workdir` | `<root>/tmp~/build` | Working directory for temporary snapshot |
+
+**What it does:**
+
+1. Snapshot the host working tree via `rsync --delete` (includes uncommitted
+   and untracked files; excludes the workdir and `tmp/`).
+2. Transfer the snapshot into a unique staging directory inside the guest via
+   `incus file push`.
+3. Validate expected files exist and fix ownership.
+4. Stop services that load Kive source (`kive-dev-web`, `apache2`).
+5. Atomically replace `/usr/local/share/Kive` with the staged tree.
+6. Start services and poll the HTTP health check
+   (`http://127.0.0.1:8000/login/`).
+7. Clean up stale staging and backup directories.
+
+**Requires `sudo`:** No. All operations run as the Incus user.
+
+**Exit behaviour:** Returns 0 on success. Exits with error on missing or
+stopped instance, unprovisioned instance, transfer failure, validation
+failure, service failure, or health-check timeout.
+
+**Scope:** Source files only. Does not install dependencies, run database
+migrations, or reprovision the instance.
+
+**Examples:**
+
+```sh
+utils/dev reload
+utils/dev reload my-instance
+```
 
 ---
 
