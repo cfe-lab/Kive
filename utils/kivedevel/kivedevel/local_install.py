@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import subprocess
+import tempfile
 from pathlib import Path
 
 from . import checks
@@ -106,6 +108,46 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     api_args = _test_api_args(instance, workdir, debug, instance_type=instance_type)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
     checks.run_test_api(api_args)
+
+    # Reload smoke test: create a marker, reload, verify, delete, reload, verify gone.
+    from .reload import run_reload
+    marker_name = ".kive-reload-smoke-marker"
+    marker_path = default_root() / marker_name
+    try:
+        marker_path.write_text("smoke-test-marker\n")
+        logger.info("Created host marker %s for reload test.", marker_path)
+
+        reload_args = _build_vm_args(instance, instance_type, workdir, debug, vm_network)
+        reload_args.root = default_root()
+        reload_args.workdir = workdir
+        run_reload(reload_args)
+
+        cmds = Cmds.create()
+        result = cmds.incus.run(
+            ["exec", instance, "--", "test", "-f", f"/usr/local/share/Kive/{marker_name}"],
+            check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Marker file not found in guest after reload: {marker_name}")
+
+        logger.info("Reload smoke test: marker propagated. Checking API health after reload...")
+        checks.run_test_api(api_args)
+
+        marker_path.unlink()
+        logger.info("Deleted host marker. Reloading again to verify deletion...")
+        run_reload(reload_args)
+
+        result = cmds.incus.run(
+            ["exec", instance, "--", "test", "-f", f"/usr/local/share/Kive/{marker_name}"],
+            check=False,
+        )
+        if result.returncode == 0:
+            raise RuntimeError(f"Deleted marker still present in guest after reload: {marker_name}")
+
+        logger.info("Reload smoke test: deletion propagated.")
+    finally:
+        if marker_path.exists():
+            marker_path.unlink()
 
     logger.info("Smoke test passed.")
 

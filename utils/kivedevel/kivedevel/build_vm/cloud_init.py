@@ -22,6 +22,25 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
     provision_runcmd = ""
     if provision:
         provision_write_files = """
+  - path: /etc/systemd/system/kive-dev-web.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Kive development web server
+      After=network.target
+
+      [Service]
+      User=kive
+      Group=kive
+      WorkingDirectory=/usr/local/share/Kive/kive
+      EnvironmentFile=/tmp/kive_dev_vars
+      ExecStart=/opt/venv_kive/bin/python manage.py runserver --noreload 0.0.0.0:8000
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
   - path: /usr/local/bin/kive-provision.sh
     owner: root:root
     permissions: '0755'
@@ -150,23 +169,6 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
         echo "ENV after sourcing dev vars:"
         env | sort
-        cat > /etc/systemd/system/kive-dev-web.service << 'KIVE_UNIT'
-[Unit]
-Description=Kive development web server
-After=network.target
-
-[Service]
-User=kive
-Group=kive
-WorkingDirectory=/usr/local/share/Kive/kive
-EnvironmentFile=/tmp/kive_dev_vars
-ExecStart=/opt/venv_kive/bin/python manage.py runserver --noreload 0.0.0.0:8000
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-KIVE_UNIT
         systemctl daemon-reload
         systemctl enable --now kive-dev-web.service
         echo "kive-dev-web.service started"
