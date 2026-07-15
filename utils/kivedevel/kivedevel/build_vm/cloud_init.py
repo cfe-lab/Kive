@@ -150,18 +150,41 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
         echo "ENV after sourcing dev vars:"
         env | sort
-        nohup bash -lc ". /tmp/kive_dev_vars 2>/dev/null || true; . /etc/kive_dev_vars 2>/dev/null || true; exec \"$PYTHON_BIN\" manage.py runserver 0.0.0.0:8000" >/var/log/kive-api-smoke.log 2>&1 &
-        echo "runserver launched, PID=$!"
-        ps -ef | grep manage.py | grep -v grep || true
-        sleep 2
-        cat /var/log/kive-api-smoke.log || true
+        cat > /etc/systemd/system/kive-dev-web.service << 'KIVE_UNIT'
+[Unit]
+Description=Kive development web server
+After=network.target
 
-        for _ in $(seq 1 180); do
-          if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+[Service]
+User=kive
+Group=kive
+WorkingDirectory=/usr/local/share/Kive/kive
+EnvironmentFile=/tmp/kive_dev_vars
+ExecStart=/opt/venv_kive/bin/python manage.py runserver --noreload 0.0.0.0:8000
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+KIVE_UNIT
+        systemctl daemon-reload
+        systemctl enable --now kive-dev-web.service
+        echo "kive-dev-web.service started"
+
+        systemctl is-system-running --wait 2>/dev/null || true
+        for _ in $(seq 1 60); do
+          if systemctl is-active kive-dev-web.service >/dev/null 2>&1 && \
+             curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
             break
           fi
-          sleep 1
+          sleep 2
         done
+        if ! systemctl is-active kive-dev-web.service >/dev/null 2>&1; then
+          echo "kive-dev-web.service failed to start:"
+          systemctl status kive-dev-web.service --no-pager || true
+          journalctl -u kive-dev-web.service --no-pager --lines=50 || true
+          exit 1
+        fi
         if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
           echo "API did not become reachable on 127.0.0.1:8000/login/"
           exit 1
