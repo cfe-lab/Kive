@@ -188,13 +188,13 @@ profiles:
 
     if debug:
         logger.info("=== host networking after repair ===")
-        _run(["sysctl", "net.ipv4.ip_forward"], check=False)
-        _run(["sysctl", "net.ipv4.conf.all.forwarding"], check=False)
-        _run(["sysctl", "net.ipv4.conf.default.forwarding"], check=False)
-        _run(["iptables", "-S", "FORWARD"], check=False)
-        _run(["iptables", "-S", "DOCKER-USER"], check=False)
-        _run(["iptables", "-t", "nat", "-S", "POSTROUTING"], check=False)
-        _run(["nft", "list", "ruleset"], check=False)
+        _run(["sysctl", "net.ipv4.ip_forward"], sudo=True, check=False)
+        _run(["sysctl", "net.ipv4.conf.all.forwarding"], sudo=True, check=False)
+        _run(["sysctl", "net.ipv4.conf.default.forwarding"], sudo=True, check=False)
+        _run(["iptables", "-S", "FORWARD"], sudo=True, check=False)
+        _run(["iptables", "-S", "DOCKER-USER"], sudo=True, check=False)
+        _run(["iptables", "-t", "nat", "-S", "POSTROUTING"], sudo=True, check=False)
+        _run(["nft", "list", "ruleset"], sudo=True, check=False)
 
     logger.info("Host preparation complete.")
 
