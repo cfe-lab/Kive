@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
-import re
 import subprocess
 import sys
 import time
@@ -24,28 +22,33 @@ _HEALTH_URL = "http://127.0.0.1:8000/login/"
 _HEALTH_TIMEOUT = 120
 
 
-def _host_source_snapshot(root: Path, workdir: Path) -> Path:
+def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path) -> Path:
     """Create a complete snapshot of *root* under *workdir* using rsync --delete.
 
     Returns the path to the snapshot directory.
     """
+    from .build_vm.workspace import _workspace_rsync_args
+
     snapshot = Path(mkdtemp(prefix="kive-reload-", dir=workdir))
-    rsync_args = ["-a", "--delete"]
-    try:
-        rel = workdir.relative_to(root).as_posix()
-    except ValueError:
-        rel = None
-    if rel is not None:
-        rsync_args += [f"--exclude=/{rel}/"]
-    rsync_args += ["--exclude=/tmp/", "--", str(root) + "/", str(snapshot) + "/"]
+    rsync_args = _workspace_rsync_args(root, workdir, snapshot)
+    # Insert --delete after -a and before the trailing --
+    separator = rsync_args.index("--")
+    rsync_args.insert(separator, "--delete")
 
     logger.info("Creating host source snapshot at %s...", snapshot)
-    subprocess.run(["rsync"] + rsync_args, check=True, capture_output=True, text=True)
+    cmds.rsync.run(rsync_args)
     return snapshot
 
 
 def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
     """Transfer *snapshot* into a unique guest staging directory via incus file push.
+
+    Because the destination does not exist, Incus creates it and places the
+    source directory's contents directly underneath.  After the push:
+
+      /usr/local/share/.Kive.reload-<stamp>/kive/
+      /usr.local/share/.Kive.reload-<stamp>/dev-env/
+      ...
 
     Returns the guest-side staging path.
     """
@@ -58,27 +61,6 @@ def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
         check=True,
         capture_output=True,
         timeout=120,
-    )
-
-    # incus file push of a directory creates the directory itself,
-    # so the content is at <guest_staging>/<basename>.
-    # We want the content directly under guest_staging, so move it.
-    basename = os.path.basename(str(snapshot))
-    inner = f"{guest_staging}/{basename}"
-    cmds.incus.run(
-        ["exec", instance, "--", "mv", inner, guest_staging + ".tmp"],
-        check=True,
-        capture_output=True,
-    )
-    cmds.incus.run(
-        ["exec", instance, "--", "rmdir", guest_staging],
-        check=True,
-        capture_output=True,
-    )
-    cmds.incus.run(
-        ["exec", instance, "--", "mv", guest_staging + ".tmp", guest_staging],
-        check=True,
-        capture_output=True,
     )
 
     return guest_staging
@@ -124,30 +106,36 @@ def _stop_services(cmds: Cmds, instance: str) -> None:
             sys.exit(1)
 
 
-def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> str:
+def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> bool:
     """Atomically replace /usr/local/share/Kive with the staged tree.
 
-    Returns the backup path.
+    Returns True if the original tree was successfully moved aside (backup
+    exists).  Returns False if the first mv failed and the active tree is
+    still in place — callers should NOT attempt to restore from a nonexistent
+    backup.
     """
     kive_root = "/usr/local/share/Kive"
-    cmds.incus.run(
+    result = cmds.incus.run(
         ["exec", instance, "--", "mv", kive_root, backup],
-        check=True, capture_output=True,
+        check=False, capture_output=True,
     )
+    if result.returncode != 0:
+        logger.error("Failed to move existing tree aside: %s", (result.stderr or "").strip())
+        return False
+
     cmds.incus.run(
         ["exec", instance, "--", "mv", guest_staging, kive_root],
         check=True, capture_output=True,
     )
-    return backup
+    return True
 
 
 def _restore_tree(cmds: Cmds, instance: str, backup: str) -> None:
-    """Restore the original tree from *backup* after a failed switch."""
+    """Restore the original tree from *backup*.
+
+    Only call this when *backup* is known to exist (the first mv succeeded).
+    """
     kive_root = "/usr/local/share/Kive"
-    cmds.incus.run(
-        ["exec", instance, "--", "mv", kive_root, guest_staging := kive_root + ".failed"],
-        check=False, capture_output=True,
-    )
     cmds.incus.run(
         ["exec", instance, "--", "mv", backup, kive_root],
         check=True, capture_output=True,
@@ -264,10 +252,17 @@ def run_reload(args: argparse.Namespace) -> None:
             stamp = int(time.time())
             backup = f"/usr/local/share/.Kive.backup-{stamp}"
             _stop_services(cmds, instance)
+            backup_created = _switch_tree(cmds, instance, guest_staging, backup)
+            if not backup_created:
+                # First mv failed; active tree still in place. No restore needed.
+                _start_services(cmds, instance)
+                logger.error("Reload aborted. Active tree unchanged.")
+                sys.exit(1)
             try:
-                _switch_tree(cmds, instance, guest_staging, backup)
-            except Exception:
+                _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
+            except SystemExit:
                 _restore_tree(cmds, instance, backup)
+                _start_services(cmds, instance)
                 raise
             _start_services(cmds, instance)
             _health_check(cmds, instance)
