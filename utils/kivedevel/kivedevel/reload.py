@@ -7,6 +7,7 @@ import logging
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 from tempfile import mkdtemp
 
@@ -52,8 +53,7 @@ def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
 
     Returns the guest-side staging path.
     """
-    stamp = int(time.time())
-    guest_staging = f"/usr/local/share/.Kive.reload-{stamp}"
+    guest_staging = f"/usr/local/share/.Kive.reload-{uuid.uuid4().hex}"
 
     logger.info("Transferring snapshot to %s:%s...", instance, guest_staging)
     cmds.incus.run(
@@ -267,13 +267,24 @@ def run_reload(args: argparse.Namespace) -> None:
         try:
             _validate_guest_tree(cmds, instance, guest_staging)
             _fix_ownership(cmds, instance, guest_staging)
-            stamp = int(time.time())
-            backup = f"/usr/local/share/.Kive.backup-{stamp}"
+            suffix = uuid.uuid4().hex
+            backup = f"/usr/local/share/.Kive.backup-{suffix}"
+            lock_path = "/var/lock/kive-reload.lock"
+            result = cmds.incus.run(
+                ["exec", instance, "--", "sh", "-c",
+                 f"flock -n {lock_path} -c 'echo locked' 2>/dev/null || echo busy"],
+                check=False, capture_output=True,
+            )
+            if "busy" in (result.stdout or ""):
+                logger.error("Another reload is already running for %s.", instance)
+                sys.exit(1)
+
+            stopped: list[str] = []
             stopped = _stop_services(cmds, instance)
+
             try:
                 backup_created = _switch_tree(cmds, instance, guest_staging, backup)
             except Exception:
-                # Second rename failed. Restore backup if it exists.
                 try:
                     _restore_tree(cmds, instance, backup)
                 except Exception as restore_err:
@@ -281,16 +292,17 @@ def run_reload(args: argparse.Namespace) -> None:
                         f"Switch failed and restoration also failed: {restore_err}"
                     ) from restore_err
                 raise
+
             if not backup_created:
-                _start_services(cmds, instance)
                 logger.error("Reload aborted. Active tree unchanged.")
                 sys.exit(1)
+
             try:
                 _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
             except SystemExit:
                 _restore_tree(cmds, instance, backup)
-                _start_services(cmds, instance)
                 raise
+
             _start_services(cmds, instance)
             _health_check(cmds, instance)
             _cleanup_stale(cmds, instance)
@@ -299,8 +311,8 @@ def run_reload(args: argparse.Namespace) -> None:
                 instance, args.root, backup,
             )
         except BaseException:
-            # Any failure after services were stopped: restart them.
-            _start_services_of(stopped, cmds, instance)
+            if stopped:
+                _start_services_of(stopped, cmds, instance)
             raise
         finally:
             cmds.incus.run(
