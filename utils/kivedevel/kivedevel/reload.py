@@ -86,8 +86,13 @@ def _fix_ownership(cmds: Cmds, instance: str, guest_staging: str) -> None:
     )
 
 
-def _stop_services(cmds: Cmds, instance: str) -> None:
-    """Stop services that load Kive source code."""
+def _stop_services(cmds: Cmds, instance: str) -> list[str]:
+    """Stop services that load Kive source code.
+
+    Returns the list of services that were successfully stopped,
+    so callers can restart them if the operation aborts.
+    """
+    stopped: list[str] = []
     for svc in (_DEV_SERVICE, _APACHE_SERVICE):
         result = cmds.incus.run(
             ["exec", instance, "--", "systemctl", "stop", svc],
@@ -104,6 +109,8 @@ def _stop_services(cmds: Cmds, instance: str) -> None:
                 sys.exit(1)
             logger.error("Failed to stop %s on %s: %s", svc, instance, stderr)
             sys.exit(1)
+        stopped.append(svc)
+    return stopped
 
 
 def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> bool:
@@ -134,8 +141,14 @@ def _restore_tree(cmds: Cmds, instance: str, backup: str) -> None:
     """Restore the original tree from *backup*.
 
     Only call this when *backup* is known to exist (the first mv succeeded).
+    Removes the existing (failed) tree at ``/usr/local/share/Kive`` first so
+    that ``mv`` does not nest the backup inside it.
     """
     kive_root = "/usr/local/share/Kive"
+    cmds.incus.run(
+        ["exec", instance, "--", "rm", "-rf", kive_root],
+        check=True, capture_output=True,
+    )
     cmds.incus.run(
         ["exec", instance, "--", "mv", backup, kive_root],
         check=True, capture_output=True,
@@ -143,8 +156,13 @@ def _restore_tree(cmds: Cmds, instance: str, backup: str) -> None:
 
 
 def _start_services(cmds: Cmds, instance: str) -> None:
-    """Start services that load Kive source code."""
-    for svc in (_APACHE_SERVICE, _DEV_SERVICE):
+    """Start the full set of services that load Kive source code."""
+    _start_services_of([_APACHE_SERVICE, _DEV_SERVICE], cmds, instance)
+
+
+def _start_services_of(services: list[str], cmds: Cmds, instance: str) -> None:
+    """Start a specific list of services."""
+    for svc in services:
         cmds.incus.run(
             ["exec", instance, "--", "systemctl", "start", svc],
             check=True, capture_output=True, timeout=30,
@@ -230,7 +248,7 @@ def run_reload(args: argparse.Namespace) -> None:
         )
         sys.exit(1)
 
-    for svc in (_DEV_SERVICE,):
+    for svc in (_DEV_SERVICE, _APACHE_SERVICE):
         result = cmds.incus.run(
             ["exec", instance, "--", "systemctl", "cat", svc],
             check=False, capture_output=True,
@@ -243,7 +261,7 @@ def run_reload(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
-    snapshot = _host_source_snapshot(args.root, args.workdir)
+    snapshot = _host_source_snapshot(cmds, args.root, args.workdir)
     try:
         guest_staging = _transfer_snapshot(cmds, instance, snapshot)
         try:
@@ -251,10 +269,19 @@ def run_reload(args: argparse.Namespace) -> None:
             _fix_ownership(cmds, instance, guest_staging)
             stamp = int(time.time())
             backup = f"/usr/local/share/.Kive.backup-{stamp}"
-            _stop_services(cmds, instance)
-            backup_created = _switch_tree(cmds, instance, guest_staging, backup)
+            stopped = _stop_services(cmds, instance)
+            try:
+                backup_created = _switch_tree(cmds, instance, guest_staging, backup)
+            except Exception:
+                # Second rename failed. Restore backup if it exists.
+                try:
+                    _restore_tree(cmds, instance, backup)
+                except Exception as restore_err:
+                    raise RuntimeError(
+                        f"Switch failed and restoration also failed: {restore_err}"
+                    ) from restore_err
+                raise
             if not backup_created:
-                # First mv failed; active tree still in place. No restore needed.
                 _start_services(cmds, instance)
                 logger.error("Reload aborted. Active tree unchanged.")
                 sys.exit(1)
@@ -271,6 +298,10 @@ def run_reload(args: argparse.Namespace) -> None:
                 "Reload complete for %s.  Source: %s  Backup: %s",
                 instance, args.root, backup,
             )
+        except BaseException:
+            # Any failure after services were stopped: restart them.
+            _start_services_of(stopped, cmds, instance)
+            raise
         finally:
             cmds.incus.run(
                 ["exec", instance, "--", "rm", "-rf", guest_staging],
