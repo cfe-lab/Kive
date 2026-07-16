@@ -10,6 +10,7 @@ import tempfile
 from pathlib import Path
 
 from . import checks
+from . import reload as reload_mod
 from .build_vm.runner import run_build_vm
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root, instance_exists
@@ -110,7 +111,6 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     checks.run_test_api(api_args)
 
     # Reload smoke test: create a marker, reload, verify, delete, reload, verify gone.
-    from .reload import run_reload
     marker_name = ".kive-reload-smoke-marker"
     marker_path = default_root() / marker_name
     try:
@@ -120,7 +120,7 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
         reload_args = _build_vm_args(instance, instance_type, workdir, debug, vm_network)
         reload_args.root = default_root()
         reload_args.workdir = workdir
-        run_reload(reload_args)
+        reload_mod.run_reload(reload_args)
 
         cmds = Cmds.create()
         result = cmds.incus.run(
@@ -135,7 +135,7 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
         marker_path.unlink()
         logger.info("Deleted host marker. Reloading again to verify deletion...")
-        run_reload(reload_args)
+        reload_mod.run_reload(reload_args)
 
         result = cmds.incus.run(
             ["exec", instance, "--", "test", "-f", f"/usr/local/share/Kive/{marker_name}"],
