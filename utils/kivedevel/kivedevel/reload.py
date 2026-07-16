@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import logging
 import subprocess
 import sys
@@ -86,13 +87,12 @@ def _fix_ownership(cmds: Cmds, instance: str, guest_staging: str) -> None:
     )
 
 
-def _stop_services(cmds: Cmds, instance: str) -> list[str]:
+def _stop_services(cmds: Cmds, instance: str, stopped: list[str]) -> None:
     """Stop services that load Kive source code.
 
-    Returns the list of services that were successfully stopped,
-    so callers can restart them if the operation aborts.
+    Appends each successfully stopped service to *stopped* immediately,
+    so the caller can see partial progress when a later stop fails.
     """
-    stopped: list[str] = []
     for svc in (_DEV_SERVICE, _APACHE_SERVICE):
         result = cmds.incus.run(
             ["exec", instance, "--", "systemctl", "stop", svc],
@@ -110,7 +110,6 @@ def _stop_services(cmds: Cmds, instance: str) -> list[str]:
             logger.error("Failed to stop %s on %s: %s", svc, instance, stderr)
             sys.exit(1)
         stopped.append(svc)
-    return stopped
 
 
 def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> bool:
@@ -269,19 +268,18 @@ def run_reload(args: argparse.Namespace) -> None:
             _fix_ownership(cmds, instance, guest_staging)
             suffix = uuid.uuid4().hex
             backup = f"/usr/local/share/.Kive.backup-{suffix}"
-            lock_path = "/var/lock/kive-reload.lock"
-            result = cmds.incus.run(
-                ["exec", instance, "--", "sh", "-c",
-                 f"flock -n {lock_path} -c 'echo locked' 2>/dev/null || echo busy"],
-                check=False, capture_output=True,
-            )
-            if "busy" in (result.stdout or ""):
+
+            # Host-side per-instance lock — held for the full transaction.
+            lock_path = args.workdir / f".kive-reload-{instance}.lock"
+            lock_file = open(lock_path, "w")
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
                 logger.error("Another reload is already running for %s.", instance)
                 sys.exit(1)
 
             stopped: list[str] = []
-            stopped = _stop_services(cmds, instance)
-
+            _stop_services(cmds, instance, stopped)
             try:
                 backup_created = _switch_tree(cmds, instance, guest_staging, backup)
             except Exception:
@@ -304,6 +302,7 @@ def run_reload(args: argparse.Namespace) -> None:
                 raise
 
             _start_services(cmds, instance)
+            stopped.clear()
             _health_check(cmds, instance)
             _cleanup_stale(cmds, instance)
             logger.info(
@@ -319,6 +318,12 @@ def run_reload(args: argparse.Namespace) -> None:
                 ["exec", instance, "--", "rm", "-rf", guest_staging],
                 check=False, capture_output=True,
             )
+            try:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
+                lock_file.close()
+                lock_path.unlink(missing_ok=True)
+            except Exception:
+                pass
     finally:
         subprocess.run(["rm", "-rf", str(snapshot)], check=False)
 
