@@ -58,7 +58,7 @@ def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
 
     logger.info("Transferring snapshot to %s:%s...", instance, guest_staging)
     cmds.incus.run(
-        ["file", "push", "-r", "--", str(snapshot), f"{instance}{guest_staging}"],
+        ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{guest_staging}"],
         check=True,
         capture_output=True,
         timeout=120,

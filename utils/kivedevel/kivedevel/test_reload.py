@@ -165,6 +165,9 @@ class TestReloadSnapshot(unittest.TestCase):
         self.assertIn(".Kive.reload-", guest_path)
         push_calls = [c for c in cmds.incus.run.call_args_list if "push" in str(c)]
         self.assertGreaterEqual(len(push_calls), 1)
+        argv = push_calls[0][0][0]
+        self.assertIn("--create-dirs", argv,
+                       "incus file push must use --create-dirs to create a nonexistent staging path")
         # No mv/rmdir normalization commands should follow the push
         exec_calls = [c for c in cmds.incus.run.call_args_list if "exec" in str(c)]
         self.assertEqual(len(exec_calls), 0)
