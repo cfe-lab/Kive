@@ -45,11 +45,11 @@ def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path) -> Path:
 def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
     """Transfer *snapshot* into a unique guest staging directory via incus file push.
 
-    Because the destination does not exist, Incus creates it and places the
-    source directory's contents directly underneath.  After the push:
+    ``--create-dirs`` is required because the staging path does not exist
+    before the first reload.  After the push the resulting tree is:
 
-      /usr/local/share/.Kive.reload-<stamp>/kive/
-      /usr.local/share/.Kive.reload-<stamp>/dev-env/
+      /usr/local/share/.Kive.reload-<uuid>/kive/
+      /usr/local/share/.Kive.reload-<uuid>/dev-env/
       ...
 
     Returns the guest-side staging path.
@@ -214,6 +214,15 @@ def _cleanup_stale(cmds: Cmds, instance: str) -> None:
         )
 
 
+def _reload_lock_path(workdir: Path, instance: str) -> Path:
+    """Return the path to a persistent per-instance lock file.
+
+    The lock file is never deleted — its presence in the workdir is
+    normal and harmless.
+    """
+    return workdir / f".kive-reload-{instance}.lock"
+
+
 def run_reload(args: argparse.Namespace) -> None:
     configure_logging(args, args.workdir)
 
@@ -260,56 +269,60 @@ def run_reload(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
+    # Phase 1: host snapshot (outside lock, does not touch the guest).
     snapshot = _host_source_snapshot(cmds, args.root, args.workdir)
     try:
+        # Phase 2: guest staging (outside lock, read-only guest operations).
         guest_staging = _transfer_snapshot(cmds, instance, snapshot)
         try:
             _validate_guest_tree(cmds, instance, guest_staging)
             _fix_ownership(cmds, instance, guest_staging)
-            suffix = uuid.uuid4().hex
-            backup = f"/usr/local/share/.Kive.backup-{suffix}"
 
-            # Host-side per-instance lock — held for the full transaction.
-            lock_path = args.workdir / f".kive-reload-{instance}.lock"
-            lock_file = open(lock_path, "w")
-            try:
-                fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except BlockingIOError:
-                logger.error("Another reload is already running for %s.", instance)
-                sys.exit(1)
-
+            # Phase 3: destructive guest transaction (under lock).
+            backup = f"/usr/local/share/.Kive.backup-{uuid.uuid4().hex}"
+            lock_path = _reload_lock_path(args.workdir, instance)
             stopped: list[str] = []
-            _stop_services(cmds, instance, stopped)
-            try:
-                backup_created = _switch_tree(cmds, instance, guest_staging, backup)
-            except Exception:
+
+            with open(lock_path, "w") as lock_file:
                 try:
+                    fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    logger.error("Another reload is already running for %s.", instance)
+                    sys.exit(1)
+
+                _stop_services(cmds, instance, stopped)
+                try:
+                    backup_created = _switch_tree(cmds, instance, guest_staging, backup)
+                except Exception:
+                    try:
+                        _restore_tree(cmds, instance, backup)
+                    except Exception as restore_err:
+                        raise RuntimeError(
+                            f"Switch failed and restoration also failed: {restore_err}"
+                        ) from restore_err
+                    raise
+
+                if not backup_created:
+                    logger.error("Reload aborted. Active tree unchanged.")
+                    sys.exit(1)
+
+                try:
+                    _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
+                except SystemExit:
                     _restore_tree(cmds, instance, backup)
-                except Exception as restore_err:
-                    raise RuntimeError(
-                        f"Switch failed and restoration also failed: {restore_err}"
-                    ) from restore_err
-                raise
+                    raise
 
-            if not backup_created:
-                logger.error("Reload aborted. Active tree unchanged.")
-                sys.exit(1)
+                _start_services(cmds, instance)
+                stopped.clear()
+                _health_check(cmds, instance)
+                _cleanup_stale(cmds, instance)
+                # Lock released via `with` block.
 
-            try:
-                _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
-            except SystemExit:
-                _restore_tree(cmds, instance, backup)
-                raise
-
-            _start_services(cmds, instance)
-            stopped.clear()
-            _health_check(cmds, instance)
-            _cleanup_stale(cmds, instance)
             logger.info(
                 "Reload complete for %s.  Source: %s  Backup: %s",
                 instance, args.root, backup,
             )
-        except BaseException:
+        except Exception:
             if stopped:
                 _start_services_of(stopped, cmds, instance)
             raise
@@ -318,12 +331,6 @@ def run_reload(args: argparse.Namespace) -> None:
                 ["exec", instance, "--", "rm", "-rf", guest_staging],
                 check=False, capture_output=True,
             )
-            try:
-                fcntl.flock(lock_file, fcntl.LOCK_UN)
-                lock_file.close()
-                lock_path.unlink(missing_ok=True)
-            except Exception:
-                pass
     finally:
         subprocess.run(["rm", "-rf", str(snapshot)], check=False)
 
