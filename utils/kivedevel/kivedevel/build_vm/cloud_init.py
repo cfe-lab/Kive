@@ -177,7 +177,6 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         systemctl enable --now kive-dev-web.service
         echo "kive-dev-web.service started"
 
-        systemctl is-system-running --wait 2>/dev/null || true
         for _ in $(seq 1 60); do
           if systemctl is-active kive-dev-web.service >/dev/null 2>&1 && \
              curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
