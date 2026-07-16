@@ -134,7 +134,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
         export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg
         export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles
-        if ! timeout --foreground 900s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
+        if ! timeout --foreground 1800s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
           echo "ansible-playbook failed or timed out" >&2
           exit 1
         fi
