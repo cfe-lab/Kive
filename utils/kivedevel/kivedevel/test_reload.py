@@ -153,21 +153,22 @@ class TestReloadSnapshot(unittest.TestCase):
                 "Kive.utils.kivedevel.kivedevel.build_vm.workspace._workspace_rsync_args",
                 return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(workdir / "snap") + "/"],
             ):
-                snapshot = rl._host_source_snapshot(cmds, workdir, workdir)
-            self.assertTrue(str(snapshot).startswith(str(workdir)))
+                snapshot = rl._host_source_snapshot(cmds, workdir, workdir, "snap")
+            self.assertEqual(str(snapshot), str(workdir / "snap"))
             self.assertGreaterEqual(len(cmds.rsync.run.call_args_list), 1)
 
-    def test_transfer_snapshot_uses_incus_file_push(self):
+    def test_transfer_snapshot_layout(self):
         rl = self._import_reload()
         cmds = make_cmds()
         cmds.incus.run.return_value = MockRunResult(returncode=0)
-        guest_path = rl._transfer_snapshot(cmds, "test-vm", Path("/tmp/snap"))
-        self.assertIn(".Kive.reload-", guest_path)
+        snapshot = Path("/tmp/.Kive.reload-test123")
+        guest_path = rl._transfer_snapshot(cmds, "test-vm", snapshot)
+        self.assertEqual(guest_path, "/usr/local/share/.Kive.reload-test123")
         push_calls = [c for c in cmds.incus.run.call_args_list if "push" in str(c)]
         self.assertGreaterEqual(len(push_calls), 1)
         argv = push_calls[0][0][0]
-        self.assertIn("--create-dirs", argv,
-                       "incus file push must use --create-dirs to create a nonexistent staging path")
+        self.assertEqual(argv[:6], ["file", "push", "-r", "--create-dirs", "--", str(snapshot)])
+        self.assertIn("test-vm/usr/local/share", argv)
         # No mv/rmdir normalization commands should follow the push
         exec_calls = [c for c in cmds.incus.run.call_args_list if "exec" in str(c)]
         self.assertEqual(len(exec_calls), 0)

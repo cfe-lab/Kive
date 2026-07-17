@@ -24,18 +24,26 @@ _HEALTH_URL = "http://127.0.0.1:8000/login/"
 _HEALTH_TIMEOUT = 120
 
 
-def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path) -> Path:
+def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path, staging_name: str) -> Path:
     """Create a complete snapshot of *root* under *workdir* using rsync --delete.
+
+    The snapshot directory is named *staging_name* so that its basename
+    matches the guest staging path used by ``_transfer_snapshot``.
 
     Returns the path to the snapshot directory.
     """
     from .build_vm.workspace import _workspace_rsync_args
 
-    snapshot = Path(mkdtemp(prefix="kive-reload-", dir=workdir))
+    snapshot = workdir / staging_name
+    snapshot.mkdir(parents=True, exist_ok=True)
     rsync_args = _workspace_rsync_args(root, workdir, snapshot)
-    # Insert --delete after -a and before the trailing --
     separator = rsync_args.index("--")
     rsync_args.insert(separator, "--delete")
+    # Exclude host-specific artefacts that are useless or harmful in the guest.
+    rsync_args.insert(separator, "--exclude=/.venv/")
+    rsync_args.insert(separator, "--exclude=/__pycache__/")
+    rsync_args.insert(separator, "--exclude=*.pyc")
+    rsync_args.insert(separator, "--exclude=/.git/")
 
     logger.info("Creating host source snapshot at %s...", snapshot)
     cmds.rsync.run(rsync_args)
@@ -45,8 +53,10 @@ def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path) -> Path:
 def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
     """Transfer *snapshot* into a unique guest staging directory via incus file push.
 
-    ``--create-dirs`` is required because the staging path does not exist
-    before the first reload.  After the push the resulting tree is:
+    ``--create-dirs`` creates the parent tree if needed.  The destination
+    is ``/usr/local/share``, so Incus places the snapshot's basename
+    (``.Kive.reload-<uuid>``) directly under that directory.  After the
+    push the resulting tree is:
 
       /usr/local/share/.Kive.reload-<uuid>/kive/
       /usr/local/share/.Kive.reload-<uuid>/dev-env/
@@ -54,11 +64,12 @@ def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
 
     Returns the guest-side staging path.
     """
-    guest_staging = f"/usr/local/share/.Kive.reload-{uuid.uuid4().hex}"
+    parent = "/usr/local/share"
+    guest_staging = f"{parent}/{snapshot.name}"
 
     logger.info("Transferring snapshot to %s:%s...", instance, guest_staging)
     cmds.incus.run(
-        ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{guest_staging}"],
+        ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{parent}"],
         check=True,
         capture_output=True,
         timeout=120,
@@ -269,8 +280,12 @@ def run_reload(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
+    # Shared staging name ensures the local snapshot basename matches the
+    # guest staging path that _transfer_snapshot creates under /usr/local/share.
+    staging_name = f".Kive.reload-{uuid.uuid4().hex}"
+
     # Phase 1: host snapshot (outside lock, does not touch the guest).
-    snapshot = _host_source_snapshot(cmds, args.root, args.workdir)
+    snapshot = _host_source_snapshot(cmds, args.root, args.workdir, staging_name)
     try:
         # Phase 2: guest staging (outside lock, read-only guest operations).
         guest_staging = _transfer_snapshot(cmds, instance, snapshot)
@@ -278,10 +293,12 @@ def run_reload(args: argparse.Namespace) -> None:
             _validate_guest_tree(cmds, instance, guest_staging)
             _fix_ownership(cmds, instance, guest_staging)
 
+            # Recovery state — initialized before any exception can be raised.
+            stopped: list[str] = []
+
             # Phase 3: destructive guest transaction (under lock).
             backup = f"/usr/local/share/.Kive.backup-{uuid.uuid4().hex}"
             lock_path = _reload_lock_path(args.workdir, instance)
-            stopped: list[str] = []
 
             with open(lock_path, "w") as lock_file:
                 try:
