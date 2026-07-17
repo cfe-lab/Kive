@@ -110,22 +110,72 @@ def _stop_services(cmds: Cmds, instance: str, stopped: list[str]) -> None:
         stopped.append(svc)
 
 
+def _guest_path_exists(cmds: Cmds, instance: str, path: str) -> bool:
+    """Return True if *path* exists inside *instance*."""
+    result = cmds.incus.run(
+        ["exec", instance, "--", "test", "-e", path],
+        check=False, capture_output=True,
+    )
+    return result.returncode == 0
+
+
 def _move_active_to_backup(cmds: Cmds, instance: str, backup: str) -> bool:
     """Move ``/usr/local/share/Kive`` to *backup*.
 
-    Returns True on success, False if the active tree could not be moved
-    (the original tree is still in place).  Never raises — callers must
-    NOT attempt restoration when this returns False.
+    Inspects the actual guest state on any failure (exception or nonzero
+    exit) to handle the case where the remote ``mv`` succeeded even
+    though the local ``incus exec`` process was interrupted or reported
+    failure.
+
+    Returns True when the backup exists and the active tree is gone.
+    Returns False when the active tree is still in place and the backup
+    is absent.
+    Raises ``ReloadError`` when the guest state is ambiguous (both paths
+    absent, or both present).
     """
     kive_root = "/usr/local/share/Kive"
-    result = cmds.incus.run(
-        ["exec", instance, "--", "mv", kive_root, backup],
-        check=False, capture_output=True,
-    )
+
+    def _reconcile(primary: BaseException | None = None) -> bool:
+        backup_exists = _guest_path_exists(cmds, instance, backup)
+        active_exists = _guest_path_exists(cmds, instance, kive_root)
+
+        if backup_exists and not active_exists:
+            return True
+        if active_exists and not backup_exists:
+            if primary is not None:
+                logger.error(
+                    "Interrupted while moving the active tree aside. "
+                    "Active tree is still in place at %s.",
+                    kive_root,
+                )
+            else:
+                logger.error(
+                    "Failed to move the active tree aside. "
+                    "Active tree is still in place at %s.",
+                    kive_root,
+                )
+            return False
+        msg = (
+            f"Guest filesystem state after first-move failure is ambiguous: "
+            f"active={{{active_exists}}}, backup={{{backup_exists}}} "
+            f"at {kive_root} and {backup}."
+        )
+        raise ReloadError(msg)
+
+    try:
+        result = cmds.incus.run(
+            ["exec", instance, "--", "mv", kive_root, backup],
+            check=False, capture_output=True,
+        )
+    except BaseException as exc:
+        return _reconcile(exc)
+
     if result.returncode != 0:
-        logger.error("Failed to move existing tree aside: %s", (result.stderr or "").strip())
-        return False
-    return True
+        stderr = (result.stderr or "").strip()
+        logger.error("Failed to move existing tree aside: %s", stderr)
+        return _reconcile()
+
+    return _reconcile()
 
 
 def _install_staging(cmds: Cmds, instance: str, guest_staging: str) -> None:

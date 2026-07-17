@@ -258,13 +258,15 @@ class TestReloadNoInstanceLifecycleCommands(unittest.TestCase):
                                                    return_value="/staging"):
                                 with mock.patch.object(rl, "_validate_guest_tree"):
                                     with mock.patch.object(rl, "_fix_ownership"):
-                                        with mock.patch.object(rl, "_stop_services"):
-                                            with mock.patch.object(rl, "_install_staging",
-                                                                    return_value="/backup"):
-                                                with mock.patch.object(rl, "_start_services"):
-                                                    with mock.patch.object(rl, "_health_check"):
-                                                        with mock.patch.object(rl, "_cleanup_stale"):
-                                                            rl.run_reload(args)
+                                            with mock.patch.object(rl, "_move_active_to_backup",
+                                                                    return_value=True):
+                                                with mock.patch.object(rl, "_stop_services"):
+                                                    with mock.patch.object(rl, "_install_staging",
+                                                                            return_value="/backup"):
+                                                        with mock.patch.object(rl, "_start_services"):
+                                                            with mock.patch.object(rl, "_health_check"):
+                                                                with mock.patch.object(rl, "_cleanup_stale"):
+                                                                    rl.run_reload(args)
             after_calls = cmds.incus.run.call_args_list[before_count:]
             for call in after_calls:
                 argv = " ".join(call[0][0]) if call[0] else ""
