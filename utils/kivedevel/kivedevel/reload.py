@@ -168,7 +168,31 @@ def _move_active_to_backup(cmds: Cmds, instance: str, backup: str) -> bool:
             check=False, capture_output=True,
         )
     except BaseException as exc:
-        return _reconcile(exc)
+        # Reconcile filesystem state, then always re-raise the exception
+        # so that KeyboardInterrupt is preserved.
+        backup_exists = _guest_path_exists(cmds, instance, backup)
+        active_exists = _guest_path_exists(cmds, instance, kive_root)
+
+        if backup_exists and not active_exists:
+            try:
+                _restore_tree(cmds, instance, backup)
+            except BaseException as rollback_err:
+                exc.add_note(
+                    f"Restoring the previous tree also failed: {rollback_err}"
+                )
+        elif active_exists and not backup_exists:
+            logger.error(
+                "Interrupted while moving the active tree aside. "
+                "Active tree is still in place at %s.",
+                kive_root,
+            )
+        else:
+            exc.add_note(
+                f"Guest tree state after interruption is ambiguous: "
+                f"active={{{active_exists}}}, backup={{{backup_exists}}} "
+                f"at {kive_root} and {backup}."
+            )
+        raise
 
     if result.returncode != 0:
         stderr = (result.stderr or "").strip()
