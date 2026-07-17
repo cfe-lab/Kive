@@ -31,23 +31,13 @@ _HEALTH_URL = "http://127.0.0.1:8000/login/"
 _HEALTH_TIMEOUT = 120
 
 
-def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path, staging_name: str) -> Path:
-    """Create a complete snapshot of *root* under *workdir* using rsync --delete.
-
-    The snapshot directory is named *staging_name* so that its basename
-    matches the guest staging path used by ``_transfer_snapshot``.
-
-    Returns the path to the snapshot directory.
-    """
+def _host_source_snapshot_rsync(cmds: Cmds, root: Path, workdir: Path, snapshot: Path) -> None:
+    """Rsync *root* into *snapshot* with --delete and exclusions."""
     from .build_vm.workspace import _workspace_rsync_args
 
-    snapshot = workdir / staging_name
-    snapshot.mkdir(parents=True, exist_ok=True)
     rsync_args = _workspace_rsync_args(root, workdir, snapshot)
     separator = rsync_args.index("--")
     rsync_args.insert(separator, "--delete")
-    # Exclude host-specific artefacts — patterns without leading / so they
-    # match at every depth (e.g. utils/kivedevel/.venv/).
     rsync_args.insert(separator, "--exclude=.venv/")
     rsync_args.insert(separator, "--exclude=__pycache__/")
     rsync_args.insert(separator, "--exclude=*.pyc")
@@ -55,35 +45,25 @@ def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path, staging_name: s
 
     logger.info("Creating host source snapshot at %s...", snapshot)
     cmds.rsync.run(rsync_args)
-    return snapshot
 
 
-def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
-    """Transfer *snapshot* into a unique guest staging directory via incus file push.
+def _transfer_snapshot_to(cmds: Cmds, instance: str, snapshot: Path, parent: str) -> None:
+    """Push *snapshot* into *parent* on *instance* via incus file push.
 
-    ``--create-dirs`` creates the parent tree if needed.  The destination
-    is ``/usr/local/share``, so Incus places the snapshot's basename
-    (``.Kive.reload-<uuid>``) directly under that directory.  After the
-    push the resulting tree is:
+    ``--create-dirs`` creates the parent tree if needed.  Incus preserves
+    the source directory's basename, so the resulting tree is:
 
-      /usr/local/share/.Kive.reload-<uuid>/kive/
-      /usr/local/share/.Kive.reload-<uuid>/dev-env/
+      <parent>/<snapshot-basename>/kive/
+      <parent>/<snapshot-basename>/dev-env/
       ...
-
-    Returns the guest-side staging path.
     """
-    parent = "/usr/local/share"
-    guest_staging = f"{parent}/{snapshot.name}"
-
-    logger.info("Transferring snapshot to %s:%s...", instance, guest_staging)
+    logger.info("Transferring snapshot to %s:%s...", instance, parent)
     cmds.incus.run(
         ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{parent}"],
         check=True,
         capture_output=True,
         timeout=120,
     )
-
-    return guest_staging
 
 
 def _validate_guest_tree(cmds: Cmds, instance: str, guest_staging: str) -> None:
@@ -300,22 +280,28 @@ def run_reload(args: argparse.Namespace) -> None:
         _run_reload(args, cmds, instance)
     except ReloadError as error:
         logger.error("%s", error)
+        for note in getattr(error, "__notes__", []):
+            logger.error("  %s", note)
         raise SystemExit(1)
 
 
 def _run_reload(args: argparse.Namespace, cmds: Cmds, instance: str) -> None:
-    # Shared staging name ensures the local snapshot basename matches the
-    # guest staging path that _transfer_snapshot creates under /usr/local/share.
     staging_name = f".Kive.reload-{uuid.uuid4().hex}"
 
     # Phase 1: host snapshot (outside lock, does not touch the guest).
-    snapshot = _host_source_snapshot(cmds, args.root, args.workdir, staging_name)
+    snapshot = args.workdir / staging_name
+    snapshot.mkdir(parents=True, exist_ok=True)
     try:
+        _host_source_snapshot_rsync(cmds, args.root, args.workdir, snapshot)
+
         # Phase 2: guest staging (outside lock, read-only guest operations).
-        # Recovery state — must exist before any code in the inner try can raise.
+        # Build the guest-side path first so cleanup is established before the
+        # transfer starts.
+        parent = "/usr/local/share"
+        guest_staging = f"{parent}/{staging_name}"
         stopped: list[str] = []
-        guest_staging = _transfer_snapshot(cmds, instance, snapshot)
         try:
+            _transfer_snapshot_to(cmds, instance, snapshot, parent)
             _validate_guest_tree(cmds, instance, guest_staging)
             _fix_ownership(cmds, instance, guest_staging)
 

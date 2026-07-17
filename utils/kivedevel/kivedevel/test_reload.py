@@ -149,12 +149,13 @@ class TestReloadSnapshot(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             workdir = Path(tmp)
+            snapshot = workdir / "snap"
+            snapshot.mkdir()
             with mock.patch(
                 "Kive.utils.kivedevel.kivedevel.build_vm.workspace._workspace_rsync_args",
-                return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(workdir / "snap") + "/"],
+                return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(snapshot) + "/"],
             ):
-                snapshot = rl._host_source_snapshot(cmds, workdir, workdir, "snap")
-            self.assertEqual(str(snapshot), str(workdir / "snap"))
+                rl._host_source_snapshot_rsync(cmds, workdir, workdir, snapshot)
             self.assertGreaterEqual(len(cmds.rsync.run.call_args_list), 1)
 
     def test_transfer_snapshot_layout(self):
@@ -162,8 +163,7 @@ class TestReloadSnapshot(unittest.TestCase):
         cmds = make_cmds()
         cmds.incus.run.return_value = MockRunResult(returncode=0)
         snapshot = Path("/tmp/.Kive.reload-test123")
-        guest_path = rl._transfer_snapshot(cmds, "test-vm", snapshot)
-        self.assertEqual(guest_path, "/usr/local/share/.Kive.reload-test123")
+        rl._transfer_snapshot_to(cmds, "test-vm", snapshot, "/usr/local/share")
         push_calls = [c for c in cmds.incus.run.call_args_list if "push" in str(c)]
         self.assertGreaterEqual(len(push_calls), 1)
         argv = push_calls[0][0][0]
@@ -202,9 +202,9 @@ class TestReloadOrdering(unittest.TestCase):
                 mock_cmds_cls.create.return_value = cmds
                 with mock.patch.object(rl, "instance_exists", return_value=True):
                     with mock.patch.object(rl, "instance_is_running", return_value=True):
-                        with mock.patch.object(rl, "_host_source_snapshot",
+                        with mock.patch.object(rl, "_host_source_snapshot_rsync",
                                                 return_value=workdir / "snap"):
-                            with mock.patch.object(rl, "_transfer_snapshot",
+                            with mock.patch.object(rl, "_transfer_snapshot_to",
                                                    return_value="/staging"):
                                 with mock.patch.object(rl, "_validate_guest_tree"):
                                     with mock.patch.object(rl, "_fix_ownership"):
@@ -250,9 +250,9 @@ class TestReloadNoInstanceLifecycleCommands(unittest.TestCase):
                 mock_cmds_cls.create.return_value = cmds
                 with mock.patch.object(rl, "instance_exists", return_value=True):
                     with mock.patch.object(rl, "instance_is_running", return_value=True):
-                        with mock.patch.object(rl, "_host_source_snapshot",
+                        with mock.patch.object(rl, "_host_source_snapshot_rsync",
                                                 return_value=workdir / "snap"):
-                            with mock.patch.object(rl, "_transfer_snapshot",
+                            with mock.patch.object(rl, "_transfer_snapshot_to",
                                                    return_value="/staging"):
                                 with mock.patch.object(rl, "_validate_guest_tree"):
                                     with mock.patch.object(rl, "_fix_ownership"):
