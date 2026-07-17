@@ -210,15 +210,17 @@ class TestReloadOrdering(unittest.TestCase):
                                     with mock.patch.object(rl, "_fix_ownership"):
                                         with mock.patch.object(rl, "_stop_services",
                                                                 side_effect=lambda *a: call_log.append("stop")):
-                                            with mock.patch.object(rl, "_switch_tree",
-                                                                    side_effect=lambda *a: call_log.append("switch") or "/backup"):
-                                                with mock.patch.object(rl, "_start_services",
-                                                                        side_effect=lambda *a: call_log.append("start")):
-                                                    with mock.patch.object(rl, "_health_check",
-                                                                            side_effect=lambda *a: call_log.append("health")):
-                                                        with mock.patch.object(rl, "_cleanup_stale"):
-                                                            rl.run_reload(args)
-        self.assertEqual(call_log, ["stop", "switch", "start", "health"])
+                                            with mock.patch.object(rl, "_move_active_to_backup",
+                                                                    side_effect=lambda *a: call_log.append("mv") or True):
+                                                with mock.patch.object(rl, "_install_staging",
+                                                                        side_effect=lambda *a: call_log.append("install")):
+                                                    with mock.patch.object(rl, "_start_services",
+                                                                            side_effect=lambda *a: call_log.append("start")):
+                                                        with mock.patch.object(rl, "_health_check",
+                                                                                side_effect=lambda *a: call_log.append("health")):
+                                                            with mock.patch.object(rl, "_cleanup_stale"):
+                                                                rl.run_reload(args)
+        self.assertEqual(call_log, ["stop", "mv", "install", "start", "health"])
 
     def _import_reload(self):
         import Kive.utils.kivedevel.kivedevel.reload as r
@@ -257,7 +259,7 @@ class TestReloadNoInstanceLifecycleCommands(unittest.TestCase):
                                 with mock.patch.object(rl, "_validate_guest_tree"):
                                     with mock.patch.object(rl, "_fix_ownership"):
                                         with mock.patch.object(rl, "_stop_services"):
-                                            with mock.patch.object(rl, "_switch_tree",
+                                            with mock.patch.object(rl, "_install_staging",
                                                                     return_value="/backup"):
                                                 with mock.patch.object(rl, "_start_services"):
                                                     with mock.patch.object(rl, "_health_check"):

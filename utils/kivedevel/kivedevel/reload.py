@@ -110,13 +110,12 @@ def _stop_services(cmds: Cmds, instance: str, stopped: list[str]) -> None:
         stopped.append(svc)
 
 
-def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> bool:
-    """Atomically replace /usr/local/share/Kive with the staged tree.
+def _move_active_to_backup(cmds: Cmds, instance: str, backup: str) -> bool:
+    """Move ``/usr/local/share/Kive`` to *backup*.
 
-    Returns True if the original tree was successfully moved aside (backup
-    exists).  Returns False if the first mv failed and the active tree is
-    still in place — callers should NOT attempt to restore from a nonexistent
-    backup.
+    Returns True on success, False if the active tree could not be moved
+    (the original tree is still in place).  Never raises — callers must
+    NOT attempt restoration when this returns False.
     """
     kive_root = "/usr/local/share/Kive"
     result = cmds.incus.run(
@@ -126,12 +125,16 @@ def _switch_tree(cmds: Cmds, instance: str, guest_staging: str, backup: str) -> 
     if result.returncode != 0:
         logger.error("Failed to move existing tree aside: %s", (result.stderr or "").strip())
         return False
+    return True
 
+
+def _install_staging(cmds: Cmds, instance: str, guest_staging: str) -> None:
+    """Install *guest_staging* as the new ``/usr/local/share/Kive``."""
+    kive_root = "/usr/local/share/Kive"
     cmds.incus.run(
         ["exec", instance, "--", "mv", guest_staging, kive_root],
         check=True, capture_output=True,
     )
-    return True
 
 
 def _restore_tree(cmds: Cmds, instance: str, backup: str) -> None:
@@ -318,28 +321,34 @@ def _run_reload(args: argparse.Namespace, cmds: Cmds, instance: str) -> None:
                     raise ReloadError("Another reload is already running.")
 
                 _stop_services(cmds, instance, stopped)
-                try:
-                    backup_created = _switch_tree(cmds, instance, guest_staging, backup)
-                except BaseException as switch_err:
-                    try:
-                        _restore_tree(cmds, instance, backup)
-                    except BaseException as restore_err:
-                        switch_err.add_note(
-                            f"Restoring the previous tree also failed: {restore_err}"
-                        )
-                    raise
 
+                # Phase 3a: move active tree aside.  If this fails the
+                # original tree is still in place — no restoration needed.
+                backup_created = _move_active_to_backup(cmds, instance, backup)
                 if not backup_created:
                     raise ReloadError("Reload aborted. Active tree unchanged.")
+
+                # Phase 3b: install staging and validate.  From here on the
+                # backup is known to exist, so any interruption must restore it.
+                try:
+                    _install_staging(cmds, instance, guest_staging)
+                except BaseException as primary:
+                    try:
+                        _restore_tree(cmds, instance, backup)
+                    except BaseException as rollback_err:
+                        primary.add_note(
+                            f"Restoring the previous tree also failed: {rollback_err}"
+                        )
+                    raise
 
                 try:
                     _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
                 except BaseException as validation_err:
                     try:
                         _restore_tree(cmds, instance, backup)
-                    except BaseException as restore_err:
+                    except BaseException as rollback_err:
                         validation_err.add_note(
-                            f"Restoring the previous tree also failed: {restore_err}"
+                            f"Restoring the previous tree also failed: {rollback_err}"
                         )
                     raise
 
