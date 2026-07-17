@@ -212,15 +212,21 @@ def _health_check(cmds: Cmds, instance: str, backup: str | None = None) -> None:
 
 
 def _cleanup_stale(cmds: Cmds, instance: str) -> None:
-    """Remove reload staging and backup directories from previous runs."""
+    """Remove backup directories from previous reload runs.
+
+    Each reload removes its own staging path in its own ``finally`` block,
+    so this function only cleans up old ``.Kive.backup-*`` directories.
+    It also preserves the current reload's backup so the success message
+    can still reference it.
+    """
     _cleanup_stale_except(cmds, instance, None)
 
 
 def _cleanup_stale_except(cmds: Cmds, instance: str, preserve: str | None) -> None:
-    """Remove reload staging and backup directories, preserving *preserve*."""
+    """Remove old backup directories, preserving *preserve*."""
     result = cmds.incus.run(
         ["exec", instance, "--", "sh", "-c",
-         "ls -d /usr/local/share/.Kive.reload-* /usr/local/share/.Kive.backup-* 2>/dev/null || true"],
+         "ls -d /usr/local/share/.Kive.backup-* 2>/dev/null || true"],
         check=False, capture_output=True,
     )
     for entry in (result.stdout or "").split():
