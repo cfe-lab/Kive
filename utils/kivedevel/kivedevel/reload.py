@@ -10,12 +10,19 @@ import sys
 import time
 import uuid
 from pathlib import Path
-from tempfile import mkdtemp
 
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root, instance_exists, instance_is_running
 
 logger = logging.getLogger("kivedevel")
+
+
+class ReloadError(RuntimeError):
+    """Raised by transactional helper functions to signal a recoverable failure.
+
+    The caller catches this exception, restarts any stopped services,
+    then calls sys.exit(1).
+    """
 
 
 _DEV_SERVICE = "kive-dev-web.service"
@@ -39,11 +46,12 @@ def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path, staging_name: s
     rsync_args = _workspace_rsync_args(root, workdir, snapshot)
     separator = rsync_args.index("--")
     rsync_args.insert(separator, "--delete")
-    # Exclude host-specific artefacts that are useless or harmful in the guest.
-    rsync_args.insert(separator, "--exclude=/.venv/")
-    rsync_args.insert(separator, "--exclude=/__pycache__/")
+    # Exclude host-specific artefacts — patterns without leading / so they
+    # match at every depth (e.g. utils/kivedevel/.venv/).
+    rsync_args.insert(separator, "--exclude=.venv/")
+    rsync_args.insert(separator, "--exclude=__pycache__/")
     rsync_args.insert(separator, "--exclude=*.pyc")
-    rsync_args.insert(separator, "--exclude=/.git/")
+    rsync_args.insert(separator, "--exclude=.git/")
 
     logger.info("Creating host source snapshot at %s...", snapshot)
     cmds.rsync.run(rsync_args)
@@ -86,8 +94,7 @@ def _validate_guest_tree(cmds: Cmds, instance: str, guest_staging: str) -> None:
             check=False, capture_output=True,
         )
         if result.returncode != 0:
-            logger.error("Expected file %s not found in staged tree at %s.", path, guest_staging)
-            sys.exit(1)
+            raise ReloadError(f"Expected file {path} not found in staged tree at {guest_staging}.")
 
 
 def _fix_ownership(cmds: Cmds, instance: str, guest_staging: str) -> None:
@@ -103,6 +110,9 @@ def _stop_services(cmds: Cmds, instance: str, stopped: list[str]) -> None:
 
     Appends each successfully stopped service to *stopped* immediately,
     so the caller can see partial progress when a later stop fails.
+
+    Raises ``ReloadError`` on failure so the caller can restart whatever
+    was already stopped.
     """
     for svc in (_DEV_SERVICE, _APACHE_SERVICE):
         result = cmds.incus.run(
@@ -112,14 +122,11 @@ def _stop_services(cmds: Cmds, instance: str, stopped: list[str]) -> None:
         if result.returncode != 0:
             stderr = (result.stderr or "").strip()
             if "not-found" in stderr:
-                logger.error(
-                    "Required service %s does not exist in instance %s.\n"
-                    "The instance must be rebuilt or reprovisioned before reload.",
-                    svc, instance,
+                raise ReloadError(
+                    f"Required service {svc} does not exist in instance {instance}. "
+                    "The instance must be rebuilt or reprovisioned before reload."
                 )
-                sys.exit(1)
-            logger.error("Failed to stop %s on %s: %s", svc, instance, stderr)
-            sys.exit(1)
+            raise ReloadError(f"Failed to stop {svc} on {instance}: {stderr}")
         stopped.append(svc)
 
 
@@ -210,6 +217,11 @@ def _health_check(cmds: Cmds, instance: str) -> None:
 
 def _cleanup_stale(cmds: Cmds, instance: str) -> None:
     """Remove reload staging and backup directories from previous runs."""
+    _cleanup_stale_except(cmds, instance, None)
+
+
+def _cleanup_stale_except(cmds: Cmds, instance: str, preserve: str | None) -> None:
+    """Remove reload staging and backup directories, preserving *preserve*."""
     result = cmds.incus.run(
         ["exec", instance, "--", "sh", "-c",
          "ls -d /usr/local/share/.Kive.reload-* /usr/local/share/.Kive.backup-* 2>/dev/null || true"],
@@ -218,6 +230,8 @@ def _cleanup_stale(cmds: Cmds, instance: str) -> None:
     for entry in (result.stdout or "").split():
         entry = entry.strip()
         if not entry:
+            continue
+        if preserve and entry == preserve:
             continue
         cmds.incus.run(
             ["exec", instance, "--", "rm", "-rf", entry],
@@ -298,6 +312,7 @@ def run_reload(args: argparse.Namespace) -> None:
 
             # Phase 3: destructive guest transaction (under lock).
             backup = f"/usr/local/share/.Kive.backup-{uuid.uuid4().hex}"
+            current_backup = backup
             lock_path = _reload_lock_path(args.workdir, instance)
 
             with open(lock_path, "w") as lock_file:
@@ -305,7 +320,7 @@ def run_reload(args: argparse.Namespace) -> None:
                     fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 except BlockingIOError:
                     logger.error("Another reload is already running for %s.", instance)
-                    sys.exit(1)
+                    raise ReloadError("Another reload is already running.")
 
                 _stop_services(cmds, instance, stopped)
                 try:
@@ -320,24 +335,23 @@ def run_reload(args: argparse.Namespace) -> None:
                     raise
 
                 if not backup_created:
-                    logger.error("Reload aborted. Active tree unchanged.")
-                    sys.exit(1)
+                    raise ReloadError("Reload aborted. Active tree unchanged.")
 
                 try:
                     _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
-                except SystemExit:
+                except ReloadError:
                     _restore_tree(cmds, instance, backup)
                     raise
 
                 _start_services(cmds, instance)
                 stopped.clear()
                 _health_check(cmds, instance)
-                _cleanup_stale(cmds, instance)
+                _cleanup_stale_except(cmds, instance, current_backup)
                 # Lock released via `with` block.
 
             logger.info(
-                "Reload complete for %s.  Source: %s  Backup: %s",
-                instance, args.root, backup,
+                "Reload complete for %s.  Previous tree backup: %s",
+                instance, backup,
             )
         except Exception:
             if stopped:
