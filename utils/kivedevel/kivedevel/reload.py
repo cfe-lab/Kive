@@ -302,13 +302,12 @@ def run_reload(args: argparse.Namespace) -> None:
     snapshot = _host_source_snapshot(cmds, args.root, args.workdir, staging_name)
     try:
         # Phase 2: guest staging (outside lock, read-only guest operations).
+        # Recovery state — must exist before any code in the inner try can raise.
+        stopped: list[str] = []
         guest_staging = _transfer_snapshot(cmds, instance, snapshot)
         try:
             _validate_guest_tree(cmds, instance, guest_staging)
             _fix_ownership(cmds, instance, guest_staging)
-
-            # Recovery state — initialized before any exception can be raised.
-            stopped: list[str] = []
 
             # Phase 3: destructive guest transaction (under lock).
             backup = f"/usr/local/share/.Kive.backup-{uuid.uuid4().hex}"
