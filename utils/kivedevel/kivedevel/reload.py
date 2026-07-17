@@ -186,7 +186,7 @@ def _start_services_of(services: list[str], cmds: Cmds, instance: str) -> None:
         )
 
 
-def _health_check(cmds: Cmds, instance: str) -> None:
+def _health_check(cmds: Cmds, instance: str, backup: str | None = None) -> None:
     """Poll until the development web server responds healthily."""
     deadline = time.monotonic() + _HEALTH_TIMEOUT
     while time.monotonic() < deadline:
@@ -199,20 +199,16 @@ def _health_check(cmds: Cmds, instance: str) -> None:
             return
         time.sleep(2)
 
-    logger.error(
-        "Health check timed out after %ss for %s.\n\n"
-        "The new source tree is installed but the web server did not become healthy.\n"
-        "Previous tree backed up at the path reported above.\n\n"
-        "Diagnostics:\n"
-        "  incus exec %s -- systemctl status %s --no-pager\n"
-        "  incus exec %s -- journalctl -u %s --no-pager --lines=50\n"
-        "  incus exec %s -- systemctl status %s --no-pager\n",
-        _HEALTH_TIMEOUT, instance,
-        instance, _DEV_SERVICE,
-        instance, _DEV_SERVICE,
-        instance, _APACHE_SERVICE,
+    backup_msg = f"\nPrevious tree backed up at: {backup}" if backup else ""
+    raise ReloadError(
+        f"Health check timed out after {_HEALTH_TIMEOUT}s for {instance}.\n"
+        f"The new source tree is installed but the web server did not become healthy."
+        f"{backup_msg}\n\n"
+        f"Diagnostics:\n"
+        f"  incus exec {instance} -- systemctl status {_DEV_SERVICE} --no-pager\n"
+        f"  incus exec {instance} -- journalctl -u {_DEV_SERVICE} --no-pager --lines=50\n"
+        f"  incus exec {instance} -- systemctl status {_APACHE_SERVICE} --no-pager"
     )
-    sys.exit(1)
 
 
 def _cleanup_stale(cmds: Cmds, instance: str) -> None:
@@ -294,6 +290,14 @@ def run_reload(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
+    try:
+        _run_reload(args, cmds, instance)
+    except ReloadError as error:
+        logger.error("%s", error)
+        raise SystemExit(1)
+
+
+def _run_reload(args: argparse.Namespace, cmds: Cmds, instance: str) -> None:
     # Shared staging name ensures the local snapshot basename matches the
     # guest staging path that _transfer_snapshot creates under /usr/local/share.
     staging_name = f".Kive.reload-{uuid.uuid4().hex}"
@@ -344,7 +348,7 @@ def run_reload(args: argparse.Namespace) -> None:
 
                 _start_services(cmds, instance)
                 stopped.clear()
-                _health_check(cmds, instance)
+                _health_check(cmds, instance, backup)
                 _cleanup_stale_except(cmds, instance, current_backup)
                 # Lock released via `with` block.
 
@@ -352,9 +356,18 @@ def run_reload(args: argparse.Namespace) -> None:
                 "Reload complete for %s.  Previous tree backup: %s",
                 instance, backup,
             )
-        except Exception:
+        except BaseException as primary:
             if stopped:
-                _start_services_of(stopped, cmds, instance)
+                try:
+                    _start_services_of(stopped, cmds, instance)
+                except Exception as recovery_err:
+                    logger.exception(
+                        "Reload failed, and restarting stopped services also failed: %s",
+                        recovery_err,
+                    )
+                    primary.add_note(
+                        f"Restarting stopped services also failed: {recovery_err}"
+                    )
             raise
         finally:
             cmds.incus.run(
