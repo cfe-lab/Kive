@@ -334,13 +334,13 @@ def _run_reload(args: argparse.Namespace, cmds: Cmds, instance: str) -> None:
                 _stop_services(cmds, instance, stopped)
                 try:
                     backup_created = _switch_tree(cmds, instance, guest_staging, backup)
-                except Exception:
+                except Exception as switch_err:
                     try:
                         _restore_tree(cmds, instance, backup)
                     except Exception as restore_err:
-                        raise RuntimeError(
-                            f"Switch failed and restoration also failed: {restore_err}"
-                        ) from restore_err
+                        switch_err.add_note(
+                            f"Restoring the previous tree also failed: {restore_err}"
+                        )
                     raise
 
                 if not backup_created:
@@ -348,8 +348,13 @@ def _run_reload(args: argparse.Namespace, cmds: Cmds, instance: str) -> None:
 
                 try:
                     _validate_guest_tree(cmds, instance, "/usr/local/share/Kive")
-                except ReloadError:
-                    _restore_tree(cmds, instance, backup)
+                except ReloadError as validation_err:
+                    try:
+                        _restore_tree(cmds, instance, backup)
+                    except Exception as restore_err:
+                        validation_err.add_note(
+                            f"Restoring the previous tree also failed: {restore_err}"
+                        )
                     raise
 
                 _start_services(cmds, instance)
