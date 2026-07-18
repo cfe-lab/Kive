@@ -75,6 +75,36 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         logger.error("Please run: incus delete -f -- %s && ./utils/dev build-vm %s", instance, instance)
         sys.exit(2)
 
+    # Verify the existing instance type matches the requested type.
+    out = cmds.incus.output(["list", instance, "--format", "json"])
+    actual_type = ""
+    if out:
+        import json as _json
+        try:
+            payload = _json.loads(out)
+            if isinstance(payload, list) and payload:
+                actual_type = payload[0].get("type", "")
+        except (_json.JSONDecodeError, IndexError):
+            pass
+    incus_vm_type = "virtual-machine"
+    incus_container_type = "container"
+    requested_is_vm = instance_type == "vm"
+    actual_is_vm = actual_type == incus_vm_type
+    if requested_is_vm and actual_type == incus_container_type:
+        logger.error(
+            "Instance %s exists as a container, but --instance-type=vm was requested.\n"
+            "Delete it first:  incus delete -f -- %s && %s",
+            instance, instance, " ".join(sys.argv),
+        )
+        sys.exit(2)
+    if not requested_is_vm and actual_is_vm:
+        logger.error(
+            "Instance %s exists as a VM, but --instance-type=container was requested.\n"
+            "Delete it first:  incus delete -f -- %s && %s",
+            instance, instance, " ".join(sys.argv),
+        )
+        sys.exit(2)
+
     logger.info("Instance %s already exists. Skipping creation.", instance)
     out = cmds.incus.output(["info", instance])
     if out and not re.search(r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE):
