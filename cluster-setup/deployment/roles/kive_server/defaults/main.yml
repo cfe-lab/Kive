@@ -1,4 +1,7 @@
 ---
+# PostgreSQL major version used in systemd unit names and config paths.
+kive_db_version: 14
+
 # TLS configuration for the Kive web server (Apache SSL).
 #
 # Two modes are supported:

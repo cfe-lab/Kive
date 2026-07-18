@@ -7,6 +7,7 @@ from . import build_vm
 from . import checks
 from . import enter_vm
 from . import local_install
+from . import reload as reload_mod
 from .backends import incus_host, incus_network
 from .shared import default_root
 
@@ -30,6 +31,7 @@ def main(argv: Sequence[str]) -> int:
     incus_host.register_subcommand(subparsers)
     incus_network.register_subcommand(subparsers)
     local_install.register_subcommand(subparsers)
+    reload_mod.register_subcommand(subparsers)
 
     if not argv:
         parser.print_help()

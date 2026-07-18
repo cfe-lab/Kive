@@ -8,8 +8,8 @@ from ..kv_commands import Cmds
 
 
 logger = logging.getLogger("kivedevel")
-DEFAULT_PROVISION_TIMEOUT = 900
-PROVISION_STUCK_THRESHOLD = 840
+DEFAULT_PROVISION_TIMEOUT = 2100
+PROVISION_STUCK_THRESHOLD = 1800
 PROVISION_POLL_INTERVAL = 2
 PROVISION_POLL_INTERVAL_AFTER_STARTED = 10
 PROBE_TIMEOUT = 30
@@ -252,8 +252,8 @@ def maybe_provision_instance(
             if time.monotonic() > start_time + PROVISION_STUCK_THRESHOLD:
                 diagnostics = _cloud_init_diagnostics(cmds, instance)
                 raise RuntimeError(
-                    "Provisioning appears stuck: /var/lib/kive-provision/started exists, "
-                    "but neither done nor failed appeared after 14 minutes."
+                    "Provisioning exceeded the 30-minute provisioning limit: "
+                    "the started marker exists, but neither done nor failed has appeared."
                     f"\n\n{diagnostics}"
                 )
 

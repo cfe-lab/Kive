@@ -1,6 +1,13 @@
 # CfE Cluster Setup
 
-This directory contains code and instructions for setting up a multi-host compute cluster.
+This directory contains code and instructions for setting up a production
+multi-host compute cluster for Kive.
+
+> For **local development**, see [dev-env/README.md](../dev-env/README.md)
+> instead. The local tooling is Incus-based and fully automated. This guide is
+> for production deployments.
+
+---
 
 ## Deployment to Octomore
 
@@ -225,6 +232,56 @@ From here, you can lock and expire the `ubuntu` user and start using one of the 
 if you have one.  Make sure that your uploaded `cluster-setup` directory is accessible by
 the account you're using if you do so.  The `lock_bootstrap_user.yaml` playbook can do this;
 modify the `user_name` variable if necessary.
+
+### Configuration variable reference
+
+Important Ansible variables for production deployment. Group-variable
+templates such as `deployment/group_vars/default_template.yml` (for testing)
+and `deployment/group_vars/octomore_template.yaml` (for production) define
+environment-specific values. Copy the relevant template to `all.yml` for your
+target. Role defaults in `deployment/roles/kive_server/defaults/main.yml`
+provide fallback values (including TLS, PostgreSQL version, etc.). Group vars
+override role defaults.
+
+| Variable | Default (group vars) | Description | Set in |
+|----------|----------------------|-------------|--------|
+| `kive_tls_mode` | `provided` | `provided` or `self_signed` | role defaults |
+| `kive_ssl_certificate_src` | — | Controller path to chained certificate file | group vars |
+| `kive_ssl_key_src` | — | Controller path to private key file | group vars |
+| `kive_ssl_cert_path` | `/etc/ssl/certs/kive.crt` | Target path for certificate | role defaults |
+| `kive_ssl_key_path` | `/etc/ssl/private/kive.key` | Target path for private key | role defaults |
+| `kive_db_version` | `14` | PostgreSQL major version (adjust to target OS) | role defaults / group vars |
+| `slurm_src_basename` | `slurm-23.02.5` | Slurm source tarball basename | group vars |
+| `kive_root` | `/usr/local/share/Kive` | Kive installation directory | group vars |
+| `kive_httpd_user` | `kive` | Apache / httpd system user | group vars |
+
+### TLS certificate rotation
+
+To update TLS certificates on an existing production server without
+re-running the full playbook:
+
+```sh
+cd cluster-setup/deployment
+
+# Replace with your actual inventory file (e.g. inventory_octomore.ini)
+sudo ansible-playbook -i inventory_octomore.ini update_ssl_certs.yaml \
+  -e kive_ssl_certificate_src=/path/to/new/fullchain.pem \
+  -e kive_ssl_key_src=/path/to/new/privkey.pem \
+  -e kive_ssl_cert_path=/etc/ssl/certs/kive.crt \
+  -e kive_ssl_key_path=/etc/ssl/private/kive.key
+```
+
+This playbook copies new certificate and key files from the controller paths
+(`kive_ssl_certificate_src`, `kive_ssl_key_src`) to the target and reloads
+Apache (the playbook uses `systemd` with `state: reloaded`, not a full
+restart).
+
+Verify the updated certificate:
+
+```sh
+echo | openssl s_client -connect your-server:443 -servername your-server \
+  2>/dev/null | openssl x509 -noout -dates -subject -issuer
+```
 
 ### Configure TLS for the web server
 
@@ -632,3 +689,12 @@ for development and debugging.
 - [blockinfile](https://docs.ansible.com/ansible/latest/modules/blockinfile_module.html#blockinfile-module)
 - [git](https://docs.ansible.com/ansible/latest/modules/git_module.html#git-module)
 - [unarchive](https://docs.ansible.com/ansible/latest/modules/unarchive_module.html)
+
+---
+
+## See also
+
+- [dev-env/README.md](../dev-env/README.md) — Local development environment
+- [CONTRIBUTING.md](../CONTRIBUTING.md) — Contributing guide
+- [INSTALL.md](../INSTALL.md) — Manual / legacy installation
+- `deployment/README.md` — Deployment playbook details

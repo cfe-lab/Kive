@@ -122,12 +122,16 @@ jobs:
           echo "=== Incus ==="
           incus info || true
 
-      - name: Prepare host
+      - name: Configure Incus group and sync uv environment
         run: |
-          sudo --preserve-env=PATH \
-            utils/dev prepare-host --debug
+          sudo usermod -aG incus-admin "$USER"
+          # sg runs the command with the supplementary group active
+          sg incus-admin -c "uv sync --project utils/kivedevel"
 
-      - name: Smoke-test local install
+      - name: Prepare host (uses sudo internally for privileged ops)
         run: |
-          sudo --preserve-env=PATH \
-            utils/dev smoke-local-install --debug
+          sg incus-admin -c "utils/dev prepare-host --debug"
+
+      - name: Smoke-test local install (unprivileged)
+        run: |
+          sg incus-admin -c "utils/dev smoke-local-install --debug"

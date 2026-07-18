@@ -34,9 +34,18 @@ class TestSmokeLocalInstall(unittest.TestCase):
         return args
 
     def test_invokes_build_then_validate_then_test_api(self):
+        from Kive.utils.kivedevel.kivedevel import local_install as li
+        from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult, make_cmds
         from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install
         args = self._make_args()
         call_order = []
+
+        cmds = make_cmds()
+        # First exec tests for marker (reload 1 -> found), second (reload 2 -> gone).
+        cmds.incus.run.side_effect = [
+            MockRunResult(returncode=0),  # first reload: marker found
+            MockRunResult(returncode=1),  # second reload: marker gone
+        ]
 
         with mock.patch(
             "Kive.utils.kivedevel.kivedevel.local_install.run_build_vm",
@@ -50,12 +59,21 @@ class TestSmokeLocalInstall(unittest.TestCase):
                     "Kive.utils.kivedevel.kivedevel.checks.run_test_api",
                     side_effect=lambda a: call_order.append("test-api"),
                 ) as mock_test_api:
-                    run_smoke_local_install(args)
+                    with mock.patch(
+                        "Kive.utils.kivedevel.kivedevel.local_install.reload_mod.run_reload",
+                        side_effect=lambda a: call_order.append("reload"),
+                    ) as mock_reload:
+                        with mock.patch.object(
+                            li, "Cmds",
+                        ) as mock_cmds_cls:
+                            mock_cmds_cls.create.return_value = cmds
+                            run_smoke_local_install(args)
 
-        self.assertEqual(call_order, ["build", "validate", "test-api"])
+        self.assertEqual(call_order, ["build", "validate", "test-api", "reload", "test-api", "reload"])
         self.assertEqual(mock_build.call_count, 1)
         self.assertEqual(mock_validate.call_count, 1)
-        self.assertEqual(mock_test_api.call_count, 1)
+        self.assertEqual(mock_test_api.call_count, 2)
+        self.assertEqual(mock_reload.call_count, 2)
 
     def test_failure_in_build_stops_sequence(self):
         from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install

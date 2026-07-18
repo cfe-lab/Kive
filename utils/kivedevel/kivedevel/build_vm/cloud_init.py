@@ -22,6 +22,25 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
     provision_runcmd = ""
     if provision:
         provision_write_files = """
+  - path: /etc/systemd/system/kive-dev-web.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Kive development web server
+      After=network.target
+
+      [Service]
+      User=kive
+      Group=kive
+      WorkingDirectory=/usr/local/share/Kive/kive
+      EnvironmentFile=/etc/kive/kive-dev.env
+      ExecStart=/opt/venv_kive/bin/python manage.py runserver --noreload 0.0.0.0:8000
+      Restart=on-failure
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
   - path: /usr/local/bin/kive-provision.sh
     owner: root:root
     permissions: '0755'
@@ -115,7 +134,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
         export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg
         export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles
-        if ! timeout --foreground 900s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
+        if ! timeout --foreground 1800s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
           echo "ansible-playbook failed or timed out" >&2
           exit 1
         fi
@@ -150,18 +169,27 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         fi
         echo "ENV after sourcing dev vars:"
         env | sort
-        nohup bash -lc ". /tmp/kive_dev_vars 2>/dev/null || true; . /etc/kive_dev_vars 2>/dev/null || true; exec \"$PYTHON_BIN\" manage.py runserver 0.0.0.0:8000" >/var/log/kive-api-smoke.log 2>&1 &
-        echo "runserver launched, PID=$!"
-        ps -ef | grep manage.py | grep -v grep || true
-        sleep 2
-        cat /var/log/kive-api-smoke.log || true
+        mkdir -p /etc/kive
+        sed 's/^export //' /tmp/kive_dev_vars > /etc/kive/kive-dev.env
+        sed -i 's|EnvironmentFile=/tmp/kive_dev_vars|EnvironmentFile=/etc/kive/kive-dev.env|' \
+          /etc/systemd/system/kive-dev-web.service
+        systemctl daemon-reload
+        systemctl enable --now kive-dev-web.service
+        echo "kive-dev-web.service started"
 
-        for _ in $(seq 1 180); do
-          if curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+        for _ in $(seq 1 60); do
+          if systemctl is-active kive-dev-web.service >/dev/null 2>&1 && \
+             curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
             break
           fi
-          sleep 1
+          sleep 2
         done
+        if ! systemctl is-active kive-dev-web.service >/dev/null 2>&1; then
+          echo "kive-dev-web.service failed to start:"
+          systemctl status kive-dev-web.service --no-pager || true
+          journalctl -u kive-dev-web.service --no-pager --lines=50 || true
+          exit 1
+        fi
         if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
           echo "API did not become reachable on 127.0.0.1:8000/login/"
           exit 1
