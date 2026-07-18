@@ -85,6 +85,10 @@ class Command(BaseCommand):
         argtype = container_dataset.argument.argtype
         if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
             base_name = container_dataset.name or container_dataset.dataset.name
+            base_name = os.path.basename(base_name)
+            if base_name in ("", ".", ".."):
+                base_name = container_dataset.dataset.name
+                base_name = os.path.basename(base_name)
             name, extension = os.path.splitext(base_name)
             return f"{name}_{container_dataset.id}{extension}"
         return container_dataset.argument.name
