@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 import unittest
+from unittest import mock
 
 
 
@@ -82,6 +84,65 @@ class TestBuildVmParser(unittest.TestCase):
         self.assertEqual(args.host_interface, "docker0")
 
 
+    def test_vm_mode_rejects_host_interface(self):
+        from kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--host-interface", "docker0"])
+        self.assertEqual(args.host_interface, "docker0")
+
+    def test_container_mode_rejects_vm_network(self):
+        from kivedevel.build_vm import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["build-vm", "--instance-type", "container", "--vm-network", "kive-lab-br"])
+        self.assertEqual(args.vm_network, "kive-lab-br")
+
+
+class TestBuildVmCrossModeRejection(unittest.TestCase):
+    """run_build_vm rejects cross-mode flags."""
+
+    def test_vm_host_interface_rejected(self):
+        from kivedevel.build_vm.runner import run_build_vm
+        args = argparse.Namespace(
+            root=Path("/tmp"), workdir=Path("/tmp"), instance="test",
+            image_name="kive-code.img", instance_type="vm",
+            pool="default", profile="default", root_size="60GiB",
+            memory="8GiB", cpu="4", host_interface="docker0",
+            provision=True, web_port=8000, no_web_proxy=False,
+            quiet=False, verbose=False, debug=False, log_file=None,
+            vm_network=None,
+        )
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as m_cmds:
+            with mock.patch("kivedevel.build_vm.runner.logger") as mock_logger:
+                with self.assertRaises(SystemExit) as ctx:
+                    run_build_vm(args)
+        self.assertEqual(ctx.exception.code, 1)
+        mock_logger.error.assert_called_once()
+        self.assertIn("not supported in VM mode", mock_logger.error.call_args[0][0])
+
+    def test_container_vm_network_rejected(self):
+        from kivedevel.build_vm.runner import run_build_vm
+        args = argparse.Namespace(
+            root=Path("/tmp"), workdir=Path("/tmp"), instance="test",
+            image_name="kive-code.img", instance_type="container",
+            pool="default", profile="default", root_size="60GiB",
+            memory="8GiB", cpu="4", host_interface=None,
+            provision=True, web_port=8000, no_web_proxy=False,
+            quiet=False, verbose=False, debug=False, log_file=None,
+            vm_network="kive-lab-br",
+        )
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as m_cmds:
+            with mock.patch("kivedevel.build_vm.runner.logger") as mock_logger:
+                with self.assertRaises(SystemExit) as ctx:
+                    run_build_vm(args)
+        self.assertEqual(ctx.exception.code, 1)
+        mock_logger.error.assert_called_once()
+        self.assertIn("not supported in container mode", mock_logger.error.call_args[0][0])
+
+
 class TestSmokeLocalInstallParser(unittest.TestCase):
     def test_default_instance_type_is_vm(self):
         from kivedevel.local_install import register_subcommand
@@ -90,6 +151,14 @@ class TestSmokeLocalInstallParser(unittest.TestCase):
         register_subcommand(subparsers)
         args = parser.parse_args(["smoke-local-install"])
         self.assertEqual(args.instance_type, "vm")
+
+    def test_default_vm_network_is_none(self):
+        from kivedevel.local_install import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["smoke-local-install"])
+        self.assertIsNone(args.vm_network)
 
 
 class TestPrepareHostParser(unittest.TestCase):

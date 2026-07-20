@@ -24,7 +24,7 @@ def _build_vm_args(
     instance_type: str,
     workdir: Path,
     debug: bool,
-    vm_network: str = "",
+    vm_network: str | None = None,
 ) -> argparse.Namespace:
     root = default_root()
     no_web_proxy = instance_type != "container"
@@ -39,7 +39,7 @@ def _build_vm_args(
         root_size="60GiB",
         memory="8GiB",
         cpu="4",
-        host_interface="",
+        host_interface=None,
         provision=True,
         web_port=8000,
         no_web_proxy=no_web_proxy,
@@ -93,8 +93,8 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
     instance: str = args.instance
     instance_type: str = args.instance_type
-    vm_network: str = getattr(args, "vm_network", "")
-    debug: bool = getattr(args, "debug", False)
+    vm_network: str | None = args.vm_network
+    debug: bool = args.debug
 
     workdir.mkdir(parents=True, exist_ok=True)
 
@@ -189,8 +189,8 @@ def register_subcommand(subparsers) -> None:
     )
     smoke.add_argument(
         "--vm-network",
-        default="",
-        help="Existing Incus managed network for VM NIC (default: auto-detect kive-lab-br)",
+        default=None,
+        help="Managed Incus bridge for VM NIC (default: kive-lab-br).  Rejected in container mode.",
     )
     _add_log_flags(smoke)
     smoke.set_defaults(func=run_smoke_local_install)

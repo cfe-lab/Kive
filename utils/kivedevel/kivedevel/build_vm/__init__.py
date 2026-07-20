@@ -65,7 +65,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         "--host-interface",
         default=None,
         metavar="IFACE",
-        help="Host network interface for container NIC (auto-detected by default).  Ignored in VM mode.",
+        help="Host network interface for container NIC (auto-detected by default).  Rejected in VM mode.",
     )
     parser.add_argument(
         "--no-provision",
@@ -90,7 +90,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         default=None,
         metavar="NAME",
         help="Managed Incus bridge for VM NIC (default: kive-lab-br). "
-        "Created automatically if it does not exist.  Ignored in container mode.",
+        "Created automatically if it does not exist.  Rejected in container mode.",
     )
     parser.set_defaults(func=run_from_args, provision=True)
 

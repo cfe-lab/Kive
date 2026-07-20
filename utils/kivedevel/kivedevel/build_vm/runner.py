@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import logging
 import platform
 import re
@@ -212,7 +213,7 @@ def _check_vm_capability() -> None:
 def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     """Run build-vm for VM mode (default, recommended local dev)."""
     _check_vm_capability()
-    nic_target = ensure_managed_vm_network(cmds, cfg.vm_network or None)
+    nic_target = ensure_managed_vm_network(cmds, cfg.vm_network)
     bridge_name = nic_target.name
     logger.info("Using managed Incus bridge %s for %s.", bridge_name, cfg.instance)
 
@@ -397,9 +398,9 @@ def run_build_vm(args: argparse.Namespace) -> None:
 
     # Resolve defaults per mode.
     if cfg.instance_type == "vm" and cfg.vm_network is None:
-        cfg = BuildVmConfig(**(cfg.__dict__ | {"vm_network": "kive-lab-br"}))
+        cfg = dataclasses.replace(cfg, vm_network="kive-lab-br")
     if cfg.instance_type == "container" and cfg.host_interface is None:
-        cfg = BuildVmConfig(**(cfg.__dict__ | {"host_interface": ""}))
+        cfg = dataclasses.replace(cfg, host_interface="")
 
     cmds.require_all()
     ensure_incus_daemon(cmds, cfg.root, cfg.workdir)

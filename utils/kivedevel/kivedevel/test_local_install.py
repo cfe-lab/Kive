@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
+import argparse
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from pathlib import Path
-
 from kivedevel._test_helpers import (
     MockRunResult,
 )
-
 
 
 class TestSmokeLocalInstall(unittest.TestCase):
@@ -22,7 +20,7 @@ class TestSmokeLocalInstall(unittest.TestCase):
         args.workdir = Path("/tmp")
         args.instance = "ci-smoke"
         args.instance_type = "vm"
-        args.vm_network = ""
+        args.vm_network = None
         args.quiet = False
         args.verbose = False
         args.debug = False
@@ -38,10 +36,9 @@ class TestSmokeLocalInstall(unittest.TestCase):
         call_order = []
 
         cmds = make_cmds()
-        # First exec tests for marker (reload 1 -> found), second (reload 2 -> gone).
         cmds.incus.run.side_effect = [
-            MockRunResult(returncode=0),  # first reload: marker found
-            MockRunResult(returncode=1),  # second reload: marker gone
+            MockRunResult(returncode=0),
+            MockRunResult(returncode=1),
         ]
 
         with mock.patch(
@@ -86,3 +83,72 @@ class TestSmokeLocalInstall(unittest.TestCase):
                 with self.assertRaises(RuntimeError):
                     run_smoke_local_install(args)
                 mock_validate.assert_not_called()
+
+    def test_build_vm_args_host_interface_is_none_by_default(self):
+        from kivedevel.local_install import _build_vm_args
+        args = _build_vm_args("test", "vm", Path("/tmp"), debug=False)
+        self.assertIsNone(args.host_interface)
+
+    def test_build_vm_args_vm_network_is_none_by_default(self):
+        from kivedevel.local_install import _build_vm_args
+        args = _build_vm_args("test", "vm", Path("/tmp"), debug=False)
+        self.assertIsNone(args.vm_network)
+
+    def test_build_vm_args_container_host_interface_is_none(self):
+        from kivedevel.local_install import _build_vm_args
+        args = _build_vm_args("test", "container", Path("/tmp"), debug=False)
+        self.assertIsNone(args.host_interface)
+
+    def test_smoke_local_install_passes_vm_network_none_by_default(self):
+        from kivedevel.local_install import register_subcommand
+        parser = argparse.ArgumentParser()
+        subparsers = parser.add_subparsers()
+        register_subcommand(subparsers)
+        args = parser.parse_args(["smoke-local-install"])
+        self.assertIsNone(args.vm_network)
+
+
+class TestBuildVmCrossModeValidation(unittest.TestCase):
+    """Default-mode args reach run_build_vm with correct types."""
+
+    def test_default_vm_networking_reaches_run_build_vm(self):
+        """Default VM smoke reaches run_build_vm with host_interface=None and vm_network=None."""
+        from kivedevel.build_vm.runner import run_build_vm
+        from kivedevel.local_install import _build_vm_args
+
+        build_args = _build_vm_args("ci-smoke", "vm", Path("/tmp"), debug=False)
+        self.assertIsNone(build_args.host_interface)
+        self.assertIsNone(build_args.vm_network)
+
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as mock_cmds:
+            with mock.patch("kivedevel.build_vm.runner.ensure_incus_daemon"):
+                with mock.patch("kivedevel.build_vm.runner.ensure_storage_pool"):
+                    with mock.patch("kivedevel.build_vm.runner.ensure_profile_with_root_disk"):
+                        with mock.patch("kivedevel.build_vm.runner._run_build_vm_vm") as mock_vm:
+                            with mock.patch("kivedevel.build_vm.runner.logger"):
+                                run_build_vm(build_args)
+
+        cfg_arg = mock_vm.call_args[0][0]
+        self.assertEqual(cfg_arg.vm_network, "kive-lab-br")
+        self.assertIsNone(cfg_arg.host_interface)
+
+    def test_default_container_networking_reaches_run_build_vm(self):
+        """Default container smoke reaches run_build_vm with vm_network=None and host_interface=None."""
+        from kivedevel.build_vm.runner import run_build_vm
+        from kivedevel.local_install import _build_vm_args
+
+        build_args = _build_vm_args("ci-smoke", "container", Path("/tmp"), debug=False)
+        self.assertIsNone(build_args.host_interface)
+        self.assertIsNone(build_args.vm_network)
+
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as mock_cmds:
+            with mock.patch("kivedevel.build_vm.runner.ensure_incus_daemon"):
+                with mock.patch("kivedevel.build_vm.runner.ensure_storage_pool"):
+                    with mock.patch("kivedevel.build_vm.runner.ensure_profile_with_root_disk"):
+                        with mock.patch("kivedevel.build_vm.runner._run_build_vm_container") as mock_ctr:
+                            with mock.patch("kivedevel.build_vm.runner.logger"):
+                                run_build_vm(build_args)
+
+        cfg_arg = mock_ctr.call_args[0][0]
+        self.assertEqual(cfg_arg.host_interface, "")
+        self.assertIsNone(cfg_arg.vm_network)
