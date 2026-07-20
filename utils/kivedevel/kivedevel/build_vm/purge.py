@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import logging
 import os
@@ -11,10 +12,66 @@ from pathlib import Path
 from ..kv_commands import Cmds
 from ..shared import configure_logging, default_root
 
+
 logger = logging.getLogger("kivedevel.build_vm.purge")
 
 _RESOURCE_MARKER = ".kive-devel-resource.json"
 _REGISTRY_NAME = ".kive-devel-resources.json"
+
+
+@dataclasses.dataclass(frozen=True)
+class NetworkInfo:
+    name: str
+    used_by: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class PurgeInventory:
+    instances: tuple[str, ...]
+    networks: tuple[NetworkInfo, ...]
+    workdirs: tuple[Path, ...]
+    registry_entries: tuple[dict, ...]
+
+    @property
+    def total_count(self) -> int:
+        return (
+            len(self.instances) + len(self.workdirs)
+            + len(self.networks) + len(self.registry_entries)
+        )
+
+
+@dataclasses.dataclass
+class PurgeOutcome:
+    deleted_instances: int = 0
+    failed_instances: int = 0
+    deleted_workdirs: int = 0
+    failed_workdirs: int = 0
+    deleted_networks: int = 0
+    retained_networks: int = 0
+    failed_networks: int = 0
+    removed_port_forwards: int = 0
+    already_absent_port_forwards: int = 0
+    failed_port_forwards: int = 0
+
+    @property
+    def all_succeeded(self) -> bool:
+        return (
+            self.failed_instances == 0
+            and self.failed_workdirs == 0
+            and self.failed_networks == 0
+            and self.retained_networks == 0
+            and self.failed_port_forwards == 0
+        )
+
+    @property
+    def remaining_count(self) -> int:
+        return (
+            self.failed_instances
+            + self.failed_workdirs
+            + self.retained_networks
+            + self.failed_networks
+            + self.failed_port_forwards
+        )
 
 
 def _is_mountpoint(path: Path) -> bool:
@@ -116,13 +173,7 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     return candidates
 
 
-def _find_tagged_networks(cmds: Cmds) -> list[str]:
-    """Discover networks tagged with ``user.kive.devel.created-by=utils/dev``.
-
-    Raises ``RuntimeError`` if the Incus query fails or returns unparseable
-    output, so the caller can distinguish 'none found' from 'could not check'.
-    """
-    import json as _json
+def _find_tagged_networks(cmds: Cmds) -> list[NetworkInfo]:
     result = cmds.incus.run(
         ["network", "list", "--format", "json"],
         check=False, capture_output=True,
@@ -136,8 +187,8 @@ def _find_tagged_networks(cmds: Cmds) -> list[str]:
     if not out:
         return []
     try:
-        networks = _json.loads(out)
-    except _json.JSONDecodeError as exc:
+        networks = json.loads(out)
+    except json.JSONDecodeError as exc:
         raise RuntimeError(f"Failed to parse incus network list output: {exc}") from exc
     tagged = []
     for net in networks:
@@ -147,8 +198,146 @@ def _find_tagged_networks(cmds: Cmds) -> list[str]:
         if config.get("user.kive.devel.created-by") == "utils/dev":
             name = net.get("name")
             if name:
-                tagged.append(name)
+                used_by = tuple(net.get("used_by", []))
+                tagged.append(NetworkInfo(name=name, used_by=used_by))
     return tagged
+
+
+def build_purge_inventory(args: argparse.Namespace, cmds: Cmds) -> PurgeInventory:
+    root = args.root.resolve()
+
+    tagged = _find_tagged_instances(cmds)
+    tagged_set = set(tagged)
+
+    extra_instances = args.instances or []
+    all_instances = list(tagged_set)
+    for inst in extra_instances:
+        if inst not in tagged_set:
+            all_instances.append(inst)
+
+    networks = _find_tagged_networks(cmds)
+
+    marked = _find_marked_workdirs(root)
+    extra_workdirs = args.workdirs or []
+    all_workdirs = list(marked)
+    for w in extra_workdirs:
+        w_resolved = w.resolve() if isinstance(w, Path) else Path(w).resolve()
+        if w_resolved not in all_workdirs:
+            all_workdirs.append(w_resolved)
+
+    registry_entries = _read_registry(root)
+
+    return PurgeInventory(
+        instances=tuple(all_instances),
+        networks=tuple(networks),
+        workdirs=tuple(all_workdirs),
+        registry_entries=tuple(registry_entries),
+    )
+
+
+def execute_purge(inventory: PurgeInventory, cmds: Cmds, root: Path) -> PurgeOutcome:
+    outcome = PurgeOutcome()
+
+    for instance in inventory.instances:
+        if _device_attached(cmds, instance, "kive-code"):
+            _remove_device(cmds, instance, "kive-code")
+        if _device_attached(cmds, instance, "kive-web"):
+            _remove_device(cmds, instance, "kive-web")
+        del_result = cmds.incus.run(
+            ["delete", "-f", "--", instance],
+            check=False, capture_output=True,
+        )
+        if del_result.returncode == 0:
+            outcome.deleted_instances += 1
+        else:
+            logger.warning("Failed to delete instance '%s': %s", instance, (del_result.stderr or "").strip())
+            outcome.failed_instances += 1
+
+    for workdir in inventory.workdirs:
+        if _remove_workdir_safely(workdir):
+            outcome.deleted_workdirs += 1
+        else:
+            outcome.failed_workdirs += 1
+
+    for net in inventory.networks:
+        if net.used_by:
+            logger.info(
+                "Skipping network '%s': still in use by %d resource(s).",
+                net.name, len(net.used_by),
+            )
+            outcome.retained_networks += 1
+            continue
+        logger.info("Removing managed network '%s'...", net.name)
+        del_result = cmds.incus.run(
+            ["network", "delete", net.name],
+            check=False, capture_output=True,
+        )
+        if del_result.returncode != 0:
+            logger.warning("Failed to delete network '%s': %s", net.name, (del_result.stderr or "").strip())
+            outcome.failed_networks += 1
+        else:
+            outcome.deleted_networks += 1
+
+    for entry in inventory.registry_entries:
+        if entry.get("kind") == "host-forward":
+            pid = entry.get("pid")
+            if pid:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    outcome.removed_port_forwards += 1
+                except ProcessLookupError:
+                    outcome.already_absent_port_forwards += 1
+                except OSError:
+                    outcome.failed_port_forwards += 1
+
+    _rewrite_registry(root, inventory, outcome)
+
+    return outcome
+
+
+def _rewrite_registry(root: Path, inventory: PurgeInventory, outcome: PurgeOutcome) -> None:
+    path = root / "tmp~" / _REGISTRY_NAME
+    if outcome.all_succeeded and outcome.remaining_count == 0:
+        if path.exists():
+            logger.info("Removing resource registry '%s'...", path)
+            path.unlink()
+        return
+
+    remaining_entries = []
+    for entry in inventory.registry_entries:
+        kind = entry.get("kind")
+        pid = entry.get("pid")
+        if kind == "host-forward" and pid:
+            try:
+                os.kill(pid, 0)
+                remaining_entries.append(entry)
+            except (ProcessLookupError, OSError):
+                pass
+        else:
+            remaining_entries.append(entry)
+
+    if remaining_entries:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(remaining_entries, indent=2) + "\n")
+        logger.info("Registry updated with %d remaining entry(ies).", len(remaining_entries))
+    else:
+        if path.exists():
+            logger.info("Removing resource registry '%s'...", path)
+            path.unlink()
+
+
+def _read_registry(root: Path) -> list[dict]:
+    path = root / "tmp~" / _REGISTRY_NAME
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+    if not isinstance(data, list):
+        logger.warning("Registry is not a list; treating as empty.")
+        return []
+    return data
 
 
 def run_purge(args: argparse.Namespace) -> None:
@@ -162,159 +351,40 @@ def _run_purge(args: argparse.Namespace, cmds: Cmds) -> None:
     workdir_default = root / "tmp~" / "build"
     configure_logging(args, workdir_default)
 
-    # Phase 1: Discover tagged instances.
-    tagged = _find_tagged_instances(cmds)
-    tagged_set = set(tagged)
+    inventory = build_purge_inventory(args, cmds)
 
-    # Phase 2: Explicit --instance overrides, deduplicated with tagged.
-    extra_instances = getattr(args, "instances", []) or []
-    all_instances = list(tagged_set)
-    for inst in extra_instances:
-        if inst not in tagged_set:
-            all_instances.append(inst)
-
-    # Phase 3: Discover tagged networks.
-    tagged_networks = _find_tagged_networks(cmds)
-
-    # Phase 4: Discover marked workdirs.
-    marked = _find_marked_workdirs(root)
-
-    # Phase 4: Explicit --workdir overrides.
-    extra_workdirs = getattr(args, "workdirs", []) or []
-
-    all_workdirs = list(marked)
-    for w in extra_workdirs:
-        w_resolved = w.resolve() if isinstance(w, Path) else Path(w).resolve()
-        if w_resolved not in all_workdirs:
-            all_workdirs.append(w_resolved)
-
-    registry_entries = _read_registry(root)
-    has_registry = bool(registry_entries)
-
-    if not all_instances and not all_workdirs and not tagged_networks and not has_registry:
+    if inventory.total_count == 0:
         logger.info("No Kive development resources found to purge.")
         return
 
-    logger.info("Resources to purge: %d instance(s), %d workdir(s), %d network(s)",
-                 len(all_instances), len(all_workdirs), len(tagged_networks))
-
-    deleted_instances = 0
-    failed_instances = 0
-    for instance in all_instances:
-        if _device_attached(cmds, instance, "kive-code"):
-            _remove_device(cmds, instance, "kive-code")
-        if _device_attached(cmds, instance, "kive-web"):
-            _remove_device(cmds, instance, "kive-web")
-        del_result = cmds.incus.run(
-            ["delete", "-f", "--", instance],
-            check=False, capture_output=True,
-        )
-        if del_result.returncode == 0:
-            deleted_instances += 1
-        else:
-            logger.warning("Failed to delete instance '%s': %s", instance, (del_result.stderr or "").strip())
-            failed_instances += 1
-
-    deleted_workdirs = 0
-    failed_workdirs = 0
-    for workdir in all_workdirs:
-        if _remove_workdir_safely(workdir):
-            deleted_workdirs += 1
-        else:
-            failed_workdirs += 1
-
-    deleted_networks = 0
-    retained_networks = 0
-    failed_networks = 0
-    if tagged_networks:
-        import json as _json
-        all_nets = ""
-        nets_result = cmds.incus.run(
-            ["network", "list", "--format", "json"],
-            check=False, capture_output=True,
-        )
-        if nets_result.returncode == 0:
-            all_nets = nets_result.stdout or ""
-        nets_by_name = {}
-        if all_nets:
-            try:
-                parsed = _json.loads(all_nets)
-                for entry in parsed if isinstance(parsed, list) else []:
-                    if isinstance(entry, dict):
-                        name = entry.get("name", "")
-                        nets_by_name[name] = entry
-            except _json.JSONDecodeError:
-                pass
-        for net in tagged_networks:
-            info = nets_by_name.get(net, {})
-            used_by = info.get("used_by", []) if isinstance(info, dict) else []
-            if used_by:
-                logger.info(
-                    "Skipping network '%s': still in use by %d resource(s).",
-                    net, len(used_by),
-                )
-                retained_networks += 1
-                continue
-            logger.info("Removing managed network '%s'...", net)
-            del_result = cmds.incus.run(
-                ["network", "delete", net],
-                check=False, capture_output=True,
-            )
-            if del_result.returncode != 0:
-                logger.warning("Failed to delete network '%s': %s", net, (del_result.stderr or "").strip())
-                failed_networks += 1
-            else:
-                deleted_networks += 1
-
-    # Phase 5: Remove port forwards and registry (only when nothing remains).
-    removed_port_forwards = 0
-    failed_port_forwards = 0
-    for entry in _read_registry(root):
-        if entry.get("kind") == "host-forward":
-            pid = entry.get("pid")
-            if pid:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    removed_port_forwards += 1
-                except ProcessLookupError:
-                    removed_port_forwards += 1
-                except OSError:
-                    failed_port_forwards += 1
-
-    all_succeeded = (
-        failed_instances == 0 and failed_workdirs == 0
-        and failed_networks == 0 and retained_networks == 0
-        and failed_port_forwards == 0
+    logger.info(
+        "Resources to purge: %d instance(s), %d workdir(s), %d network(s), %d registry entry(ies)",
+        len(inventory.instances), len(inventory.workdirs),
+        len(inventory.networks), len(inventory.registry_entries),
     )
-    if all_succeeded:
-        _remove_registry(root)
+
+    outcome = execute_purge(inventory, cmds, root)
+
+    if outcome.all_succeeded:
         logger.info(
             "Purge complete. All Kive development resources removed "
             "(%d instances, %d workdirs, %d networks, %d port forwards).",
-            deleted_instances, deleted_workdirs, deleted_networks, removed_port_forwards,
+            outcome.deleted_instances, outcome.deleted_workdirs,
+            outcome.deleted_networks, outcome.removed_port_forwards,
         )
     else:
         logger.info(
             "Purge finished with %d owned resource(s) remaining. "
             "Deleted: %d instances, %d workdirs, %d networks, %d port forwards. "
             "Skipped: %d networks (in use). "
-            "Failed: %d instances, %d workdirs, %d networks.",
-            failed_instances + failed_workdirs + retained_networks + failed_networks,
-            deleted_instances, deleted_workdirs, deleted_networks, removed_port_forwards,
-            retained_networks,
-            failed_instances, failed_workdirs, failed_networks,
+            "Failed: %d instances, %d workdirs, %d networks, %d port forwards.",
+            outcome.remaining_count,
+            outcome.deleted_instances, outcome.deleted_workdirs,
+            outcome.deleted_networks, outcome.removed_port_forwards,
+            outcome.retained_networks,
+            outcome.failed_instances, outcome.failed_workdirs,
+            outcome.failed_networks, outcome.failed_port_forwards,
         )
-
-
-def _read_registry(root: Path) -> list[dict]:
-    path = root / "tmp~" / _REGISTRY_NAME
-    if not path.exists():
-        return []
-    try:
-        data = json.loads(path.read_text())
-        return data if isinstance(data, list) else [data]
-    except (json.JSONDecodeError, OSError):
-        return []
 
 
 def _remove_registry(root: Path) -> None:
