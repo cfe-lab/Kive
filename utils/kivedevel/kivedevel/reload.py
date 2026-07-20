@@ -21,11 +21,11 @@ _HEALTH_URL = "http://127.0.0.1:8000/login/"
 _HEALTH_TIMEOUT = 120
 
 
-def _host_source_snapshot(cmds: Cmds, root: Path, snapshot: Path) -> None:
+def _host_source_snapshot(cmds: Cmds, root: Path, workdir: Path, snapshot: Path) -> None:
     """Rsync *root* into *snapshot* with --delete and exclusions."""
     from .build_vm.workspace import _workspace_rsync_args
 
-    rsync_args = _workspace_rsync_args(root, root / "tmp~" / "build", snapshot)
+    rsync_args = _workspace_rsync_args(root, workdir, snapshot)
     separator = rsync_args.index("--")
     rsync_args.insert(separator, "--delete")
     rsync_args.insert(separator, "--exclude=.venv/")
@@ -38,14 +38,21 @@ def _host_source_snapshot(cmds: Cmds, root: Path, snapshot: Path) -> None:
 
 
 def _transfer_snapshot(cmds: Cmds, instance: str, snapshot: Path) -> str:
-    """Push *snapshot* under ``/usr/local/share`` in *instance* via incus file push.
+    """Push *snapshot* into ``/usr/local/share`` in *instance* via incus file push.
+
+    The destination parent (``/usr/local/share``) always exists on a provisioned
+    instance.  Incus preserves the source directory's basename, so the resulting
+    tree is ``/usr/local/share/<snapshot-basename>/kive/...``.
 
     Returns the guest-side staging path.
     """
-    guest_staging = f"/usr/local/share/.Kive.reload-{uuid.uuid4().hex}"
+    parent = "/usr/local/share"
+    guest_staging = f"{parent}/{snapshot.name}"
     logger.info("Transferring snapshot to %s:%s...", instance, guest_staging)
+    # --create-dirs is required by Incus 6.x when the parent path does not
+    # exist (first reload on a fresh instance).
     cmds.incus.run(
-        ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{guest_staging}"],
+        ["file", "push", "-r", "--create-dirs", "--", str(snapshot), f"{instance}{parent}"],
         check=True, capture_output=True, timeout=120,
     )
     return guest_staging
@@ -185,7 +192,7 @@ def run_reload(args: argparse.Namespace) -> None:
     snapshot = args.workdir / staging_name
     snapshot.mkdir(parents=True, exist_ok=True)
     try:
-        _host_source_snapshot(cmds, args.root, snapshot)
+        _host_source_snapshot(cmds, args.root, args.workdir, snapshot)
 
         guest_staging = _transfer_snapshot(cmds, instance, snapshot)
         try:
