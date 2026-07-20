@@ -135,7 +135,7 @@ class TestPurge(unittest.TestCase):
             with mock.patch.object(purge, "_find_tagged_networks"):
                 with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
                     with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                        with mock.patch.object(purge, "_detach_stale_nbd"):
+                        with mock.patch.object(purge, "print"):
                             with mock.patch.object(purge, "print"):
                                 with mock.patch.object(purge, "_remove_registry"):
                                     with mock.patch.object(purge, "Cmds") as mock_cmds_cls:
@@ -164,7 +164,7 @@ class TestPurge(unittest.TestCase):
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                 with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "_detach_stale_nbd"):
+                    with mock.patch.object(purge, "print"):
                         with mock.patch.object(purge, "print"):
                             with mock.patch.object(purge, "_remove_registry"):
                                 purge.run_purge(self._make_args())
@@ -207,7 +207,7 @@ class TestPurge(unittest.TestCase):
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                 with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "_detach_stale_nbd"):
+                    with mock.patch.object(purge, "print"):
                         with mock.patch.object(purge, "print"):
                             with mock.patch.object(purge, "_remove_registry"):
                                 purge.run_purge(self._make_args())
