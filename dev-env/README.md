@@ -105,9 +105,6 @@ The recommended sequence for setting up a development environment:
 > (systemctl, sysctl, iptables).
 
 ```sh
-# 0. Sync development tool dependencies.
-uv sync --project utils/kivedevel
-
 # 1. Prepare the host: initialise Incus, create the Kive bridge, configure
 #    IP forwarding and firewall rules.
 utils/dev prepare-host
