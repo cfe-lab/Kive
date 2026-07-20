@@ -106,15 +106,7 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
             raise RuntimeError("Failed to create instance: see previous incus output.")
         return True, instance_type
 
-    if not instance_is_cloud_variant(cmds, instance):
-        logger.error(
-            "Existing VM '%s' was not created from a cloud image and won't reliably apply login/agent config.",
-            instance,
-        )
-        logger.error("Please run: incus delete -f -- %s && ./utils/dev build-vm %s", instance, instance)
-        sys.exit(2)
-
-    # Verify the existing instance type matches the requested type.
+    # Verify the existing instance type matches the requested type first.
     actual_type = _parse_incus_instance_type(cmds, instance)
     if actual_type != instance_type:
         incus_display = {"virtual-machine": "vm", "container": "container"}.get(actual_type, actual_type)
@@ -123,6 +115,15 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
             "Delete it first:  incus delete -f -- %s",
             instance, incus_display, instance_type, instance,
         )
+        sys.exit(2)
+
+    if not instance_is_cloud_variant(cmds, instance):
+        type_label = {"vm": "VM", "container": "container"}.get(actual_type, actual_type)
+        logger.error(
+            "Existing %s '%s' was not created from a cloud image and won't reliably apply login/agent config.",
+            type_label, instance,
+        )
+        logger.error("Please run: incus delete -f -- %s && ./utils/dev build-vm %s", instance, instance)
         sys.exit(2)
 
     logger.info("Instance %s already exists. Skipping creation.", instance)
