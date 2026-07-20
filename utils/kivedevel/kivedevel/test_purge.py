@@ -72,13 +72,13 @@ class TestFindMarkedWorkdirs(unittest.TestCase):
             self.assertEqual(len(result), 1)
         self.marker_path.unlink()
 
-    def test_accepts_old_hyphen_key(self):
+    def test_rejects_old_hyphen_key(self):
         purge = self._import()
         self.marker_path.parent.mkdir(parents=True, exist_ok=True)
         self.marker_path.write_text(json.dumps({"created-by": "utils/dev", "kind": "build-workdir"}))
         with mock.patch.object(Path, "rglob", return_value=[self.marker_path]):
             result = purge._find_marked_workdirs(self.root)
-            self.assertEqual(len(result), 1)
+            self.assertEqual(len(result), 0)
         self.marker_path.unlink()
 
     def test_rejects_unknown_creator(self):
@@ -132,9 +132,9 @@ class TestPurge(unittest.TestCase):
         purge = self._import()
         self.cmds.incus.output.return_value = ""
         with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
-            with mock.patch.object(purge, "_check_legacy_skipped"):
+            with mock.patch.object(purge, "_find_tagged_networks"):
                 with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-                    with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
+                    with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                         with mock.patch.object(purge, "_detach_stale_nbd"):
                             with mock.patch.object(purge, "_remove_port_forwards"):
                                 with mock.patch.object(purge, "_remove_registry"):
@@ -162,8 +162,8 @@ class TestPurge(unittest.TestCase):
             "kive-code:\n",
         ]
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
-                with mock.patch.object(purge, "_check_legacy_skipped"):
+            with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
+                with mock.patch.object(purge, "_find_tagged_networks"):
                     with mock.patch.object(purge, "_detach_stale_nbd"):
                         with mock.patch.object(purge, "_remove_port_forwards"):
                             with mock.patch.object(purge, "_remove_registry"):
@@ -205,8 +205,8 @@ class TestPurge(unittest.TestCase):
             "kive-web:\n",
         ]
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-            with mock.patch.object(purge, "_find_marked_networks", return_value=[]):
-                with mock.patch.object(purge, "_check_legacy_skipped"):
+            with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
+                with mock.patch.object(purge, "_find_tagged_networks"):
                     with mock.patch.object(purge, "_detach_stale_nbd"):
                         with mock.patch.object(purge, "_remove_port_forwards"):
                             with mock.patch.object(purge, "_remove_registry"):
