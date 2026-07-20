@@ -21,26 +21,24 @@ def make_cmds(incus_output: str = "[]", **kwargs) -> mock.Mock:
     return cmds
 
 
-def make_config(instance: str = "test", instance_type: str = "vm", **overrides) -> Path:
+def make_config(instance: str = "test", instance_type: str = "vm", **overrides):
     from kivedevel.build_vm.models import BuildVmConfig
     params = dict(
         root=Path("/tmp"),
         workdir=Path("/tmp"),
         instance=instance,
         instance_type=instance_type,
-        image_path=Path("/tmp/img.qcow2"),
+        image_path=Path("/tmp/img.img"),
         pool="default",
         profile="default",
         root_size="60GiB",
         memory="1GB",
         cpu="1",
-        host_interface="",
+        host_interface=None,
         provision=False,
         web_port=8000,
         no_web_proxy=False,
-        vm_network="kive-lab-br",
+        vm_network=None,
     )
     params.update(overrides)
     return BuildVmConfig(**params)
-
-
