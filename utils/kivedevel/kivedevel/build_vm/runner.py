@@ -268,6 +268,8 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
         logger.info("Checking VM network egress via incus exec...")
         _check_vm_egress(cmds, cfg.instance)
 
+    _ensure_web_proxy_device(cmds, cfg)
+
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 
     if cfg.provision:

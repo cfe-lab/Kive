@@ -24,7 +24,6 @@ def _build_vm_args(
     vm_network: str | None = None,
 ) -> argparse.Namespace:
     root = default_root()
-    no_web_proxy = instance_type != "container"
     return argparse.Namespace(
         instance=instance,
         instance_type=instance_type,
@@ -39,7 +38,7 @@ def _build_vm_args(
         host_interface=None,
         provision=True,
         web_port=8000,
-        no_web_proxy=no_web_proxy,
+        no_web_proxy=False,
         quiet=False,
         verbose=False,
         debug=debug,
