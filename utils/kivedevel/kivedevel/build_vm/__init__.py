@@ -52,9 +52,9 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
     )
     parser.add_argument(
         "--image-name",
-        default="kive-code.qcow2",
+        default="kive-code.img",
         metavar="NAME",
-        help="Filename of the workspace qcow2 image (default: kive-code.qcow2)",
+        help="Filename of the workspace raw image (default: kive-code.img)",
     )
     parser.add_argument("--pool", default="default", help="Incus storage pool (default: default)")
     parser.add_argument("--profile", default="default", help="Incus profile (default: default)")

@@ -132,16 +132,6 @@ class Rsync(Command):
     guix_package = "rsync"
 
 
-class QemuImg(Command):
-    exe = "qemu-img"
-    guix_package = "qemu"
-
-
-class QemuNbd(Command):
-    exe = "qemu-nbd"
-    guix_package = "qemu"
-
-
 class Ip(Command):
     exe = "ip"
     guix_package = "iproute2"
@@ -161,8 +151,6 @@ class Socat(Command):
 class Cmds:
     incus: Incus
     rsync: Rsync
-    qemu_img: QemuImg
-    qemu_nbd: QemuNbd
     ip: Ip
     nft: Nft
     socat: Socat
@@ -178,8 +166,6 @@ class Cmds:
         return cls(
             incus=Incus(use_guix),
             rsync=Rsync(use_guix),
-            qemu_img=QemuImg(use_guix),
-            qemu_nbd=QemuNbd(use_guix),
             ip=Ip(use_guix),
             nft=Nft(use_guix),
             socat=Socat(use_guix),
@@ -187,5 +173,5 @@ class Cmds:
         )
 
     def require_all(self) -> None:
-        for cmd in (self.incus, self.rsync, self.qemu_img, self.qemu_nbd, self.socat):
+        for cmd in (self.incus, self.rsync, self.socat):
             cmd.require()

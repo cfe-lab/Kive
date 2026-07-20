@@ -39,18 +39,6 @@ def _umount(path: Path) -> None:
         pass
 
 
-def _detach_stale_nbd() -> None:
-    pid_file = Path("/sys/block/nbd0/pid")
-    if not pid_file.exists():
-        return
-    pid = pid_file.read_text().strip()
-    if not pid or pid == "0":
-        return
-    logger.info("Detaching stale /dev/nbd0...")
-    cmds = Cmds.create()
-    cmds.qemu_nbd.run(["-d", "/dev/nbd0"], sudo=True, check=False)
-
-
 def _device_attached(cmds: Cmds, instance: str, device: str = "kive-code") -> bool:
     out = cmds.incus.output(["config", "show", instance])
     return any(line.strip() == f"{device}:" for line in out.splitlines())
@@ -193,8 +181,6 @@ def run_purge(args: argparse.Namespace) -> None:
     logger.info("Resources to purge: %d instance(s), %d workdir(s), %d network(s)",
                  len(all_instances), len(all_workdirs), len(tagged_networks))
 
-    _detach_stale_nbd()
-
     deleted_instances = 0
     failed_instances = 0
     for instance in all_instances:
@@ -219,7 +205,7 @@ def run_purge(args: argparse.Namespace) -> None:
         if mountpoint_path.exists() and _is_mountpoint(mountpoint_path):
             _umount(mountpoint_path)
 
-        image_path = workdir / "kive-code.qcow2"
+        image_path = workdir / "kive-code.img"
         _remove_image(image_path)
         _remove_workdir(workdir)
         if workdir.exists():

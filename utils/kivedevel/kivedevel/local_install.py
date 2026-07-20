@@ -33,7 +33,7 @@ def _build_vm_args(
         instance_type=instance_type,
         workdir=workdir,
         root=root,
-        image_name="kive-code.qcow2",
+        image_name="kive-code.img",
         pool="default",
         profile="default",
         root_size="60GiB",
