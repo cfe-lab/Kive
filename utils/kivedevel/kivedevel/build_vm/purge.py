@@ -205,20 +205,26 @@ def run_purge(args: argparse.Namespace) -> None:
 
     if tagged_networks:
         import json as _json
-        for net in tagged_networks:
-            out = cmds.incus.run(
-                ["network", "show", net],
-                check=False, capture_output=True,
-            )
-            if out.returncode != 0:
-                logger.warning("Could not inspect network '%s', skipping.", net)
-                continue
-            used_by = []
+        all_nets = ""
+        nets_result = cmds.incus.run(
+            ["network", "list", "--format", "json"],
+            check=False, capture_output=True,
+        )
+        if nets_result.returncode == 0:
+            all_nets = nets_result.stdout or ""
+        nets_by_name = {}
+        if all_nets:
             try:
-                info = _json.loads(out.stdout)
-                used_by = info.get("used_by", [])
-            except (_json.JSONDecodeError, AttributeError):
+                parsed = _json.loads(all_nets)
+                for entry in parsed if isinstance(parsed, list) else []:
+                    if isinstance(entry, dict):
+                        name = entry.get("name", "")
+                        nets_by_name[name] = entry
+            except _json.JSONDecodeError:
                 pass
+        for net in tagged_networks:
+            info = nets_by_name.get(net, {})
+            used_by = info.get("used_by", []) if isinstance(info, dict) else []
             if used_by:
                 logger.info(
                     "Skipping network '%s': still in use by %d resource(s).",
@@ -226,7 +232,12 @@ def run_purge(args: argparse.Namespace) -> None:
                 )
                 continue
             logger.info("Removing managed network '%s'...", net)
-            cmds.incus.run(["network", "delete", net], check=False)
+            del_result = cmds.incus.run(
+                ["network", "delete", net],
+                check=False, capture_output=True,
+            )
+            if del_result.returncode != 0:
+                logger.warning("Failed to delete network '%s': %s", net, (del_result.stderr or "").strip())
 
     # Phase 5: Remove port forwards and registry.
     _remove_port_forwards(root)
