@@ -1417,6 +1417,7 @@ class ContainerRun(Stopwatch, AccessControl):
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """
+        import json as _json
         encoding = 'utf8'
         md5gen = hashlib.md5()
         container = self.app.container
@@ -1427,13 +1428,23 @@ class ContainerRun(Stopwatch, AccessControl):
             parent_md5 = parent_container.md5.encode(encoding)
             md5gen.update(parent_md5)
 
-        # Use explict sort order, so changes to default don't invalidate MD5's.
-        for container_dataset in self.datasets.order_by('argument__type',
-                                                        'argument__position',
-                                                        'argument__name'):
-            dataset = container_dataset.dataset
-            dataset_md5 = dataset.MD5_checksum.encode(encoding)
-            md5gen.update(dataset_md5)
+        # Build a canonical representation of every input binding.
+        # Order by (argument type, argument position, argument name, multi_position)
+        # to match command semantics.  Include argument pk as a stable identifier.
+        bindings = []
+        for cd in self.datasets.select_related('argument', 'dataset').order_by(
+            'argument__type', 'argument__position', 'argument__name', 'multi_position',
+        ):
+            bindings.append((
+                cd.argument_id,
+                cd.argument.type,
+                cd.argument.position,
+                cd.argument.name,
+                cd.multi_position,
+                cd.dataset.MD5_checksum,
+            ))
+        payload = _json.dumps(bindings, sort_keys=False, separators=(',', ':'))
+        md5gen.update(payload.encode(encoding))
         self.md5 = md5gen.hexdigest()
 
 

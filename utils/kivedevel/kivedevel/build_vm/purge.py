@@ -104,8 +104,7 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
         except (json.JSONDecodeError, OSError):
             continue
         for entry in entries:
-            created_by = entry.get("created_by") or entry.get("created-by")
-            if created_by != "utils/dev":
+            if entry.get("created_by") != "utils/dev":
                 continue
             kind = entry.get("kind")
             if kind is None or kind == "build-workdir":
@@ -116,21 +115,25 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     return candidates
 
 
-def _find_marked_networks(root: Path) -> list[str]:
+def _find_tagged_networks(cmds: Cmds) -> list[str]:
+    """Discover networks tagged with ``user.kive.devel.created-by=utils/dev``."""
+    import json as _json
+    out = cmds.incus.output(["network", "list", "--format", "json"])
+    if not out:
+        return []
+    try:
+        networks = _json.loads(out)
+    except _json.JSONDecodeError:
+        return []
     tagged = []
-    for marker in root.rglob(_RESOURCE_MARKER):
-        try:
-            data = json.loads(marker.read_text())
-            entries = data if isinstance(data, list) else [data]
-        except (json.JSONDecodeError, OSError):
+    for net in networks:
+        if not isinstance(net, dict):
             continue
-        for entry in entries:
-            if entry.get("kind") == "network" and entry.get("created_by") == "utils/dev":
-                name = entry.get("name")
-                if name:
-                    tagged.append(name)
-    if tagged:
-        logger.info("Found tagged networks: %s", ", ".join(tagged))
+        config = net.get("config", {})
+        if config.get("user.kive.devel.created-by") == "utils/dev":
+            name = net.get("name")
+            if name:
+                tagged.append(name)
     return tagged
 
 
@@ -151,11 +154,8 @@ def run_purge(args: argparse.Namespace) -> None:
 
     all_instances = list(tagged) + extra_instances
 
-    # Log any legacy untagged instances that were discovered but skipped.
-    _check_legacy_skipped(cmds, tagged_set)
-
     # Phase 3: Discover tagged networks.
-    tagged_networks = _find_marked_networks(root)
+    tagged_networks = _find_tagged_networks(cmds)
 
     # Phase 4: Discover marked workdirs.
     marked = _find_marked_workdirs(root)
@@ -204,25 +204,29 @@ def run_purge(args: argparse.Namespace) -> None:
         _delete_instance(cmds, instance)
 
     if tagged_networks:
-        remaining = set()
-        for name in tagged_networks:
+        import json as _json
+        for net in tagged_networks:
             out = cmds.incus.run(
-                ["list", "--format", "csv", "--columns", "n"],
-                check=False,
-                capture_output=True,
+                ["network", "show", net],
+                check=False, capture_output=True,
             )
-            if out.returncode == 0:
-                remaining = set(line.strip() for line in out.stdout.splitlines() if line.strip())
-                break
-        if not remaining:
-            for net in tagged_networks:
-                logger.info("Removing managed network '%s'...", net)
-                cmds.incus.run(["network", "delete", net], check=False)
-        else:
-            logger.info(
-                "Skipping network removal: %d instance(s) still exist.",
-                len(remaining),
-            )
+            if out.returncode != 0:
+                logger.warning("Could not inspect network '%s', skipping.", net)
+                continue
+            used_by = []
+            try:
+                info = _json.loads(out.stdout)
+                used_by = info.get("used_by", [])
+            except (_json.JSONDecodeError, AttributeError):
+                pass
+            if used_by:
+                logger.info(
+                    "Skipping network '%s': still in use by %d resource(s).",
+                    net, len(used_by),
+                )
+                continue
+            logger.info("Removing managed network '%s'...", net)
+            cmds.incus.run(["network", "delete", net], check=False)
 
     # Phase 5: Remove port forwards and registry.
     _remove_port_forwards(root)
@@ -259,24 +263,6 @@ def _remove_registry(root: Path) -> None:
     if path.exists():
         logger.info("Removing resource registry '%s'...", path)
         path.unlink()
-
-
-def _check_legacy_skipped(cmds: Cmds, tagged_set: set[str]) -> None:
-    """Log a warning for any untagged legacy-name instances found running."""
-    known_legacy = ("kive-minimal", "ci-smoke", "network-smoke")
-    for name in known_legacy:
-        if name not in tagged_set:
-            out = cmds.incus.run(
-                ["list", name, "--format", "csv", "--columns", "n"],
-                check=False,
-                capture_output=True,
-            )
-            if out.returncode == 0 and out.stdout.strip():
-                logger.warning(
-                    "Skipping untagged legacy instance '%s'; "
-                    "pass --instance %s to remove it explicitly.",
-                    name, name,
-                )
 
 
 def register_subcommand(subparsers) -> None:

@@ -253,7 +253,7 @@ def check_cidr_conflict(cidr: str) -> None:
 # ── Bridge creation ────────────────────────────────────────────────
 
 def _ensure_incus_network_create(cmds: Cmds, name: str) -> None:
-    """Create a managed Incus bridge with deterministic CIDR, NAT, and DNS."""
+    """Create a managed Incus bridge with deterministic CIDR, NAT, DNS, and ownership tag."""
     cidr = DEFAULT_VM_BRIDGE_CIDR
     dns_opt = f"dhcp-option=option:dns-server,{DEFAULT_VM_BRIDGE_DNS}"
 
@@ -270,6 +270,8 @@ def _ensure_incus_network_create(cmds: Cmds, name: str) -> None:
             "ipv4.dhcp=true",
             f"raw.dnsmasq={dns_opt}",
             "ipv6.address=none",
+            "user.kive.devel.created-by=utils/dev",
+            "user.kive.devel.kind=network",
         ])
     except subprocess.CalledProcessError as exc:
         err = (exc.stderr or "") + (exc.output or "")
