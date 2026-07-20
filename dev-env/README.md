@@ -267,22 +267,44 @@ This removes:
 
 - **Incus instances** tagged with `user.kive.devel.created-by: utils/dev`
 - **Build directories** marked with `.kive-devel-resource.json`
-- **Managed networks** tagged via marker files with `kind: network`
+- **Managed networks** tagged with Incus metadata
+  (`user.kive.devel.created-by=utils/dev`, `user.kive.devel.kind=network`)
 - **Port forwards** registered in the resource registry
+
+An owned network is deleted only when its `used_by` list is empty.
+If any instance still references the network, it is retained and reported.
 
 ### What is intentionally not removed
 
-- The `kive-lab-br` bridge (not tagged by `prepare-host`; remove manually if needed)
 - The `incusbr0` default bridge
 - The `default` Incus storage pool and profile
-- Firewall rules (IP forwarding, iptables `FORWARD`, `DOCKER-USER`)
+- Firewall rules (IP forwarding, iptables `FORWARD`, `DOCKER-USER`,
+  `POSTROUTING` MASQUERADE)
 - `sysctl` changes
 - System packages
 
+### Removing leftover host firewall state
+
+The prepare-host command installs iptables/nftables rules that survive purge.
+To revert:
+
+```sh
+sudo iptables -D FORWARD -i kive-lab-br -j ACCEPT 2>/dev/null || true
+sudo iptables -D FORWARD -o kive-lab-br -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+sudo iptables -D DOCKER-USER -i kive-lab-br -j ACCEPT 2>/dev/null || true
+sudo iptables -D DOCKER-USER -o kive-lab-br -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true
+CIDR=$(incus network get kive-lab-br ipv4.address 2>/dev/null)
+if [ -n "$CIDR" ]; then
+  sudo iptables -t nat -D POSTROUTING -s "$CIDR" ! -d "$CIDR" -j MASQUERADE 2>/dev/null || true
+fi
+sudo sysctl -w net.ipv4.ip_forward=0
+```
+
 ### Removing the bridge manually
 
-Before deleting the bridge, remove or reconfigure the default profile's NIC
-that references it:
+If you need to delete the bridge after purge (e.g. because it was
+retained due to `used_by`), first remove or reconfigure the default
+profile's NIC that references it:
 
 ```sh
 incus profile device remove default eth0
@@ -317,7 +339,7 @@ utils/dev purge --instance my-instance --workdir /path/to/workdir
 | Firewall: `FORWARD` | Accept rules for bridge traffic | Yes |
 | Firewall: `DOCKER-USER` | Accept rules for bridge traffic | Yes |
 | Firewall: `POSTROUTING` | MASQUERADE rule for bridge CIDR | Yes |
-| Incus bridge | `kive-lab-br` (10.77.77.1/24) | Yes |
+| Incus bridge | `kive-lab-br` (10.77.77.1/24), tagged with ownership metadata | Yes (unless purged when unused) |
 | Incus storage pool | `default` (dir-backed) | Yes |
 | Default profile | NIC, root disk | Yes |
 
