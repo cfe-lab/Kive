@@ -71,7 +71,6 @@ def _test_api_args(
     instance: str,
     workdir: Path,
     debug: bool,
-    instance_type: str = "container",
 ) -> argparse.Namespace:
     return argparse.Namespace(
         instance=instance,
@@ -83,7 +82,6 @@ def _test_api_args(
         quiet=False,
         verbose=False,
         debug=debug,
-        instance_type=instance_type,
     )
 
 
@@ -106,7 +104,7 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
     checks.run_validate_vm(validate_args)
 
-    api_args = _test_api_args(instance, workdir, debug, instance_type=instance_type)
+    api_args = _test_api_args(instance, workdir, debug)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
     checks.run_test_api(api_args)
 
