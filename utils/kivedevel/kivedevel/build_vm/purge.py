@@ -100,16 +100,15 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     for marker in root.rglob(_RESOURCE_MARKER):
         try:
             data = json.loads(marker.read_text())
-            entries = data if isinstance(data, list) else [data]
         except (json.JSONDecodeError, OSError):
             continue
-        for entry in entries:
-            if entry.get("created_by") != "utils/dev":
-                continue
-            kind = entry.get("kind")
-            if kind is None or kind == "build-workdir":
-                candidates.append(marker.parent.resolve())
-                break
+        if not isinstance(data, dict):
+            continue
+        if data.get("created_by") != "utils/dev":
+            continue
+        if data.get("kind") != "build-workdir":
+            continue
+        candidates.append(marker.parent.resolve())
     if candidates:
         logger.info("Found marked workdirs: %s", ", ".join(str(p) for p in candidates))
     return candidates

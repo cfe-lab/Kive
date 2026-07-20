@@ -23,15 +23,7 @@ def _write_marker(workdir: Path, root: Path) -> None:
         "workdir": str(workdir),
         "kind": "build-workdir",
     }
-    existing = []
-    if marker.exists():
-        try:
-            data = json.loads(marker.read_text())
-            existing = data if isinstance(data, list) else [data]
-        except (json.JSONDecodeError, OSError):
-            pass
-    existing.append(entry)
-    marker.write_text(json.dumps(existing, indent=2) + "\n")
+    marker.write_text(json.dumps(entry, indent=2) + "\n")
     logger.debug("Updated resource marker %s", marker)
 
 
