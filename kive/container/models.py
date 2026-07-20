@@ -1433,7 +1433,8 @@ class ContainerRun(Stopwatch, AccessControl):
         # to match command semantics.  Include argument pk as a stable identifier.
         bindings = []
         for cd in self.datasets.select_related('argument', 'dataset').order_by(
-            'argument__type', 'argument__position', 'argument__name', 'multi_position',
+            'argument__type', 'argument__position', 'argument__name',
+            'argument_id', 'multi_position',
         ):
             bindings.append((
                 cd.argument_id,

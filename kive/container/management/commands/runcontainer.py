@@ -213,6 +213,7 @@ class Command(BaseCommand):
                 argcontainerdatasets,
                 key=lambda cd: (
                     cd.multi_position if cd.multi_position is not None else 0,
+                    cd.argument_id,
                     cd.pk or 0,
                 ),
             )
