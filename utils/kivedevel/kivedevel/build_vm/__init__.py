@@ -65,7 +65,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         "--host-interface",
         default="",
         metavar="IFACE",
-        help="Host network interface for the VM NIC (auto-detected by default)",
+        help="Host network interface for container NIC (auto-detected by default; ignored in VM mode)",
     )
     parser.add_argument(
         "--no-provision",

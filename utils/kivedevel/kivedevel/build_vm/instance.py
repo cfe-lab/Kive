@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sys
@@ -10,6 +11,44 @@ from .helpers import instance_is_cloud_variant
 
 
 logger = logging.getLogger("kivedevel")
+
+
+def _parse_incus_instance_type(cmds: Cmds, instance: str) -> str:
+    """Query Incus for the actual type of *instance* and normalize it.
+
+    Returns ``"vm"`` for ``virtual-machine`` and ``"container"`` for
+    ``container``.  Fails with ``SystemExit`` on empty, malformed, or
+    unknown output.
+    """
+    out = cmds.incus.output(["list", instance, "--format", "json"])
+    if not out:
+        logger.error("Empty Incus output for %s.", instance)
+        sys.exit(2)
+    try:
+        payload = json.loads(out)
+    except json.JSONDecodeError as exc:
+        logger.error("Invalid Incus JSON for %s: %s", instance, exc)
+        sys.exit(2)
+    if not isinstance(payload, list):
+        logger.error("Expected a JSON list from incus list, got %s.", type(payload).__name__)
+        sys.exit(2)
+    if not payload:
+        logger.error("Instance %s returned no data from Incus.", instance)
+        sys.exit(2)
+    entry = payload[0]
+    if not isinstance(entry, dict):
+        logger.error("Expected a JSON object for %s, got %s.", instance, type(entry).__name__)
+        sys.exit(2)
+    raw = entry.get("type", "")
+    if raw == "virtual-machine":
+        return "vm"
+    if raw == "container":
+        return "container"
+    logger.error(
+        "Instance %s has unknown type %r.  Expected 'container' or 'virtual-machine'.",
+        instance, raw,
+    )
+    sys.exit(2)
 
 
 def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str, cpu: str, memory: str) -> tuple[bool, str]:
@@ -76,32 +115,13 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         sys.exit(2)
 
     # Verify the existing instance type matches the requested type.
-    out = cmds.incus.output(["list", instance, "--format", "json"])
-    actual_type = ""
-    if out:
-        import json as _json
-        try:
-            payload = _json.loads(out)
-            if isinstance(payload, list) and payload:
-                actual_type = payload[0].get("type", "")
-        except (_json.JSONDecodeError, IndexError):
-            pass
-    incus_vm_type = "virtual-machine"
-    incus_container_type = "container"
-    requested_is_vm = instance_type == "vm"
-    actual_is_vm = actual_type == incus_vm_type
-    if requested_is_vm and actual_type == incus_container_type:
+    actual_type = _parse_incus_instance_type(cmds, instance)
+    if actual_type != instance_type:
+        incus_display = {"virtual-machine": "vm", "container": "container"}.get(actual_type, actual_type)
         logger.error(
-            "Instance %s exists as a container, but --instance-type=vm was requested.\n"
-            "Delete it first:  incus delete -f -- %s && %s",
-            instance, instance, " ".join(sys.argv),
-        )
-        sys.exit(2)
-    if not requested_is_vm and actual_is_vm:
-        logger.error(
-            "Instance %s exists as a VM, but --instance-type=container was requested.\n"
-            "Delete it first:  incus delete -f -- %s && %s",
-            instance, instance, " ".join(sys.argv),
+            "Instance %s exists as %s, but --instance-type=%s was requested.\n"
+            "Delete it first:  incus delete -f -- %s",
+            instance, incus_display, instance_type, instance,
         )
         sys.exit(2)
 
