@@ -152,22 +152,6 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     logger.info("Smoke test passed.")
 
 
-def run_cleanup_local_install(args: argparse.Namespace) -> None:
-    """Delegate to the canonical purge operation."""
-    from .build_vm.purge import run_purge
-
-    purge_args = argparse.Namespace(
-        root=default_root(),
-        instances=[args.instance],
-        workdirs=[args.workdir],
-        quiet=getattr(args, "quiet", False),
-        verbose=getattr(args, "verbose", False),
-        debug=getattr(args, "debug", False),
-        log_file=None,
-    )
-    run_purge(purge_args)
-
-
 def _add_log_flags(parser: argparse.ArgumentParser) -> None:
     log_group = parser.add_mutually_exclusive_group()
     log_group.add_argument("--quiet", action="store_true", help="Only show errors")
@@ -210,20 +194,3 @@ def register_subcommand(subparsers) -> None:
     )
     _add_log_flags(smoke)
     smoke.set_defaults(func=run_smoke_local_install)
-
-    cleanup = subparsers.add_parser(
-        "cleanup-local-install",
-        help="Clean up a local install smoke run (delete instance, remove workdir)",
-    )
-    cleanup.add_argument(
-        "--instance",
-        default="ci-smoke",
-        help="Instance name to delete (default: ci-smoke)",
-    )
-    cleanup.add_argument(
-        "--workdir",
-        type=Path,
-        default=default_root() / "tmp~" / "build",
-        help="Working directory to remove (default: <root>/tmp~/build)",
-    )
-    cleanup.set_defaults(func=run_cleanup_local_install)
