@@ -7,18 +7,15 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
     make_cmds,
 )
 
 
-_PURGE = "Kive.utils.kivedevel.kivedevel.build_vm.purge"
+_PURGE = "kivedevel.build_vm.purge"
 
 
 class TestFindTaggedInstances(unittest.TestCase):
@@ -28,7 +25,7 @@ class TestFindTaggedInstances(unittest.TestCase):
         self.cmds = make_cmds()
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        from kivedevel.build_vm import purge as p
         import importlib
         importlib.reload(p)
         return p
@@ -61,7 +58,7 @@ class TestFindMarkedWorkdirs(unittest.TestCase):
         self.marker_path = self.root / ".kive-devel-resource.json"
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        from kivedevel.build_vm import purge as p
         import importlib
         importlib.reload(p)
         return p
@@ -107,7 +104,7 @@ class TestPurge(unittest.TestCase):
         self.cmds = make_cmds()
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.build_vm.purge as p
+        from kivedevel.build_vm import purge as p
         import importlib
         importlib.reload(p)
         return p

@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
     make_cmds,
 )
@@ -22,7 +20,7 @@ class TestProfileRootDisk(unittest.TestCase):
         self.cmds = make_cmds()
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.build_vm.incus as incus
+        from kivedevel.build_vm import incus as incus
         import importlib
         importlib.reload(incus)
         return incus
@@ -68,7 +66,7 @@ class TestWorkspaceRsyncExclusions(unittest.TestCase):
     """Workspace rsync excludes tmp and own workdir."""
 
     def test_workspace_rsync_excludes_tmp_and_workdir(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.workspace import _workspace_rsync_args
+        from kivedevel.build_vm.workspace import _workspace_rsync_args
         root = Path("/repo")
         workdir = root / "tmp~" / "build"
         dest = Path("/dest")

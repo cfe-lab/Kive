@@ -1,15 +1,12 @@
 import logging
-import sys
 import unittest
-from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel.backends import incus_host
-from Kive.utils.kivedevel.kivedevel.backends import incus_network
-from Kive.utils.kivedevel.kivedevel.shared import _log_level, configure_console_logging
-from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult
+from kivedevel.backends import incus_host
+from kivedevel.backends import incus_network
+from kivedevel.shared import _log_level, configure_console_logging
+from kivedevel._test_helpers import MockRunResult
 
 
 class TestIncusHostCheckBeforeInsert(unittest.TestCase):
@@ -407,7 +404,7 @@ class TestPrepareHostDefaults(unittest.TestCase):
 
     def test_prepare_host_default_bridge_is_kive_lab_br(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        from kivedevel.backends.incus_host import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -415,7 +412,7 @@ class TestPrepareHostDefaults(unittest.TestCase):
         self.assertEqual(args.bridge, "kive-lab-br")
 
     def test_prepare_host_preseed_uses_kive_lab_cidr(self):
-        from Kive.utils.kivedevel.kivedevel.backends.incus_host import (
+        from kivedevel.backends.incus_host import (
             DEFAULT_VM_BRIDGE_CIDR,
         )
         preseed = f"""config: {{}}
@@ -432,7 +429,7 @@ networks:
 
     def test_prepare_host_default_bridge_is_not_incusbr0(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        from kivedevel.backends.incus_host import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)

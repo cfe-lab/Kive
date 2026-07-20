@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import sys
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
 
 class TestBuildVmParser(unittest.TestCase):
@@ -15,7 +12,7 @@ class TestBuildVmParser(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -40,7 +37,7 @@ class TestBuildVmParser(unittest.TestCase):
         self.assertTrue(self.args.provision)
 
     def test_no_provision_sets_false(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -48,7 +45,7 @@ class TestBuildVmParser(unittest.TestCase):
         self.assertFalse(args.provision)
 
     def test_default_vm_network_is_kive_lab_br(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -56,11 +53,11 @@ class TestBuildVmParser(unittest.TestCase):
         self.assertEqual(args.vm_network, "kive-lab-br")
 
     def test_default_model_network_is_kive_lab_br(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+        from kivedevel.build_vm.models import BuildVmConfig
         self.assertEqual(BuildVmConfig.__dataclass_fields__["vm_network"].default, "kive-lab-br")
 
     def test_explicit_instance_type_container(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -68,7 +65,7 @@ class TestBuildVmParser(unittest.TestCase):
         self.assertEqual(args.instance_type, "container")
 
     def test_host_interface_flag(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm import register_subcommand
+        from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -78,7 +75,7 @@ class TestBuildVmParser(unittest.TestCase):
 
 class TestSmokeLocalInstallParser(unittest.TestCase):
     def test_default_instance_type_is_vm(self):
-        from Kive.utils.kivedevel.kivedevel.local_install import register_subcommand
+        from kivedevel.local_install import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -88,7 +85,7 @@ class TestSmokeLocalInstallParser(unittest.TestCase):
 
 class TestPrepareHostParser(unittest.TestCase):
     def test_default_bridge_is_kive_lab_br(self):
-        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        from kivedevel.backends.incus_host import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -96,7 +93,7 @@ class TestPrepareHostParser(unittest.TestCase):
         self.assertEqual(args.bridge, "kive-lab-br")
 
     def test_default_backend_is_incus(self):
-        from Kive.utils.kivedevel.kivedevel.backends.incus_host import register_subcommand
+        from kivedevel.backends.incus_host import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)

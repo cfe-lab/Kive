@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-import sys
 import unittest
 from pathlib import Path
 from unittest import mock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
     make_cmds,
 )
 
-_RELOAD = "Kive.utils.kivedevel.kivedevel.reload"
+_RELOAD = "kivedevel.reload"
 
 
 class TestReloadCli(unittest.TestCase):
@@ -22,7 +20,7 @@ class TestReloadCli(unittest.TestCase):
 
     def test_reload_subcommand_registered(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
+        from kivedevel.reload import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -31,7 +29,7 @@ class TestReloadCli(unittest.TestCase):
 
     def test_default_instance_is_kive_minimal(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
+        from kivedevel.reload import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -40,8 +38,8 @@ class TestReloadCli(unittest.TestCase):
 
     def test_default_root_is_repo_root(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
-        from Kive.utils.kivedevel.kivedevel.shared import default_root
+        from kivedevel.reload import register_subcommand
+        from kivedevel.shared import default_root
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -50,8 +48,8 @@ class TestReloadCli(unittest.TestCase):
 
     def test_default_workdir_under_root(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
-        from Kive.utils.kivedevel.kivedevel.shared import default_root
+        from kivedevel.reload import register_subcommand
+        from kivedevel.shared import default_root
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -60,7 +58,7 @@ class TestReloadCli(unittest.TestCase):
 
     def test_explicit_instance(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
+        from kivedevel.reload import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -69,7 +67,7 @@ class TestReloadCli(unittest.TestCase):
 
     def test_logging_flags(self):
         import argparse
-        from Kive.utils.kivedevel.kivedevel.reload import register_subcommand
+        from kivedevel.reload import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
@@ -94,7 +92,7 @@ class TestReloadPreconditions(unittest.TestCase):
         return args
 
     def _import_reload(self):
-        import Kive.utils.kivedevel.kivedevel.reload as r
+        from kivedevel import reload as r
         import importlib
         importlib.reload(r)
         return r
@@ -120,7 +118,7 @@ class TestReloadPreconditions(unittest.TestCase):
         cmds.incus.run.return_value = MockRunResult(returncode=1)
         with mock.patch.object(rl, "instance_exists", return_value=True):
             with mock.patch.object(rl, "instance_is_running", return_value=True):
-                from Kive.utils.kivedevel.kivedevel.shared import instance_exists, instance_is_running
+                from kivedevel.shared import instance_exists, instance_is_running
                 with mock.patch.object(rl, "instance_exists", return_value=True):
                     with mock.patch.object(rl, "instance_is_running", return_value=True):
                         with self.assertRaises(SystemExit):
@@ -152,7 +150,7 @@ class TestReloadSnapshot(unittest.TestCase):
             snapshot = workdir / "snap"
             snapshot.mkdir()
             with mock.patch(
-                "Kive.utils.kivedevel.kivedevel.build_vm.workspace._workspace_rsync_args",
+                "kivedevel.build_vm.workspace._workspace_rsync_args",
                 return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(snapshot) + "/"],
             ):
                 rl._host_source_snapshot_rsync(cmds, workdir, workdir, snapshot)
@@ -174,7 +172,7 @@ class TestReloadSnapshot(unittest.TestCase):
         self.assertEqual(len(exec_calls), 0)
 
     def _import_reload(self):
-        import Kive.utils.kivedevel.kivedevel.reload as r
+        from kivedevel import reload as r
         import importlib
         importlib.reload(r)
         return r
@@ -223,7 +221,7 @@ class TestReloadOrdering(unittest.TestCase):
         self.assertEqual(call_log, ["stop", "mv", "install", "start", "health"])
 
     def _import_reload(self):
-        import Kive.utils.kivedevel.kivedevel.reload as r
+        from kivedevel import reload as r
         import importlib
         importlib.reload(r)
         return r
@@ -275,7 +273,7 @@ class TestReloadNoInstanceLifecycleCommands(unittest.TestCase):
                                      f"reload issued dangerous command: {argv}")
 
     def _import_reload(self):
-        import Kive.utils.kivedevel.kivedevel.reload as r
+        from kivedevel import reload as r
         import importlib
         importlib.reload(r)
         return r
@@ -285,7 +283,7 @@ class TestCloudInitSystemdUnit(unittest.TestCase):
     """Generated cloud-init contains the systemd unit and not the old nohup."""
 
     def test_provision_cloud_init_has_systemd_unit(self):
-        source_path = Path(__file__).resolve().parents[4] / "Kive" / "utils" / "kivedevel" / "kivedevel" / "build_vm" / "cloud_init.py"
+        source_path = Path(__file__).resolve().parent / "build_vm" / "cloud_init.py"
         text = source_path.read_text()
         self.assertIn("kive-dev-web.service", text)
         self.assertIn("--noreload", text)

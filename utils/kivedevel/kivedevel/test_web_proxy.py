@@ -3,22 +3,17 @@
 from __future__ import annotations
 
 import unittest
-from pathlib import Path
 from unittest import mock
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
     make_cmds,
     make_config,
 )
 
 
-_RUNNER = "Kive.utils.kivedevel.kivedevel.build_vm.runner"
+_RUNNER = "kivedevel.build_vm.runner"
 
 
 class TestWebProxyDevice(unittest.TestCase):
@@ -29,7 +24,7 @@ class TestWebProxyDevice(unittest.TestCase):
         self.cfg = make_config()
 
     def _import_ensure(self):
-        from Kive.utils.kivedevel.kivedevel.build_vm.runner import _ensure_web_proxy_device
+        from kivedevel.build_vm.runner import _ensure_web_proxy_device
         return _ensure_web_proxy_device
 
     def test_creates_new_proxy_device(self):

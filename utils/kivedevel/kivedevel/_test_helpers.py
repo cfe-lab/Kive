@@ -22,7 +22,7 @@ def make_cmds(incus_output: str = "[]", **kwargs) -> mock.Mock:
 
 
 def make_config(instance: str = "test", instance_type: str = "vm", **overrides) -> Path:
-    from Kive.utils.kivedevel.kivedevel.build_vm.models import BuildVmConfig
+    from kivedevel.build_vm.models import BuildVmConfig
     params = dict(
         root=Path("/tmp"),
         workdir=Path("/tmp"),
@@ -44,7 +44,3 @@ def make_config(instance: str = "test", instance_type: str = "vm", **overrides) 
     return BuildVmConfig(**params)
 
 
-def add_source_path() -> None:
-    root = Path(__file__).resolve().parents[4]
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))

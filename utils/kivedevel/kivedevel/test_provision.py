@@ -4,23 +4,18 @@ from __future__ import annotations
 
 import json
 import unittest
-from pathlib import Path
 from unittest import mock
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
     make_cmds,
     make_config,
 )
 
 
 
-_PROVISION_MODULE = "Kive.utils.kivedevel.kivedevel.build_vm.provision"
+_PROVISION_MODULE = "kivedevel.build_vm.provision"
 
 
 class TestMaybeProvisionInstance(unittest.TestCase):
@@ -172,6 +167,6 @@ class TestPullFile(unittest.TestCase):
 
 def _import_provision():
     import importlib
-    import Kive.utils.kivedevel.kivedevel.build_vm.provision as p
+    from kivedevel.build_vm import provision as p
     importlib.reload(p)
     return p

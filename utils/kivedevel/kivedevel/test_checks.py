@@ -6,13 +6,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
     make_cmds,
 )
 
@@ -25,7 +22,7 @@ class TestValidateVm(unittest.TestCase):
         self.cmds = make_cmds()
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.checks as checks
+        from kivedevel import checks as checks
         import importlib
         importlib.reload(checks)
         return checks
@@ -51,7 +48,7 @@ class TestSingularityProbeFatal(unittest.TestCase):
         self.cmds = make_cmds()
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.checks as checks
+        from kivedevel import checks as checks
         import importlib
         importlib.reload(checks)
         return checks
@@ -110,7 +107,7 @@ class TestSlurmProbe(unittest.TestCase):
         )
 
     def _import(self):
-        import Kive.utils.kivedevel.kivedevel.checks as checks
+        from kivedevel import checks as checks
         import importlib
         importlib.reload(checks)
         return checks
@@ -139,13 +136,13 @@ class TestSlurmProbe(unittest.TestCase):
 
 class TestDeviceExists(unittest.TestCase):
     def test_device_exists_returns_true_when_present(self):
-        from Kive.utils.kivedevel.kivedevel.checks import _device_exists
+        from kivedevel.checks import _device_exists
         cmds = mock.Mock()
         cmds.incus.output.return_value = "kive-code:\n  type: disk\n"
         self.assertTrue(_device_exists(cmds, "test", "kive-code"))
 
     def test_device_exists_returns_false_when_absent(self):
-        from Kive.utils.kivedevel.kivedevel.checks import _device_exists
+        from kivedevel.checks import _device_exists
         cmds = mock.Mock()
         cmds.incus.output.return_value = "other:\n  type: disk\n"
         self.assertFalse(_device_exists(cmds, "test", "kive-code"))

@@ -6,13 +6,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 
-from Kive.utils.kivedevel.kivedevel._test_helpers import (
+from kivedevel._test_helpers import (
     MockRunResult,
-    add_source_path,
 )
 
 
@@ -34,9 +31,9 @@ class TestSmokeLocalInstall(unittest.TestCase):
         return args
 
     def test_invokes_build_then_validate_then_test_api(self):
-        from Kive.utils.kivedevel.kivedevel import local_install as li
-        from Kive.utils.kivedevel.kivedevel._test_helpers import MockRunResult, make_cmds
-        from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install
+        from kivedevel import local_install as li
+        from kivedevel._test_helpers import MockRunResult, make_cmds
+        from kivedevel.local_install import run_smoke_local_install
         args = self._make_args()
         call_order = []
 
@@ -48,19 +45,19 @@ class TestSmokeLocalInstall(unittest.TestCase):
         ]
 
         with mock.patch(
-            "Kive.utils.kivedevel.kivedevel.local_install.run_build_vm",
+            "kivedevel.local_install.run_build_vm",
             side_effect=lambda a: call_order.append("build"),
         ) as mock_build:
             with mock.patch(
-                "Kive.utils.kivedevel.kivedevel.checks.run_validate_vm",
+                "kivedevel.checks.run_validate_vm",
                 side_effect=lambda a: call_order.append("validate"),
             ) as mock_validate:
                 with mock.patch(
-                    "Kive.utils.kivedevel.kivedevel.checks.run_test_api",
+                    "kivedevel.checks.run_test_api",
                     side_effect=lambda a: call_order.append("test-api"),
                 ) as mock_test_api:
                     with mock.patch(
-                        "Kive.utils.kivedevel.kivedevel.local_install.reload_mod.run_reload",
+                        "kivedevel.local_install.reload_mod.run_reload",
                         side_effect=lambda a: call_order.append("reload"),
                     ) as mock_reload:
                         with mock.patch.object(
@@ -76,15 +73,15 @@ class TestSmokeLocalInstall(unittest.TestCase):
         self.assertEqual(mock_reload.call_count, 2)
 
     def test_failure_in_build_stops_sequence(self):
-        from Kive.utils.kivedevel.kivedevel.local_install import run_smoke_local_install
+        from kivedevel.local_install import run_smoke_local_install
         args = self._make_args()
 
         with mock.patch(
-            "Kive.utils.kivedevel.kivedevel.local_install.run_build_vm",
+            "kivedevel.local_install.run_build_vm",
             side_effect=RuntimeError("build failed"),
         ):
             with mock.patch(
-                "Kive.utils.kivedevel.kivedevel.checks.run_validate_vm",
+                "kivedevel.checks.run_validate_vm",
             ) as mock_validate:
                 with self.assertRaises(RuntimeError):
                     run_smoke_local_install(args)
