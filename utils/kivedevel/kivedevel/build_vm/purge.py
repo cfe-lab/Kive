@@ -176,33 +176,46 @@ def run_purge(args: argparse.Namespace) -> None:
         logger.info("No Kive development resources found to purge.")
         return
 
-    logger.info("Resources to purge: %d instance(s), %d workdir(s)", len(all_instances), len(all_workdirs))
+    logger.info("Resources to purge: %d instance(s), %d workdir(s), %d network(s)",
+                 len(all_instances), len(all_workdirs), len(tagged_networks))
 
     _detach_stale_nbd()
 
+    deleted_instances = 0
+    failed_instances = 0
     for instance in all_instances:
         if _device_attached(cmds, instance, "kive-code"):
             _remove_device(cmds, instance, "kive-code")
-        else:
-            logger.debug("No kive-code device attached to '%s'.", instance)
         if _device_attached(cmds, instance, "kive-web"):
             _remove_device(cmds, instance, "kive-web")
+        del_result = cmds.incus.run(
+            ["delete", "-f", "--", instance],
+            check=False, capture_output=True,
+        )
+        if del_result.returncode == 0:
+            deleted_instances += 1
         else:
-            logger.debug("No kive-web device attached to '%s'.", instance)
+            logger.warning("Failed to delete instance '%s': %s", instance, (del_result.stderr or "").strip())
+            failed_instances += 1
 
+    deleted_workdirs = 0
+    failed_workdirs = 0
     for workdir in all_workdirs:
         mountpoint_path = workdir / "kive-code-mount"
         if mountpoint_path.exists() and _is_mountpoint(mountpoint_path):
-            logger.info("Cleaning stale mountpoint '%s'...", mountpoint_path)
             _umount(mountpoint_path)
 
         image_path = workdir / "kive-code.qcow2"
         _remove_image(image_path)
         _remove_workdir(workdir)
+        if workdir.exists():
+            failed_workdirs += 1
+        else:
+            deleted_workdirs += 1
 
-    for instance in all_instances:
-        _delete_instance(cmds, instance)
-
+    deleted_networks = 0
+    retained_networks = 0
+    failed_networks = 0
     if tagged_networks:
         import json as _json
         all_nets = ""
@@ -230,6 +243,7 @@ def run_purge(args: argparse.Namespace) -> None:
                     "Skipping network '%s': still in use by %d resource(s).",
                     net, len(used_by),
                 )
+                retained_networks += 1
                 continue
             logger.info("Removing managed network '%s'...", net)
             del_result = cmds.incus.run(
@@ -238,12 +252,44 @@ def run_purge(args: argparse.Namespace) -> None:
             )
             if del_result.returncode != 0:
                 logger.warning("Failed to delete network '%s': %s", net, (del_result.stderr or "").strip())
+                failed_networks += 1
+            else:
+                deleted_networks += 1
 
-    # Phase 5: Remove port forwards and registry.
-    _remove_port_forwards(root)
-    _remove_registry(root)
+    # Phase 5: Remove port forwards and registry (only when nothing remains).
+    removed_port_forwards = 0
+    for entry in _read_registry(root):
+        if entry.get("kind") == "host-forward":
+            pid = entry.get("pid")
+            if pid:
+                try:
+                    os.kill(pid, signal.SIGTERM)
+                    removed_port_forwards += 1
+                except (OSError, ProcessLookupError):
+                    pass
 
-    logger.info("Purge complete. All Kive development resources removed.")
+    all_succeeded = (
+        failed_instances == 0 and failed_workdirs == 0
+        and failed_networks == 0 and retained_networks == 0
+    )
+    if all_succeeded:
+        _remove_registry(root)
+        logger.info(
+            "Purge complete. All Kive development resources removed "
+            "(%d instances, %d workdirs, %d networks, %d port forwards).",
+            deleted_instances, deleted_workdirs, deleted_networks, removed_port_forwards,
+        )
+    else:
+        logger.info(
+            "Purge finished with %d owned resource(s) remaining. "
+            "Deleted: %d instances, %d workdirs, %d networks, %d port forwards. "
+            "Skipped: %d networks (in use). "
+            "Failed: %d instances, %d workdirs, %d networks.",
+            failed_instances + failed_workdirs + retained_networks + failed_networks,
+            deleted_instances, deleted_workdirs, deleted_networks, removed_port_forwards,
+            retained_networks,
+            failed_instances, failed_workdirs, failed_networks,
+        )
 
 
 def _read_registry(root: Path) -> list[dict]:
@@ -255,18 +301,6 @@ def _read_registry(root: Path) -> list[dict]:
         return data if isinstance(data, list) else [data]
     except (json.JSONDecodeError, OSError):
         return []
-
-
-def _remove_port_forwards(root: Path) -> None:
-    for entry in _read_registry(root):
-        if entry.get("kind") == "host-forward":
-            pid = entry.get("pid")
-            if pid:
-                logger.info("Killing owned port forward (pid %d)...", pid)
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                except (OSError, ProcessLookupError):
-                    pass
 
 
 def _remove_registry(root: Path) -> None:
