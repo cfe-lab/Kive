@@ -92,8 +92,6 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         help="Managed Incus bridge for VM NIC (default: kive-lab-br). "
         "Created automatically if it does not exist.",
     )
-    # VM networking is DHCP-only via the managed Incus bridge.
-    # Static IP options (--vm-cidr, --vm-ip) have been removed.
     parser.set_defaults(func=run_from_args, provision=True)
 
     purge.register_subcommand(subparsers)

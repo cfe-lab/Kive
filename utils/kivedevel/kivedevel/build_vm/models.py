@@ -21,8 +21,6 @@ class BuildVmConfig:
     web_port: int = 8000
     no_web_proxy: bool = False
     vm_network: str = "kive-lab-br"
-    vm_cidr: str = ""
-    vm_ip: str = ""
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
@@ -44,6 +42,4 @@ class BuildVmConfig:
             web_port=args.web_port,
             no_web_proxy=bool(args.no_web_proxy),
             vm_network=getattr(args, "vm_network", ""),
-            vm_cidr=getattr(args, "vm_cidr", ""),
-            vm_ip=getattr(args, "vm_ip", ""),
         )

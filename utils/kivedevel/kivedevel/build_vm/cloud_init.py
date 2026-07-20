@@ -304,27 +304,16 @@ def enable_network_config(
     instance: str,
     host_interface: str,
     instance_type: str,
-    static_ip: str | None = None,
-    cidr: str | None = None,
-    gateway: str | None = None,
 ) -> bool:
     """Set cloud-init network config for the instance.
 
-    For VM mode: skip network config entirely and let the Ubuntu cloud image
-    use its default DHCP behavior on the attached NIC.  The static IP path
-    (``--vm-ip`` / ``--vm-cidr``) has been removed — VMs always use DHCP.
+    VM mode: no network config needed (DHCP from the managed Incus bridge).
 
-    For container mode: write a DHCP config for ``eth0``.
+    Container mode: write a DHCP config for ``eth0``.
 
     Returns True if a change was made.
     """
     if instance_type == "vm":
-        if static_ip or cidr or gateway:
-            logger.error(
-                "Static VM IP configuration (--vm-ip / --vm-cidr) is no longer supported. "
-                "VMs always use DHCP from the Incus managed bridge."
-            )
-            sys.exit(1)
         current = cmds.incus.output(["config", "get", instance, "user.network-config"]).strip()
         if not current:
             return False
