@@ -44,17 +44,26 @@ class TestBuildVmParser(unittest.TestCase):
         args = parser.parse_args(["build-vm", "--no-provision"])
         self.assertFalse(args.provision)
 
-    def test_default_vm_network_is_kive_lab_br(self):
+    def test_default_vm_network_is_none(self):
         from kivedevel.build_vm import register_subcommand
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
         args = parser.parse_args(["build-vm"])
-        self.assertEqual(args.vm_network, "kive-lab-br")
+        self.assertIsNone(args.vm_network)
 
-    def test_default_model_network_is_kive_lab_br(self):
+    def test_vm_mode_resolves_network_to_kive_lab_br(self):
+        from pathlib import Path
         from kivedevel.build_vm.models import BuildVmConfig
-        self.assertEqual(BuildVmConfig.__dataclass_fields__["vm_network"].default, "kive-lab-br")
+        cfg = BuildVmConfig(
+            root=Path("/tmp"), workdir=Path("/tmp"), instance="test",
+            image_path=Path("/tmp/img.img"), instance_type="vm",
+        )
+        self.assertIsNone(cfg.vm_network)
+
+    def test_default_model_network_is_none(self):
+        from kivedevel.build_vm.models import BuildVmConfig
+        self.assertIsNone(BuildVmConfig.__dataclass_fields__["vm_network"].default)
 
     def test_explicit_instance_type_container(self):
         from kivedevel.build_vm import register_subcommand
