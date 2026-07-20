@@ -131,15 +131,10 @@ class TestPurge(unittest.TestCase):
         purge = self._import()
         self.cmds.incus.output.return_value = ""
         with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
-            with mock.patch.object(purge, "_find_tagged_networks"):
+            with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                 with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-                    with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                        with mock.patch.object(purge, "print"):
-                            with mock.patch.object(purge, "print"):
-                                with mock.patch.object(purge, "_remove_registry"):
-                                    with mock.patch.object(purge, "Cmds") as mock_cmds_cls:
-                                        mock_cmds_cls.create.return_value = self.cmds
-                                        purge._run_purge(self._make_args(), self.cmds)
+                    with mock.patch.object(purge, "_remove_registry"):
+                        purge._run_purge(self._make_args(), self.cmds)
         delete_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if c[0][0][:2] == ["delete", "-f"]
@@ -163,9 +158,8 @@ class TestPurge(unittest.TestCase):
         ] * 3
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "_remove_registry"):
-                        purge._run_purge(self._make_args(), self.cmds)
+                with mock.patch.object(purge, "_remove_registry"):
+                    purge._run_purge(self._make_args(), self.cmds)
 
     def test_purge_removes_web_proxy_device(self):
         purge = self._import()
@@ -176,9 +170,8 @@ class TestPurge(unittest.TestCase):
         ] * 3
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "_remove_registry"):
-                        purge._run_purge(self._make_args(), self.cmds)
+                with mock.patch.object(purge, "_remove_registry"):
+                    purge._run_purge(self._make_args(), self.cmds)
 
     def test_purge_kills_port_forward(self):
         purge = self._import()
@@ -241,14 +234,14 @@ class TestSafeWorkdirRemoval(unittest.TestCase):
     def test_successful_unmount(self):
         """Unmount succeeds: remove image + workdir."""
         purge = self._import()
-        with mock.patch.object(purge, "_is_mountpoint", return_value=False):
+        with mock.patch.object(purge, "_is_mountpoint", side_effect=[True, False]):
             with mock.patch.object(purge, "_umount") as mock_umount:
                 mock_umount.return_value = subprocess.CompletedProcess(
                     args=[], returncode=0, stdout="", stderr="",
                 )
                 result = purge._remove_workdir_safely(self.workdir)
         self.assertTrue(result)
-        mock_umount.assert_not_called()
+        mock_umount.assert_called_once()
 
     def test_unmount_failure_preserves_image_and_workdir(self):
         """Non-zero umount: image and workdir are NOT removed."""

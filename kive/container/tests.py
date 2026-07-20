@@ -1788,8 +1788,6 @@ class ContainerDatasetTest(TestCase):
             dataset.clean()
 
 
-
-
 @skipIfDBFeature('is_mocked')
 class ContainerLogTests(TestCase):
     fixtures = ['container_run']
