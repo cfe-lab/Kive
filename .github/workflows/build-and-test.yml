@@ -122,6 +122,11 @@ jobs:
           echo "=== Incus ==="
           incus info || true
 
+      - name: Run kivedevel unit tests
+        run: |
+          uv sync --project utils/kivedevel --extra test
+          uv run --project utils/kivedevel --extra test pytest utils/kivedevel/kivedevel
+
       - name: Configure Incus group and sync uv environment
         run: |
           sudo usermod -aG incus-admin "$USER"

@@ -694,42 +694,6 @@ def run_test_api(args: argparse.Namespace) -> None:
         auth_status,
         probe.get("auth_count"),
     )
-    probe = _run_api_probe(base_url, username=args.username, password=args.password)
-
-    logger.debug("Probe result: %s", probe)
-
-    login_page_status = int(probe.get("login_page_status", 0))
-    anon_status = int(probe.get("anon_datasets_status", 0))
-    auth_status = int(probe.get("auth_datasets_status", 0))
-    auth_json_ok = bool(probe.get("auth_json_ok", False))
-
-    if login_page_status != 200:
-        logger.error("Login page check failed: expected 200, got %s", login_page_status)
-        sys.exit(1)
-
-    # Observable effect: authenticated session should change API behavior.
-    if anon_status == auth_status:
-        logger.error(
-            "Authentication had no observable effect on /api/datasets/: status stayed %s",
-            auth_status,
-        )
-        sys.exit(1)
-
-    if auth_status != 200:
-        logger.error("Authenticated datasets request failed: expected 200, got %s", auth_status)
-        sys.exit(1)
-
-    if not auth_json_ok:
-        logger.error("Authenticated /api/datasets/ response was not valid JSON")
-        sys.exit(1)
-
-    logger.info(
-        "test-api checks passed for %s. anon=%s auth=%s dataset_count=%s",
-        instance,
-        anon_status,
-        auth_status,
-        probe.get("auth_count"),
-    )
 
 
 def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
