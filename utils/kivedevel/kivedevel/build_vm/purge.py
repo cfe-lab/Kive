@@ -115,15 +115,28 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
 
 
 def _find_tagged_networks(cmds: Cmds) -> list[str]:
-    """Discover networks tagged with ``user.kive.devel.created-by=utils/dev``."""
+    """Discover networks tagged with ``user.kive.devel.created-by=utils/dev``.
+
+    Raises ``RuntimeError`` if the Incus query fails or returns unparseable
+    output, so the caller can distinguish 'none found' from 'could not check'.
+    """
     import json as _json
-    out = cmds.incus.output(["network", "list", "--format", "json"])
+    result = cmds.incus.run(
+        ["network", "list", "--format", "json"],
+        check=False, capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"incus network list failed (rc={result.returncode}): "
+            f"{result.stderr}"
+        )
+    out = result.stdout or ""
     if not out:
         return []
     try:
         networks = _json.loads(out)
-    except _json.JSONDecodeError:
-        return []
+    except _json.JSONDecodeError as exc:
+        raise RuntimeError(f"Failed to parse incus network list output: {exc}") from exc
     tagged = []
     for net in networks:
         if not isinstance(net, dict):
@@ -148,10 +161,12 @@ def run_purge(args: argparse.Namespace) -> None:
     tagged = _find_tagged_instances(cmds)
     tagged_set = set(tagged)
 
-    # Phase 2: Explicit --instance overrides.
+    # Phase 2: Explicit --instance overrides, deduplicated with tagged.
     extra_instances = getattr(args, "instances", []) or []
-
-    all_instances = list(tagged) + extra_instances
+    all_instances = list(tagged_set)
+    for inst in extra_instances:
+        if inst not in tagged_set:
+            all_instances.append(inst)
 
     # Phase 3: Discover tagged networks.
     tagged_networks = _find_tagged_networks(cmds)
@@ -257,6 +272,7 @@ def run_purge(args: argparse.Namespace) -> None:
 
     # Phase 5: Remove port forwards and registry (only when nothing remains).
     removed_port_forwards = 0
+    failed_port_forwards = 0
     for entry in _read_registry(root):
         if entry.get("kind") == "host-forward":
             pid = entry.get("pid")
@@ -264,12 +280,15 @@ def run_purge(args: argparse.Namespace) -> None:
                 try:
                     os.kill(pid, signal.SIGTERM)
                     removed_port_forwards += 1
-                except (OSError, ProcessLookupError):
-                    pass
+                except ProcessLookupError:
+                    removed_port_forwards += 1
+                except OSError:
+                    failed_port_forwards += 1
 
     all_succeeded = (
         failed_instances == 0 and failed_workdirs == 0
         and failed_networks == 0 and retained_networks == 0
+        and failed_port_forwards == 0
     )
     if all_succeeded:
         _remove_registry(root)

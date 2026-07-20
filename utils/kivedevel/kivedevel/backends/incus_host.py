@@ -154,6 +154,8 @@ networks:
     ipv4.address: {DEFAULT_VM_BRIDGE_CIDR}
     ipv4.nat: "true"
     ipv6.address: none
+    user.kive.devel.created-by: utils/dev
+    user.kive.devel.kind: network
 storage_pools:
 - name: default
   driver: dir
@@ -182,7 +184,6 @@ profiles:
         _print_diagnostics(cmds, bridge)
 
     _enable_ipv4_forwarding()
-    _set_bridge_options(cmds, bridge)
     _add_bridge_forwarding_rules(bridge)
     _add_masquerade_fallback(cmds, bridge)
 

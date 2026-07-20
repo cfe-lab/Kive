@@ -153,25 +153,19 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
 
 
 def run_cleanup_local_install(args: argparse.Namespace) -> None:
-    workdir: Path | None = getattr(args, "workdir", None)
-    if workdir is not None:
-        workdir = workdir.resolve()
+    """Delegate to the canonical purge operation."""
+    from .build_vm.purge import run_purge
 
-    instance: str = args.instance
-
-    cmds = Cmds.create()
-
-    if instance_exists(cmds, instance):
-        logger.info("Deleting instance %s...", instance)
-        cmds.incus.run(["delete", "-f", instance], check=False)
-    else:
-        logger.info("Instance %s does not exist, skipping.", instance)
-
-    if workdir is not None and workdir.exists():
-        logger.info("Removing workdir %s...", workdir)
-        subprocess.run(["rm", "-rf", str(workdir)], check=False)
-
-    logger.info("Cleanup complete.")
+    purge_args = argparse.Namespace(
+        root=default_root(),
+        instances=[args.instance],
+        workdirs=[args.workdir],
+        quiet=getattr(args, "quiet", False),
+        verbose=getattr(args, "verbose", False),
+        debug=getattr(args, "debug", False),
+        log_file=None,
+    )
+    run_purge(purge_args)
 
 
 def _add_log_flags(parser: argparse.ArgumentParser) -> None:

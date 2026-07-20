@@ -340,7 +340,7 @@ def _vm_start_api_via_ssh(ip: str, port: int, max_wait: int = 30) -> bool:
         "cd /usr/local/share/Kive/kive && "
         "source /etc/kive_dev_vars 2>/dev/null || true && "
         "source $HOME/.venv_kive/bin/activate 2>/dev/null || true && "
-        "(python manage.py runserver 0.0.0.0:8000 >/tmp/kive_api.log 2>&1 &) && "
+        f"(python manage.py runserver 0.0.0.0:{port} >/tmp/kive_api.log 2>&1 &) && "
         "sleep 2 && echo 'started'"
     )
     
@@ -428,7 +428,10 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     }
 
     if auth_status == 200:
-        parsed = json.loads(auth_body)
+        try:
+            parsed = json.loads(auth_body)
+        except json.JSONDecodeError:
+            return result
         if isinstance(parsed, dict):
             items = parsed.get("results", parsed)
             if isinstance(items, list):
