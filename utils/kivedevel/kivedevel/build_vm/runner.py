@@ -152,7 +152,7 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
     if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
         restart_required = True
 
-    if enable_network_config(cmds, cfg.instance, host_interface, actual_instance_type):
+    if enable_network_config(cmds, cfg.instance, actual_instance_type):
         restart_required = True
 
     if not created_new_instance:
@@ -233,7 +233,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
         restart_required = True
 
-    if enable_network_config(cmds, cfg.instance, "", actual_instance_type):
+    if enable_network_config(cmds, cfg.instance, actual_instance_type):
         restart_required = True
 
     if not created_new_instance:

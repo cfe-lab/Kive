@@ -302,7 +302,6 @@ runcmd:
 def enable_network_config(
     cmds: Cmds,
     instance: str,
-    host_interface: str,
     instance_type: str,
 ) -> bool:
     """Set cloud-init network config for the instance.
