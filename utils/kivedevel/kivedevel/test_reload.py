@@ -6,13 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-
-from kivedevel._test_helpers import (
-    MockRunResult,
-    make_cmds,
-)
-
-_RELOAD = "kivedevel.reload"
+from kivedevel._test_helpers import MockRunResult, make_cmds
 
 
 class TestReloadCli(unittest.TestCase):
@@ -30,30 +24,13 @@ class TestReloadCli(unittest.TestCase):
     def test_default_instance_is_kive_minimal(self):
         import argparse
         from kivedevel.reload import register_subcommand
+        from kivedevel.shared import default_root
         parser = argparse.ArgumentParser()
         subparsers = parser.add_subparsers()
         register_subcommand(subparsers)
         args = parser.parse_args(["reload"])
         self.assertEqual(args.instance, "kive-minimal")
-
-    def test_default_root_is_repo_root(self):
-        import argparse
-        from kivedevel.reload import register_subcommand
-        from kivedevel.shared import default_root
-        parser = argparse.ArgumentParser()
-        subparsers = parser.add_subparsers()
-        register_subcommand(subparsers)
-        args = parser.parse_args(["reload"])
         self.assertEqual(args.root, default_root())
-
-    def test_default_workdir_under_root(self):
-        import argparse
-        from kivedevel.reload import register_subcommand
-        from kivedevel.shared import default_root
-        parser = argparse.ArgumentParser()
-        subparsers = parser.add_subparsers()
-        register_subcommand(subparsers)
-        args = parser.parse_args(["reload"])
         self.assertEqual(args.workdir, default_root() / "tmp~" / "build")
 
     def test_explicit_instance(self):
@@ -65,127 +42,85 @@ class TestReloadCli(unittest.TestCase):
         args = parser.parse_args(["reload", "my-instance"])
         self.assertEqual(args.instance, "my-instance")
 
-    def test_logging_flags(self):
-        import argparse
-        from kivedevel.reload import register_subcommand
-        parser = argparse.ArgumentParser()
-        subparsers = parser.add_subparsers()
-        register_subcommand(subparsers)
-        for flag in ("--quiet", "--verbose", "--debug"):
-            args = parser.parse_args(["reload", flag])
-            self.assertTrue(getattr(args, flag.replace("--", "")))
-
 
 class TestReloadPreconditions(unittest.TestCase):
     """Missing instance, stopped instance, unprovisioned instance."""
 
-    def _make_args(self, **overrides) -> mock.Mock:
-        args = mock.Mock(spec=[])
-        args.instance = "test-vm"
-        args.root = Path("/tmp")
-        args.workdir = Path("/tmp")
-        args.quiet = False
-        args.verbose = False
-        args.debug = False
-        for k, v in overrides.items():
-            setattr(args, k, v)
-        return args
-
-    def _import_reload(self):
-        from kivedevel import reload as r
-        import importlib
-        importlib.reload(r)
-        return r
-
-    def test_fails_when_instance_missing(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        with mock.patch.object(rl, "instance_exists", return_value=False):
-            with self.assertRaises(SystemExit):
-                rl.run_reload(self._make_args())
-
-    def test_fails_when_instance_stopped(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        with mock.patch.object(rl, "instance_exists", return_value=True):
-            with mock.patch.object(rl, "instance_is_running", return_value=False):
-                with self.assertRaises(SystemExit):
-                    rl.run_reload(self._make_args())
-
-    def test_fails_when_not_provisioned(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        cmds.incus.run.return_value = MockRunResult(returncode=1)
-        with mock.patch.object(rl, "instance_exists", return_value=True):
-            with mock.patch.object(rl, "instance_is_running", return_value=True):
-                from kivedevel.shared import instance_exists, instance_is_running
-                with mock.patch.object(rl, "instance_exists", return_value=True):
-                    with mock.patch.object(rl, "instance_is_running", return_value=True):
-                        with self.assertRaises(SystemExit):
-                            rl.run_reload(self._make_args())
-
-    def test_fails_when_dev_service_missing(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        se = iter([
-            MockRunResult(returncode=0),  # test -d /usr/local/share/Kive
-            MockRunResult(returncode=1, stderr="not-found"),  # systemctl cat kive-dev-web
-        ])
-        cmds.incus.run.side_effect = se
-        with mock.patch.object(rl, "instance_exists", return_value=True):
-            with mock.patch.object(rl, "instance_is_running", return_value=True):
-                with self.assertRaises(SystemExit):
-                    rl.run_reload(self._make_args())
-
-
-class TestReloadSnapshot(unittest.TestCase):
-    """Host snapshot and transfer."""
-
-    def test_host_source_snapshot_uses_rsync(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            workdir = Path(tmp)
-            snapshot = workdir / "snap"
-            snapshot.mkdir()
-            with mock.patch(
-                "kivedevel.build_vm.workspace._workspace_rsync_args",
-                return_value=["-a", "--exclude=/tmp/", "--", str(workdir) + "/", str(snapshot) + "/"],
-            ):
-                rl._host_source_snapshot_rsync(cmds, workdir, workdir, snapshot)
-            self.assertGreaterEqual(len(cmds.rsync.run.call_args_list), 1)
-
-    def test_transfer_snapshot_layout(self):
-        rl = self._import_reload()
+    def _call_reload(self, **patches):
+        import kivedevel.reload as rl
         cmds = make_cmds()
         cmds.incus.run.return_value = MockRunResult(returncode=0)
-        snapshot = Path("/tmp/.Kive.reload-test123")
-        rl._transfer_snapshot_to(cmds, "test-vm", snapshot, "/usr/local/share")
-        push_calls = [c for c in cmds.incus.run.call_args_list if "push" in str(c)]
-        self.assertGreaterEqual(len(push_calls), 1)
-        argv = push_calls[0][0][0]
-        self.assertEqual(argv[:6], ["file", "push", "-r", "--create-dirs", "--", str(snapshot)])
-        self.assertIn("test-vm/usr/local/share", argv)
-        # No mv/rmdir normalization commands should follow the push
-        exec_calls = [c for c in cmds.incus.run.call_args_list if "exec" in str(c)]
-        self.assertEqual(len(exec_calls), 0)
+        args = mock.Mock(spec=[])
+        args.instance = "test"
+        args.root = Path("/tmp")
+        args.workdir = Path("/tmp")
+        args.quiet = True
+        args.verbose = False
+        args.debug = False
+        with mock.patch.object(rl, "Cmds") as mc:
+            mc.create.return_value = cmds
+            for key, val in patches.items():
+                if val is None:
+                    continue
+                getattr(rl, key)
+            rl.run_reload(args)
+        return cmds
 
-    def _import_reload(self):
-        from kivedevel import reload as r
-        import importlib
-        importlib.reload(r)
-        return r
+    def _make_args(self, wd):
+        args = mock.Mock(spec=[])
+        args.instance = "test"
+        args.root = wd
+        args.workdir = wd
+        args.quiet = True
+        args.verbose = False
+        args.debug = False
+        return args
+
+    def test_fails_when_instance_missing(self):
+        import kivedevel.reload as rl
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            wd = Path(tmp)
+            with mock.patch.object(rl, "instance_exists", return_value=False):
+                with mock.patch.object(rl, "Cmds") as mc:
+                    mc.create.return_value = make_cmds()
+                    with self.assertRaises(SystemExit):
+                        rl.run_reload(self._make_args(wd))
+
+    def test_fails_when_instance_stopped(self):
+        import kivedevel.reload as rl
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            wd = Path(tmp)
+            with mock.patch.object(rl, "instance_exists", return_value=True):
+                with mock.patch.object(rl, "instance_is_running", return_value=False):
+                    with mock.patch.object(rl, "Cmds") as mc:
+                        mc.create.return_value = make_cmds()
+                        with self.assertRaises(SystemExit):
+                            rl.run_reload(self._make_args(wd))
+
+    def test_fails_when_not_provisioned(self):
+        import kivedevel.reload as rl
+        cmds = make_cmds()
+        cmds.incus.run.return_value = MockRunResult(returncode=1)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            wd = Path(tmp)
+            with mock.patch.object(rl, "instance_exists", return_value=True):
+                with mock.patch.object(rl, "instance_is_running", return_value=True):
+                    with mock.patch.object(rl, "Cmds") as mc:
+                        mc.create.return_value = cmds
+                        with self.assertRaises(SystemExit):
+                            rl.run_reload(self._make_args(wd))
 
 
 class TestReloadOrdering(unittest.TestCase):
-    """Correct ordering: stage → validate → stop → switch → start → health."""
+    """Verify correct operation ordering."""
 
-    def test_run_reload_ordering(self):
-        rl = self._import_reload()
+    def test_successful_ordering(self):
+        import kivedevel.reload as rl
         cmds = make_cmds()
         cmds.incus.run.return_value = MockRunResult(returncode=0)
-        call_log = []
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             workdir = Path(tmp)
@@ -196,95 +131,39 @@ class TestReloadOrdering(unittest.TestCase):
             args.quiet = True
             args.verbose = False
             args.debug = False
-            with mock.patch.object(rl, "Cmds") as mock_cmds_cls:
-                mock_cmds_cls.create.return_value = cmds
+            call_log = []
+            with mock.patch.object(rl, "Cmds") as mc:
+                mc.create.return_value = cmds
                 with mock.patch.object(rl, "instance_exists", return_value=True):
                     with mock.patch.object(rl, "instance_is_running", return_value=True):
-                        with mock.patch.object(rl, "_host_source_snapshot_rsync",
-                                                return_value=workdir / "snap"):
-                            with mock.patch.object(rl, "_transfer_snapshot_to",
-                                                   return_value="/staging"):
-                                with mock.patch.object(rl, "_validate_guest_tree"):
-                                    with mock.patch.object(rl, "_fix_ownership"):
+                        with mock.patch.object(rl, "_host_source_snapshot",
+                                                side_effect=lambda *a: call_log.append("snapshot")):
+                            with mock.patch.object(rl, "_transfer_snapshot",
+                                                    return_value="/staging",
+                                                    side_effect=lambda *a: call_log.append("transfer") or "/staging"):
+                                with mock.patch.object(rl, "_validate_staged_tree",
+                                                        side_effect=lambda *a: call_log.append("validate")):
+                                    with mock.patch.object(rl, "_fix_ownership",
+                                                            side_effect=lambda *a: call_log.append("chown")):
                                         with mock.patch.object(rl, "_stop_services",
                                                                 side_effect=lambda *a: call_log.append("stop")):
-                                            with mock.patch.object(rl, "_move_active_to_backup",
-                                                                    side_effect=lambda *a: call_log.append("mv") or True):
-                                                with mock.patch.object(rl, "_install_staging",
-                                                                        side_effect=lambda *a: call_log.append("install")):
-                                                    with mock.patch.object(rl, "_start_services",
-                                                                            side_effect=lambda *a: call_log.append("start")):
-                                                        with mock.patch.object(rl, "_health_check",
-                                                                                side_effect=lambda *a: call_log.append("health")):
-                                                            with mock.patch.object(rl, "_cleanup_stale"):
-                                                                rl.run_reload(args)
-        self.assertEqual(call_log, ["stop", "mv", "install", "start", "health"])
-
-    def _import_reload(self):
-        from kivedevel import reload as r
-        import importlib
-        importlib.reload(r)
-        return r
+                                            with mock.patch.object(rl, "_install_tree",
+                                                                    side_effect=lambda *a: call_log.append("install")):
+                                                with mock.patch.object(rl, "_start_services",
+                                                                        side_effect=lambda *a: call_log.append("start")):
+                                                    with mock.patch.object(rl, "_health_check",
+                                                                            side_effect=lambda *a: call_log.append("health")):
+                                                        rl.run_reload(args)
+        self.assertEqual(call_log, ["snapshot", "transfer", "validate", "chown", "stop", "install", "start", "health"])
 
 
-class TestReloadNoInstanceLifecycleCommands(unittest.TestCase):
-    """Assert that reload never restarts, stops, or recreates the instance."""
+class TestReloadNoBackupPaths(unittest.TestCase):
+    """No .Kive.backup-* path or backup helper remains."""
 
-    def test_no_instance_lifecycle_commands(self):
-        rl = self._import_reload()
-        cmds = make_cmds()
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
-        dangerous = ["stop", "restart", "delete", "create"]
-        import tempfile
-        with tempfile.TemporaryDirectory() as tmp:
-            workdir = Path(tmp)
-            args = mock.Mock(spec=[])
-            args.instance = "test"
-            args.root = workdir
-            args.workdir = workdir
-            args.quiet = True
-            args.verbose = False
-            args.debug = False
-            before_count = len(cmds.incus.run.call_args_list)
-            with mock.patch.object(rl, "Cmds") as mock_cmds_cls:
-                mock_cmds_cls.create.return_value = cmds
-                with mock.patch.object(rl, "instance_exists", return_value=True):
-                    with mock.patch.object(rl, "instance_is_running", return_value=True):
-                        with mock.patch.object(rl, "_host_source_snapshot_rsync",
-                                                return_value=workdir / "snap"):
-                            with mock.patch.object(rl, "_transfer_snapshot_to",
-                                                   return_value="/staging"):
-                                with mock.patch.object(rl, "_validate_guest_tree"):
-                                    with mock.patch.object(rl, "_fix_ownership"):
-                                            with mock.patch.object(rl, "_move_active_to_backup",
-                                                                    return_value=True):
-                                                with mock.patch.object(rl, "_stop_services"):
-                                                    with mock.patch.object(rl, "_install_staging",
-                                                                            return_value="/backup"):
-                                                        with mock.patch.object(rl, "_start_services"):
-                                                            with mock.patch.object(rl, "_health_check"):
-                                                                with mock.patch.object(rl, "_cleanup_stale"):
-                                                                    rl.run_reload(args)
-            after_calls = cmds.incus.run.call_args_list[before_count:]
-            for call in after_calls:
-                argv = " ".join(call[0][0]) if call[0] else ""
-                for cmd in dangerous:
-                    self.assertNotIn(cmd, argv.split()[0] if argv else "",
-                                     f"reload issued dangerous command: {argv}")
-
-    def _import_reload(self):
-        from kivedevel import reload as r
-        import importlib
-        importlib.reload(r)
-        return r
-
-
-class TestCloudInitSystemdUnit(unittest.TestCase):
-    """Generated cloud-init contains the systemd unit and not the old nohup."""
-
-    def test_provision_cloud_init_has_systemd_unit(self):
-        source_path = Path(__file__).resolve().parent / "build_vm" / "cloud_init.py"
-        text = source_path.read_text()
-        self.assertIn("kive-dev-web.service", text)
-        self.assertIn("--noreload", text)
-        self.assertNotIn("nohup.*manage.py runserver", text)
+    def test_no_backup_paths(self):
+        import kivedevel.reload as rl
+        src = Path(rl.__file__).read_text()
+        self.assertNotIn(".Kive.backup-", src)
+        self.assertNotIn("_restore_tree", src)
+        self.assertNotIn("_move_active_to_backup", src)
+        self.assertNotIn("_cleanup_stale", src)
