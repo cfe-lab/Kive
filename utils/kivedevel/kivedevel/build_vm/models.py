@@ -16,11 +16,11 @@ class BuildVmConfig:
     root_size: str = "60GiB"
     memory: str = "8GiB"
     cpu: str = "4"
-    host_interface: str = ""
+    host_interface: str | None = None
     provision: bool = True
     web_port: int = 8000
     no_web_proxy: bool = False
-    vm_network: str = "kive-lab-br"
+    vm_network: str | None = None
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
@@ -41,5 +41,5 @@ class BuildVmConfig:
             provision=bool(args.provision),
             web_port=args.web_port,
             no_web_proxy=bool(args.no_web_proxy),
-            vm_network=getattr(args, "vm_network", ""),
+            vm_network=args.vm_network,
         )
