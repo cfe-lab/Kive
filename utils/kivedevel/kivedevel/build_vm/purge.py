@@ -138,12 +138,15 @@ def _find_tagged_networks(cmds: Cmds) -> list[str]:
 
 
 def run_purge(args: argparse.Namespace) -> None:
+    cmds = Cmds.create()
+    cmds.incus.require()
+    _run_purge(args, cmds)
+
+
+def _run_purge(args: argparse.Namespace, cmds: Cmds) -> None:
     root = args.root.resolve()
     workdir_default = root / "tmp~" / "build"
     configure_logging(args, workdir_default)
-
-    cmds = Cmds.create()
-    cmds.incus.require()
 
     # Phase 1: Discover tagged instances.
     tagged = _find_tagged_instances(cmds)
