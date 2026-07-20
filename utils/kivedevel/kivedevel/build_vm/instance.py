@@ -85,20 +85,27 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
             if instance_type == "container":
                 if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
                     logger.warning(
-                        "Incus server does not support unprivileged containers; retrying %s as privileged.",
-                        instance,
+                        "Unprivileged container creation failed; retrying %s as privileged.", instance,
                     )
                     privileged_args = create_args + ["--config", "security.privileged=true"]
                     privileged_result = cmds.incus.run(privileged_args, check=False, capture_output=True)
                     if privileged_result.returncode == 0:
                         logger.info("Successfully created privileged instance %s.", instance)
                         return True, instance_type
-                    else:
-                        logger.error(
-                            "Failed to create privileged instance %s. Please ensure your Incus server supports unprivileged containers or run with --privileged.",
-                            instance,
-                        )
-                        raise RuntimeError("Failed to create privileged instance: see previous incus output.")
+
+                    pri_stderr = (privileged_result.stderr or "").strip()
+                    pri_stdout = (privileged_result.stdout or "").strip()
+                    logger.error(
+                        "Automatic privileged retry also failed for %s.\n"
+                        "stdout: %s\nstderr: %s",
+                        instance,
+                        pri_stdout or "(empty)",
+                        pri_stderr or "(empty)",
+                    )
+                    raise RuntimeError(
+                        f"Automatic privileged retry failed for {instance}. "
+                        f"See the log output above for details."
+                    )
             if result.stderr:
                 logger.error(result.stderr.strip())
             if result.stdout:
