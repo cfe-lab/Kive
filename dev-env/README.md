@@ -49,7 +49,6 @@ provisioning, validation, API testing, and cleanup.
 | `uv` | Python project manager | `uv --version` |
 | `rsync` | File synchronisation | `rsync --version` |
 | `iproute2` | Network configuration | `ip --version` |
-| `socat` | Port forwarding | `socat -V` |
 | `sudo` | Privileged operations | — |
 | UID/GID subordinate mappings | Unprivileged containers | `incus info` |
 
@@ -70,7 +69,7 @@ Ubuntu 24.04:
 sudo apt-get update
 # Install system packages (curl is needed for the uv installer)
 sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
-  iproute2 socat curl
+  iproute2 curl
 
 # Install uv (Python project manager) — https://docs.astral.sh/uv/
 curl -LsSf https://astral.sh/uv/install.sh | sh
