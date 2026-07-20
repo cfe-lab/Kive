@@ -85,10 +85,11 @@ class TestEnsureManagedVmNetwork(unittest.TestCase):
         net = self._import()
         bridges_json = json.dumps([{"name": "kive-lab-br", "type": "bridge", "managed": True}])
         se = [bridges_json]
-        se.append(net.DEFAULT_VM_BRIDGE_CIDR)
+        se.append("utils/dev")  # user.kive.devel.created-by
+        se.append(net.DEFAULT_VM_BRIDGE_CIDR)  # ipv4.address
         for key in net._MUTABLE_KEYS:
             se.append("false" if key == "ipv4.nat" else "true")
-        se.append("none")
+        se.append("none")  # ipv6.address
         self.cmds.incus.output.side_effect = se
         with mock.patch(f"{_NET}.validate_live_bridge_address"):
             net.ensure_managed_vm_network(self.cmds, None)
@@ -117,10 +118,11 @@ class TestEnsureManagedVmNetwork(unittest.TestCase):
             bridges.append({"name": name, "type": "bridge", "managed": True})
         bridges_json = json.dumps(bridges)
         se = [bridges_json]
-        se.append(net.DEFAULT_VM_BRIDGE_CIDR)
+        se.append("utils/dev")  # user.kive.devel.created-by
+        se.append(net.DEFAULT_VM_BRIDGE_CIDR)  # ipv4.address
         for _ in net._MUTABLE_KEYS:
             se.append("true")
-        se.append("none")
+        se.append("none")  # ipv6.address
         self.cmds.incus.output.side_effect = se
 
 

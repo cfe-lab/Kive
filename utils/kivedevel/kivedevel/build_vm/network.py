@@ -71,9 +71,20 @@ def _parse_cidr(raw: str) -> str | None:
 def validate_incus_bridge_config(cmds: Cmds, name: str) -> None:
     """Validate an existing managed bridge matches Kive's expected config.
 
-    Fails if ``ipv4.address`` differs (never changes it).  Safe mutable
-    keys are repaired silently.  Exits on address mismatch.
+    Requires the Kive ownership tag.  Untagged networks are not modified.
+    Fails if ``ipv4.address`` differs.  Safe mutable keys are repaired.
     """
+    owner = _incus_network_get(cmds, name, "user.kive.devel.created-by")
+    if owner != "utils/dev":
+        logger.error(
+            "Refusing to modify Incus network %s: it is not owned by "
+            "Kive utils/dev.  Found created-by=%r.\n"
+            "Supply a network created by the Kive tooling, "
+            "or assign the tag manually.",
+            name, owner,
+        )
+        sys.exit(1)
+
     expected_cidr = DEFAULT_VM_BRIDGE_CIDR
 
     actual_cidr_raw = _incus_network_get(cmds, name, "ipv4.address")
