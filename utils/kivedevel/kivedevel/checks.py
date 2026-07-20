@@ -242,22 +242,6 @@ def _vm_ip_candidates(cmds: Cmds, instance: str) -> list[str]:
     return candidates
 
 
-def _instance_kind(cmds: Cmds, instance: str) -> str:
-    out = cmds.incus.output(["list", instance, "--format", "json"])
-    if not out:
-        return ""
-    try:
-        payload = json.loads(out)
-    except json.JSONDecodeError:
-        return ""
-    if not isinstance(payload, list) or not payload:
-        return ""
-    kind = payload[0].get("type")
-    if isinstance(kind, str):
-        return kind.lower()
-    return ""
-
-
 def _resolve_base_url(
     cmds: Cmds,
     instance: str,
@@ -299,6 +283,7 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
         if cookie.name == "csrftoken":
             csrf = cookie.value
             break
+    csrf_available = csrf is not None
 
     post_login_status = None
     if csrf:
@@ -324,8 +309,9 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     auth_status, auth_body = _request_status(opener, datasets_url)
     result = {
         "login_page_status": login_status,
-        "anon_datasets_status": anon_status,
+        "csrf_available": csrf_available,
         "post_login_status": post_login_status,
+        "anon_datasets_status": anon_status,
         "auth_datasets_status": auth_status,
         "auth_json_ok": False,
         "auth_count": None,
@@ -383,8 +369,11 @@ jar = CookieJar()
 opener = build_opener(HTTPCookieProcessor(jar))
 login_status, _ = _req(LOGIN_URL, opener=opener)
 csrf = next((c.value for c in jar if c.name == "csrftoken"), "")
-data = urlencode({"username": USERNAME, "password": PASSWORD, "csrfmiddlewaretoken": csrf}).encode()
-_, _ = _req(LOGIN_URL, data=data, opener=opener, method="POST")
+csrf_available = bool(csrf)
+post_login_status = None
+if csrf:
+    data = urlencode({"username": USERNAME, "password": PASSWORD, "csrfmiddlewaretoken": csrf}).encode()
+    post_login_status, _ = _req(LOGIN_URL, data=data, opener=opener, method="POST")
 auth_status, auth_body = _req(DATASETS_URL, opener=opener)
 auth_json_ok = False
 auth_count = None
@@ -399,6 +388,8 @@ if auth_status == 200:
         pass
 print(json.dumps({
     "login_page_status": login_status,
+    "csrf_available": csrf_available,
+    "post_login_status": post_login_status,
     "anon_datasets_status": anon_status,
     "auth_datasets_status": auth_status,
     "auth_json_ok": auth_json_ok,
@@ -476,6 +467,7 @@ def _run_api_probe_via_exec(cmds: Cmds, instance: str, *, username: str = "kive"
 def _check_api_probe_results(results: dict, instance: str) -> None:
     """Validate probe results and log/exit on failure."""
     login_page_status = results.get("login_page_status")
+    csrf_available = results.get("csrf_available", False)
     post_login_status = results.get("post_login_status")
     anon_status = results.get("anon_datasets_status")
     auth_status = results.get("auth_datasets_status")
@@ -483,6 +475,10 @@ def _check_api_probe_results(results: dict, instance: str) -> None:
 
     if not login_page_status or login_page_status != 200:
         logger.error("Login page check failed: expected 200, got %s", login_page_status)
+        sys.exit(1)
+
+    if not csrf_available:
+        logger.error("CSRF token not available after login page GET")
         sys.exit(1)
 
     if not post_login_status or post_login_status != 200:
