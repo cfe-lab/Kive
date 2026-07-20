@@ -20,18 +20,6 @@ provisioning, validation, API testing, and cleanup.
 
 ---
 
-## Supported hosts
-
-| Requirement | Details |
-|-------------|---------|
-| Operating system | Linux (tested on Ubuntu 24.04) |
-| Architecture | x86\_64 (amd64) |
-| Nested virtualisation | Required for VM mode |
-| Other distributions | May work but not tested |
-| macOS / Windows | Not supported |
-
----
-
 ## Host prerequisites
 
 ### Required for all modes
