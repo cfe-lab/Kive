@@ -264,21 +264,13 @@ def _resolve_base_url(
     instance: str,
     port: int,
     explicit: str | None,
-    fallback_ports: list[int] | None = None,
 ) -> str | None:
     if explicit:
         return explicit.rstrip("/")
 
-    ports_to_try = [port]
-    for fallback_port in fallback_ports or []:
-        if fallback_port not in ports_to_try:
-            ports_to_try.append(fallback_port)
-
-    candidates: list[str] = []
-    for candidate_port in ports_to_try:
-        candidates.append(f"http://127.0.0.1:{candidate_port}")
-        for ip in _vm_ip_candidates(cmds, instance):
-            candidates.append(f"http://{ip}:{candidate_port}")
+    candidates: list[str] = [f"http://127.0.0.1:{port}"]
+    for ip in _vm_ip_candidates(cmds, instance):
+        candidates.append(f"http://{ip}:{port}")
 
     for candidate in candidates:
         try:
@@ -289,92 +281,6 @@ def _resolve_base_url(
 
     logger.info("No pre-existing API server reachable at: %s", ", ".join(candidates))
     return None
-
-
-def _vm_looks_provisioned_for_primary_api(ip: str) -> bool:
-    ssh_common = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "ConnectTimeout=8",
-        f"ubuntu@{ip}",
-    ]
-    probe = (
-        "test -f /etc/kive_dev_vars "
-        "-o -f /usr/local/share/Kive/kive/manage.py "
-        "-o -d /usr/local/share/Kive/kive"
-    )
-    try:
-        result = subprocess.run(
-            ssh_common + [probe],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        return result.returncode == 0
-    except Exception:
-        return False
-
-
-def _vm_start_api_via_ssh(ip: str, port: int, max_wait: int = 30) -> bool:
-    """Attempt to start the Kive API on the VM via SSH and wait for it to become reachable.
-    
-    Returns True if API becomes reachable on the given port, False otherwise.
-    """
-    ssh_common = [
-        "ssh",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "ConnectTimeout=8",
-        f"ubuntu@{ip}",
-    ]
-    
-    # Start the API in the background
-    start_cmd = (
-        "cd /usr/local/share/Kive/kive && "
-        "source /etc/kive_dev_vars 2>/dev/null || true && "
-        "source $HOME/.venv_kive/bin/activate 2>/dev/null || true && "
-        f"(python manage.py runserver 0.0.0.0:{port} >/tmp/kive_api.log 2>&1 &) && "
-        "sleep 2 && echo 'started'"
-    )
-    
-    try:
-        result = subprocess.run(
-            ssh_common + [start_cmd],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=15,
-        )
-        if result.returncode != 0:
-            logger.debug("SSH API startup failed: %s", (result.stderr or "").strip())
-            return False
-    except Exception as e:
-        logger.debug("SSH API startup exception: %s", e)
-        return False
-    
-    # Wait for API to become HTTP-reachable on the given port
-    url = f"http://{ip}:{port}/login/"
-    deadline = time.time() + max_wait
-    while time.time() < deadline:
-        try:
-            opener = urllib.request.build_opener()
-            with opener.open(url, timeout=2) as response:
-                if response.status == 200:
-                    logger.info("API started and is reachable at %s:%s", ip, port)
-                    return True
-        except Exception:
-            pass
-        time.sleep(1)
-    
-    logger.debug("API did not become reachable at %s:%s within %s seconds", ip, port, max_wait)
-    return False
 
 
 def _run_api_probe(base_url: str, username: str, password: str) -> dict:
@@ -388,34 +294,33 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
 
     login_status, _ = _request_status(opener, login_url)
-    if login_status != 200:
-        logger.error("Login page returned %s (expected 200)", login_status)
-        sys.exit(1)
 
     csrf = None
     for cookie in jar:
         if cookie.name == "csrftoken":
             csrf = cookie.value
             break
-    if not csrf:
-        logger.error("Missing csrftoken after GET %s", login_url)
-        sys.exit(1)
 
-    data = urllib.parse.urlencode(
-        {
-            "username": username,
-            "password": password,
-            "csrfmiddlewaretoken": csrf,
-        }
-    ).encode("utf-8")
-    req = urllib.request.Request(
-        login_url,
-        data=data,
-        headers={"Referer": login_url},
-        method="POST",
-    )
-    with opener.open(req, timeout=5) as response:
-        post_login_status = response.status
+    post_login_status = None
+    if csrf:
+        data = urllib.parse.urlencode(
+            {
+                "username": username,
+                "password": password,
+                "csrfmiddlewaretoken": csrf,
+            }
+        ).encode("utf-8")
+        req = urllib.request.Request(
+            login_url,
+            data=data,
+            headers={"Referer": login_url},
+            method="POST",
+        )
+        try:
+            with opener.open(req, timeout=5) as response:
+                post_login_status = response.status
+        except Exception:
+            post_login_status = None
 
     auth_status, auth_body = _request_status(opener, datasets_url)
     result = {
@@ -571,23 +476,28 @@ def _run_api_probe_via_exec(cmds: Cmds, instance: str, *, username: str = "kive"
 
 def _check_api_probe_results(results: dict, instance: str) -> None:
     """Validate probe results and log/exit on failure."""
-    login_page_status = int(results.get("login_page_status", 0))
-    anon_status = int(results.get("anon_datasets_status", 0))
-    auth_status = int(results.get("auth_datasets_status", 0))
+    login_page_status = results.get("login_page_status")
+    post_login_status = results.get("post_login_status")
+    anon_status = results.get("anon_datasets_status")
+    auth_status = results.get("auth_datasets_status")
     auth_json_ok = bool(results.get("auth_json_ok", False))
 
-    if login_page_status != 200:
+    if not login_page_status or login_page_status != 200:
         logger.error("Login page check failed: expected 200, got %s", login_page_status)
         sys.exit(1)
 
-    if anon_status == auth_status:
+    if not post_login_status or post_login_status != 200:
+        logger.error("Login POST failed: expected 200, got %s", post_login_status)
+        sys.exit(1)
+
+    if not anon_status or anon_status == auth_status:
         logger.error(
-            "Authentication had no observable effect on /api/datasets/: status stayed %s",
-            auth_status,
+            "Authentication had no observable effect on /api/datasets/: anon=%s auth=%s",
+            anon_status, auth_status,
         )
         sys.exit(1)
 
-    if auth_status != 200:
+    if not auth_status or auth_status != 200:
         logger.error("Authenticated datasets request failed: expected 200, got %s", auth_status)
         sys.exit(1)
 
@@ -612,7 +522,6 @@ def run_test_api(args: argparse.Namespace) -> None:
     cmds.incus.require()
 
     instance = args.instance
-    instance_type = getattr(args, "instance_type", "")
     if not instance_exists(cmds, instance):
         logger.error("Instance %s does not exist.", instance)
         sys.exit(1)
@@ -621,80 +530,29 @@ def run_test_api(args: argparse.Namespace) -> None:
         logger.error("Instance %s is not running.", instance)
         sys.exit(1)
 
-    fallback_ports = [80, 8080] if args.port == 8000 else []
-    base_url = _resolve_base_url(
-        cmds,
-        instance,
-        args.port,
-        args.base_url,
-        fallback_ports=fallback_ports,
-    )
+    # Try direct host HTTP first.
+    base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
 
-    if not base_url and not args.base_url:
-        kind = _instance_kind(cmds, instance)
-        vm_ips = _vm_ip_candidates(cmds, instance)
-        vm_ip = vm_ips[0] if vm_ips else ""
-        
-        if kind == "virtual-machine" and vm_ip:
-            # Attempt SSH startup if provisioned
-            if _vm_looks_provisioned_for_primary_api(vm_ip):
-                logger.info(
-                    "API not HTTP-reachable on %s, attempting SSH-based startup...",
-                    vm_ip,
-                )
-                if _vm_start_api_via_ssh(vm_ip, args.port):
-                    base_url = f"http://{vm_ip}:{args.port}"
-                    logger.info("API started successfully, resuming test-api checks...")
-                else:
-                    logger.error(
-                        "Failed to start API via SSH on %s. "
-                        "Verify provisioning and dependencies, then try again.",
-                        vm_ip,
-                    )
-            else:
-                logger.info(
-                    "No SSH-accessible API on %s; trying incus-exec based API probe...",
-                    vm_ip,
-                )
-                exec_results = _run_api_probe_via_exec(
-                    cmds, instance,
-                    username=args.username, password=args.password, port=args.port,
-                )
-                if exec_results is not None:
-                    _check_api_probe_results(exec_results, instance)
-                    return
-                logger.error(
-                    "No host-reachable API endpoint for VM instance %s, "
-                    "and incus-exec API probe also failed.",
-                    instance,
-                )
-        elif kind == "container":
-            logger.error(
-                "No host-reachable API endpoint for container instance %s. "
-                "Publish the API to a host-reachable address and rerun test-api.",
-                instance,
-            )
-        else:
-            logger.error(
-                "No host-reachable API endpoint for instance %s. "
-                "Verify the instance is properly provisioned and the API is running.",
-                instance,
-            )
-
-    if not base_url:
-        # Last resort: try incus-exec based probe for any instance type
-        exec_results = _run_api_probe_via_exec(
+    if base_url:
+        logger.info("Running API probe against %s...", base_url)
+        probe = _run_api_probe(base_url, username=args.username, password=args.password)
+    else:
+        logger.info(
+            "No host-reachable API endpoint at port %s for %s; "
+            "trying incus-exec based API probe...",
+            args.port, instance,
+        )
+        probe = _run_api_probe_via_exec(
             cmds, instance,
             username=args.username, password=args.password, port=args.port,
         )
-        if exec_results is not None:
-            _check_api_probe_results(exec_results, instance)
-            return
-        logger.error("No reachable API endpoint for instance %s", instance)
-        sys.exit(1)
+        if probe is None:
+            logger.error(
+                "No reachable API endpoint for instance %s (port %s).",
+                instance, args.port,
+            )
+            sys.exit(1)
 
-    logger.info("Running API probe against %s...", base_url)
-    probe = _run_api_probe(base_url, username=args.username, password=args.password)
     _check_api_probe_results(probe, instance)
 
 
@@ -741,7 +599,6 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
         default="kive",
         help="Password for API auth probe (default: kive)",
     )
-    # --instance-type was removed: the probe selects its own fallback path.
     test_api.add_argument(
         "--port",
         type=int,
