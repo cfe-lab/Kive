@@ -3,11 +3,9 @@
 from __future__ import annotations
 
 import unittest
-from unittest import mock
 
 
 from kivedevel._test_helpers import (
-    MockRunResult,
     make_cmds,
     make_config,
 )

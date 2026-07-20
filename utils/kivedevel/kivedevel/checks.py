@@ -9,7 +9,6 @@ import os
 import re
 import subprocess
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -535,23 +534,24 @@ def run_test_api(args: argparse.Namespace) -> None:
 
     if base_url:
         logger.info("Running API probe against %s...", base_url)
-        probe = _run_api_probe(base_url, username=args.username, password=args.password)
+        probe: dict = _run_api_probe(base_url, username=args.username, password=args.password)
     else:
         logger.info(
             "No host-reachable API endpoint at port %s for %s; "
             "trying incus-exec based API probe...",
             args.port, instance,
         )
-        probe = _run_api_probe_via_exec(
+        exec_probe = _run_api_probe_via_exec(
             cmds, instance,
             username=args.username, password=args.password, port=args.port,
         )
-        if probe is None:
+        if exec_probe is None:
             logger.error(
                 "No reachable API endpoint for instance %s (port %s).",
                 instance, args.port,
             )
             sys.exit(1)
+        probe = exec_probe
 
     _check_api_probe_results(probe, instance)
 

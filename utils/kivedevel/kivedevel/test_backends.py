@@ -412,7 +412,6 @@ class TestPrepareHostDefaults(unittest.TestCase):
         self.assertEqual(args.bridge, "kive-lab-br")
 
     def test_prepare_host_preseed_has_no_network(self):
-        from kivedevel.backends.incus_host import run_prepare_host
         import textwrap
         preseed = textwrap.dedent("""\\
         config: {}

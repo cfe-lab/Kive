@@ -6,7 +6,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from pathlib import Path
 
 from kivedevel._test_helpers import (
     MockRunResult,

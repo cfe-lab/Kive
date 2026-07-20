@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
-import subprocess
-import tempfile
 from pathlib import Path
 
 from . import checks
 from . import reload as reload_mod
 from .build_vm.runner import run_build_vm
 from .kv_commands import Cmds
-from .shared import configure_logging, default_root, instance_exists
+from .shared import configure_logging, default_root
 
 
 logger = logging.getLogger("kivedevel.local_install")

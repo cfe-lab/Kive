@@ -115,7 +115,7 @@ class TestBuildVmCrossModeRejection(unittest.TestCase):
             quiet=False, verbose=False, debug=False, log_file=None,
             vm_network=None,
         )
-        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as m_cmds:
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create"):
             with mock.patch("kivedevel.build_vm.runner.logger") as mock_logger:
                 with self.assertRaises(SystemExit) as ctx:
                     run_build_vm(args)
@@ -134,7 +134,7 @@ class TestBuildVmCrossModeRejection(unittest.TestCase):
             quiet=False, verbose=False, debug=False, log_file=None,
             vm_network="kive-lab-br",
         )
-        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as m_cmds:
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create"):
             with mock.patch("kivedevel.build_vm.runner.logger") as mock_logger:
                 with self.assertRaises(SystemExit) as ctx:
                     run_build_vm(args)

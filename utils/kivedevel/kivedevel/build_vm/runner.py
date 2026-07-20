@@ -8,7 +8,6 @@ import re
 import shutil
 import subprocess
 import sys
-from pathlib import Path
 
 from ..kv_commands import Cmds
 from .cloud_init import enable_network_config, ensure_user_data
@@ -16,7 +15,6 @@ from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_st
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import (
-    VmNicTarget,
     ensure_managed_vm_network,
     ensure_network_device,
     ensure_vm_nic,
@@ -141,7 +139,7 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
     )
 
     restart_required = False
-    host_interface = cfg.host_interface
+    host_interface: str = cfg.host_interface or ""
     added_network = ensure_network_device(cmds, cfg.instance, host_interface)
     if added_network:
         if not host_interface:

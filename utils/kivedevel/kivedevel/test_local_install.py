@@ -30,7 +30,7 @@ class TestSmokeLocalInstall(unittest.TestCase):
 
     def test_invokes_build_then_validate_then_test_api(self):
         from kivedevel import local_install as li
-        from kivedevel._test_helpers import MockRunResult, make_cmds
+        from kivedevel._test_helpers import make_cmds
         from kivedevel.local_install import run_smoke_local_install
         args = self._make_args()
         call_order = []
@@ -120,7 +120,7 @@ class TestBuildVmCrossModeValidation(unittest.TestCase):
         self.assertIsNone(build_args.host_interface)
         self.assertIsNone(build_args.vm_network)
 
-        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as mock_cmds:
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create"):
             with mock.patch("kivedevel.build_vm.runner.ensure_incus_daemon"):
                 with mock.patch("kivedevel.build_vm.runner.ensure_storage_pool"):
                     with mock.patch("kivedevel.build_vm.runner.ensure_profile_with_root_disk"):
@@ -141,7 +141,7 @@ class TestBuildVmCrossModeValidation(unittest.TestCase):
         self.assertIsNone(build_args.host_interface)
         self.assertIsNone(build_args.vm_network)
 
-        with mock.patch("kivedevel.build_vm.runner.Cmds.create") as mock_cmds:
+        with mock.patch("kivedevel.build_vm.runner.Cmds.create"):
             with mock.patch("kivedevel.build_vm.runner.ensure_incus_daemon"):
                 with mock.patch("kivedevel.build_vm.runner.ensure_storage_pool"):
                     with mock.patch("kivedevel.build_vm.runner.ensure_profile_with_root_disk"):
