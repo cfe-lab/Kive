@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import unittest
 from pathlib import Path
 from unittest import mock
-
-from pathlib import Path
 
 from kivedevel._test_helpers import (
     MockRunResult,
@@ -203,4 +202,78 @@ class TestPurge(unittest.TestCase):
                 purge._run_purge(args, cmds)
 
             mock_os.kill.assert_any_call(12345, signal.SIGTERM)
+
+
+class TestSafeWorkdirRemoval(unittest.TestCase):
+    """_remove_workdir_safely verifies mount state before image/workdir deletion."""
+
+    def setUp(self):
+        self.tmp = Path("/tmp/test_safe_workdir")
+        self.tmp.mkdir(parents=True, exist_ok=True)
+        self.workdir = self.tmp / "workdir"
+        self.workdir.mkdir(parents=True, exist_ok=True)
+        self.mountpoint = self.workdir / "kive-code-mount"
+        self.mountpoint.mkdir(parents=True, exist_ok=True)
+        self.image = self.workdir / "kive-code.img"
+        self.image.write_text("fake-image")
+        self.marker = self.workdir / ".kive-devel-resource.json"
+        self.marker.write_text("{}")
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _import(self):
+        from kivedevel.build_vm import purge as p
+        import importlib
+        importlib.reload(p)
+        return p
+
+    def test_not_mounted(self):
+        """Path not mounted: remove image + workdir directly."""
+        purge = self._import()
+        with mock.patch.object(purge, "_is_mountpoint", return_value=False):
+            result = purge._remove_workdir_safely(self.workdir)
+        self.assertTrue(result)
+        self.assertFalse(self.image.exists())
+        self.assertFalse(self.workdir.exists())
+
+    def test_successful_unmount(self):
+        """Unmount succeeds: remove image + workdir."""
+        purge = self._import()
+        with mock.patch.object(purge, "_is_mountpoint", return_value=False):
+            with mock.patch.object(purge, "_umount") as mock_umount:
+                mock_umount.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="", stderr="",
+                )
+                result = purge._remove_workdir_safely(self.workdir)
+        self.assertTrue(result)
+        mock_umount.assert_not_called()
+
+    def test_unmount_failure_preserves_image_and_workdir(self):
+        """Non-zero umount: image and workdir are NOT removed."""
+        purge = self._import()
+        with mock.patch.object(purge, "_is_mountpoint", side_effect=[True, True]):
+            with mock.patch.object(purge, "_umount") as mock_umount:
+                mock_umount.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=1, stdout="", stderr="error",
+                )
+                result = purge._remove_workdir_safely(self.workdir)
+        self.assertFalse(result)
+        self.assertTrue(self.image.exists(), "Image should not have been removed")
+        self.assertTrue(self.workdir.exists(), "Workdir should not have been removed")
+
+    def test_mount_still_active_after_success_umount(self):
+        """umount command succeeds but mount remains active: image and workdir preserved."""
+        purge = self._import()
+        is_mountpoint_calls = [True, True]
+        with mock.patch.object(purge, "_is_mountpoint", side_effect=is_mountpoint_calls):
+            with mock.patch.object(purge, "_umount") as mock_umount:
+                mock_umount.return_value = subprocess.CompletedProcess(
+                    args=[], returncode=0, stdout="", stderr="",
+                )
+                result = purge._remove_workdir_safely(self.workdir)
+        self.assertFalse(result)
+        self.assertTrue(self.image.exists(), "Image should not have been removed")
+        self.assertTrue(self.workdir.exists(), "Workdir should not have been removed")
 
