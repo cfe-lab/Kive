@@ -27,16 +27,11 @@ def _is_mountpoint(path: Path) -> bool:
     return result.returncode == 0
 
 
-def _umount(path: Path) -> None:
-    try:
-        subprocess.run(
-            ["sudo", "umount", "--", str(path)],
-            check=False,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-    except Exception:
-        pass
+def _umount(path: Path) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["sudo", "umount", "--", str(path)],
+        capture_output=True, text=True,
+    )
 
 
 def _device_attached(cmds: Cmds, instance: str, device: str = "kive-code") -> bool:
@@ -62,6 +57,25 @@ def _remove_workdir(workdir: Path) -> None:
     if workdir.exists():
         logger.info("Removing build directory '%s'...", workdir)
         subprocess.run(["sudo", "rm", "-rf", "--", str(workdir)], check=False)
+
+
+def _remove_workdir_safely(workdir: Path) -> bool:
+    mountpoint_path = workdir / "kive-code-mount"
+    if mountpoint_path.exists() and _is_mountpoint(mountpoint_path):
+        result = _umount(mountpoint_path)
+        if result.returncode != 0 or _is_mountpoint(mountpoint_path):
+            logger.warning(
+                "Cannot remove workdir '%s': failed to unmount '%s' (rc=%s).",
+                workdir, mountpoint_path, result.returncode,
+            )
+            return False
+
+    image_path = workdir / "kive-code.img"
+    _remove_image(image_path)
+    _remove_workdir(workdir)
+    if workdir.exists():
+        return False
+    return True
 
 
 def _delete_instance(cmds: Cmds, instance: str) -> None:
@@ -204,17 +218,10 @@ def _run_purge(args: argparse.Namespace, cmds: Cmds) -> None:
     deleted_workdirs = 0
     failed_workdirs = 0
     for workdir in all_workdirs:
-        mountpoint_path = workdir / "kive-code-mount"
-        if mountpoint_path.exists() and _is_mountpoint(mountpoint_path):
-            _umount(mountpoint_path)
-
-        image_path = workdir / "kive-code.img"
-        _remove_image(image_path)
-        _remove_workdir(workdir)
-        if workdir.exists():
-            failed_workdirs += 1
-        else:
+        if _remove_workdir_safely(workdir):
             deleted_workdirs += 1
+        else:
+            failed_workdirs += 1
 
     deleted_networks = 0
     retained_networks = 0
