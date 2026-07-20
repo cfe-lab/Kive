@@ -381,6 +381,21 @@ def run_build_vm(args: argparse.Namespace) -> None:
 
     cfg.workdir.mkdir(parents=True, exist_ok=True)
 
+    # Validate mode-specific flags.
+    if cfg.instance_type == "vm" and cfg.host_interface:
+        logger.error(
+            "--host-interface is not supported in VM mode. "
+            "VM networking uses the managed Incus bridge (%s).",
+            cfg.vm_network,
+        )
+        sys.exit(1)
+    if cfg.instance_type == "container" and cfg.vm_network != "kive-lab-br":
+        logger.error(
+            "--vm-network is not supported in container mode. "
+            "Container networking uses the host interface.",
+        )
+        sys.exit(1)
+
     cmds.require_all()
     ensure_incus_daemon(cmds, cfg.root, cfg.workdir)
     ensure_storage_pool(cmds, cfg.pool)

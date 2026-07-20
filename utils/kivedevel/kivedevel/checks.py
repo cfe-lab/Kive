@@ -741,12 +741,7 @@ def register_subcommands(subparsers) -> None:  # type: ignore[type-arg]
         default="kive",
         help="Password for API auth probe (default: kive)",
     )
-    test_api.add_argument(
-        "--instance-type",
-        choices=("vm", "container"),
-        default="",
-        help="Instance type hint for VM-exec fallback probe (default: auto-detect)",
-    )
+    # --instance-type was removed: the probe selects its own fallback path.
     test_api.add_argument(
         "--port",
         type=int,

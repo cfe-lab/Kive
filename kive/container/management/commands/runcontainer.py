@@ -208,6 +208,13 @@ class Command(BaseCommand):
         for cd in containerdatasets:
             grouped.setdefault(cd.argument, []).append(cd)
 
+        # Sort arguments by the same canonical ordering used by set_md5.
+        for arg in sorted(
+            grouped,
+            key=lambda a: (a.type, a.position or 0, a.name, a.pk or 0),
+        ):
+            grouped.move_to_end(arg)
+
         for arg, argcontainerdatasets in grouped.items():
             argcontainerdatasets = sorted(
                 argcontainerdatasets,

@@ -89,7 +89,7 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
                         instance,
                     )
                     privileged_args = create_args + ["--config", "security.privileged=true"]
-                    privileged_result = cmds.incus.run(privileged_args)
+                    privileged_result = cmds.incus.run(privileged_args, check=False, capture_output=True)
                     if privileged_result.returncode == 0:
                         logger.info("Successfully created privileged instance %s.", instance)
                         return True, instance_type
