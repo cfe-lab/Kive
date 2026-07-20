@@ -1788,6 +1788,8 @@ class ContainerDatasetTest(TestCase):
             dataset.clean()
 
 
+
+
 @skipIfDBFeature('is_mocked')
 class ContainerLogTests(TestCase):
     fixtures = ['container_run']
@@ -4639,6 +4641,39 @@ class ContainerRunCreateValidationTests(TestCase):
             list(run.datasets.order_by("multi_position")
                  .values_list("dataset_id", flat=True)),
         )
+
+    def test_db_rejects_duplicate_single_valued_binding(self):
+        from django.db import IntegrityError
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_single_arg, dataset=self.dataset1)
+        with self.assertRaises(IntegrityError):
+            ContainerDataset.objects.create(
+                run=self.run, argument=self.opt_single_arg,
+                dataset=self.dataset2)
+
+    def test_db_allows_different_single_valued_arguments(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.fixed_arg, dataset=self.dataset1)
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_single_arg, dataset=self.dataset2)
+
+    def test_db_allows_distinct_multi_positions(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset1, multi_position=1)
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset2, multi_position=2)
+
+    def test_db_rejects_duplicate_multi_position(self):
+        from django.db import IntegrityError
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset1, multi_position=1)
+        with self.assertRaises(IntegrityError):
+            ContainerDataset.objects.create(
+                run=self.run, argument=self.opt_multiple_arg,
+                dataset=self.dataset2, multi_position=1)
 
 
 @skipIfDBFeature('is_mocked')

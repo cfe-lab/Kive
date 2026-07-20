@@ -17,4 +17,11 @@ class Migration(migrations.Migration):
                 fields=('run', 'argument', 'multi_position'),
                 name='unique_run_arg_multi_position'),
         ),
+        migrations.AddConstraint(
+            model_name='containerdataset',
+            constraint=models.UniqueConstraint(
+                condition=models.Q(('multi_position__isnull', True)),
+                fields=('run', 'argument'),
+                name='unique_run_arg_single_binding'),
+        ),
     ]

@@ -1429,12 +1429,13 @@ class ContainerRun(Stopwatch, AccessControl):
             md5gen.update(parent_md5)
 
         # Build a canonical representation of every input binding.
-        # Order by (argument type, argument position, argument name, multi_position)
-        # to match command semantics.  Include argument pk as a stable identifier.
+        # Order by (argument type, argument position, argument name, multi_position, pk)
+        # to match command semantics.  Include argument pk and dataset pk as stable
+        # tiebreakers.
         bindings = []
         for cd in self.datasets.select_related('argument', 'dataset').order_by(
             'argument__type', 'argument__position', 'argument__name',
-            'argument_id', 'multi_position',
+            'argument_id', 'multi_position', 'pk',
         ):
             bindings.append((
                 cd.argument_id,
@@ -1486,6 +1487,10 @@ class ContainerDataset(models.Model):
                 fields=['run', 'argument', 'multi_position'],
                 condition=models.Q(multi_position__isnull=False),
                 name='unique_run_arg_multi_position'),
+            models.UniqueConstraint(
+                fields=['run', 'argument'],
+                condition=models.Q(multi_position__isnull=True),
+                name='unique_run_arg_single_binding'),
         ]
 
     def find_rerun_dataset(self):
