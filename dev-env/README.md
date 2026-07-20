@@ -13,14 +13,7 @@ For contributing, see [CONTRIBUTING.md](../CONTRIBUTING.md).
 ## Overview
 
 The development tooling (`utils/dev`) provisions an environment from the
-current source checkout. The environment includes:
-
-- **Kive** itself (from the checkout)
-- **PostgreSQL** — relational database
-- **Slurm** — workload manager (single-node)
-- **Apache** — web server with TLS
-- **Development TLS** — self-signed certificate for HTTPS
-- **Singularity** (optional, VM mode only) — container runtime for pipelines
+current source checkout. The environment includes all dependencies.
 
 The tooling manages the full lifecycle: host preparation, instance creation,
 provisioning, validation, API testing, and cleanup.
