@@ -445,10 +445,16 @@ from urllib.request import build_opener, HTTPCookieProcessor, HTTPError, Request
 from urllib.parse import urlencode
 from http.cookiejar import CookieJar
 
-LOGIN_URL = "http://127.0.0.1:8000/login/"
-DATASETS_URL = "http://127.0.0.1:8000/api/datasets/?limit=1"
-USERNAME = "kive"
-PASSWORD = "kive"
+def load_config(path):
+    with open(path) as f:
+        return json.load(f)
+
+cfg = load_config(sys.argv[1])
+base_url = "http://127.0.0.1:{port}".format(**cfg)
+LOGIN_URL = base_url + "/login/"
+DATASETS_URL = base_url + "/api/datasets/?limit=1"
+USERNAME = cfg["username"]
+PASSWORD = cfg["password"]
 
 def _req(url, data=None, opener=None, method=None):
     if opener is None:
@@ -494,13 +500,29 @@ print(json.dumps({
 """
 
 
-def _run_api_probe_via_exec(cmds: Cmds, instance: str) -> dict | None:
+def _run_api_probe_via_exec(cmds: Cmds, instance: str, *, username: str = "kive", password: str = "kive", port: int = 8000) -> dict | None:
     """Run the API probe script inside the VM via ``incus exec``.
+
+    Accepts *username*, *password*, and *port* so the same credentials
+    are used regardless of which probe path is taken.
 
     Returns the same dict format as ``_run_api_probe``, or None on failure.
     """
-    import tempfile
+    config = {"username": username, "password": password, "port": port}
+    config_json = json.dumps(config)
+
+    config_path = f"/var/tmp/_kive_api_config_{os.getpid()}.json"
     script_path = f"/var/tmp/_kive_api_probe_{os.getpid()}.py"
+
+    push_config = cmds.incus.run(
+        ["file", "push", "-", f"{instance}{config_path}"],
+        input=config_json,
+        check=False, capture_output=True, timeout=15,
+    )
+    if push_config.returncode != 0:
+        logger.debug("Failed to push API config to %s: %s", instance, push_config.stderr)
+        return None
+
     push_result = cmds.incus.run(
         ["file", "push", "-", f"{instance}{script_path}"],
         input=_VM_API_PROBE_SCRIPT,
@@ -508,10 +530,11 @@ def _run_api_probe_via_exec(cmds: Cmds, instance: str) -> dict | None:
     )
     if push_result.returncode != 0:
         logger.debug("Failed to push API probe script to %s: %s", instance, push_result.stderr)
+        cmds.incus.run(["file", "delete", f"{instance}{config_path}"], check=False, timeout=10)
         return None
     try:
         exec_result = cmds.incus.run(
-            ["exec", instance, "--", "python3", script_path],
+            ["exec", instance, "--", "python3", script_path, config_path],
             check=False, capture_output=True, timeout=30,
         )
         if exec_result.returncode != 0:
@@ -535,6 +558,10 @@ def _run_api_probe_via_exec(cmds: Cmds, instance: str) -> dict | None:
     finally:
         cmds.incus.run(
             ["file", "delete", f"{instance}{script_path}"],
+            check=False, timeout=10,
+        )
+        cmds.incus.run(
+            ["file", "delete", f"{instance}{config_path}"],
             check=False, timeout=10,
         )
 
@@ -626,7 +653,10 @@ def run_test_api(args: argparse.Namespace) -> None:
                     "No SSH-accessible API on %s; trying incus-exec based API probe...",
                     vm_ip,
                 )
-                exec_results = _run_api_probe_via_exec(cmds, instance)
+                exec_results = _run_api_probe_via_exec(
+                    cmds, instance,
+                    username=args.username, password=args.password, port=args.port,
+                )
                 if exec_results is not None:
                     _check_api_probe_results(exec_results, instance)
                     return
@@ -650,7 +680,10 @@ def run_test_api(args: argparse.Namespace) -> None:
 
     if not base_url:
         # Last resort: try incus-exec based probe for any instance type
-        exec_results = _run_api_probe_via_exec(cmds, instance)
+        exec_results = _run_api_probe_via_exec(
+            cmds, instance,
+            username=args.username, password=args.password, port=args.port,
+        )
         if exec_results is not None:
             _check_api_probe_results(exec_results, instance)
             return
