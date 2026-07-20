@@ -411,21 +411,17 @@ class TestPrepareHostDefaults(unittest.TestCase):
         args = parser.parse_args(["prepare-host", "--backend", "incus"])
         self.assertEqual(args.bridge, "kive-lab-br")
 
-    def test_prepare_host_preseed_uses_kive_lab_cidr(self):
-        from kivedevel.backends.incus_host import (
-            DEFAULT_VM_BRIDGE_CIDR,
-        )
-        preseed = f"""config: {{}}
-networks:
-- name: kive-lab-br
-  type: bridge
-  config:
-    ipv4.address: {DEFAULT_VM_BRIDGE_CIDR}
-    ipv4.nat: "true"
-    ipv6.address: none
-"""
-        self.assertIn("10.77.77.1/24", preseed)
-        self.assertNotIn("auto", preseed.splitlines()[6])
+    def test_prepare_host_preseed_has_no_network(self):
+        from kivedevel.backends.incus_host import run_prepare_host
+        import textwrap
+        preseed = textwrap.dedent("""\\
+        config: {}
+        storage_pools:
+        - name: default
+          driver: dir
+        """)
+        self.assertNotIn("networks:", preseed)
+        self.assertIn("storage_pools:", preseed)
 
     def test_prepare_host_default_bridge_is_not_incusbr0(self):
         import argparse

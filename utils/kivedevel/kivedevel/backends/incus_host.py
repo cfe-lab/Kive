@@ -6,9 +6,9 @@ import argparse
 import logging
 import subprocess
 
+from ..build_vm.incus import ensure_profile_with_root_disk
 from ..build_vm.network import (
     DEFAULT_VM_BRIDGE,
-    DEFAULT_VM_BRIDGE_CIDR,
     ensure_managed_vm_network,
 )
 from ..kv_commands import Cmds
@@ -53,6 +53,19 @@ def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
     cmds.incus.run(["network", "set", bridge, "ipv4.nat", "true"])
     cmds.incus.run(["network", "set", bridge, "ipv4.routing", "true"])
     cmds.incus.run(["network", "set", bridge, "ipv4.firewall", "true"])
+
+
+def _ensure_profile_nic(cmds: Cmds, bridge: str) -> None:
+    out = cmds.incus.output(["profile", "device", "show", "default"])
+    has_nic = "eth0:" in (out or "")
+    if has_nic:
+        logger.debug("Profile default already has eth0 NIC.")
+        return
+    logger.info("Adding eth0 NIC to profile default (bridge=%s)...", bridge)
+    cmds.incus.run([
+        "profile", "device", "add", "default", "eth0",
+        "nic", f"parent={bridge}", "nictype=bridged",
+    ])
 
 
 def _add_bridge_forwarding_rules(bridge: str) -> None:
@@ -144,41 +157,22 @@ def run_prepare_host(args: argparse.Namespace) -> None:
         _run(["systemctl", "enable", "--now", unit], sudo=True, check=False)
         _run(["systemctl", "start", unit], sudo=True, check=False)
 
-    # Initialize Incus with dir-backed storage pool, bridge network, default profile.
-    # If Incus is already initialized the preseed is a no-op; that is fine.
-    preseed = f"""config: {{}}
-networks:
-- name: {bridge}
-  type: bridge
-  config:
-    ipv4.address: {DEFAULT_VM_BRIDGE_CIDR}
-    ipv4.nat: "true"
-    ipv6.address: none
-    user.kive.devel.created-by: utils/dev
-    user.kive.devel.kind: network
+    # Initialize Incus with dir-backed storage pool only.
+    # The bridge and profile are set up procedurally below.
+    preseed = """config: {}
 storage_pools:
 - name: default
   driver: dir
-profiles:
-- name: default
-  devices:
-    eth0:
-      name: eth0
-      nictype: bridged
-      parent: {bridge}
-      type: nic
-    root:
-      path: /
-      pool: default
-      type: disk
 """
     cmds.incus.run(["admin", "init", "--preseed"], input=preseed, check=False)
     cmds.incus.run(["info"], check=False)
 
-    # Ensure the Kive managed bridge exists with correct configuration.
-    # This handles the case where Incus was already initialized and the
-    # preseed above was a no-op.
+    # Create or validate the Kive managed bridge.
     ensure_managed_vm_network(cmds, bridge)
+
+    # Ensure the default profile has root disk and bridge NIC.
+    ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
+    _ensure_profile_nic(cmds, bridge)
 
     if debug:
         _print_diagnostics(cmds, bridge)
