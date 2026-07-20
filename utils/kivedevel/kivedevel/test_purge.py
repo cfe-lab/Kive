@@ -126,7 +126,7 @@ class TestPurge(unittest.TestCase):
     def test_purge_idempotent_when_nothing_to_purge(self):
         purge = self._import()
         self.cmds.incus.output.return_value = ""
-        purge.run_purge(self._make_args())
+        purge._run_purge(self._make_args(), self.cmds)
 
     def test_deletes_tagged_instances_and_marked_workdirs(self):
         purge = self._import()
@@ -140,7 +140,7 @@ class TestPurge(unittest.TestCase):
                                 with mock.patch.object(purge, "_remove_registry"):
                                     with mock.patch.object(purge, "Cmds") as mock_cmds_cls:
                                         mock_cmds_cls.create.return_value = self.cmds
-                                        purge.run_purge(self._make_args())
+                                        purge._run_purge(self._make_args(), self.cmds)
         delete_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if c[0][0][:2] == ["delete", "-f"]
@@ -160,14 +160,26 @@ class TestPurge(unittest.TestCase):
             "test-vm\n",
             "user.kive.devel.created-by: utils/dev\n",
             "kive-code:\n",
-        ]
+            "kive-web:\n",
+        ] * 3
         with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                 with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "print"):
-                        with mock.patch.object(purge, "print"):
-                            with mock.patch.object(purge, "_remove_registry"):
-                                purge.run_purge(self._make_args())
+                    with mock.patch.object(purge, "_remove_registry"):
+                        purge._run_purge(self._make_args(), self.cmds)
+
+    def test_purge_removes_web_proxy_device(self):
+        purge = self._import()
+        self.cmds.incus.output.side_effect = [
+            "test-vm\n",
+            "user.kive.devel.created-by: utils/dev\n",
+            "kive-web:\n",
+        ] * 3
+        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
+            with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
+                with mock.patch.object(purge, "_find_tagged_networks"):
+                    with mock.patch.object(purge, "_remove_registry"):
+                        purge._run_purge(self._make_args(), self.cmds)
 
     def test_purge_kills_port_forward(self):
         purge = self._import()
@@ -187,27 +199,8 @@ class TestPurge(unittest.TestCase):
             ], indent=2) + "\n")
 
             args = self._make_args(root=root)
-            with (
-                mock.patch.object(purge, "Cmds") as mock_cmds_cls,
-                mock.patch.object(purge, "os") as mock_os,
-                mock.patch.object(purge, "configure_logging"),
-            ):
-                mock_cmds_cls.create.return_value = cmds
-                purge.run_purge(args)
+            with mock.patch.object(purge, "os") as mock_os:
+                purge._run_purge(args, cmds)
 
             mock_os.kill.assert_any_call(12345, signal.SIGTERM)
 
-    def test_purge_removes_web_proxy_device(self):
-        purge = self._import()
-        self.cmds.incus.output.side_effect = [
-            "test-vm\n",
-            "user.kive.devel.created-by: utils/dev\n",
-            "kive-web:\n",
-        ]
-        with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-            with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                with mock.patch.object(purge, "_find_tagged_networks"):
-                    with mock.patch.object(purge, "print"):
-                        with mock.patch.object(purge, "print"):
-                            with mock.patch.object(purge, "_remove_registry"):
-                                purge.run_purge(self._make_args())
