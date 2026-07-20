@@ -139,14 +139,15 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
     )
 
     restart_required = False
-    host_interface: str = cfg.host_interface or ""
+    host_interface: str | None = cfg.host_interface
     added_network = ensure_network_device(cmds, cfg.instance, host_interface)
     if added_network:
-        if not host_interface:
+        if host_interface is None:
             host_interface = get_default_host_interface(cmds)
         restart_required = True
-    elif not host_interface:
-        host_interface = get_existing_network_parent(cmds, cfg.instance) or get_default_host_interface(cmds)
+    elif host_interface is None:
+        existing = get_existing_network_parent(cmds, cfg.instance)
+        host_interface = existing if existing is not None else get_default_host_interface(cmds)
 
     if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
         restart_required = True
@@ -398,7 +399,7 @@ def run_build_vm(args: argparse.Namespace) -> None:
     if cfg.instance_type == "vm" and cfg.vm_network is None:
         cfg = dataclasses.replace(cfg, vm_network="kive-lab-br")
     if cfg.instance_type == "container" and cfg.host_interface is None:
-        cfg = dataclasses.replace(cfg, host_interface="")
+        cfg = dataclasses.replace(cfg, host_interface=None)
 
     cmds.require_all()
     ensure_incus_daemon(cmds, cfg.root, cfg.workdir)

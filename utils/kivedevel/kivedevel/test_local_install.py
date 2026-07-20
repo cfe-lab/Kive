@@ -150,5 +150,5 @@ class TestBuildVmCrossModeValidation(unittest.TestCase):
                                 run_build_vm(build_args)
 
         cfg_arg = mock_ctr.call_args[0][0]
-        self.assertEqual(cfg_arg.host_interface, "")
+        self.assertIsNone(cfg_arg.host_interface)
         self.assertIsNone(cfg_arg.vm_network)

@@ -510,7 +510,7 @@ def print_network_diagnostics(cmds: Cmds, instance: str, bridge_name: str) -> No
         pass
 
 
-def get_default_host_interface(cmds: Cmds) -> str:
+def get_default_host_interface(cmds: Cmds) -> str | None:
     if cmds.ip.ok(["link", "show", "docker0"]):
         return "docker0"
     out = cmds.ip.output(["route", "get", "8.8.8.8"])
@@ -522,7 +522,7 @@ def get_default_host_interface(cmds: Cmds) -> str:
         m = re.search(r"default.*dev\s+(\S+)", line)
         if m:
             return m.group(1)
-    return ""
+    return None
 
 
 def get_bridge_cidr(cmds: Cmds, iface: str) -> str:
@@ -531,7 +531,7 @@ def get_bridge_cidr(cmds: Cmds, iface: str) -> str:
     return parts[3] if len(parts) >= 4 else ""
 
 
-def ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> bool:
+def ensure_network_device(cmds: Cmds, instance: str, host_interface: str | None) -> bool:
     out = cmds.incus.output(["config", "device", "list", instance])
     if re.search(r"^eth0\s*$", out, re.MULTILINE):
         return False
@@ -539,9 +539,9 @@ def ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> boo
     if re.search(r"^  eth0:\s*$", expanded, re.MULTILINE):
         logger.info("Network device eth0 already configured via profile on %s.", instance)
         return False
-    if not host_interface:
+    if host_interface is None:
         host_interface = get_default_host_interface(cmds)
-        if not host_interface:
+        if host_interface is None:
             logger.error("Unable to determine host network interface for VM network device.")
             sys.exit(1)
     nictype = "bridged" if (host_interface == "docker0" or host_interface.startswith("br-")) else "macvlan"
@@ -550,10 +550,10 @@ def ensure_network_device(cmds: Cmds, instance: str, host_interface: str) -> boo
     return True
 
 
-def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
+def get_existing_network_parent(cmds: Cmds, instance: str) -> str | None:
     out = cmds.incus.output(["config", "device", "show", instance])
     if not out:
-        return ""
+        return None
     in_eth0 = False
     for raw in out.splitlines():
         line = raw.rstrip()
@@ -565,7 +565,7 @@ def get_existing_network_parent(cmds: Cmds, instance: str) -> str:
         m = re.match(r"^\s+parent:\s*(\S+)\s*$", line)
         if m:
             return m.group(1)
-    return ""
+    return None
 
 
 def find_tagged_networks(root: Path) -> list[str]:
