@@ -6,7 +6,6 @@ import unittest
 
 
 from kivedevel._test_helpers import (
-    MockRunResult,
     make_cmds,
     make_config,
 )

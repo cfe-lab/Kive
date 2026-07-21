@@ -926,6 +926,16 @@ class ContainerArgument(models.Model):
 
     class Meta:
         ordering = ('app_id', 'type', 'position', 'name')
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(type='I', position__isnull=False, allow_multiple=False)
+                    | models.Q(type='I', position__isnull=True)
+                    | models.Q(type='O', position__isnull=False)
+                ),
+                name='valid_argument_classification',
+            ),
+        ]
 
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
