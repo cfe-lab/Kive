@@ -367,7 +367,15 @@ class ContainerRunSerializer(AccessControlSerializer,
                     ]
                 })
 
-            if argument.type == ContainerArgument.INPUT and dataset is not None:
+            if argument.type != ContainerArgument.INPUT:
+                raise serializers.ValidationError({
+                    "datasets": [
+                        f'Argument "{argument.name}" is an output; '
+                        f'only input arguments are accepted here.'
+                    ]
+                })
+
+            if dataset is not None:
                 if not dataset.has_data():
                     raise serializers.ValidationError({
                         "datasets": [
