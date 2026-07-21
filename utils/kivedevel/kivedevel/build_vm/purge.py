@@ -52,6 +52,7 @@ class PurgeOutcome:
     removed_port_forwards: int = 0
     already_absent_port_forwards: int = 0
     failed_port_forwards: int = 0
+    failed_forward_entries: list[dict] = dataclasses.field(default_factory=list)
 
     @property
     def all_succeeded(self) -> bool:
@@ -140,14 +141,36 @@ def _delete_instance(cmds: Cmds, instance: str) -> None:
 
 
 def _find_tagged_instances(cmds: Cmds) -> list[str]:
-    out = cmds.incus.output(["list", "--format", "csv", "--columns", "n"])
+    result = cmds.incus.run(
+        ["list", "--format", "json"],
+        check=False, capture_output=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"incus list failed (rc={result.returncode}): {result.stderr}")
+    out = result.stdout or ""
+    if not out:
+        return []
+    try:
+        instances = json.loads(out)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(
+            f"Failed to parse incus list output: {exc}") from exc
+    if not isinstance(instances, list):
+        raise RuntimeError(
+            f"Expected incus list to return a JSON list, got {type(instances).__name__}")
     found = []
-    for line in out.splitlines():
-        name = line.strip()
-        if not name:
+    for entry in instances:
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                f"Expected JSON object entry in incus list, got {type(entry).__name__}")
+        name = entry.get("name")
+        if not isinstance(name, str):
             continue
-        config = cmds.incus.output(["config", "show", name])
-        if "user.kive.devel.created-by: utils/dev" in config:
+        config = entry.get("config", {})
+        if not isinstance(config, dict):
+            continue
+        if config.get("user.kive.devel.created-by") == "utils/dev":
             found.append(name)
     if found:
         logger.info("Found tagged instances: %s", ", ".join(found))
@@ -159,10 +182,12 @@ def _find_marked_workdirs(root: Path) -> list[Path]:
     for marker in root.rglob(_RESOURCE_MARKER):
         try:
             data = json.loads(marker.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
+        except (json.JSONDecodeError, OSError) as exc:
+            raise RuntimeError(
+                f"Malformed resource marker at {marker}: {exc}") from exc
         if not isinstance(data, dict):
-            continue
+            raise RuntimeError(
+                f"Resource marker at {marker} is not a JSON object: {data!r}")
         if data.get("created_by") != "utils/dev":
             continue
         if data.get("kind") != "build-workdir":
@@ -185,21 +210,34 @@ def _find_tagged_networks(cmds: Cmds) -> list[NetworkInfo]:
         )
     out = result.stdout or ""
     if not out:
-        return []
+        raise RuntimeError("incus network list returned empty output")
     try:
         networks = json.loads(out)
     except json.JSONDecodeError as exc:
         raise RuntimeError(f"Failed to parse incus network list output: {exc}") from exc
+    if not isinstance(networks, list):
+        raise RuntimeError(
+            f"Expected incus network list to return a JSON list, "
+            f"got {type(networks).__name__}")
     tagged = []
     for net in networks:
         if not isinstance(net, dict):
-            continue
+            raise RuntimeError(
+                f"Expected JSON object in network list, got {type(net).__name__}")
+        name = net.get("name")
+        if not isinstance(name, str):
+            raise RuntimeError(f"Network entry missing string 'name': {net}")
         config = net.get("config", {})
+        if not isinstance(config, dict):
+            raise RuntimeError(f"Network {name} has non-dict config: {config}")
         if config.get("user.kive.devel.created-by") == "utils/dev":
-            name = net.get("name")
-            if name:
-                used_by = tuple(net.get("used_by", []))
-                tagged.append(NetworkInfo(name=name, used_by=used_by))
+            used_by_raw = net.get("used_by", [])
+            if not isinstance(used_by_raw, list):
+                raise RuntimeError(
+                    f"Network {name} has non-list used_by: {used_by_raw}")
+            used_by = tuple(
+                u for u in used_by_raw if isinstance(u, str))
+            tagged.append(NetworkInfo(name=name, used_by=used_by))
     return tagged
 
 
@@ -289,13 +327,14 @@ def execute_purge(inventory: PurgeInventory, cmds: Cmds, root: Path) -> PurgeOut
                     outcome.already_absent_port_forwards += 1
                 except OSError:
                     outcome.failed_port_forwards += 1
+                    outcome.failed_forward_entries.append(entry)
 
-    _rewrite_registry(root, inventory, outcome)
+    _rewrite_registry(root, outcome)
 
     return outcome
 
 
-def _rewrite_registry(root: Path, inventory: PurgeInventory, outcome: PurgeOutcome) -> None:
+def _rewrite_registry(root: Path, outcome: PurgeOutcome) -> None:
     path = root / "tmp~" / _REGISTRY_NAME
     if outcome.all_succeeded and outcome.remaining_count == 0:
         if path.exists():
@@ -303,19 +342,7 @@ def _rewrite_registry(root: Path, inventory: PurgeInventory, outcome: PurgeOutco
             path.unlink()
         return
 
-    remaining_entries = []
-    for entry in inventory.registry_entries:
-        kind = entry.get("kind")
-        pid = entry.get("pid")
-        if kind == "host-forward" and pid:
-            try:
-                os.kill(pid, 0)
-                remaining_entries.append(entry)
-            except (ProcessLookupError, OSError):
-                pass
-        else:
-            remaining_entries.append(entry)
-
+    remaining_entries = outcome.failed_forward_entries[:]
     if remaining_entries:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(remaining_entries, indent=2) + "\n")
@@ -332,11 +359,26 @@ def _read_registry(root: Path) -> list[dict]:
         return []
     try:
         data = json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError):
-        return []
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(f"Malformed registry file {path}: {exc}") from exc
     if not isinstance(data, list):
-        logger.warning("Registry is not a list; treating as empty.")
-        return []
+        raise RuntimeError(
+            f"Registry at {path} is not a JSON list; got {type(data).__name__}")
+    for entry in data:
+        if not isinstance(entry, dict):
+            raise RuntimeError(
+                f"Registry entry is not a JSON object: {entry!r}")
+        kind = entry.get("kind")
+        if kind not in ("host-forward",):
+            raise RuntimeError(
+                f"Unknown registry entry kind {kind!r}: {entry!r}")
+        if "pid" in entry:
+            pid = entry["pid"]
+            if not isinstance(pid, int) or pid <= 0:
+                raise RuntimeError(
+                    f"Invalid PID in registry entry: {pid!r}")
+        if "created_by" not in entry:
+            raise RuntimeError(f"Registry entry missing 'created_by': {entry!r}")
     return data
 
 

@@ -31,20 +31,20 @@ class TestFindTaggedInstances(unittest.TestCase):
 
     def test_returns_matching_instances(self):
         purge = self._import()
-        self.cmds.incus.output.side_effect = [
-            "test-vm\nother-instance\n",
-            "user.kive.devel.created-by: utils/dev\n",
-            "",
-        ]
+        instances_json = json.dumps([
+            {"name": "test-vm", "config": {"user.kive.devel.created-by": "utils/dev"}},
+            {"name": "other-instance", "config": {}},
+        ])
+        self.cmds.incus.run.return_value = MockRunResult(returncode=0, stdout=instances_json)
         result = purge._find_tagged_instances(self.cmds)
         self.assertEqual(result, ["test-vm"])
 
     def test_returns_empty_when_none_found(self):
         purge = self._import()
-        self.cmds.incus.output.side_effect = [
-            "test-vm\n",
-            "",
-        ]
+        instances_json = json.dumps([
+            {"name": "test-vm", "config": {}},
+        ])
+        self.cmds.incus.run.return_value = MockRunResult(returncode=0, stdout=instances_json)
         result = purge._find_tagged_instances(self.cmds)
         self.assertEqual(result, [])
 
@@ -124,7 +124,7 @@ class TestPurge(unittest.TestCase):
 
     def test_purge_idempotent_when_nothing_to_purge(self):
         purge = self._import()
-        self.cmds.incus.output.return_value = ""
+        self.cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="[]")
         purge._run_purge(self._make_args(), self.cmds)
 
     def test_deletes_tagged_instances_and_marked_workdirs(self):
@@ -179,7 +179,7 @@ class TestPurge(unittest.TestCase):
         import signal
         import json
         cmds = make_cmds()
-        cmds.incus.run.return_value = MockRunResult(returncode=0)
+        cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="[]")
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
