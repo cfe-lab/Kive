@@ -302,15 +302,17 @@ sudo sysctl -w net.ipv4.ip_forward=0
 
 ### Removing the bridge manually
 
-If you need to delete the bridge after purge (e.g. because it was
-retained due to `used_by`), first remove or reconfigure the default
-profile's NIC that references it:
+After purge removes all Kive instances, the bridge is deleted
+automatically if `used_by` is empty.  If it was retained (e.g.
+another resource references it), delete it directly:
 
 ```sh
-incus profile device remove default eth0
 incus network delete kive-lab-br
 sudo ip link delete kive-lab-br
 ```
+
+The default profile no longer contains a Kive NIC, so no profile
+cleanup is needed before deleting the bridge.
 
 ### Idempotence
 
@@ -341,7 +343,7 @@ utils/dev purge --instance my-instance --workdir /path/to/workdir
 | Firewall: `POSTROUTING` | MASQUERADE rule for bridge CIDR | Yes |
 | Incus bridge | `kive-lab-br` (10.77.77.1/24), tagged with ownership metadata | Yes (unless purged when unused) |
 | Incus storage pool | `default` (dir-backed) | Yes |
-| Default profile | NIC, root disk | Yes |
+| Default profile | Root disk only (no NIC — VM mode uses per-instance `--network`) | Yes |
 
 ### Viewing current state
 
