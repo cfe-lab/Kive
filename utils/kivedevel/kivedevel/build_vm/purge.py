@@ -379,7 +379,7 @@ def _rewrite_registry(root: Path, outcome: PurgeOutcome) -> None:
             path.unlink()
 
 
-def _read_registry(root: Path) -> list[RegistryEntry]:
+def _read_registry(root: Path) -> list[HostForwardEntry]:
     path = root / "tmp~" / _REGISTRY_NAME
     if not path.exists():
         return []
@@ -390,7 +390,7 @@ def _read_registry(root: Path) -> list[RegistryEntry]:
     if not isinstance(data, list):
         raise RuntimeError(
             f"Registry at {path} is not a JSON list; got {type(data).__name__}")
-    entries: list[RegistryEntry] = []
+    entries: list[HostForwardEntry] = []
     for entry in data:
         if not isinstance(entry, dict):
             raise RuntimeError(
