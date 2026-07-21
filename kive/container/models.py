@@ -834,28 +834,53 @@ class ContainerApp(models.Model):
     def write_outputs(self, formatted):
         self._write_arguments(ContainerArgument.OUTPUT, formatted)
 
-    def _write_arguments(self, argument_type, formatted):
-        self.arguments.filter(type=argument_type).delete()
+    @staticmethod
+    def _parse_argument_specs(argument_type, formatted):
         expected_multiples = {ContainerArgument.INPUT: '*',
                               ContainerArgument.OUTPUT: '/'}
+        specs = []
+        seen_names = set()
         for position, term in enumerate(formatted.split(), 1):
             if term == '--':
                 continue
             match = re.match(r'(--)?(\w+)([*/])?$', term)
             if match is None:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            if match.group(1):
-                position = None
-            if not match.group(3):
+            name = match.group(2)
+            if name in seen_names:
+                raise ValueError(f'Duplicate argument name: {name}')
+            seen_names.add(name)
+            actual_position = None if match.group(1) else position
+            suffix = match.group(3)
+            if not suffix:
                 allow_multiple = False
-            elif match.group(3) == expected_multiples[argument_type]:
+            elif suffix == expected_multiples[argument_type]:
                 allow_multiple = True
             else:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            self.arguments.create(name=match.group(2),
-                                  position=position,
-                                  allow_multiple=allow_multiple,
-                                  type=argument_type)
+            if argument_type == ContainerArgument.OUTPUT:
+                if actual_position is None:
+                    raise ValueError(
+                        f'Output argument {name} must be positional '
+                        f'(omit -- prefix).')
+            if argument_type == ContainerArgument.INPUT and actual_position is not None and allow_multiple:
+                raise ValueError(
+                    f'Positioned input argument {name} cannot accept multiple values.')
+            specs.append((name, actual_position, allow_multiple))
+        return specs
+
+    def _write_arguments(self, argument_type, formatted):
+        specs = self._parse_argument_specs(argument_type, formatted)
+        from django.db import transaction
+        with transaction.atomic():
+            self.arguments.filter(type=argument_type).delete()
+            for name, position, allow_multiple in specs:
+                self.arguments.create(
+                    name=name,
+                    position=position,
+                    allow_multiple=allow_multiple,
+                    type=argument_type,
+                )
 
     def can_be_accessed(self, user):
         return self.container.can_be_accessed(user)
