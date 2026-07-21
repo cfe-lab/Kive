@@ -51,7 +51,7 @@ def _parse_incus_instance_type(cmds: Cmds, instance: str) -> str:
     sys.exit(2)
 
 
-def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str, cpu: str, memory: str) -> tuple[bool, str]:
+def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str, cpu: str, memory: str, vm_network: str | None = None) -> tuple[bool, str]:
     if not instance_exists(cmds, instance):
         logger.info("Creating %s instance %s...", instance_type, instance)
         create_args = [
@@ -69,11 +69,16 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
         ]
         if instance_type == "vm":
             create_args.insert(3, "--vm")
+            if vm_network:
+                create_args += ["--network", vm_network]
 
         result = cmds.incus.run(create_args, check=False, capture_output=True)
         if result.returncode != 0:
-            stderr = (result.stderr or "").lower()
-            if instance_type == "vm" and "instance type \"virtual-machine\" is not supported" in stderr:
+            stderr_lower = (result.stderr or "").lower()
+            cmd_str = " ".join(str(a) for a in create_args)
+            stderr_text = (result.stderr or "").strip()
+            stdout_text = (result.stdout or "").strip()
+            if instance_type == "vm" and "instance type \"virtual-machine\" is not supported" in stderr_lower:
                 logger.error(
                     "Incus VM instances are not supported on this host.\n"
                     "The default local Kive development environment requires an Incus VM "
@@ -83,7 +88,7 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
                 )
                 raise RuntimeError("Incus VM instances are not supported on this host.")
             if instance_type == "container":
-                if "no uid/gid allocation configured" in stderr or "no map found for user" in stderr:
+                if "no uid/gid allocation configured" in stderr_lower or "no map found for user" in stderr_lower:
                     logger.warning(
                         "Unprivileged container creation failed; retrying %s as privileged.", instance,
                     )
@@ -106,11 +111,17 @@ def ensure_instance(cmds: Cmds, instance: str, instance_type: str, profile: str,
                         f"Automatic privileged retry failed for {instance}. "
                         f"See the log output above for details."
                     )
-            if result.stderr:
-                logger.error(result.stderr.strip())
-            if result.stdout:
-                logger.error(result.stdout.strip())
-            raise RuntimeError("Failed to create instance: see previous incus output.")
+            logger.error(
+                "Failed to create instance.\n"
+                "Command: %s\n"
+                "Return code: %s\n"
+                "stdout: %s\n"
+                "stderr: %s",
+                cmd_str, result.returncode,
+                stdout_text or "(empty)",
+                stderr_text or "(empty)",
+            )
+            raise RuntimeError(f"Failed to create instance {instance} (rc={result.returncode}).")
         return True, instance_type
 
     # Verify the existing instance type matches the requested type first.

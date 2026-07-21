@@ -55,19 +55,6 @@ def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
     cmds.incus.run(["network", "set", bridge, "ipv4.firewall", "true"])
 
 
-def _ensure_profile_nic(cmds: Cmds, bridge: str) -> None:
-    out = cmds.incus.output(["profile", "device", "show", "default"])
-    has_nic = "eth0:" in (out or "")
-    if has_nic:
-        logger.debug("Profile default already has eth0 NIC.")
-        return
-    logger.info("Adding eth0 NIC to profile default (bridge=%s)...", bridge)
-    cmds.incus.run([
-        "profile", "device", "add", "default", "eth0",
-        "nic", f"parent={bridge}", "nictype=bridged",
-    ])
-
-
 def _add_bridge_forwarding_rules(bridge: str) -> None:
     docker_chain = _run(["iptables", "-nL", "DOCKER-USER"], sudo=True, check=False)
     if docker_chain.returncode == 0:
@@ -170,9 +157,8 @@ storage_pools:
     # Create or validate the Kive managed bridge.
     ensure_managed_vm_network(cmds, bridge)
 
-    # Ensure the default profile has root disk and bridge NIC.
+    # Ensure the default profile has a root disk (no NIC — VM mode uses per-instance --network).
     ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
-    _ensure_profile_nic(cmds, bridge)
 
     if debug:
         _print_diagnostics(cmds, bridge)

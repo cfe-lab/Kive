@@ -223,6 +223,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
         cfg.profile,
         cfg.cpu,
         cfg.memory,
+        vm_network=cfg.vm_network,
     )
 
     restart_required = False
