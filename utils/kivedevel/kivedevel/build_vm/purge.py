@@ -194,10 +194,12 @@ def _find_tagged_instances(cmds: Cmds) -> list[str]:
                 f"Expected JSON object entry in incus list, got {type(entry).__name__}")
         name = entry.get("name")
         if not isinstance(name, str):
-            continue
-        config = entry.get("config", {})
+            raise RuntimeError(
+                f"Instance entry missing or non-string name: {entry}")
+        config = entry.get("config")
         if not isinstance(config, dict):
-            continue
+            raise RuntimeError(
+                f"Instance {name} has missing or non-dict config: {config}")
         if config.get("user.kive.devel.created-by") == "utils/dev":
             found.append(name)
     if found:
@@ -263,8 +265,11 @@ def _find_tagged_networks(cmds: Cmds) -> list[NetworkInfo]:
             if not isinstance(used_by_raw, list):
                 raise RuntimeError(
                     f"Network {name} has non-list used_by: {used_by_raw}")
-            used_by = tuple(
-                u for u in used_by_raw if isinstance(u, str))
+            for u in used_by_raw:
+                if not isinstance(u, str):
+                    raise RuntimeError(
+                        f"Network {name} has non-string used_by member: {u!r}")
+            used_by = tuple(used_by_raw)
             tagged.append(NetworkInfo(name=name, used_by=used_by))
     return tagged
 

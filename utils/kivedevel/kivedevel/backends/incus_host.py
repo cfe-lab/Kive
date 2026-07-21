@@ -6,6 +6,8 @@ import argparse
 import logging
 import subprocess
 
+import yaml
+
 from ..build_vm.incus import ensure_profile_with_root_disk
 from ..build_vm.network import (
     DEFAULT_VM_BRIDGE,
@@ -56,16 +58,50 @@ def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
 
 
 def _remove_stale_profile_nic(cmds: Cmds, bridge: str) -> None:
-    out = cmds.incus.output(["profile", "device", "show", "default"])
-    if "eth0:" not in (out or ""):
+    raw = cmds.incus.output(["profile", "device", "show", "default"])
+    if not raw:
         return
-    if bridge in (out or ""):
+    try:
+        devices = yaml.safe_load(raw)
+    except yaml.YAMLError as exc:
+        logger.error("Failed to parse default profile device list: %s", exc)
+        return
+    if not isinstance(devices, dict):
+        logger.error("Expected device mapping in default profile, got %s", type(devices).__name__)
+        return
+
+    eth0 = devices.get("eth0")
+    if eth0 is None:
+        return
+    if not isinstance(eth0, dict):
+        logger.warning("eth0 in default profile is not a device mapping; skipping cleanup.")
+        return
+
+    nic_network = eth0.get("network")
+    nic_parent = eth0.get("parent")
+    nic_nictype = eth0.get("nictype", "")
+
+    if nic_network == bridge or (nic_parent == bridge and nic_nictype == "bridged"):
         logger.info("Removing stale Kive NIC (eth0) from default profile (bridge=%s)...", bridge)
-        cmds.incus.run(["profile", "device", "remove", "default", "eth0"], check=False)
-    elif any(line.strip().startswith("parent:") or "network:" in line for line in (out or "").splitlines()):
+        result = cmds.incus.run(
+            ["profile", "device", "remove", "default", "eth0"],
+            check=False, capture_output=True,
+        )
+        if result.returncode != 0:
+            logger.error(
+                "Failed to remove eth0 from default profile:\n"
+                "Command: incus profile device remove default eth0\n"
+                "Return code: %s\nstderr: %s",
+                result.returncode, (result.stderr or "").strip(),
+            )
+            return
+        after = cmds.incus.output(["profile", "device", "show", "default"])
+        if after and bridge in after:
+            logger.error("Stale Kive NIC still present in default profile after removal attempt.")
+    elif nic_network or nic_parent:
         logger.warning(
-            "Default profile has eth0 targeting a non-Kive network; "
-            "not removing automatically."
+            "Default profile has eth0 targeting %s; not removing automatically.",
+            nic_network or nic_parent,
         )
 
 
