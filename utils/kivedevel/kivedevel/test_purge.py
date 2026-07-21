@@ -133,8 +133,7 @@ class TestPurge(unittest.TestCase):
         with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
             with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
                 with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
-                    with mock.patch.object(purge, "_remove_registry"):
-                        purge._run_purge(self._make_args(), self.cmds)
+                    purge._run_purge(self._make_args(), self.cmds)
         delete_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if c[0][0][:2] == ["delete", "-f"]
@@ -159,8 +158,7 @@ class TestPurge(unittest.TestCase):
         with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
             with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
                 with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                    with mock.patch.object(purge, "_remove_registry"):
-                        purge._run_purge(self._make_args(), self.cmds)
+                    purge._run_purge(self._make_args(), self.cmds)
 
     def test_purge_removes_web_proxy_device(self):
         purge = self._import()
@@ -172,8 +170,7 @@ class TestPurge(unittest.TestCase):
         with mock.patch.object(purge, "_find_tagged_instances", return_value=["test-vm"]):
             with mock.patch.object(purge, "_find_marked_workdirs", return_value=[]):
                 with mock.patch.object(purge, "_find_tagged_networks", return_value=[]):
-                    with mock.patch.object(purge, "_remove_registry"):
-                        purge._run_purge(self._make_args(), self.cmds)
+                    purge._run_purge(self._make_args(), self.cmds)
 
     def test_purge_kills_port_forward(self):
         purge = self._import()

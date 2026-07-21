@@ -27,11 +27,11 @@ class NetworkInfo:
 
 @dataclasses.dataclass(frozen=True)
 class HostForwardEntry:
+    pid: int
+    port: int
+    vm_ip: str
     kind: str = "host-forward"
     created_by: str = "utils/dev"
-    pid: int = 0
-    port: int = 0
-    vm_ip: str = ""
 
     @classmethod
     def from_dict(cls, d: dict) -> HostForwardEntry:
@@ -53,15 +53,12 @@ class HostForwardEntry:
         return cls(kind=kind, created_by="utils/dev", pid=pid, port=port, vm_ip=vm_ip)
 
 
-RegistryEntry = HostForwardEntry
-
-
 @dataclasses.dataclass(frozen=True)
 class PurgeInventory:
     instances: tuple[str, ...]
     networks: tuple[NetworkInfo, ...]
     workdirs: tuple[Path, ...]
-    registry_entries: tuple[RegistryEntry, ...]
+    registry_entries: tuple[HostForwardEntry, ...]
 
     @property
     def total_count(self) -> int:
@@ -83,7 +80,7 @@ class PurgeOutcome:
     removed_port_forwards: int = 0
     already_absent_port_forwards: int = 0
     failed_port_forwards: int = 0
-    failed_forward_entries: list[dict] = dataclasses.field(default_factory=list)
+    failed_forward_entries: list[HostForwardEntry] = dataclasses.field(default_factory=list)
 
     @property
     def all_succeeded(self) -> bool:
@@ -356,7 +353,7 @@ def execute_purge(inventory: PurgeInventory, cmds: Cmds, root: Path) -> PurgeOut
             outcome.already_absent_port_forwards += 1
         except OSError:
             outcome.failed_port_forwards += 1
-            outcome.failed_forward_entries.append(dataclasses.asdict(entry))
+            outcome.failed_forward_entries.append(entry)
 
     _rewrite_registry(root, outcome)
 
@@ -371,7 +368,7 @@ def _rewrite_registry(root: Path, outcome: PurgeOutcome) -> None:
             path.unlink()
         return
 
-    remaining_entries = outcome.failed_forward_entries[:]
+    remaining_entries = [dataclasses.asdict(e) for e in outcome.failed_forward_entries]
     if remaining_entries:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(remaining_entries, indent=2) + "\n")
@@ -452,13 +449,6 @@ def _run_purge(args: argparse.Namespace, cmds: Cmds) -> None:
             outcome.failed_instances, outcome.failed_workdirs,
             outcome.failed_networks, outcome.failed_port_forwards,
         )
-
-
-def _remove_registry(root: Path) -> None:
-    path = root / "tmp~" / _REGISTRY_NAME
-    if path.exists():
-        logger.info("Removing resource registry '%s'...", path)
-        path.unlink()
 
 
 def register_subcommand(subparsers) -> None:
