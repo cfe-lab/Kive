@@ -1431,11 +1431,12 @@ class ContainerRun(Stopwatch, AccessControl):
             md5gen.update(parent_md5)
 
         bindings = []
-        for cd in self.datasets.select_related('argument', 'dataset').order_by(
-            'argument__type', 'argument__position',
-            'argument_id', 'argument__name',
-            'multi_position', 'pk',
-        ):
+        all_cds = list(self.datasets.select_related('argument', 'dataset'))
+        all_cds.sort(key=lambda cd: (
+            argument_execution_key(cd.argument),
+            binding_execution_key(cd),
+        ))
+        for cd in all_cds:
             bindings.append((
                 cd.argument_id,
                 cd.argument.type,
@@ -1508,10 +1509,16 @@ class ContainerDataset(models.Model):
         for rerun in output_container_dataset.run.reruns.all():
             argtype = output_argument.argtype
             if argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
-                rerun_container_dataset = rerun.datasets.filter(
-                    argument=output_argument, name=self.name).first()
-                if rerun_container_dataset is None:
+                output_name = output_container_dataset.name
+                matches = list(rerun.datasets.filter(
+                    argument=output_argument, name=output_name))
+                if len(matches) == 0:
                     continue
+                if len(matches) > 1:
+                    raise RuntimeError(
+                        f"Multiple directory-output bindings with name "
+                        f"{output_name!r} in rerun {rerun.id}")
+                rerun_container_dataset = matches[0]
             elif argtype == ContainerArgumentType.FIXED_OUTPUT:
                 try:
                     rerun_container_dataset = rerun.datasets.get(
