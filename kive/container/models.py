@@ -1523,7 +1523,21 @@ class ContainerDataset(models.Model):
             argument__type=ContainerArgument.OUTPUT)
         output_argument = output_container_dataset.argument
         for rerun in output_container_dataset.run.reruns.all():
-            rerun_container_dataset = rerun.datasets.get(argument=output_argument)
+            argtype = output_argument.argtype
+            if argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
+                rerun_container_dataset = rerun.datasets.filter(
+                    argument=output_argument, name=self.name).first()
+                if rerun_container_dataset is None:
+                    continue
+            elif argtype == ContainerArgumentType.FIXED_OUTPUT:
+                try:
+                    rerun_container_dataset = rerun.datasets.get(
+                        argument=output_argument)
+                except rerun.datasets.model.DoesNotExist:
+                    continue
+            else:
+                raise RuntimeError(
+                    f"Unsupported output argument type for rerun lookup: {argtype}")
             dataset, source_run = rerun_container_dataset.find_rerun_dataset()
             if dataset is not None:
                 return dataset, None
