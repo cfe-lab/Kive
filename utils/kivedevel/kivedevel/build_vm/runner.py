@@ -52,12 +52,18 @@ def _retry_on_etag(fn, max_retries=_MAX_ETAG_RETRIES, initial_delay=_ETAG_BACKOF
 
 
 def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
-    config = {
+    if cfg.instance_type == "vm":
+        return {
+            "listen": f"tcp:127.0.0.1:{cfg.web_port}",
+            "type": "proxy",
+            "nat": "true",
+            "connect": f"tcp:0.0.0.0:{GUEST_WEB_PORT}",
+        }
+    return {
         "listen": f"tcp:127.0.0.1:{cfg.web_port}",
         "type": "proxy",
         "connect": f"tcp:127.0.0.1:{GUEST_WEB_PORT}",
     }
-    return config
 
 
 def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
@@ -74,7 +80,7 @@ def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
         line = line.strip()
         if ":" in line:
             key, _, val = line.partition(":")
-            config[key.strip()] = val.strip()
+            config[key.strip()] = val.strip().strip('"')
     return config
 
 
@@ -89,6 +95,13 @@ def _proxy_args(desired: dict[str, str]) -> list[str]:
     return args_list
 
 
+def _proxy_config_match(desired: dict[str, str], current: dict[str, str]) -> bool:
+    for key in desired:
+        if desired[key] != current.get(key):
+            return False
+    return True
+
+
 def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
@@ -97,35 +110,56 @@ def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     desired = _proxy_config(cfg)
     current = _current_proxy_config(cmds, cfg.instance)
 
-    if current is None:
-        logger.info(
-            "Creating proxy device '%s' (%s -> %s)...",
-            PROXY_DEVICE, desired["listen"], desired["connect"],
-        )
-        cmds.incus.run([
-            "config", "device", "add", cfg.instance, PROXY_DEVICE,
-            *_proxy_args(desired),
-        ])
-        return
-
-    if current.get("listen") == desired["listen"] and current.get("connect") == desired["connect"]:
+    if current is not None and _proxy_config_match(desired, current):
         logger.debug(
-            "Proxy device '%s' already present with matching config (%s -> %s).",
-            PROXY_DEVICE, desired["listen"], desired["connect"],
+            "Proxy device '%s' already present with matching config (%s).",
+            PROXY_DEVICE, desired,
         )
         return
 
-    logger.debug(
-        "Updating proxy device '%s': was (%s -> %s), now (%s -> %s).",
-        PROXY_DEVICE,
-        current.get("listen", "?"), current.get("connect", "?"),
-        desired["listen"], desired["connect"],
+    if current is not None:
+        logger.info(
+            "Replacing proxy device '%s': was %s, now %s.",
+            PROXY_DEVICE, current, desired,
+        )
+        result = cmds.incus.run(
+            ["config", "device", "remove", cfg.instance, PROXY_DEVICE],
+            check=False, capture_output=True,
+        )
+        if result.returncode != 0:
+            logger.error(
+                "Failed to remove proxy device '%s' from %s:\n"
+                "Command: incus config device remove %s %s\n"
+                "Return code: %s\nstderr: %s",
+                PROXY_DEVICE, cfg.instance, cfg.instance, PROXY_DEVICE,
+                result.returncode, (result.stderr or "").strip(),
+            )
+            raise RuntimeError(
+                f"Failed to remove proxy device {PROXY_DEVICE} "
+                f"from {cfg.instance} (rc={result.returncode})")
+
+    logger.info(
+        "Creating proxy device '%s' on %s: %s",
+        PROXY_DEVICE, cfg.instance, desired,
     )
-    cmds.incus.run(["config", "device", "remove", cfg.instance, PROXY_DEVICE])
-    cmds.incus.run([
+    cmd = [
         "config", "device", "add", cfg.instance, PROXY_DEVICE,
         *_proxy_args(desired),
-    ])
+    ]
+    result = cmds.incus.run(cmd, check=False, capture_output=True)
+    if result.returncode != 0:
+        logger.error(
+            "Failed to create proxy device '%s' on %s:\n"
+            "Command: incus %s\n"
+            "Return code: %s\nstdout: %s\nstderr: %s",
+            PROXY_DEVICE, cfg.instance, " ".join(cmd),
+            result.returncode,
+            (result.stdout or "").strip(),
+            (result.stderr or "").strip(),
+        )
+        raise RuntimeError(
+            f"Failed to create proxy device {PROXY_DEVICE} "
+            f"on {cfg.instance} (rc={result.returncode})")
 
 
 def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:

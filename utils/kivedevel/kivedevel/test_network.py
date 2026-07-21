@@ -197,6 +197,7 @@ class TestPortForward(unittest.TestCase):
         from kivedevel.build_vm.network import VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value.returncode = 0
         cfg = make_config()
         nic_target = VmNicTarget(name="kive-lab-br", managed=True)
         with (
@@ -221,6 +222,7 @@ class TestPortForward(unittest.TestCase):
         from kivedevel.build_vm.network import VmNicTarget
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value.returncode = 0
         cfg = make_config()
         nic_target = VmNicTarget(name="kive-lab-br", managed=True)
         with (
@@ -245,6 +247,7 @@ class TestPortForward(unittest.TestCase):
         from kivedevel.build_vm.runner import _run_build_vm_container
         cmds = mock.Mock()
         cmds.incus.output.return_value = ""
+        cmds.incus.run.return_value.returncode = 0
         cfg = make_config(instance_type="container")
         with (
             mock.patch("kivedevel.build_vm.runner.ensure_instance",
