@@ -814,18 +814,20 @@ class ContainerApp(models.Model):
         return self._format_arguments(ContainerArgument.OUTPUT)
 
     def _format_arguments(self, argument_type):
-        arguments = self.arguments.filter(type=argument_type)
-        optionals = [argument
-                     for argument in arguments
-                     if argument.position is None]
-        positionals = [argument
-                       for argument in arguments
-                       if argument.position is not None]
-        terms = [argument.formatted for argument in optionals]
-        if (argument_type == ContainerArgument.INPUT and
-                any(argument.allow_multiple for argument in optionals)):
+        arguments = sorted(
+            self.arguments.filter(type=argument_type),
+            key=argument_execution_key,
+        )
+        terms = []
+        for arg in arguments:
+            if arg.position is None:
+                terms.append(arg.formatted)
+        if argument_type == ContainerArgument.INPUT and any(
+            arg.allow_multiple for arg in arguments if arg.position is None
+        ):
             terms.append('--')
-        terms.extend(argument.formatted for argument in positionals)
+        terms.extend(
+            arg.formatted for arg in arguments if arg.position is not None)
         return ' '.join(terms)
 
     def write_inputs(self, formatted):

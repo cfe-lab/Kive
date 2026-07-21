@@ -72,46 +72,73 @@ def _remove_stale_profile_nic(cmds: Cmds, bridge: str) -> None:
             f"Expected device mapping in default profile, "
             f"got {type(devices).__name__}")
 
-    eth0 = devices.get("eth0")
-    if eth0 is None:
+    # Inspect every device for bridge references.
+    stale_name = None
+    ambiguous = []
+    for name, dev in devices.items():
+        if not isinstance(dev, dict):
+            continue
+        nic_network = dev.get("network", "")
+        nic_parent = dev.get("parent", "")
+        nic_nictype = dev.get("nictype", "")
+        references_bridge = (
+            nic_network == bridge
+            or (nic_parent == bridge and nic_nictype == "bridged")
+        )
+        if not references_bridge:
+            continue
+        if name == "eth0":
+            stale_name = name
+        else:
+            ambiguous.append(name)
+
+    if ambiguous:
+        raise RuntimeError(
+            f"Default profile has {len(ambiguous)} non-eth0 device(s) "
+            f"({', '.join(ambiguous)}) referencing bridge {bridge}. "
+            f"Remove manually.")
+
+    if stale_name is None:
         return
+
+    eth0 = devices[stale_name]
     if not isinstance(eth0, dict):
         raise RuntimeError(
-            f"eth0 in default profile is not a device mapping: {eth0}")
+            f"{stale_name} in default profile is not a device mapping: {eth0}")
 
-    nic_network = eth0.get("network")
-    nic_parent = eth0.get("parent")
-    nic_nictype = eth0.get("nictype", "")
-
-    if nic_network == bridge or (nic_parent == bridge and nic_nictype == "bridged"):
-        logger.info("Removing stale Kive NIC (eth0) from default profile (bridge=%s)...", bridge)
-        result = cmds.incus.run(
-            ["profile", "device", "remove", "default", "eth0"],
-            check=False, capture_output=True,
-        )
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Failed to remove eth0 from default profile "
-                f"(rc={result.returncode}): {result.stderr}")
-
-        after = cmds.incus.output(["profile", "device", "show", "default"])
-        try:
-            after_devices = yaml.safe_load(after) if after else {}
-        except yaml.YAMLError:
-            after_devices = {}
-        if isinstance(after_devices, dict):
-            for _name, dev in after_devices.items():
-                if isinstance(dev, dict) and (
-                    dev.get("network") == bridge
-                    or (dev.get("parent") == bridge and dev.get("nictype") == "bridged")
-                ):
-                    raise RuntimeError(
-                        f"Device {_name} in default profile still references "
-                        f"bridge {bridge} after removal attempt.")
-    elif nic_network or nic_parent:
+    logger.info("Removing stale Kive NIC (%s) from default profile (bridge=%s)...",
+                stale_name, bridge)
+    result = cmds.incus.run(
+        ["profile", "device", "remove", "default", stale_name],
+        check=False, capture_output=True,
+    )
+    if result.returncode != 0:
         raise RuntimeError(
-            f"Default profile has eth0 targeting {nic_network or nic_parent}, "
-            f"not {bridge}. Remove manually.")
+            f"Failed to remove {stale_name} from default profile "
+            f"(rc={result.returncode}): {result.stderr}")
+
+    after = cmds.incus.output(["profile", "device", "show", "default"])
+    try:
+        after_devices = yaml.safe_load(after) if after else {}
+    except yaml.YAMLError as exc:
+        raise RuntimeError(
+            f"Failed to parse default profile after removal: {exc}")
+
+    if not isinstance(after_devices, dict):
+        raise RuntimeError(
+            f"Expected device mapping after removal, "
+            f"got {type(after_devices).__name__}")
+
+    for _name, dev in after_devices.items():
+        if not isinstance(dev, dict):
+            continue
+        if (
+            dev.get("network") == bridge
+            or (dev.get("parent") == bridge and dev.get("nictype") == "bridged")
+        ):
+            raise RuntimeError(
+                f"Device {_name} in default profile still references "
+                f"bridge {bridge} after removal attempt.")
 
 
 def _add_bridge_forwarding_rules(bridge: str) -> None:

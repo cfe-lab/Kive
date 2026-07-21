@@ -546,7 +546,7 @@ class ContainerAppMockTests(TestCase):
                              position=1,
                              type=ContainerArgument.OUTPUT,
                              allow_multiple=True)
-        expected_inputs = 'greetings_csv names_csv*'
+        expected_inputs = '--names_csv* -- greetings_csv'
         expected_outputs = 'messages_csv/'
 
         inputs = app.inputs
@@ -601,25 +601,27 @@ class ContainerAppMockTests(TestCase):
         app = ContainerApp()
         with self.assertRaisesRegex(ValueError,
                                     r'Invalid argument name: @greetings_csv'):
-            app.write_outputs('@greetings_csv names_csv')
+            app.write_inputs('@greetings_csv names_csv')
 
-    def test_write_optional(self):
+    def test_write_outputs_rejects_optional_output(self):
         app = ContainerApp()
-        expected_outputs = '--greetings_csv names_csv'
+        app.write_outputs("existing")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Output argument greetings_csv must be positional",
+        ):
+            app.write_outputs("--greetings_csv names_csv")
+        self.assertEqual("existing", app.outputs)
 
-        app.write_outputs(expected_outputs)
-        outputs = app.outputs
-
-        self.assertEqual(expected_outputs, outputs)
-
-    def test_write_input_multiple(self):
+    def test_write_inputs_rejects_positioned_multiple(self):
         app = ContainerApp()
-        expected_inputs = 'greetings_csv* names_csv'
-
-        app.write_inputs(expected_inputs)
-        inputs = app.inputs
-
-        self.assertEqual(expected_inputs, inputs)
+        app.write_inputs("existing")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Positioned input argument greetings_csv cannot accept multiple values",
+        ):
+            app.write_inputs("greetings_csv* names_csv")
+        self.assertEqual("existing", app.inputs)
 
     def test_write_output_multiple(self):
         app = ContainerApp()

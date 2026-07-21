@@ -72,7 +72,7 @@ def _test_api_args(
         instance=instance,
         workdir=workdir,
         port=8000,
-        base_url=None,
+        base_url="http://127.0.0.1:8000",
         username="kive",
         password="kive",
         quiet=False,
