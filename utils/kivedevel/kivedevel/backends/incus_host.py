@@ -55,6 +55,20 @@ def _set_bridge_options(cmds: Cmds, bridge: str) -> None:
     cmds.incus.run(["network", "set", bridge, "ipv4.firewall", "true"])
 
 
+def _remove_stale_profile_nic(cmds: Cmds, bridge: str) -> None:
+    out = cmds.incus.output(["profile", "device", "show", "default"])
+    if "eth0:" not in (out or ""):
+        return
+    if bridge in (out or ""):
+        logger.info("Removing stale Kive NIC (eth0) from default profile (bridge=%s)...", bridge)
+        cmds.incus.run(["profile", "device", "remove", "default", "eth0"], check=False)
+    elif any(line.strip().startswith("parent:") or "network:" in line for line in (out or "").splitlines()):
+        logger.warning(
+            "Default profile has eth0 targeting a non-Kive network; "
+            "not removing automatically."
+        )
+
+
 def _add_bridge_forwarding_rules(bridge: str) -> None:
     docker_chain = _run(["iptables", "-nL", "DOCKER-USER"], sudo=True, check=False)
     if docker_chain.returncode == 0:
@@ -159,6 +173,8 @@ storage_pools:
 
     # Ensure the default profile has a root disk (no NIC — VM mode uses per-instance --network).
     ensure_profile_with_root_disk(cmds, "default", "default", "60GiB")
+    # Remove any stale Kive-created NIC from the default profile.
+    _remove_stale_profile_nic(cmds, bridge)
 
     if debug:
         _print_diagnostics(cmds, bridge)
