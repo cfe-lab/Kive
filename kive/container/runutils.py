@@ -116,38 +116,32 @@ def _compare_optional_inputs(
 def _compare_directory_outputs(
         argument: ContainerArgument, original: ContainerRun,
         rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
-    all_original_datasets = original.datasets.filter(argument=argument).all()
-    all_rerun_datasets = rerun.datasets.filter(argument=argument).all()
+    original_by_name: dict[str, ContainerDataset] = {}
+    for binding in original.datasets.filter(argument=argument):
+        name = binding.name
+        if name in original_by_name:
+            raise RuntimeError(
+                f"Duplicate directory-output name {name!r} in original run "
+                f"{original.id}")
+        original_by_name[name] = binding
 
-    def group_by_path(
-        datasets: ty.Iterable[ContainerDataset]
-    ) -> ty.Dict[ty.Any, ty.List[ContainerDataset]]:
-        grouped = collections.defaultdict(list)
-        for dataset in datasets:
-            path = pathlib.Path(dataset.name)
-            parents = tuple(path.parents)
-            grouped[parents].append(dataset)
-        return grouped
+    rerun_by_name: dict[str, ContainerDataset] = {}
+    for binding in rerun.datasets.filter(argument=argument):
+        name = binding.name
+        if name in rerun_by_name:
+            raise RuntimeError(
+                f"Duplicate directory-output name {name!r} in rerun run "
+                f"{rerun.id}")
+        rerun_by_name[name] = binding
 
-    grouped_original_datasets = group_by_path(all_original_datasets)
-    grouped_rerun_datasets = group_by_path(all_rerun_datasets)
-
-    original_locations = set(grouped_original_datasets.keys())
-    rerun_locations = set(grouped_rerun_datasets.keys())
-    all_locations = original_locations.union(rerun_locations)
-
-    for location in sorted(all_locations):
-        original_datasets = grouped_original_datasets.get(location, [])
-        rerun_datasets = grouped_rerun_datasets.get(location, [])
-        dataset_pairs = itertools.zip_longest(
-            original_datasets,
-            rerun_datasets,
-            fillvalue=None,
-        )
-        for original, rerun in dataset_pairs:
-            comparison = DatasetComparison.compare_optional(original, rerun)
-            if comparison is not None:
-                yield comparison
+    all_names = sorted(set(original_by_name) | set(rerun_by_name))
+    for name in all_names:
+        original_binding = original_by_name.get(name)
+        rerun_binding = rerun_by_name.get(name)
+        comparison = DatasetComparison.compare_optional(
+            original_binding, rerun_binding)
+        if comparison is not None:
+            yield comparison
 
 
 def _compare_rerun_datasets(
