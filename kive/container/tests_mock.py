@@ -539,7 +539,7 @@ class ContainerAppMockTests(TestCase):
                              position=1,
                              type=ContainerArgument.INPUT)
         app.arguments.create(name='names_csv',
-                             position=2,
+                             position=None,
                              allow_multiple=True,
                              type=ContainerArgument.INPUT)
         app.arguments.create(name='messages_csv',
@@ -571,7 +571,7 @@ class ContainerAppMockTests(TestCase):
                              allow_multiple=True,
                              type=ContainerArgument.OUTPUT)
         expected_inputs = '--names_csv* -- greetings_csv'
-        expected_outputs = '--log_csv/ messages_csv'
+        expected_outputs = 'messages_csv log_csv/'
 
         inputs = app.inputs
         outputs = app.outputs

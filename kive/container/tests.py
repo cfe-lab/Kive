@@ -1913,7 +1913,12 @@ class ContainerArgumentApiTests(BaseTestCases.ApiTestCase):
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         app = ContainerApp.objects.create(container=container, name='test')
-        self.test_argument = app.arguments.create(name='test_arg')
+        self.test_argument = app.arguments.create(
+            name="test_arg",
+            type=ContainerArgument.INPUT,
+            position=None,
+            allow_multiple=False,
+        )
 
         self.list_path = reverse("containerargument-list")
         self.list_view, _, _ = resolve(self.list_path)
