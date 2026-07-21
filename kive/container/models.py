@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import errno
 import hashlib
@@ -889,25 +891,6 @@ class ContainerArgumentType(enum.Enum):
     FIXED_DIRECTORY_OUTPUT = enum.auto()
 
 
-def argument_execution_key(argument: ContainerArgument) -> tuple:
-    """Canonical ordering key for arguments.
-
-    Keyword arguments first (type I, null position → 0), sorted by pk
-    (app-definition order).  Fixed arguments after, sorted by position.
-    """
-    return (argument.type, argument.position or 0, argument.pk or 0, argument.name)
-
-
-def binding_execution_key(binding: ContainerDataset) -> tuple:
-    """Canonical ordering key for bindings within one argument.
-
-    Multi-valued bindings ordered by multi_position; pk is final
-    tie-breaker for corrupted or tied state.
-    """
-    return (binding.multi_position if binding.multi_position is not None else 0,
-            binding.pk or 0)
-
-
 class ContainerArgument(models.Model):
     INPUT = 'I'
     OUTPUT = 'O'
@@ -1553,6 +1536,25 @@ class ContainerDataset(models.Model):
                     f"type {argtype}")
         elif self.multi_position is not None:
             raise ValidationError("multi_position should be None for single-valued argtype")
+
+
+def argument_execution_key(argument: ContainerArgument) -> tuple:
+    """Canonical ordering key for arguments.
+
+    Keyword arguments first (type I, null position → 0), sorted by pk
+    (app-definition order).  Fixed arguments after, sorted by position.
+    """
+    return (argument.type, argument.position or 0, argument.pk or 0, argument.name)
+
+
+def binding_execution_key(binding: ContainerDataset) -> tuple:
+    """Canonical ordering key for bindings within one argument.
+
+    Multi-valued bindings ordered by multi_position; pk is final
+    tie-breaker for corrupted or tied state.
+    """
+    return (binding.multi_position if binding.multi_position is not None else 0,
+            binding.pk or 0)
 
 
 class ContainerLog(models.Model):
