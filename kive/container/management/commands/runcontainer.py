@@ -193,11 +193,12 @@ class Command(BaseCommand):
         if optional_arguments:
             command.extend(cls._format_kw_args(optional_arguments))
             command.append("--")
-        # Add fixed arguments as specified by the ContainerApp
-        fixed_arguments = [
-            arg for arg in run.app.arguments.all()
-            if arg.argtype in ContainerArgument.FIXED_ARG_TYPES
-        ]
+        # Add fixed arguments in canonical order: (position, pk).
+        fixed_arguments = sorted(
+            (arg for arg in run.app.arguments.all()
+             if arg.argtype in ContainerArgument.FIXED_ARG_TYPES),
+            key=lambda a: (a.position or 0, a.pk or 0),
+        )
         command.extend(cls._format_fixed_arg(arg) for arg in fixed_arguments)
         return command
 
@@ -208,10 +209,13 @@ class Command(BaseCommand):
         for cd in containerdatasets:
             grouped.setdefault(cd.argument, []).append(cd)
 
-        # Sort arguments by the same canonical ordering used by set_md5.
+        # Canonical argument-ordering contract:
+        #   fixed: (position, pk)
+        #   keyword: (pk)
+        #   within argument: (multi_position, pk)
         for arg in sorted(
             grouped,
-            key=lambda a: (a.type, a.position or 0, a.name, a.pk or 0),
+            key=lambda a: (a.type, a.position or 0, a.pk or 0, a.name),
         ):
             grouped.move_to_end(arg)
 
@@ -220,7 +224,6 @@ class Command(BaseCommand):
                 argcontainerdatasets,
                 key=lambda cd: (
                     cd.multi_position if cd.multi_position is not None else 0,
-                    cd.argument_id,
                     cd.pk or 0,
                 ),
             )
@@ -333,27 +336,31 @@ class Command(BaseCommand):
                                         upload_path: str) -> None:
         output_path = pathlib.Path(output_path).absolute()
         dirarg_path = output_path / argument.name
+        files: list[pathlib.Path] = []
         for dirpath, _, filenames in os.walk(dirarg_path):
             dirpath = pathlib.Path(dirpath)
             for filename in filenames:
-                datafile_path: pathlib.Path = (dirpath / filename).absolute()
-                dataset_filename = cls._build_directory_file_name(
-                    run.id, output_path, datafile_path)
-                destination_path = os.path.join(upload_path, dataset_filename)
-                dataset_name = cls._build_directory_dataset_name(
-                    run.id, output_path, datafile_path)
-                try:
-                    os.rename(datafile_path, destination_path)
-                    dataset = Dataset.create_dataset(
-                        destination_path,
-                        name=dataset_name,
-                        user=run.user,
-                    )
-                    dataset.copy_permissions(run)
-                    run.datasets.create(dataset=dataset, argument=argument)
-                except (OSError, IOError) as ex:
-                    if ex.errno != errno.ENOENT:
-                        raise
+                files.append((dirpath / filename).absolute())
+        files.sort(key=lambda p: p.relative_to(output_path).as_posix())
+        for position, datafile_path in enumerate(files, start=1):
+            dataset_filename = cls._build_directory_file_name(
+                run.id, output_path, datafile_path)
+            destination_path = os.path.join(upload_path, dataset_filename)
+            dataset_name = cls._build_directory_dataset_name(
+                run.id, output_path, datafile_path)
+            try:
+                os.rename(datafile_path, destination_path)
+                dataset = Dataset.create_dataset(
+                    destination_path,
+                    name=dataset_name,
+                    user=run.user,
+                )
+                dataset.copy_permissions(run)
+                run.datasets.create(dataset=dataset, argument=argument,
+                                    multi_position=position)
+            except (OSError, IOError) as ex:
+                if ex.errno != errno.ENOENT:
+                    raise
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')

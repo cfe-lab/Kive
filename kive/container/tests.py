@@ -3126,8 +3126,6 @@ Line 3
 
     def test_full_argument_formatting(self):
         # Set up test data
-        # NOTE(nknight): The order of these specs matters; it matches the order that the
-        # associated ContainerDataset objects would be returned from the database.
         argspecs = [
             {
                 "name": "positional_input",

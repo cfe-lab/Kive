@@ -1429,13 +1429,15 @@ class ContainerRun(Stopwatch, AccessControl):
             md5gen.update(parent_md5)
 
         # Build a canonical representation of every input binding.
-        # Order by (argument type, argument position, argument name, multi_position, pk)
-        # to match command semantics.  Include argument pk and dataset pk as stable
-        # tiebreakers.
+        # Canonical argument-ordering contract:
+        #   fixed: (position, pk)
+        #   keyword: (pk)
+        #   within argument: (multi_position, pk)
         bindings = []
         for cd in self.datasets.select_related('argument', 'dataset').order_by(
-            'argument__type', 'argument__position', 'argument__name',
-            'argument_id', 'multi_position', 'pk',
+            'argument__type', 'argument__position',
+            'argument_id', 'argument__name',
+            'multi_position', 'pk',
         ):
             bindings.append((
                 cd.argument_id,
@@ -1514,10 +1516,13 @@ class ContainerDataset(models.Model):
         return None, output_container_dataset.run
 
     def clean(self):
-        # Check that a position has been supplied for multiple-input arguments
-        if self.argument.argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        argtype = self.argument.argtype
+        if argtype in (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                       ContainerArgumentType.FIXED_DIRECTORY_OUTPUT):
             if self.multi_position is None:
-                raise ValidationError("multi_position is required for a multi-valued input")
+                raise ValidationError(
+                    "multi_position is required for multi-valued argument "
+                    f"type {argtype}")
         elif self.multi_position is not None:
             raise ValidationError("multi_position should be None for single-valued argtype")
 
