@@ -567,6 +567,7 @@ class ContainerAppMockTests(TestCase):
                              position=1,
                              type=ContainerArgument.OUTPUT)
         app.arguments.create(name='log_csv',
+                             position=2,
                              allow_multiple=True,
                              type=ContainerArgument.OUTPUT)
         expected_inputs = '--names_csv* -- greetings_csv'

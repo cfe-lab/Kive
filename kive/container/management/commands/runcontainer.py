@@ -344,9 +344,13 @@ class Command(BaseCommand):
             if not container_name:
                 raise RuntimeError(
                     f"Empty relative path for {datafile_path}")
-            if container_name.startswith("/") or ".." in container_name:
+            if relative.is_absolute():
                 raise RuntimeError(
-                    f"Invalid relative path '{container_name}' "
+                    f"Absolute relative path '{container_name}' "
+                    f"for {datafile_path}")
+            if ".." in relative.parts:
+                raise RuntimeError(
+                    f"Parent-traversing path '{container_name}' "
                     f"for {datafile_path}")
             if container_name in seen_names:
                 raise RuntimeError(

@@ -928,7 +928,7 @@ class ContainerArgument(models.Model):
         ordering = ('app_id', 'type', 'position', 'name')
         constraints = [
             models.CheckConstraint(
-                condition=(
+                check=(
                     models.Q(type='I', position__isnull=False, allow_multiple=False)
                     | models.Q(type='I', position__isnull=True)
                     | models.Q(type='O', position__isnull=False)
@@ -1555,13 +1555,19 @@ class ContainerDataset(models.Model):
             raise ValidationError("multi_position should be None for single-valued argtype")
 
 
+def _is_keyword(arg: ContainerArgument) -> bool:
+    return arg.argtype in ContainerArgument.KEYWORD_ARG_TYPES if arg.argtype is not None else arg.position is None
+
+
 def argument_execution_key(argument: ContainerArgument) -> tuple:
     """Canonical ordering key for arguments.
 
-    Keyword arguments first (type I, null position → 0), sorted by pk
-    (app-definition order).  Fixed arguments after, sorted by position.
+    Semantic class first: 0 = keyword, 1 = fixed.
+    Keyword arguments ordered by pk (app-definition order).
+    Fixed arguments ordered by position, then pk.
     """
-    return (argument.type, argument.position or 0, argument.pk or 0, argument.name)
+    semantic_class = 1 if argument.position is not None else 0
+    return (semantic_class, argument.position or 0, argument.pk or 0, argument.name)
 
 
 def binding_execution_key(binding: ContainerDataset) -> tuple:

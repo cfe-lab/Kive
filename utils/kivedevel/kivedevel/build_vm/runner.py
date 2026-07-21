@@ -302,25 +302,34 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     maybe_restart_after_config(cmds, cfg.instance, restart_required)
 
-    logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
-    ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
-    if ip is None:
-        print_network_diagnostics(cmds, cfg.instance, bridge_name)
-        logger.error(
-            "VM %s did not receive a DHCP lease on %s. "
-            "Check the bridge configuration and Incus network health.",
-            cfg.instance, bridge_name,
-        )
-        sys.exit(1)
-    logger.info("VM %s has IP %s.", cfg.instance, ip)
+    needs_lease = cfg.provision or not cfg.no_web_proxy
+    needs_reserved_address = not cfg.no_web_proxy
 
-    _reserve_vm_nic_address(cmds, cfg.instance, ip)
+    ip: str | None = None
+    if needs_lease:
+        logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
+        ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
+        if ip is None:
+            print_network_diagnostics(cmds, cfg.instance, bridge_name)
+            logger.error(
+                "VM %s did not receive a DHCP lease on %s. "
+                "Check the bridge configuration and Incus network health.",
+                cfg.instance, bridge_name,
+            )
+            sys.exit(1)
+        logger.info("VM %s has IP %s.", cfg.instance, ip)
+    else:
+        logger.debug("Skipping DHCP lease (provision=%s, no_web_proxy=%s).",
+                     cfg.provision, cfg.no_web_proxy)
 
-    if cfg.provision:
+    if needs_reserved_address and ip:
+        _reserve_vm_nic_address(cmds, cfg.instance, ip)
+
+    if cfg.provision and ip:
         logger.info("Checking VM network egress via incus exec...")
         _check_vm_egress(cmds, cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg, vm_ip=ip)
+    _ensure_web_proxy_device(cmds, cfg, vm_ip=ip if needs_reserved_address else None)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 

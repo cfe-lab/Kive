@@ -1142,7 +1142,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         container = Container.objects.create(family=family, user=user)
         app = ContainerApp.objects.create(container=container, name='test')
         arg = app.arguments.create(type=ContainerArgument.INPUT)
-        app.arguments.create(type=ContainerArgument.OUTPUT)
+        app.arguments.create(type=ContainerArgument.OUTPUT, name='output', position=1)
         dataset = Dataset.objects.create(user=user)
         content_file = ContentFile('a,b\n0,9')
         dataset.dataset_file.save('in1.csv', content_file)

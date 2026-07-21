@@ -1,4 +1,5 @@
 import datetime
+from itertools import zip_longest
 import typing as ty
 
 from .models import (ContainerArgument, ContainerArgumentType,
@@ -98,7 +99,7 @@ def _compare_optional_inputs(
             argument=argument).order_by("multi_position")
         rerun_datasets = rerun.datasets.filter(
             argument=argument).order_by("multi_position")
-        dataset_pairs = itertools.zip_longest(
+        dataset_pairs = zip_longest(
             original_datasets,
             rerun_datasets,
             fillvalue=None,
@@ -159,7 +160,7 @@ def _compare_directory_outputs(
             rerun_by_name[b.name] = b
 
         matched: set[int] = set()
-        for name in set(orig_by_name) & set(rerun_by_name):
+        for name in sorted(set(orig_by_name) & set(rerun_by_name)):
             orig = orig_by_name[name]
             rerun_b = rerun_by_name[name]
             matched.add(id(orig))
@@ -177,16 +178,14 @@ def _compare_directory_outputs(
             if comparison is not None:
                 yield comparison
 
-        for b in orig_bindings:
-            if id(b) not in matched:
-                comparison = DatasetComparison.compare_optional(b, None)
-                if comparison is not None:
-                    yield comparison
-        for b in rerun_bindings:
-            if id(b) not in matched:
-                comparison = DatasetComparison.compare_optional(None, b)
-                if comparison is not None:
-                    yield comparison
+        for b in orig_unmatched[len(rerun_unmatched):]:
+            comparison = DatasetComparison.compare_optional(b, None)
+            if comparison is not None:
+                yield comparison
+        for b in rerun_unmatched[len(orig_unmatched):]:
+            comparison = DatasetComparison.compare_optional(None, b)
+            if comparison is not None:
+                yield comparison
 
 
 def _parent_path(name: str) -> str:
