@@ -201,6 +201,10 @@ class TestPortForward(unittest.TestCase):
         cfg = make_config()
         nic_target = VmNicTarget(name="kive-lab-br", managed=True)
         with (
+            mock.patch("kivedevel.build_vm.runner.wait_vm_dhcp_lease",
+                       return_value="10.77.77.100"),
+            mock.patch("kivedevel.build_vm.runner._reserve_vm_nic_address"),
+            mock.patch("kivedevel.build_vm.runner._check_vm_egress"),
             mock.patch("kivedevel.build_vm.runner.ensure_managed_vm_network",
                        return_value=nic_target),
             mock.patch("kivedevel.build_vm.runner.ensure_instance",
@@ -226,6 +230,10 @@ class TestPortForward(unittest.TestCase):
         cfg = make_config()
         nic_target = VmNicTarget(name="kive-lab-br", managed=True)
         with (
+            mock.patch("kivedevel.build_vm.runner.wait_vm_dhcp_lease",
+                       return_value="10.77.77.100"),
+            mock.patch("kivedevel.build_vm.runner._reserve_vm_nic_address"),
+            mock.patch("kivedevel.build_vm.runner._check_vm_egress"),
             mock.patch("kivedevel.build_vm.runner.ensure_managed_vm_network",
                        return_value=nic_target) as mock_choose,
             mock.patch("kivedevel.build_vm.runner.ensure_instance",

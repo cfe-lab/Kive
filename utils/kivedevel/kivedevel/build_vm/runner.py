@@ -15,6 +15,7 @@ from .incus import ensure_incus_daemon, ensure_profile_with_root_disk, ensure_st
 from .instance import ensure_instance, maybe_restart_after_config
 from .models import BuildVmConfig
 from .network import (
+    _eth0_config,
     ensure_managed_vm_network,
     ensure_network_device,
     ensure_vm_nic,
@@ -51,13 +52,15 @@ def _retry_on_etag(fn, max_retries=_MAX_ETAG_RETRIES, initial_delay=_ETAG_BACKOF
             raise
 
 
-def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
+def _proxy_config(cfg: BuildVmConfig, vm_ip: str | None = None) -> dict[str, str]:
     if cfg.instance_type == "vm":
+        if vm_ip is None:
+            raise RuntimeError("vm_ip is required for VM proxy configuration")
         return {
             "listen": f"tcp:127.0.0.1:{cfg.web_port}",
             "type": "proxy",
             "nat": "true",
-            "connect": f"tcp:0.0.0.0:{GUEST_WEB_PORT}",
+            "connect": f"tcp:{vm_ip}:{GUEST_WEB_PORT}",
         }
     return {
         "listen": f"tcp:127.0.0.1:{cfg.web_port}",
@@ -84,6 +87,18 @@ def _current_proxy_config(cmds: Cmds, instance: str) -> dict[str, str] | None:
     return config
 
 
+def _reserve_vm_nic_address(cmds: Cmds, instance: str, ip: str) -> None:
+    current = _eth0_config(cmds, instance)
+    if current and current.get("ipv4.address") == ip:
+        logger.debug("eth0 on %s already has ipv4.address=%s.", instance, ip)
+        return
+    logger.info("Reserving IP %s on eth0 of %s...", ip, instance)
+    cmds.incus.run(
+        ["config", "device", "set", instance, "eth0", "ipv4.address", ip],
+        check=True, capture_output=True,
+    )
+
+
 def _proxy_args(desired: dict[str, str]) -> list[str]:
     args_list = [
         desired["type"],
@@ -102,12 +117,12 @@ def _proxy_config_match(desired: dict[str, str], current: dict[str, str]) -> boo
     return True
 
 
-def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
+def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig, vm_ip: str | None = None) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
 
-    desired = _proxy_config(cfg)
+    desired = _proxy_config(cfg, vm_ip=vm_ip)
     current = _current_proxy_config(cmds, cfg.instance)
 
     if current is not None and _proxy_config_match(desired, current):
@@ -287,23 +302,25 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     maybe_restart_after_config(cmds, cfg.instance, restart_required)
 
-    if cfg.provision:
-        logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
-        ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
-        if ip is None:
-            print_network_diagnostics(cmds, cfg.instance, bridge_name)
-            logger.error(
-                "VM %s did not receive a DHCP lease on %s. "
-                "Check the bridge configuration and Incus network health.",
-                cfg.instance, bridge_name,
-            )
-            sys.exit(1)
-        logger.info("VM %s has IP %s.", cfg.instance, ip)
+    logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
+    ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
+    if ip is None:
+        print_network_diagnostics(cmds, cfg.instance, bridge_name)
+        logger.error(
+            "VM %s did not receive a DHCP lease on %s. "
+            "Check the bridge configuration and Incus network health.",
+            cfg.instance, bridge_name,
+        )
+        sys.exit(1)
+    logger.info("VM %s has IP %s.", cfg.instance, ip)
 
+    _reserve_vm_nic_address(cmds, cfg.instance, ip)
+
+    if cfg.provision:
         logger.info("Checking VM network egress via incus exec...")
         _check_vm_egress(cmds, cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg)
+    _ensure_web_proxy_device(cmds, cfg, vm_ip=ip)
 
     maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
 

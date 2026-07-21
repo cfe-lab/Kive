@@ -6,6 +6,7 @@ import unittest
 
 
 from kivedevel._test_helpers import (
+    MockRunResult,
     make_cmds,
     make_config,
 )
@@ -28,7 +29,7 @@ class TestWebProxyDevice(unittest.TestCase):
     def test_creates_new_proxy_device(self):
         ensure = self._import_ensure()
         self.cmds.incus.output.return_value = ""
-        ensure(self.cmds, self.cfg)
+        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
         add_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "add" in str(c) and "proxy" in str(c)
@@ -52,9 +53,9 @@ class TestWebProxyDevice(unittest.TestCase):
             "  type: proxy\n"
             "  nat: \"true\"\n"
             "  listen: tcp:127.0.0.1:8000\n"
-            "  connect: tcp:0.0.0.0:8000\n"
+            "  connect: tcp:10.77.77.100:8000\n"
         )
-        ensure(self.cmds, self.cfg)
+        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
         self.assertNotIn("add", str(self.cmds.incus.run.call_args_list))
 
     def test_updates_when_port_differs(self):
@@ -64,27 +65,28 @@ class TestWebProxyDevice(unittest.TestCase):
             "  type: proxy\n"
             "  nat: \"true\"\n"
             "  listen: tcp:127.0.0.1:9000\n"
-            "  connect: tcp:0.0.0.0:8000\n"
+            "  connect: tcp:10.77.77.100:8000\n"
         )
-        ensure(self.cmds, self.cfg)
+        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
         remove_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "remove" in str(c)
         ]
         self.assertGreaterEqual(len(remove_calls), 1)
 
-    def test_vm_add_command_has_nat_and_wildcard(self):
+    def test_vm_add_command_has_concrete_address(self):
         ensure = self._import_ensure()
         cfg = make_config(instance_type="vm")
         self.cmds.incus.output.return_value = ""
-        ensure(self.cmds, cfg)
+        ensure(self.cmds, cfg, vm_ip="10.77.77.100")
         add_call = next(
             c for c in self.cmds.incus.run.call_args_list
             if "add" in str(c) and "proxy" in str(c)
         )
         args = " ".join(add_call[0][0])
         self.assertIn("nat=true", args)
-        self.assertIn("connect=tcp:0.0.0.0:8000", args)
+        self.assertIn("connect=tcp:10.77.77.100:8000", args)
+        self.assertNotIn("0.0.0.0", args)
 
     def test_container_add_command_no_nat(self):
         ensure = self._import_ensure()
@@ -107,7 +109,7 @@ class TestWebProxyDevice(unittest.TestCase):
             "  listen: tcp:127.0.0.1:8000\n"
             "  connect: tcp:127.0.0.1:8000\n"
         )
-        ensure(self.cmds, self.cfg)
+        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
         remove_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "remove" in str(c)

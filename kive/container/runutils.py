@@ -1,7 +1,4 @@
-import collections
 import datetime
-import itertools
-import pathlib
 import typing as ty
 
 from .models import (ContainerArgument, ContainerArgumentType,
@@ -116,32 +113,87 @@ def _compare_optional_inputs(
 def _compare_directory_outputs(
         argument: ContainerArgument, original: ContainerRun,
         rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
-    original_by_name: dict[str, ContainerDataset] = {}
-    for binding in original.datasets.filter(argument=argument):
-        name = binding.name
-        if name in original_by_name:
-            raise RuntimeError(
-                f"Duplicate directory-output name {name!r} in original run "
-                f"{original.id}")
-        original_by_name[name] = binding
 
-    rerun_by_name: dict[str, ContainerDataset] = {}
-    for binding in rerun.datasets.filter(argument=argument):
-        name = binding.name
-        if name in rerun_by_name:
-            raise RuntimeError(
-                f"Duplicate directory-output name {name!r} in rerun run "
-                f"{rerun.id}")
-        rerun_by_name[name] = binding
+    def _by_parent(
+        bindings: ty.Iterable[ContainerDataset],
+    ) -> dict[str, list[ContainerDataset]]:
+        groups: dict[str, list[ContainerDataset]] = {}
+        for b in bindings:
+            parent = _parent_path(b.name)
+            groups.setdefault(parent, []).append(b)
+        return groups
 
-    all_names = sorted(set(original_by_name) | set(rerun_by_name))
-    for name in all_names:
-        original_binding = original_by_name.get(name)
-        rerun_binding = rerun_by_name.get(name)
-        comparison = DatasetComparison.compare_optional(
-            original_binding, rerun_binding)
-        if comparison is not None:
-            yield comparison
+    def _sorted_unmatched(
+        bindings: list[ContainerDataset],
+        matched: set[int],
+    ) -> list[ContainerDataset]:
+        return sorted(
+            (b for b in bindings if id(b) not in matched),
+            key=lambda b: (
+                b.multi_position if b.multi_position is not None else 0,
+                b.name,
+                b.pk or 0,
+            ),
+        )
+
+    original_all = list(original.datasets.filter(argument=argument))
+    rerun_all = list(rerun.datasets.filter(argument=argument))
+    original_by_parent = _by_parent(original_all)
+    rerun_by_parent = _by_parent(rerun_all)
+    all_parents = sorted(set(original_by_parent) | set(rerun_by_parent))
+
+    for parent in all_parents:
+        orig_bindings = original_by_parent.get(parent, [])
+        rerun_bindings = rerun_by_parent.get(parent, [])
+        orig_by_name: dict[str, ContainerDataset] = {}
+        for b in orig_bindings:
+            if b.name in orig_by_name:
+                raise RuntimeError(
+                    f"Duplicate name {b.name!r} in original run {original.id}")
+            orig_by_name[b.name] = b
+        rerun_by_name: dict[str, ContainerDataset] = {}
+        for b in rerun_bindings:
+            if b.name in rerun_by_name:
+                raise RuntimeError(
+                    f"Duplicate name {b.name!r} in rerun run {rerun.id}")
+            rerun_by_name[b.name] = b
+
+        matched: set[int] = set()
+        for name in set(orig_by_name) & set(rerun_by_name):
+            orig = orig_by_name[name]
+            rerun_b = rerun_by_name[name]
+            matched.add(id(orig))
+            matched.add(id(rerun_b))
+            comparison = DatasetComparison.compare_optional(orig, rerun_b)
+            if comparison is not None:
+                yield comparison
+
+        orig_unmatched = _sorted_unmatched(orig_bindings, matched)
+        rerun_unmatched = _sorted_unmatched(rerun_bindings, matched)
+        for orig_b, rerun_b in zip(orig_unmatched, rerun_unmatched):
+            matched.add(id(orig_b))
+            matched.add(id(rerun_b))
+            comparison = DatasetComparison.compare_optional(orig_b, rerun_b)
+            if comparison is not None:
+                yield comparison
+
+        for b in orig_bindings:
+            if id(b) not in matched:
+                comparison = DatasetComparison.compare_optional(b, None)
+                if comparison is not None:
+                    yield comparison
+        for b in rerun_bindings:
+            if id(b) not in matched:
+                comparison = DatasetComparison.compare_optional(None, b)
+                if comparison is not None:
+                    yield comparison
+
+
+def _parent_path(name: str) -> str:
+    idx = name.rfind("/")
+    if idx == -1:
+        return ""
+    return name[:idx]
 
 
 def _compare_rerun_datasets(

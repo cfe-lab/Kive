@@ -330,7 +330,28 @@ class Command(BaseCommand):
             for filename in filenames:
                 files.append((dirpath / filename).absolute())
         files.sort(key=lambda p: p.relative_to(output_path).as_posix())
+        seen_names: set[str] = set()
         for position, datafile_path in enumerate(files, start=1):
+            try:
+                relative = datafile_path.relative_to(dirarg_path)
+            except ValueError:
+                logger.error(
+                    "File %s is outside directory argument root %s",
+                    datafile_path, dirarg_path,
+                )
+                raise
+            container_name = relative.as_posix()
+            if not container_name:
+                raise RuntimeError(
+                    f"Empty relative path for {datafile_path}")
+            if container_name.startswith("/") or ".." in container_name:
+                raise RuntimeError(
+                    f"Invalid relative path '{container_name}' "
+                    f"for {datafile_path}")
+            if container_name in seen_names:
+                raise RuntimeError(
+                    f"Duplicate directory-output path '{container_name}'")
+            seen_names.add(container_name)
             dataset_filename = cls._build_directory_file_name(
                 run.id, output_path, datafile_path)
             destination_path = os.path.join(upload_path, dataset_filename)
@@ -345,6 +366,7 @@ class Command(BaseCommand):
                 )
                 dataset.copy_permissions(run)
                 run.datasets.create(dataset=dataset, argument=argument,
+                                    name=container_name,
                                     multi_position=position)
             except (OSError, IOError) as ex:
                 if ex.errno != errno.ENOENT:
