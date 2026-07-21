@@ -3,6 +3,36 @@
 from django.db import migrations, models
 
 
+def backfill_directory_output_positions(apps, schema_editor):
+    ContainerDataset = apps.get_model('container', 'ContainerDataset')
+    ContainerArgument = apps.get_model('container', 'ContainerArgument')
+
+    # Identify FIXED_DIRECTORY_OUTPUT arguments:
+    #   position NOT NULL, allow_multiple=True, type='O' (OUTPUT)
+    dir_arg_ids = ContainerArgument.objects.filter(
+        position__isnull=False, allow_multiple=True, type='O',
+    ).values_list('id', flat=True)
+
+    if not dir_arg_ids:
+        return
+
+    affected = list(ContainerDataset.objects.filter(
+        argument_id__in=dir_arg_ids,
+        multi_position__isnull=True,
+    ).order_by('run_id', 'argument_id', 'name', 'id'))
+
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for cd in affected:
+        key = (cd.run_id, cd.argument_id)
+        groups.setdefault(key, []).append(cd)
+
+    for (run_id, arg_id), datasets in groups.items():
+        for position, cd in enumerate(datasets, start=1):
+            ContainerDataset.objects.filter(pk=cd.pk).update(
+                multi_position=position)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -10,6 +40,10 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
+        migrations.RunPython(
+            backfill_directory_output_positions,
+            reverse_code=migrations.RunPython.noop,
+        ),
         migrations.AddConstraint(
             model_name='containerdataset',
             constraint=models.UniqueConstraint(
