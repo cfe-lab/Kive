@@ -14,7 +14,7 @@ class MockRunResult:
 def make_cmds(incus_output: str = "[]", **kwargs) -> mock.Mock:
     cmds = mock.Mock()
     cmds.incus.output.return_value = incus_output
-    cmds.incus.run.return_value = MockRunResult(returncode=0)
+    cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="[]")
     for key, val in kwargs.items():
         setattr(cmds, key, val)
     return cmds

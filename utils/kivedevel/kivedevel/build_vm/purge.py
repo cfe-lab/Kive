@@ -26,11 +26,42 @@ class NetworkInfo:
 
 
 @dataclasses.dataclass(frozen=True)
+class HostForwardEntry:
+    kind: str = "host-forward"
+    created_by: str = "utils/dev"
+    pid: int = 0
+    port: int = 0
+    vm_ip: str = ""
+
+    @classmethod
+    def from_dict(cls, d: dict) -> HostForwardEntry:
+        kind = d.get("kind")
+        if kind != "host-forward":
+            raise RuntimeError(f"Expected kind 'host-forward', got {kind!r}")
+        if d.get("created_by") != "utils/dev":
+            raise RuntimeError(
+                f"Expected created_by 'utils/dev', got {d.get('created_by')!r}")
+        pid = d.get("pid")
+        if not isinstance(pid, int) or pid <= 0:
+            raise RuntimeError(f"Invalid or missing PID: {pid!r}")
+        port = d.get("port")
+        if not isinstance(port, int) or port <= 0 or port > 65535:
+            raise RuntimeError(f"Invalid or missing port: {port!r}")
+        vm_ip = d.get("vm_ip")
+        if not isinstance(vm_ip, str) or not vm_ip:
+            raise RuntimeError(f"Invalid or missing vm_ip: {vm_ip!r}")
+        return cls(kind=kind, created_by="utils/dev", pid=pid, port=port, vm_ip=vm_ip)
+
+
+RegistryEntry = HostForwardEntry
+
+
+@dataclasses.dataclass(frozen=True)
 class PurgeInventory:
     instances: tuple[str, ...]
     networks: tuple[NetworkInfo, ...]
     workdirs: tuple[Path, ...]
-    registry_entries: tuple[dict, ...]
+    registry_entries: tuple[RegistryEntry, ...]
 
     @property
     def total_count(self) -> int:
@@ -150,7 +181,7 @@ def _find_tagged_instances(cmds: Cmds) -> list[str]:
             f"incus list failed (rc={result.returncode}): {result.stderr}")
     out = result.stdout or ""
     if not out:
-        return []
+        raise RuntimeError("incus list returned empty output")
     try:
         instances = json.loads(out)
     except json.JSONDecodeError as exc:
@@ -317,17 +348,15 @@ def execute_purge(inventory: PurgeInventory, cmds: Cmds, root: Path) -> PurgeOut
             outcome.deleted_networks += 1
 
     for entry in inventory.registry_entries:
-        if entry.get("kind") == "host-forward":
-            pid = entry.get("pid")
-            if pid:
-                try:
-                    os.kill(pid, signal.SIGTERM)
-                    outcome.removed_port_forwards += 1
-                except ProcessLookupError:
-                    outcome.already_absent_port_forwards += 1
-                except OSError:
-                    outcome.failed_port_forwards += 1
-                    outcome.failed_forward_entries.append(entry)
+        pid = entry.pid
+        try:
+            os.kill(pid, signal.SIGTERM)
+            outcome.removed_port_forwards += 1
+        except ProcessLookupError:
+            outcome.already_absent_port_forwards += 1
+        except OSError:
+            outcome.failed_port_forwards += 1
+            outcome.failed_forward_entries.append(dataclasses.asdict(entry))
 
     _rewrite_registry(root, outcome)
 
@@ -353,7 +382,7 @@ def _rewrite_registry(root: Path, outcome: PurgeOutcome) -> None:
             path.unlink()
 
 
-def _read_registry(root: Path) -> list[dict]:
+def _read_registry(root: Path) -> list[RegistryEntry]:
     path = root / "tmp~" / _REGISTRY_NAME
     if not path.exists():
         return []
@@ -364,22 +393,18 @@ def _read_registry(root: Path) -> list[dict]:
     if not isinstance(data, list):
         raise RuntimeError(
             f"Registry at {path} is not a JSON list; got {type(data).__name__}")
+    entries: list[RegistryEntry] = []
     for entry in data:
         if not isinstance(entry, dict):
             raise RuntimeError(
                 f"Registry entry is not a JSON object: {entry!r}")
         kind = entry.get("kind")
-        if kind not in ("host-forward",):
+        if kind == "host-forward":
+            entries.append(HostForwardEntry.from_dict(entry))
+        else:
             raise RuntimeError(
                 f"Unknown registry entry kind {kind!r}: {entry!r}")
-        if "pid" in entry:
-            pid = entry["pid"]
-            if not isinstance(pid, int) or pid <= 0:
-                raise RuntimeError(
-                    f"Invalid PID in registry entry: {pid!r}")
-        if "created_by" not in entry:
-            raise RuntimeError(f"Registry entry missing 'created_by': {entry!r}")
-    return data
+    return entries
 
 
 def run_purge(args: argparse.Namespace) -> None:
