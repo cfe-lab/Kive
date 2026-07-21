@@ -16,6 +16,7 @@ from django.utils import timezone
 from container.models import (
     ContainerRun, ContainerArgument, ContainerArgumentType,
     ContainerLog, ContainerDataset,
+    argument_execution_key, binding_execution_key,
 )
 from librarian.models import Dataset
 
@@ -193,11 +194,10 @@ class Command(BaseCommand):
         if optional_arguments:
             command.extend(cls._format_kw_args(optional_arguments))
             command.append("--")
-        # Add fixed arguments in canonical order: (position, pk).
         fixed_arguments = sorted(
             (arg for arg in run.app.arguments.all()
              if arg.argtype in ContainerArgument.FIXED_ARG_TYPES),
-            key=lambda a: (a.position or 0, a.pk or 0),
+            key=argument_execution_key,
         )
         command.extend(cls._format_fixed_arg(arg) for arg in fixed_arguments)
         return command
@@ -209,24 +209,12 @@ class Command(BaseCommand):
         for cd in containerdatasets:
             grouped.setdefault(cd.argument, []).append(cd)
 
-        # Canonical argument-ordering contract:
-        #   fixed: (position, pk)
-        #   keyword: (pk)
-        #   within argument: (multi_position, pk)
-        for arg in sorted(
-            grouped,
-            key=lambda a: (a.type, a.position or 0, a.pk or 0, a.name),
-        ):
+        for arg in sorted(grouped, key=argument_execution_key):
             grouped.move_to_end(arg)
 
         for arg, argcontainerdatasets in grouped.items():
             argcontainerdatasets = sorted(
-                argcontainerdatasets,
-                key=lambda cd: (
-                    cd.multi_position if cd.multi_position is not None else 0,
-                    cd.pk or 0,
-                ),
-            )
+                argcontainerdatasets, key=binding_execution_key)
             if arg.type == ContainerArgument.INPUT:
                 datasetfolder = "/mnt/input"
             else:

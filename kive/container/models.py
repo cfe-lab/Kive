@@ -889,6 +889,25 @@ class ContainerArgumentType(enum.Enum):
     FIXED_DIRECTORY_OUTPUT = enum.auto()
 
 
+def argument_execution_key(argument: ContainerArgument) -> tuple:
+    """Canonical ordering key for arguments.
+
+    Keyword arguments first (type I, null position → 0), sorted by pk
+    (app-definition order).  Fixed arguments after, sorted by position.
+    """
+    return (argument.type, argument.position or 0, argument.pk or 0, argument.name)
+
+
+def binding_execution_key(binding: ContainerDataset) -> tuple:
+    """Canonical ordering key for bindings within one argument.
+
+    Multi-valued bindings ordered by multi_position; pk is final
+    tie-breaker for corrupted or tied state.
+    """
+    return (binding.multi_position if binding.multi_position is not None else 0,
+            binding.pk or 0)
+
+
 class ContainerArgument(models.Model):
     INPUT = 'I'
     OUTPUT = 'O'
@@ -1428,11 +1447,6 @@ class ContainerRun(Stopwatch, AccessControl):
             parent_md5 = parent_container.md5.encode(encoding)
             md5gen.update(parent_md5)
 
-        # Build a canonical representation of every input binding.
-        # Canonical argument-ordering contract:
-        #   fixed: (position, pk)
-        #   keyword: (pk)
-        #   within argument: (multi_position, pk)
         bindings = []
         for cd in self.datasets.select_related('argument', 'dataset').order_by(
             'argument__type', 'argument__position',
