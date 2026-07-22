@@ -98,10 +98,14 @@ class TestSlurmProbe(unittest.TestCase):
         self.cmds.incus.run.return_value = MockRunResult(
             returncode=0,
             stdout=(
-                "=== hostname ===\nhead\n"
-                "=== getent hosts head ===\n127.0.0.1\n"
-                "=== Slurm services ===\nactive: slurmdbd\nactive: slurmctld\nactive: slurmd\n"
-                "=== Slurm commands ===\n/usr/bin/squeue\n/usr/bin/sinfo\n"
+                "active\n"
+                "active\n"
+                "active\n"
+                "active\n"
+                "active\n"
+                "UP\n"
+                "head\n"
+                "idle\n"
             ),
         )
 

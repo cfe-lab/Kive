@@ -44,13 +44,15 @@ command -v scontrol
 command -v srun
 echo '=== services ==='
 systemctl is-active munge
+systemctl is-active mariadb
 systemctl is-active slurmdbd
 systemctl is-active slurmctld
 systemctl is-active slurmd
 echo '=== controller ==='
 scontrol ping
-scontrol show node head
-sinfo -Nel
+scontrol show node head -o
+sinfo -h -N -n head -o '%T'
+squeue -a
 """
 
 
@@ -67,7 +69,7 @@ def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
                      instance, result.returncode, stdout, stderr)
         _print_slurm_diagnostics(cmds, instance)
         sys.exit(1)
-    if "inactive" in stdout or "down" in stdout.lower():
+    if "inactive" in stdout or "not active" in stderr:
         logger.error("Slurm services are not fully active on %s.\n%s", instance, stdout)
         _print_slurm_diagnostics(cmds, instance)
         sys.exit(1)
@@ -75,27 +77,49 @@ def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
         logger.error("Required Slurm commands missing on %s.\n%s", instance, stdout)
         _print_slurm_diagnostics(cmds, instance)
         sys.exit(1)
+
+    node_state_line = [line for line in stdout.splitlines() if line.strip() and '/' not in line and line.strip() != 'UP' and 'controller' not in line.lower()]
+    node_state = node_state_line[-1].strip() if node_state_line else ""
+    if node_state != "idle":
+        logger.error(
+            "Node head is not idle on %s (state=%r).\n%s",
+            instance, node_state, stdout,
+        )
+        _print_slurm_diagnostics(cmds, instance)
+        sys.exit(1)
     logger.info("Slurm health check passed on %s.", instance)
 
 
 def _print_slurm_diagnostics(cmds: Cmds, instance: str) -> None:
     logger.error("=== Slurm diagnostics for %s ===", instance)
-    for svc in ("munge", "slurmdbd", "slurmctld", "slurmd"):
+    logger.error("--- service state ---")
+    for svc in ("munge", "mariadb", "slurmdbd", "slurmctld", "slurmd"):
         cmds.incus.run(
             ["exec", instance, "--", "systemctl", "status", svc, "--no-pager"],
             check=False,
         )
+    logger.error("--- journal ---")
     cmds.incus.run(
         ["exec", instance, "--",
-         "journalctl", "-u", "munge", "-u", "slurmdbd",
-         "-u", "slurmctld", "-u", "slurmd",
-         "--no-pager", "--lines=100"],
+         "journalctl", "-u", "munge", "-u", "mariadb",
+         "-u", "slurmdbd", "-u", "slurmctld", "-u", "slurmd",
+         "--no-pager", "--lines=300"],
         check=False,
     )
+    logger.error("--- controller ---")
     cmds.incus.run(["exec", instance, "--", "scontrol", "ping"], check=False)
-    cmds.incus.run(["exec", instance, "--", "scontrol", "show", "node", "head"], check=False)
+    cmds.incus.run(["exec", instance, "--", "scontrol", "show", "node", "head", "-o"], check=False)
+    logger.error("--- partitions and jobs ---")
     cmds.incus.run(["exec", instance, "--", "sinfo", "-Nel"], check=False)
     cmds.incus.run(["exec", instance, "--", "squeue", "-a"], check=False)
+    logger.error("--- worker hardware ---")
+    cmds.incus.run(["exec", instance, "--", "slurmd", "-C"], check=False)
+    logger.error("--- Slurm logs ---")
+    for logf in ("slurmdbd.log", "slurmctld.log", "slurmd.log"):
+        cmds.incus.run(
+            ["exec", instance, "--", "tail", "-200", f"/var/log/slurm/{logf}"],
+            check=False,
+        )
 
 
 _SINGULARITY_PROBE_SCRIPT = """
