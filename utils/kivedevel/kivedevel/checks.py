@@ -17,6 +17,7 @@ from pathlib import Path
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root, instance_exists, instance_is_running
 from .slurm_health import SLURM_HEALTHCHECK_SCRIPT
+from .web_endpoint import check_host_endpoint
 
 
 logger = logging.getLogger("kivedevel.checks")
@@ -307,26 +308,61 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
 def _print_proxy_diagnostics(cmds: Cmds, instance: str) -> None:
     logger.error("=== INCUS proxy device configuration ===")
     cmds.incus.run(["config", "device", "show", instance], check=False)
-    logger.error("=== HOST listener ===")
+    for key in ("type", "listen", "connect", "nat"):
+        out = cmds.incus.output(["config", "device", "get", instance, "kive-web", key])
+        if out:
+            logger.error("  %s = %s", key, out.strip())
+    logger.error("=== INCUS network ===")
+    cmds.incus.run(["network", "show", "kive-lab-br"], check=False)
+    cmds.incus.run(["network", "list-leases", "kive-lab-br"], check=False)
+    logger.error("=== HOST NAT rules ===")
     import subprocess as _sp
-    _sp.run(["ss", "-ltnp", "sport", "=", ":8000"], check=False)
+    _sp.run(["sudo", "nft", "list", "ruleset"], check=False)
+    logger.error("=== HOST route to VM ===")
+    vm_ip = _get_vm_ip_from_state(cmds, instance)
+    if vm_ip:
+        _sp.run(["ip", "route", "get", vm_ip], check=False)
+        _sp.run(["ip", "neighbor", "show", vm_ip], check=False)
     logger.error("=== GUEST loopback ===")
-    cmds.incus.run(["exec", instance, "--", "curl", "-v", "http://127.0.0.1:8000/login/"], check=False)
-    logger.error("=== HOST localhost request ===")
-    try:
-        opener = _build_local_opener()
-        with opener.open("http://127.0.0.1:8000/login/", timeout=10) as r:
-            logger.error("HOST localhost status: %s", r.status)
-    except Exception as exc:
-        logger.error("HOST localhost failed: %r", exc)
+    cmds.incus.run(["exec", instance, "--", "curl", "-v", "--connect-timeout", "3", "--max-time", "5", "http://127.0.0.1:8000/login/"], check=False)
+    if vm_ip:
+        logger.error("=== GUEST VM-address curl ===")
+        cmds.incus.run(["exec", instance, "--", "curl", "-v", "--connect-timeout", "3", "--max-time", "5", f"http://{vm_ip}:8000/login/"], check=False)
+        logger.error("=== HOST to VM curl ===")
+        _sp.run(["curl", "--noproxy", "*", "--connect-timeout", "3", "--max-time", "5", f"http://{vm_ip}:8000/login/"], check=False)
+    logger.error("=== HOST localhost curl ===")
+    _sp.run(["curl", "--noproxy", "*", "--connect-timeout", "3", "--max-time", "5", "http://127.0.0.1:8000/login/"], check=False)
     logger.error("=== GUEST service ===")
     cmds.incus.run(["exec", instance, "--", "systemctl", "status", "kive-dev-web.service", "--no-pager"], check=False)
-    cmds.incus.run(["exec", instance, "--", "journalctl", "-u", "kive-dev-web.service", "--no-pager", "--lines=100"], check=False)
+    cmds.incus.run(["exec", instance, "--", "journalctl", "-u", "kive-dev-web.service", "--no-pager", "--lines=200"], check=False)
     logger.error("=== GUEST network ===")
     cmds.incus.run(["exec", instance, "--", "ss", "-ltnp"], check=False)
     cmds.incus.run(["exec", instance, "--", "ufw", "status", "verbose"], check=False)
     cmds.incus.run(["exec", instance, "--", "ip", "addr"], check=False)
     cmds.incus.run(["exec", instance, "--", "ip", "route"], check=False)
+
+
+def _get_vm_ip_from_state(cmds: Cmds, instance: str) -> str | None:
+    import json
+    result = cmds.incus.run(
+        ["list", instance, "--format", "json"],
+        check=False, capture_output=True, timeout=10,
+    )
+    if result.returncode != 0:
+        return None
+    try:
+        data = json.loads(result.stdout or "[]")
+        if isinstance(data, list) and data:
+            state = data[0].get("state", {})
+            network = state.get("network", {}) if isinstance(state, dict) else {}
+            for iface_data in network.values():
+                if isinstance(iface_data, dict):
+                    for addr in iface_data.get("addresses", []):
+                        if isinstance(addr, dict) and addr.get("family") == "inet" and addr.get("scope") == "global":
+                            return addr["address"]
+    except (json.JSONDecodeError, IndexError, KeyError):
+        pass
+    return None
 
 
 def _check_api_probe_results(results: dict, instance: str) -> None:
@@ -391,11 +427,12 @@ def run_test_api(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     base_url = _resolve_base_url(args.base_url)
-    logger.info("Waiting for API at %s/login/ (deadline %ss)...", base_url, SMOKE_DEADLINE_SECONDS)
-    if not _wait_for_url(base_url, deadline=SMOKE_DEADLINE_SECONDS):
+    logger.info("Checking host endpoint at %s/login/ ...", base_url)
+    result = check_host_endpoint(cmds, instance, port=args.port)
+    if result.failure_stage is not None:
         logger.error(
-            "API endpoint %s/login/ did not become reachable within %s seconds.",
-            base_url, SMOKE_DEADLINE_SECONDS,
+            "Host endpoint check failed at stage %s (last error: %s).",
+            result.failure_stage, result.last_error,
         )
         _print_proxy_diagnostics(cmds, instance)
         sys.exit(1)

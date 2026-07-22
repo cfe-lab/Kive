@@ -28,7 +28,7 @@ class TestWebProxyDevice(unittest.TestCase):
     def test_creates_new_proxy_device(self):
         ensure = self._import_ensure()
         self.cmds.incus.output.return_value = ""
-        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
+        ensure(self.cmds, self.cfg)
         add_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "add" in str(c) and "proxy" in str(c)
@@ -45,52 +45,58 @@ class TestWebProxyDevice(unittest.TestCase):
         ]
         self.assertEqual(len(add_calls), 0)
 
+    def _make_device_config(self, listen, connect, nat):
+        def side_effect(args, **kwargs):
+            if "get" in args and "type" in args:
+                return "proxy\n"
+            if "get" in args and "nat" in args:
+                return nat + "\n"
+            if "get" in args and "listen" in args:
+                return listen + "\n"
+            if "get" in args and "connect" in args:
+                return connect + "\n"
+            if "show" in args:
+                return ""
+            return ""
+        return side_effect
+
     def test_skipped_when_already_matches(self):
         ensure = self._import_ensure()
-        self.cmds.incus.output.return_value = (
-            "kive-web:\n"
-            "  type: proxy\n"
-            "  nat: \"true\"\n"
-            "  listen: tcp:127.0.0.1:8000\n"
-            "  connect: tcp:10.77.77.100:8000\n"
+        self.cmds.incus.output.side_effect = self._make_device_config(
+            "tcp:127.0.0.1:8000", "tcp:0.0.0.0:8000", "true",
         )
-        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
+        ensure(self.cmds, self.cfg)
         self.assertNotIn("add", str(self.cmds.incus.run.call_args_list))
 
     def test_updates_when_port_differs(self):
         ensure = self._import_ensure()
-        self.cmds.incus.output.return_value = (
-            "kive-web:\n"
-            "  type: proxy\n"
-            "  nat: \"true\"\n"
-            "  listen: tcp:127.0.0.1:9000\n"
-            "  connect: tcp:10.77.77.100:8000\n"
+        self.cmds.incus.output.side_effect = self._make_device_config(
+            "tcp:127.0.0.1:9000", "tcp:0.0.0.0:8000", "true",
         )
-        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
+        ensure(self.cmds, self.cfg)
         remove_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "remove" in str(c)
         ]
         self.assertGreaterEqual(len(remove_calls), 1)
 
-    def test_vm_add_command_has_concrete_address(self):
+    def test_vm_add_command_has_wildcard(self):
         ensure = self._import_ensure()
         cfg = make_config(instance_type="vm")
-        self.cmds.incus.output.return_value = ""
-        ensure(self.cmds, cfg, vm_ip="10.77.77.100")
+        self.cmds.incus.output.side_effect = self._make_device_config("", "", "")
+        ensure(self.cmds, cfg)
         add_call = next(
             c for c in self.cmds.incus.run.call_args_list
             if "add" in str(c) and "proxy" in str(c)
         )
         args = " ".join(add_call[0][0])
         self.assertIn("nat=true", args)
-        self.assertIn("connect=tcp:10.77.77.100:8000", args)
-        self.assertNotIn("0.0.0.0", args)
+        self.assertIn("connect=tcp:0.0.0.0:8000", args)
 
     def test_container_add_command_no_nat(self):
         ensure = self._import_ensure()
         cfg = make_config(instance_type="container")
-        self.cmds.incus.output.return_value = ""
+        self.cmds.incus.output.side_effect = self._make_device_config("", "", "")
         ensure(self.cmds, cfg)
         add_call = next(
             c for c in self.cmds.incus.run.call_args_list
@@ -102,13 +108,10 @@ class TestWebProxyDevice(unittest.TestCase):
 
     def test_vm_replaces_non_nat_config(self):
         ensure = self._import_ensure()
-        self.cmds.incus.output.return_value = (
-            "kive-web:\n"
-            "  type: proxy\n"
-            "  listen: tcp:127.0.0.1:8000\n"
-            "  connect: tcp:127.0.0.1:8000\n"
+        self.cmds.incus.output.side_effect = self._make_device_config(
+            "tcp:127.0.0.1:8000", "tcp:127.0.0.1:8000", "",
         )
-        ensure(self.cmds, self.cfg, vm_ip="10.77.77.100")
+        ensure(self.cmds, self.cfg)
         remove_calls = [
             c for c in self.cmds.incus.run.call_args_list
             if "remove" in str(c)
