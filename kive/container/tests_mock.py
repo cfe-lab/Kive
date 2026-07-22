@@ -1120,43 +1120,61 @@ class SandboxInputFilenameTests(TestCase):
 
     def test_optional_input_returns_argument_name(self):
         cd = Mock()
+        cd.name = ''
         cd.multi_position = None
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
         cd.argument.name = 'extra'
+        cd.dataset = Mock()
+        cd.dataset.name = 'sample.txt'
         result = runcontainer.Command._sandbox_argument_filename(cd)
-        self.assertEqual('extra', result)
+        self.assertEqual('extra.txt', result)
 
-    def test_optional_multiple_includes_multi_position(self):
+    def test_optional_multiple_includes_multi_position_and_suffix(self):
         cd = Mock()
+        cd.name = ''
         cd.multi_position = 3
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         cd.argument.name = 'inputs'
+        cd.dataset = Mock()
+        cd.dataset.name = 'data.csv'
         result = runcontainer.Command._sandbox_argument_filename(cd)
-        self.assertEqual('inputs_3', result)
+        self.assertEqual('inputs_3.csv', result)
 
     def test_different_multi_positions_gives_different_filenames(self):
         cd1 = Mock()
+        cd1.name = ''
         cd1.multi_position = 1
         cd1.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         cd1.argument.name = 'inputs'
+        cd1.dataset = Mock()
+        cd1.dataset.name = 'a.csv'
         cd2 = Mock()
+        cd2.name = ''
         cd2.multi_position = 2
         cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         cd2.argument.name = 'inputs'
+        cd2.dataset = Mock()
+        cd2.dataset.name = 'b.csv'
         self.assertNotEqual(
             runcontainer.Command._sandbox_argument_filename(cd1),
             runcontainer.Command._sandbox_argument_filename(cd2),
         )
 
-    def test_duplicate_multi_position_produces_same_filename(self):
+    def test_duplicate_multi_position_same_suffix_produces_same_filename(self):
         cd1 = Mock()
+        cd1.name = ''
         cd1.multi_position = 1
         cd1.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         cd1.argument.name = 'inputs'
+        cd1.dataset = Mock()
+        cd1.dataset.name = 'x.csv'
         cd2 = Mock()
+        cd2.name = ''
         cd2.multi_position = 1
         cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
         cd2.argument.name = 'inputs'
+        cd2.dataset = Mock()
+        cd2.dataset.name = 'y.csv'
         self.assertEqual(
             runcontainer.Command._sandbox_argument_filename(cd1),
             runcontainer.Command._sandbox_argument_filename(cd2),
@@ -1165,11 +1183,25 @@ class SandboxInputFilenameTests(TestCase):
     def test_no_id_in_filename(self):
         cd = Mock()
         cd.id = 999
+        cd.name = ''
         cd.multi_position = None
         cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
         cd.argument.name = 'opt'
+        cd.dataset = Mock()
+        cd.dataset.name = 'data.txt'
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertNotIn('999', result)
+
+    def test_preserves_complete_suffix_chain(self):
+        cd = Mock()
+        cd.name = ''
+        cd.multi_position = 1
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+        cd.argument.name = 'reads'
+        cd.dataset = Mock()
+        cd.dataset.name = 'sample.fastq.gz'
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('reads_1.fastq.gz', result)
 
 
 class RunContainerFormatKwArgsTests(TestCase):
@@ -1198,9 +1230,9 @@ class RunContainerFormatKwArgsTests(TestCase):
         paths = list(runcontainer.Command._format_kw_args(cds))
         expected_order = [
             '--inputs',
-            '/mnt/input/a_102.csv',
-            '/mnt/input/b_103.csv',
-            '/mnt/input/c_101.csv',
+            '/mnt/input/inputs_1.csv',
+            '/mnt/input/inputs_2.csv',
+            '/mnt/input/inputs_3.csv',
         ]
         self.assertEqual(expected_order, paths)
 

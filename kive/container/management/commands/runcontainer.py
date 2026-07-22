@@ -86,10 +86,26 @@ class Command(BaseCommand):
         argtype = container_dataset.argument.argtype
         if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
             arg_name = container_dataset.argument.name
+            base = container_dataset.name or container_dataset.dataset.name
+            base = os.path.basename(base)
+            if base in ("", ".", ".."):
+                raise RuntimeError(
+                    f"Invalid dataset name for {arg_name}: {base!r}")
+            if "/" in base:
+                raise RuntimeError(
+                    f"Dataset name contains path separator: {base!r}")
+            suffix = ""
+            name_part = base
+            if "." in name_part:
+                dot = name_part.find(".")
+                name_part = name_part[:dot]
+                suffix = base[dot:]
             multi = container_dataset.multi_position
             if multi is not None:
-                return f"{arg_name}_{multi}"
-            return arg_name
+                staged = f"{arg_name}_{multi}{suffix}"
+            else:
+                staged = f"{arg_name}{suffix}"
+            return staged
         return container_dataset.argument.name
 
     def fill_sandbox(self, run):
@@ -102,15 +118,17 @@ class Command(BaseCommand):
             raise RuntimeError('Inputs missing from reruns.')
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
+        seen_filenames: set[str] = set()
         for container_dataset in run.datasets.all():
-            target_path = os.path.join(
-                input_path,
-                self._sandbox_argument_filename(container_dataset),
-            )
+            staged = self._sandbox_argument_filename(container_dataset)
+            if staged in seen_filenames:
+                raise RuntimeError(
+                    f"Duplicate staged filename in sandbox input: {staged}")
+            seen_filenames.add(staged)
+            target_path = os.path.join(input_path, staged)
             if os.path.exists(target_path):
                 raise RuntimeError(
-                    "File already exists in sandbox input: {}".format(
-                        target_path))
+                    f"File already exists in sandbox input: {target_path}")
             source_file = container_dataset.dataset.get_open_file_handle(
                 raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:

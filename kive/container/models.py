@@ -1480,6 +1480,8 @@ class ContainerRun(Stopwatch, AccessControl):
                 cd.argument.position,
                 cd.argument.name,
                 cd.multi_position,
+                cd.name,
+                cd.dataset.name,
                 cd.dataset.MD5_checksum,
             ))
         payload = _json.dumps(bindings, sort_keys=False, separators=(',', ':'))
