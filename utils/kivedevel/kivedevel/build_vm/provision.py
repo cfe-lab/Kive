@@ -97,12 +97,14 @@ class ProvisionStatus:
             raise ProvisionProtocolError(f"Invalid PID: {pid_value!r}")
 
         exit_code = data.get("exit_code")
-        if exit_code is not None and not isinstance(exit_code, int):
+        if exit_code is not None and not isinstance(exit_code, (int, str)):
             raise ProvisionProtocolError(f"Invalid exit_code type: {exit_code!r}")
 
-        if state == "succeeded" and exit_code is not None and exit_code != 0:
+        if state == "succeeded" and exit_code is not None and str(exit_code) != "0":
             raise ProvisionProtocolError(
                 f"Succeeded state with nonzero exit_code: {exit_code}")
+
+        exit_code_str = str(exit_code) if exit_code is not None else None
 
         return cls(
             schema_version=sv,
@@ -111,7 +113,7 @@ class ProvisionStatus:
             phase=phase,
             pid=pid_value,
             service_result=data.get("service_result"),
-            exit_code=exit_code,
+            exit_code=exit_code_str,
             message=data.get("message"),
         )
 

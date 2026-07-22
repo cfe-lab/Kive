@@ -186,7 +186,7 @@ def run_validate_vm(args: argparse.Namespace) -> None:
 
 
 def _build_local_opener(cookie_jar: CookieJar | None = None):
-    handlers = [urllib.request.ProxyHandler({})]
+    handlers: list = [urllib.request.ProxyHandler({})]
     if cookie_jar is not None:
         handlers.append(urllib.request.HTTPCookieProcessor(cookie_jar))
     return urllib.request.build_opener(*handlers)
