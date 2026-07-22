@@ -198,7 +198,7 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
         existing = get_existing_network_parent(cmds, cfg.instance)
         host_interface = existing if existing is not None else get_default_host_interface(cmds)
 
-    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
+    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision, provision_id=cfg.provision_id):
         restart_required = True
 
     if enable_network_config(cmds, cfg.instance, actual_instance_type):
@@ -283,7 +283,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
     if added_nic:
         restart_required = True
 
-    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision):
+    if ensure_user_data(cmds, cfg.instance, provision=cfg.provision, provision_id=cfg.provision_id):
         restart_required = True
 
     if enable_network_config(cmds, cfg.instance, actual_instance_type):

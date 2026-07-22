@@ -11,7 +11,7 @@ from .helpers import find_ssh_pubkey, generate_password_hash, set_instance_confi
 logger = logging.getLogger("kivedevel")
 
 
-def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool:
+def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, provision_id: str = "") -> bool:
     logger.info("Configuring cloud-init user data for %s...", instance)
     pubkey = find_ssh_pubkey()
 
@@ -21,7 +21,7 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
     provision_write_files = ""
     provision_runcmd = ""
     if provision:
-        provision_write_files = """
+        provision_write_files = f"""
   - path: /etc/systemd/system/kive-dev-web.service
     owner: root:root
     permissions: '0644'
@@ -41,6 +41,101 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
 
       [Install]
       WantedBy=multi-user.target
+  - path: /usr/local/bin/kive-provision-status
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env python3
+      import json, os, sys, tempfile
+
+      STATE_DIR = "/var/lib/kive-provision"
+      STATUS_PATH = os.path.join(STATE_DIR, "status.json")
+
+      def write_status(provision_id, state, phase, pid=0, service_result=None, exit_code=None, message=None):
+          doc = {{
+              "schema_version": 1,
+              "provision_id": provision_id,
+              "state": state,
+              "phase": phase,
+              "pid": pid or os.getpid(),
+              "service_result": service_result,
+              "exit_code": exit_code,
+              "message": message,
+          }}
+          os.makedirs(STATE_DIR, exist_ok=True)
+          fd, tmp = tempfile.mkstemp(dir=STATE_DIR)
+          try:
+              with os.fdopen(fd, "w") as f:
+                  json.dump(doc, f, indent=2)
+                  f.write("\\n")
+                  f.flush()
+                  os.fsync(fd)
+              os.rename(tmp, STATUS_PATH)
+          except BaseException:
+              try:
+                  os.unlink(tmp)
+              except OSError:
+                  pass
+              raise
+
+      if __name__ == "__main__":
+          pid = os.getpid()
+          prov_id = os.environ.get("KIVE_PROVISION_ID", "")
+          write_status(prov_id, "starting", "starting", pid=pid)
+          sys.argv.pop(0)
+          if sys.argv:
+              state = sys.argv.pop(0)
+              phase = sys.argv.pop(0) if sys.argv else state
+              extra = {{}}
+              if "--service-result" in sys.argv:
+                  idx = sys.argv.index("--service-result")
+                  extra["service_result"] = sys.argv[idx + 1]
+              if "--exit-code" in sys.argv:
+                  idx = sys.argv.index("--exit-code")
+                  extra["exit_code"] = int(sys.argv[idx + 1])
+              if "--message" in sys.argv:
+                  idx = sys.argv.index("--message")
+                  extra["message"] = sys.argv[idx + 1]
+              write_status(prov_id, state, phase, pid=pid, **extra)
+  - path: /etc/systemd/system/kive-provision.service
+    owner: root:root
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=Provision the Kive development environment
+      After=network-online.target mount-kive-code.service
+      Wants=network-online.target
+      Requires=mount-kive-code.service
+
+      [Service]
+      Type=oneshot
+      Environment=KIVE_PROVISION_ID={provision_id}
+      ExecStart=/usr/local/bin/kive-provision.sh
+      ExecStopPost=/usr/local/bin/kive-provision-finalize
+      TimeoutStartSec=3000
+      TimeoutStopSec=30
+      KillMode=control-group
+      SendSIGKILL=yes
+      RemainAfterExit=yes
+      StandardOutput=append:/var/log/kive-provision.log
+      StandardError=append:/var/log/kive-provision.log
+
+      [Install]
+      WantedBy=multi-user.target
+  - path: /usr/local/bin/kive-provision-finalize
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env sh
+      set -eu
+      STATUS_FILE=/var/lib/kive-provision/status.json
+      if [ -f "$STATUS_FILE" ] && grep -q '"state": "succeeded"' "$STATUS_FILE" 2>/dev/null; then
+        exit 0
+      fi
+      /usr/local/bin/kive-provision-status running finalize \\
+        --service-result "${{SERVICE_RESULT:-unknown}}" \\
+        --exit-code "${{EXIT_STATUS:-1}}" \\
+        --message "Provisioning terminated before success"
   - path: /usr/local/bin/kive-provision.sh
     owner: root:root
     permissions: '0755'
@@ -50,41 +145,37 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       STATE_DIR=/var/lib/kive-provision
       LOG_FILE=/var/log/kive-provision.log
       mkdir -p "$STATE_DIR"
-      rm -f "$STATE_DIR/done" "$STATE_DIR/failed" "$STATE_DIR/started"
-      touch "$STATE_DIR/started"
-
-      mark_failed_on_exit() {
-        status=$?
-        if [ "$status" -ne 0 ] && [ ! -f "$STATE_DIR/done" ]; then
-          touch "$STATE_DIR/failed" || true
-        fi
-        exit "$status"
-      }
-      trap mark_failed_on_exit EXIT
-
-      _apt_diagnostics() {
-        {
-          echo "date: $(date)"
-          ip addr
-          ip route
-          resolvectl status
-          cat /etc/resolv.conf
-          find /etc/apt -maxdepth 3 -type f \
-            -print -exec sed -n '1,160p' {} ";"
-        } >&2 || true
-      }
-
       exec >>"$LOG_FILE" 2>&1
       set -x
-      date
-      uname -a
-      echo "HOSTNAME=$(hostname)"
-      echo "PWD=$(pwd)"
-      echo "USER=$(id)"
-      echo "ENVIRONMENT:"
-      env | sort
-      echo "--- initial file checks ---"
-      ls -la /mnt/kive-code /mnt/kive-code/dev-env/setup-dev-env.yml /usr/local/share/Kive || true
+
+      kive_status() {{
+        /usr/local/bin/kive-provision-status running "$1"
+      }}
+
+      run_bounded() {{
+        phase="$1"
+        duration="$2"
+        shift 2
+        kive_status "$phase"
+        set +e
+        timeout --signal=TERM --kill-after=30s "$duration" "$@"
+        rc=$?
+        set -e
+        case "$rc" in
+          0) return 0 ;;
+          124|137)
+            echo "$phase exceeded its deadline" >&2
+            return "$rc"
+            ;;
+          *)
+            echo "$phase failed with status $rc" >&2
+            return "$rc"
+            ;;
+        esac
+      }}
+
+      /usr/local/bin/kive-provision-status running starting
+
       echo "=== cloud-init status check ==="
       cloud_init_status=$(cloud-init status --long 2>&1 || true)
       echo "$cloud_init_status"
@@ -93,181 +184,111 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
         cat /var/log/cloud-init.log /var/log/cloud-init-output.log 2>/dev/null || true
         exit 1
       fi
+
       echo "=== network preflight ==="
-      ip addr || true
-      ip route || true
-      resolvectl status || true
-      cat /etc/resolv.conf || true
+      run_bounded network-preflight 30s python3 -c '
+      import socket
+      sock=socket.create_connection(("1.1.1.1",443), timeout=10); sock.close()
+      '
 
-      if ! timeout --foreground 15s python3 -c 'import socket; sock=socket.create_connection(("1.1.1.1",443), timeout=10); sock.close()'; then
-        echo "raw IPv4 egress failed; likely host forwarding/NAT/firewall." >&2
-        exit 1
-      fi
-      echo "--- raw IPv4 egress OK ---"
-
-      getent ahostsv4 archive.ubuntu.com || true
-      if ! timeout --foreground 15s python3 -c 'import socket; addr=socket.getaddrinfo("archive.ubuntu.com",80,socket.AF_INET,socket.SOCK_STREAM)[0][4]; sock=socket.create_connection(addr, timeout=10); sock.close()'; then
-        echo "DNS resolution worked but TCP egress to archive.ubuntu.com:80 failed." >&2
-        exit 1
-      fi
-      echo "--- TCP egress to archive.ubuntu.com OK ---"
       echo "=== apt install prerequisites ==="
       export DEBIAN_FRONTEND=noninteractive
-      APT_DEADLINE_SECONDS=1800
-      set +e
-      timeout --foreground "${APT_DEADLINE_SECONDS}s" \
-        apt-get \
-          -o Acquire::ForceIPv4=true \
-          -o Acquire::Retries=10 \
-          update
-      apt_status=$?
-      set -e
-      if [ "$apt_status" -eq 124 ]; then
-        echo "apt-get update exceeded ${APT_DEADLINE_SECONDS}s" >&2
-        _apt_diagnostics
-        exit 124
-      fi
-      if [ "$apt_status" -ne 0 ]; then
-        echo "apt-get update failed with status $apt_status" >&2
-        _apt_diagnostics
-        exit "$apt_status"
-      fi
-      set +e
-      timeout --foreground "${APT_DEADLINE_SECONDS}s" \
-        apt-get \
-          -o Acquire::ForceIPv4=true \
-          -o Acquire::Retries=10 \
-          install -y ansible curl openssh-server
-      apt_status=$?
-      set -e
-      if [ "$apt_status" -eq 124 ]; then
-        echo "apt-get install exceeded ${APT_DEADLINE_SECONDS}s" >&2
-        _apt_diagnostics
-        exit 124
-      fi
-      if [ "$apt_status" -ne 0 ]; then
-        echo "apt-get install failed with status $apt_status" >&2
-        _apt_diagnostics
-        exit "$apt_status"
-      fi
-      if ! systemctl enable --now ssh; then
-        echo "Failed to enable/start ssh after installing openssh-server" >&2
-        exit 1
-      fi
-      {
+      run_bounded apt-update 1800s apt-get \
+        -o Acquire::ForceIPv4=true \
+        -o Acquire::Retries=10 \
+        update
+      run_bounded apt-install 1800s apt-get \
+        -o Acquire::ForceIPv4=true \
+        -o Acquire::Retries=10 \
+        install -y ansible curl openssh-server
+      systemctl enable --now ssh
+
+      echo "=== workspace wait ==="
+      run_bounded workspace-wait 600s sh -c '
         for _ in $(seq 1 300); do
           if [ -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
-            break
+            exit 0
           fi
           sleep 2
         done
-        if [ ! -f /mnt/kive-code/dev-env/setup-dev-env.yml ]; then
-          echo "Workspace mount not ready at /mnt/kive-code/dev-env/setup-dev-env.yml"
-          exit 1
-        fi
+        echo "Workspace mount not ready" >&2
+        exit 1
+      '
 
-        export DEBIAN_FRONTEND=noninteractive
-        rm -rf /usr/local/share/Kive
-        mkdir -p /usr/local/share/Kive
-        cp -a /mnt/kive-code/. /usr/local/share/Kive/
-        chown -R root:root /usr/local/share/Kive
-        cd /usr/local/share/Kive/dev-env
-        printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
-        export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg
-        export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles
-        if ! timeout --foreground 1800s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml; then
-          echo "ansible-playbook failed or timed out" >&2
-          exit 1
-        fi
-        ls -la /opt/venv_kive/bin /usr/bin/python3 /tmp/kive_dev_vars /etc/kive_dev_vars || true
-        cat /tmp/kive_dev_vars | sed -n '1,80p' || true
+      echo "=== workspace copy and ansible ==="
+      rm -rf /usr/local/share/Kive
+      mkdir -p /usr/local/share/Kive
+      cp -a /mnt/kive-code/. /usr/local/share/Kive/
+      chown -R root:root /usr/local/share/Kive
+      cd /usr/local/share/Kive/dev-env
+      printf '%s\\n' 'head ansible_connection=local ansible_python_interpreter=/usr/bin/python3' > /tmp/dev_inv.ini
+      export ANSIBLE_CONFIG=/usr/local/share/Kive/dev-env/ansible.cfg
+      export ANSIBLE_ROLES_PATH=/usr/local/share/Kive/roles:/usr/local/share/Kive/cluster-setup/deployment/roles
+      run_bounded ansible 1800s ansible-playbook --become -i /tmp/dev_inv.ini setup-dev-env.yml
 
+      echo "=== web config ==="
+      PYTHON_BIN=/opt/venv_kive/bin/python
+      if [ ! -x "$PYTHON_BIN" ]; then PYTHON_BIN=/usr/bin/python3; fi
+      if [ ! -x "$PYTHON_BIN" ]; then echo "Missing Python interpreter" >&2; exit 1; fi
 
-        PYTHON_BIN=/opt/venv_kive/bin/python
-        if [ ! -x "$PYTHON_BIN" ]; then
-          PYTHON_BIN=/usr/bin/python3
-        fi
-        if [ ! -x "$PYTHON_BIN" ]; then
-          echo "Missing Python interpreter after provisioning"
-          exit 1
-        fi
-        export PYTHON_BIN
+      cd /usr/local/share/Kive/kive
+      if [ -s /tmp/kive_dev_vars ]; then source /tmp/kive_dev_vars; fi
+      if [ -s /etc/kive_dev_vars ]; then source /etc/kive_dev_vars; fi
+      if [ ! -s /tmp/kive_dev_vars ] && [ ! -s /etc/kive_dev_vars ]; then
+        echo "Missing kive_dev_vars" >&2; exit 1
+      fi
+      mkdir -p /etc/kive
+      sed 's/^export //' /tmp/kive_dev_vars > /etc/kive/kive-dev.env
+      sed -i 's|EnvironmentFile=/tmp/kive_dev_vars|EnvironmentFile=/etc/kive/kive-dev.env|' \
+        /etc/systemd/system/kive-dev-web.service
+      systemctl daemon-reload
+      systemctl enable --now kive-dev-web.service
 
-        cd /usr/local/share/Kive/kive
-        pwd
-        ls -la . || true
-        echo "Using PYTHON_BIN=$PYTHON_BIN"
-        if [ -s /tmp/kive_dev_vars ]; then
-          source /tmp/kive_dev_vars
+      echo "=== web readiness ==="
+      kive_status web-readiness
+      for _ in $(seq 1 60); do
+        if systemctl is-active kive-dev-web.service >/dev/null 2>&1 && \
+           curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+          break
         fi
-        if [ -s /etc/kive_dev_vars ]; then
-          source /etc/kive_dev_vars
-        fi
-        if [ ! -s /tmp/kive_dev_vars ] && [ ! -s /etc/kive_dev_vars ]; then
-          echo "Missing kive_dev_vars configuration files"
-          ls -la /tmp/kive_dev_vars /etc/kive_dev_vars || true
-          exit 1
-        fi
-        echo "ENV after sourcing dev vars:"
-        env | sort
-        mkdir -p /etc/kive
-        sed 's/^export //' /tmp/kive_dev_vars > /etc/kive/kive-dev.env
-        sed -i 's|EnvironmentFile=/tmp/kive_dev_vars|EnvironmentFile=/etc/kive/kive-dev.env|' \
-          /etc/systemd/system/kive-dev-web.service
-        systemctl daemon-reload
-        systemctl enable --now kive-dev-web.service
-        echo "kive-dev-web.service started"
+        sleep 2
+      done
+      if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
+        echo "API did not become reachable" >&2; exit 1
+      fi
 
-        for _ in $(seq 1 60); do
-          if systemctl is-active kive-dev-web.service >/dev/null 2>&1 && \
-             curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-        if ! systemctl is-active kive-dev-web.service >/dev/null 2>&1; then
-          echo "kive-dev-web.service failed to start:"
-          systemctl status kive-dev-web.service --no-pager || true
-          journalctl -u kive-dev-web.service --no-pager --lines=50 || true
-          exit 1
-        fi
-        if ! curl -fsS http://127.0.0.1:8000/login/ >/dev/null 2>&1; then
-          echo "API did not become reachable on 127.0.0.1:8000/login/"
-          exit 1
-        fi
+      echo "=== Slurm readiness check ==="
+      kive_status slurm-readiness
+      /usr/local/bin/kive-slurm-healthcheck
 
-        echo "=== Slurm readiness check ==="
-        SINFO="$(sinfo -Nel 2>&1 || true)"
-        SCONTROL="$(scontrol show node head 2>&1 || true)"
-        echo "$SCONTROL"
-        echo "$SINFO"
+      echo "=== Slurm smoke job ==="
+      kive_status slurm-job
+      job_id="$(sbatch --parsable --partition=debug --nodes=1 --ntasks=1 --wrap=/bin/true)"
+      if [ -z "$job_id" ] || ! [ "$job_id" -eq "$job_id" ] 2>/dev/null; then
+        echo "Invalid job ID from sbatch: $job_id" >&2; exit 1
+      fi
+      JOB_DEADLINE=300
+      JOB_END=$(( $(date +%s) + JOB_DEADLINE ))
+      while [ $(date +%s) -lt $JOB_END ]; do
+        job_state="$(sacct -n -X -j "$job_id" --format=State,ExitCode 2>/dev/null || true)"
+        case "$job_state" in
+          *COMPLETED*0:0*) break ;;
+          *FAILED*|*CANCELLED*|*TIMEOUT*|*NODE_FAIL*|*OUT_OF_MEMORY*|*PREEMPTED*|*BOOT_FAIL*|*DEADLINE*|*REVOKED*)
+            echo "Slurm job failed: $job_state" >&2; exit 1 ;;
+        esac
+        sleep 2
+      done
+      if ! echo "$job_state" | grep -q 'COMPLETED.*0:0'; then
+        scancel "$job_id" 2>/dev/null || true
+        echo "Slurm job did not complete within ${JOB_DEADLINE}s" >&2; exit 1
+      fi
+      echo "--- Slurm readiness OK ---"
 
-        if echo "$SCONTROL" | grep -qiE 'down|drain|invalid_reg'; then
-          echo "Slurm node head is not usable:" >&2
-          echo "$SCONTROL" >&2
-          echo "$SINFO" >&2
-          grep -nE 'NodeName|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
-          tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
-          exit 1
-        fi
-
-        echo "Running test Slurm job via srun..."
-        if ! timeout --foreground 120s srun --partition=debug --nodes=1 --ntasks=1 /bin/true 2>&1; then
-          echo "Slurm test job failed:" >&2
-          scontrol show node head >&2 || true
-          sinfo -Nel >&2 || true
-          squeue -a >&2 || true
-          sacct --format=JobID,State,ExitCode --brief 2>/dev/null | tail -5 >&2 || true
-          grep -nE 'NodeName|PartitionName' /usr/local/etc/slurm/slurm.conf 2>/dev/null || true >&2
-          tail -20 /var/log/slurm/slurmd.log /var/log/slurm/slurmctld.log 2>/dev/null || true >&2
-          exit 1
-        fi
-        echo "--- Slurm readiness OK ---"
-
-        touch "$STATE_DIR/done"
-      } >>"$LOG_FILE" 2>&1
+      /usr/local/bin/kive-provision-status succeeded complete --exit-code 0
 """
-        provision_runcmd = "\n  - [sh, -c, '/usr/local/bin/kive-provision.sh']"
+        provision_runcmd = """
+  - [sh, -c, 'systemctl daemon-reload']
+  - [sh, -c, 'systemctl enable --now --no-block kive-provision.service']"""
 
     userdata = f"""\
 #cloud-config
