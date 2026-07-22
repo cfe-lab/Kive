@@ -17,7 +17,7 @@ from container.models import (
     ContainerRun, ContainerArgument, ContainerArgumentType,
     ContainerLog, ContainerDataset,
     argument_execution_key, binding_execution_key,
-    _source_filename, _suffix_from_source, _staged_input_filename,
+    _staged_input_filename,
 )
 from librarian.models import Dataset
 

@@ -196,18 +196,30 @@ def run_validate_vm(args: argparse.Namespace) -> None:
     logger.info("validate-vm checks passed for %s.", instance)
 
 
+def _build_local_opener(cookie_jar: CookieJar | None = None):
+    handlers = [urllib.request.ProxyHandler({})]
+    if cookie_jar is not None:
+        handlers.append(urllib.request.HTTPCookieProcessor(cookie_jar))
+    return urllib.request.build_opener(*handlers)
+
+
 def _wait_for_url(base_url: str, deadline: float = 1800) -> bool:
     import time as _time
-    end = _time.time() + deadline
-    while _time.time() < end:
+    end = _time.monotonic() + deadline
+    last_error: Exception | None = None
+    while _time.monotonic() < end:
         try:
-            opener = urllib.request.build_opener()
+            opener = _build_local_opener()
             with opener.open(f"{base_url}/login/", timeout=5) as response:
                 if response.status == 200:
                     return True
-        except Exception:
-            pass
+        except Exception as exc:
+            last_error = exc
         _time.sleep(2)
+    logger.error(
+        "Host endpoint %s/login/ did not become reachable; last error: %r",
+        base_url, last_error,
+    )
     return False
 
 
@@ -225,7 +237,7 @@ def _request_status(opener, url: str):
 
 
 def _is_url_reachable(base_url: str) -> bool:
-    opener = urllib.request.build_opener()
+    opener = _build_local_opener()
     status, _ = _request_status(opener, f"{base_url}/login/")
     return status == 200
 
@@ -240,11 +252,11 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     login_url = f"{base_url}/login/"
     datasets_url = f"{base_url}/api/datasets/?limit=1"
 
-    anon_opener = urllib.request.build_opener()
+    anon_opener = _build_local_opener()
     anon_status, _ = _request_status(anon_opener, datasets_url)
 
     jar = CookieJar()
-    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(jar))
+    opener = _build_local_opener(cookie_jar=jar)
 
     login_status, _ = _request_status(opener, login_url)
 
@@ -304,16 +316,28 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
 
 
 def _print_proxy_diagnostics(cmds: Cmds, instance: str) -> None:
-    logger.error("=== Proxy diagnostics for %s ===", instance)
+    logger.error("=== INCUS proxy device configuration ===")
     cmds.incus.run(["config", "device", "show", instance], check=False)
-    cmds.incus.run(["config", "show", "--expanded", instance], check=False)
+    logger.error("=== HOST listener ===")
+    import subprocess as _sp
+    _sp.run(["ss", "-ltnp", "sport", "=", ":8000"], check=False)
+    logger.error("=== GUEST loopback ===")
+    cmds.incus.run(["exec", instance, "--", "curl", "-v", "http://127.0.0.1:8000/login/"], check=False)
+    logger.error("=== HOST localhost request ===")
+    try:
+        opener = _build_local_opener()
+        with opener.open("http://127.0.0.1:8000/login/", timeout=10) as r:
+            logger.error("HOST localhost status: %s", r.status)
+    except Exception as exc:
+        logger.error("HOST localhost failed: %r", exc)
+    logger.error("=== GUEST service ===")
     cmds.incus.run(["exec", instance, "--", "systemctl", "status", "kive-dev-web.service", "--no-pager"], check=False)
     cmds.incus.run(["exec", instance, "--", "journalctl", "-u", "kive-dev-web.service", "--no-pager", "--lines=100"], check=False)
+    logger.error("=== GUEST network ===")
     cmds.incus.run(["exec", instance, "--", "ss", "-ltnp"], check=False)
     cmds.incus.run(["exec", instance, "--", "ufw", "status", "verbose"], check=False)
     cmds.incus.run(["exec", instance, "--", "ip", "addr"], check=False)
     cmds.incus.run(["exec", instance, "--", "ip", "route"], check=False)
-    cmds.incus.run(["exec", instance, "--", "curl", "-v", "http://127.0.0.1:8000/login/"], check=False)
 
 
 def _check_api_probe_results(results: dict, instance: str) -> None:

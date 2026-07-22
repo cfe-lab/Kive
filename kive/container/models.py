@@ -1628,15 +1628,35 @@ def _suffix_from_source(base: str) -> str:
 
 
 def _staged_input_filename(cd: ContainerDataset) -> str:
-    """Deterministic command-visible filename for an input binding."""
+    argtype = cd.argument.argtype
     argname = cd.argument.name
-    if cd.argument.position is not None:
+
+    if argtype == ContainerArgumentType.FIXED_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Fixed input {argname!r} cannot have multi_position"
+            )
         return argname
-    base = _source_filename(cd)
-    suffix = _suffix_from_source(base)
-    if cd.multi_position is not None:
+
+    if argtype == ContainerArgumentType.OPTIONAL_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Single optional input {argname!r} cannot have multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
+        return f"{argname}{suffix}"
+
+    if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        if cd.multi_position is None:
+            raise RuntimeError(
+                f"Multiple optional input {argname!r} requires multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
         return f"{argname}_{cd.multi_position}{suffix}"
-    return f"{argname}{suffix}"
+
+    raise RuntimeError(
+        f"Cannot construct staged input filename for argument type {argtype!r}"
+    )
 
 
 def argument_execution_key(argument: ContainerArgument) -> tuple:

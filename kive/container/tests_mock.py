@@ -1110,98 +1110,160 @@ class RunContainerMockTests(TestCase):
         )
 
 
+def _make_input_binding(
+    *,
+    argtype,
+    argument_name,
+    source_name,
+    multi_position=None,
+):
+    cd = Mock()
+    cd.name = ""
+    cd.multi_position = multi_position
+
+    cd.argument = Mock()
+    cd.argument.argtype = argtype
+    cd.argument.name = argument_name
+
+    cd.dataset = Mock()
+    cd.dataset.dataset_file = Mock()
+    cd.dataset.dataset_file.name = source_name
+    cd.dataset.external_path = ""
+
+    return cd
+
+
 class SandboxInputFilenameTests(TestCase):
     def test_fixed_input_returns_argument_name(self):
-        cd = Mock()
-        cd.argument.argtype = ContainerArgumentType.FIXED_INPUT
-        cd.argument.name = 'input_txt'
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.FIXED_INPUT,
+            argument_name="input_txt",
+            source_name="/some/path/data.bin",
+        )
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('input_txt', result)
 
-    def test_optional_input_returns_argument_name(self):
-        cd = Mock()
-        cd.name = ''
-        cd.multi_position = None
-        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
-        cd.argument.name = 'extra'
-        cd.dataset = Mock()
-        cd.dataset.name = 'sample.txt'
+    def test_optional_input_preserves_suffix(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="extra",
+            source_name="sample.txt",
+        )
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('extra.txt', result)
 
-    def test_optional_multiple_includes_multi_position_and_suffix(self):
-        cd = Mock()
-        cd.name = ''
-        cd.multi_position = 3
-        cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd.argument.name = 'inputs'
-        cd.dataset = Mock()
-        cd.dataset.name = 'data.csv'
+    def test_optional_multiple_includes_position_and_suffix(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="data.csv",
+            multi_position=3,
+        )
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('inputs_3.csv', result)
 
-    def test_different_multi_positions_gives_different_filenames(self):
-        cd1 = Mock()
-        cd1.name = ''
-        cd1.multi_position = 1
-        cd1.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd1.argument.name = 'inputs'
-        cd1.dataset = Mock()
-        cd1.dataset.name = 'a.csv'
-        cd2 = Mock()
-        cd2.name = ''
-        cd2.multi_position = 2
-        cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd2.argument.name = 'inputs'
-        cd2.dataset = Mock()
-        cd2.dataset.name = 'b.csv'
+    def test_different_positions_gives_different_names(self):
+        cd1 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="a.csv",
+            multi_position=1,
+        )
+        cd2 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="b.csv",
+            multi_position=2,
+        )
         self.assertNotEqual(
             runcontainer.Command._sandbox_argument_filename(cd1),
             runcontainer.Command._sandbox_argument_filename(cd2),
         )
 
-    def test_duplicate_multi_position_same_suffix_produces_same_filename(self):
-        cd1 = Mock()
-        cd1.name = ''
-        cd1.multi_position = 1
-        cd1.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd1.argument.name = 'inputs'
-        cd1.dataset = Mock()
-        cd1.dataset.name = 'x.csv'
-        cd2 = Mock()
-        cd2.name = ''
-        cd2.multi_position = 1
-        cd2.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd2.argument.name = 'inputs'
-        cd2.dataset = Mock()
-        cd2.dataset.name = 'y.csv'
+    def test_duplicate_multi_position_same_suffix(self):
+        cd1 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="x.csv",
+            multi_position=1,
+        )
+        cd2 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="y.csv",
+            multi_position=1,
+        )
         self.assertEqual(
             runcontainer.Command._sandbox_argument_filename(cd1),
             runcontainer.Command._sandbox_argument_filename(cd2),
         )
 
     def test_no_id_in_filename(self):
-        cd = Mock()
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="opt",
+            source_name="data.txt",
+        )
         cd.id = 999
-        cd.name = ''
-        cd.multi_position = None
-        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
-        cd.argument.name = 'opt'
-        cd.dataset = Mock()
-        cd.dataset.name = 'data.txt'
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertNotIn('999', result)
 
     def test_preserves_complete_suffix_chain(self):
-        cd = Mock()
-        cd.name = ''
-        cd.multi_position = 1
-        cd.argument.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
-        cd.argument.name = 'reads'
-        cd.dataset = Mock()
-        cd.dataset.name = 'sample.fastq.gz'
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="reads",
+            source_name="sample.fastq.gz",
+            multi_position=1,
+        )
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('reads_1.fastq.gz', result)
+
+    def test_rejects_optional_multiple_without_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="data.csv",
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_optional_single_with_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="opt",
+            source_name="data.txt",
+            multi_position=1,
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_fixed_input_with_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.FIXED_INPUT,
+            argument_name="fixed_in",
+            source_name="data.bin",
+            multi_position=1,
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_output_argument(self):
+        cd = Mock()
+        cd.argument.argtype = ContainerArgumentType.FIXED_OUTPUT
+        cd.argument.name = "out"
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_missing_file_identity(self):
+        cd = Mock()
+        cd.name = ""
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        cd.argument.name = "opt"
+        cd.dataset = Mock()
+        cd.dataset.dataset_file = None
+        cd.dataset.external_path = ""
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
 
 
 class RunContainerFormatKwArgsTests(TestCase):
@@ -1212,7 +1274,9 @@ class RunContainerFormatKwArgsTests(TestCase):
         cd.argument = argument
         cd.multi_position = multi_position
         cd.dataset = Mock()
-        cd.dataset.name = ds_name
+        cd.dataset.dataset_file = Mock()
+        cd.dataset.dataset_file.name = ds_name
+        cd.dataset.external_path = ""
         return cd
 
     def test_optional_multiple_ordered_by_multi_position(self):
