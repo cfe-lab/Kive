@@ -220,7 +220,10 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     _ensure_web_proxy_device(cmds, cfg)
 
-    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
+    maybe_provision_instance(
+        cmds, cfg.instance, actual_instance_type,
+        provision=cfg.provision, provision_id=cfg.provision_id,
+    )
 
     if cfg.provision and not cfg.no_web_proxy:
         print(f"Kive is available at: http://127.0.0.1:{cfg.web_port}/login/")
@@ -331,7 +334,10 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     _ensure_web_proxy_device(cmds, cfg, vm_ip=ip if needs_reserved_address else None)
 
-    maybe_provision_instance(cmds, cfg.instance, actual_instance_type, provision=cfg.provision)
+    maybe_provision_instance(
+        cmds, cfg.instance, actual_instance_type,
+        provision=cfg.provision, provision_id=cfg.provision_id,
+    )
 
     if cfg.provision:
         print(f"VM {cfg.instance} provisioned. Use incus exec {cfg.instance} -- bash to connect.")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 
 
@@ -21,6 +22,7 @@ class BuildVmConfig:
     web_port: int = 8000
     no_web_proxy: bool = False
     vm_network: str | None = None
+    provision_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
     @classmethod
     def from_args(cls, args) -> "BuildVmConfig":
