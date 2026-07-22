@@ -3201,10 +3201,10 @@ Line 3
         self.assertEqual(
             command_args,
             [
-                "--optional_input", "/mnt/input/optional_input_100",
+                "--optional_input", "/mnt/input/optional_input",
                 "--multiple_optional_input",
-                "/mnt/input/multiple_optional_input0_101",
-                "/mnt/input/multiple_optional_input1_102", "--",
+                "/mnt/input/multiple_optional_input_0",
+                "/mnt/input/multiple_optional_input_1", "--",
                 "/mnt/input/positional_input", "/mnt/output/positional_output"
             ],
         )
@@ -4551,8 +4551,7 @@ class ContainerRunCreateValidationTests(TestCase):
             dataset=self.dataset1,
         )
         staged_name = runcontainer.Command._sandbox_argument_filename(cd)
-        self.assertIn(str(cd.id), staged_name)
-        self.assertNotEqual(self.dataset1.name, staged_name)
+        self.assertEqual("opt", staged_name)
 
     def test_serializer_rejects_missing_multi_position(self):
         request = self.factory.post(

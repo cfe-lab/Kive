@@ -5,11 +5,9 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import re
 import subprocess
 import sys
-import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -58,7 +56,6 @@ sinfo -Nel
 
 
 def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
-    import shlex
     script = _SLURM_CHECK_SCRIPT.replace('\n', '; ')
     result = cmds.incus.run(
         ["exec", instance, "--", "sh", "-c", script],
