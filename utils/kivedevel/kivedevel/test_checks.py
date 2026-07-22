@@ -117,20 +117,16 @@ class TestSlurmProbe(unittest.TestCase):
             checks._run_slurm_probe(self.cmds, "test")
             mock_warn.assert_not_called()
 
-    def test_slurm_probe_logs_warning_for_wrong_hostname(self):
+    def test_slurm_probe_fails_on_inactive_service(self):
         checks = self._import()
         self.cmds.incus.run.return_value = MockRunResult(
             returncode=0,
             stdout=(
-                "=== hostname ===\nwrong\n"
-                "=== getent hosts head ===\nnot found\n"
-                "=== Slurm services ===\ninactive: slurmctld\n"
-                "=== Slurm commands ===\n/usr/bin/squeue\n"
+                "inactive: slurmctld\n"
             ),
         )
-        with mock.patch.object(checks.logger, "warning") as mock_warn:
+        with self.assertRaises(SystemExit):
             checks._run_slurm_probe(self.cmds, "test")
-            self.assertGreaterEqual(mock_warn.call_count, 1)
 
 
 class TestDeviceExists(unittest.TestCase):

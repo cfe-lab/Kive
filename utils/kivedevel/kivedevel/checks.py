@@ -38,68 +38,68 @@ def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> 
     return value
 
 
-_SLURM_PROBE_SCRIPT = """
+_SLURM_CHECK_SCRIPT = """
 set -e
-echo '=== hostname ==='
-hostname -s
-echo '=== getent hosts head ==='
-getent hosts head || echo 'not found'
-echo '=== Slurm services ==='
-for svc in slurmdbd slurmctld slurmd; do
-  if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet "$svc" 2>/dev/null; then
-    echo "active: $svc"
-  elif command -v systemctl >/dev/null 2>&1; then
-    echo "inactive: $svc"
-  else
-    echo "unknown: $svc (no systemctl)"
-  fi
-done
-echo '=== Slurm commands ==='
-command -v squeue sinfo 2>&1 || true
+echo '=== commands ==='
+command -v squeue
+command -v sinfo
+command -v scontrol
+command -v srun
+echo '=== services ==='
+systemctl is-active munge
+systemctl is-active slurmdbd
+systemctl is-active slurmctld
+systemctl is-active slurmd
+echo '=== controller ==='
+scontrol ping
+scontrol show node head
+sinfo -Nel
 """
 
 
 def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
-    try:
-        result = cmds.incus.run(
-            ["exec", instance, "--", "sh", "-c", _SLURM_PROBE_SCRIPT],
+    import shlex
+    script = _SLURM_CHECK_SCRIPT.replace('\n', '; ')
+    result = cmds.incus.run(
+        ["exec", instance, "--", "sh", "-c", script],
+        check=False, capture_output=True, timeout=30,
+    )
+    stdout = (result.stdout or "").strip()
+    stderr = (result.stderr or "").strip()
+    if result.returncode != 0:
+        logger.error("Slurm check failed on %s (rc=%s).\nstdout:\n%s\nstderr:\n%s",
+                     instance, result.returncode, stdout, stderr)
+        _print_slurm_diagnostics(cmds, instance)
+        sys.exit(1)
+    if "inactive" in stdout or "down" in stdout.lower():
+        logger.error("Slurm services are not fully active on %s.\n%s", instance, stdout)
+        _print_slurm_diagnostics(cmds, instance)
+        sys.exit(1)
+    if "command not found" in stdout or "not found" in stderr:
+        logger.error("Required Slurm commands missing on %s.\n%s", instance, stdout)
+        _print_slurm_diagnostics(cmds, instance)
+        sys.exit(1)
+    logger.info("Slurm health check passed on %s.", instance)
+
+
+def _print_slurm_diagnostics(cmds: Cmds, instance: str) -> None:
+    logger.error("=== Slurm diagnostics for %s ===", instance)
+    for svc in ("munge", "slurmdbd", "slurmctld", "slurmd"):
+        cmds.incus.run(
+            ["exec", instance, "--", "systemctl", "status", svc, "--no-pager"],
             check=False,
-            capture_output=True,
-            timeout=15,
         )
-    except subprocess.TimeoutExpired:
-        logger.warning("Slurm probe timed out on %s (instance may still be booting)", instance)
-        return
-    except Exception as exc:
-        logger.debug("Slurm probe skipped on %s: %s", instance, exc)
-        return
-
-    output = (result.stdout or "").strip()
-    if not output:
-        logger.debug("Slurm probe returned empty output on %s", instance)
-        return
-
-    hostname_match = re.search(r"^=== hostname ===\s*\n(.+)", output, re.MULTILINE)
-    got_hostname = hostname_match.group(1).strip() if hostname_match else ""
-    if got_hostname and got_hostname != "head":
-        logger.warning("Hostname is %r (expected 'head')", got_hostname)
-
-    hosts_match = re.search(r"^=== getent hosts head ===\s*\n(.+)", output, re.MULTILINE)
-    hosts_line = hosts_match.group(1).strip() if hosts_match else ""
-    if hosts_line and hosts_line != "not found":
-        if "127.0.0.1" not in hosts_line:
-            logger.warning("'head' resolves to %s (expected 127.0.0.1)", hosts_line)
-    elif hosts_line == "not found":
-        logger.warning("'head' does not resolve via getent hosts")
-
-    services_text = output[output.find("=== Slurm services ==="):output.find("=== Slurm commands ===")] if "=== Slurm commands ===" in output else output[output.find("=== Slurm services ==="):]
-    inactive_svcs = re.findall(r"^inactive: (.+)$", services_text, re.MULTILINE)
-    if inactive_svcs:
-        logger.warning("Slurm service(s) not active: %s", ", ".join(inactive_svcs))
-
-    cmds_text = output[output.find("=== Slurm commands ==="):] if "=== Slurm commands ===" in output else ""
-    if cmds_text:
-        logger.debug("Slurm commands found:\n%s", cmds_text)
+    cmds.incus.run(
+        ["exec", instance, "--",
+         "journalctl", "-u", "munge", "-u", "slurmdbd",
+         "-u", "slurmctld", "-u", "slurmd",
+         "--no-pager", "--lines=100"],
+        check=False,
+    )
+    cmds.incus.run(["exec", instance, "--", "scontrol", "ping"], check=False)
+    cmds.incus.run(["exec", instance, "--", "scontrol", "show", "node", "head"], check=False)
+    cmds.incus.run(["exec", instance, "--", "sinfo", "-Nel"], check=False)
+    cmds.incus.run(["exec", instance, "--", "squeue", "-a"], check=False)
 
 
 _SINGULARITY_PROBE_SCRIPT = """
