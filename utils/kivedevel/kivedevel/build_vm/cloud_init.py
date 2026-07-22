@@ -5,6 +5,7 @@ import logging
 import yaml
 
 from ..kv_commands import Cmds
+from ..slurm_health import SLURM_HEALTHCHECK_SCRIPT
 from .helpers import find_ssh_pubkey, generate_password_hash, set_instance_config_multiline
 
 
@@ -21,6 +22,9 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
     provision_write_files = ""
     provision_runcmd = ""
     if provision:
+        kive_slurm_healthcheck = "\n".join(
+            "      " + line for line in SLURM_HEALTHCHECK_SCRIPT.strip().splitlines()
+        )
         provision_write_files = f"""
   - path: /etc/systemd/system/kive-dev-web.service
     owner: root:root
@@ -41,6 +45,11 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
 
       [Install]
       WantedBy=multi-user.target
+  - path: /usr/local/bin/kive-slurm-healthcheck
+    owner: root:root
+    permissions: '0755'
+    content: |
+{kive_slurm_healthcheck}
   - path: /usr/local/bin/kive-provision-status
     owner: root:root
     permissions: '0755'
@@ -79,24 +88,37 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
               raise
 
       if __name__ == "__main__":
-          pid = os.getpid()
           prov_id = os.environ.get("KIVE_PROVISION_ID", "")
-          write_status(prov_id, "starting", "starting", pid=pid)
+          if not prov_id:
+              print("KIVE_PROVISION_ID is empty or unset", file=sys.stderr)
+              sys.exit(1)
           sys.argv.pop(0)
-          if sys.argv:
-              state = sys.argv.pop(0)
-              phase = sys.argv.pop(0) if sys.argv else state
-              extra = {{}}
-              if "--service-result" in sys.argv:
-                  idx = sys.argv.index("--service-result")
-                  extra["service_result"] = sys.argv[idx + 1]
-              if "--exit-code" in sys.argv:
-                  idx = sys.argv.index("--exit-code")
-                  extra["exit_code"] = int(sys.argv[idx + 1])
-              if "--message" in sys.argv:
-                  idx = sys.argv.index("--message")
-                  extra["message"] = sys.argv[idx + 1]
-              write_status(prov_id, state, phase, pid=pid, **extra)
+          if len(sys.argv) < 2:
+              print("Usage: kive-provision-status <state> <phase> [options]", file=sys.stderr)
+              sys.exit(1)
+          state = sys.argv.pop(0)
+          if state not in ("starting", "running", "succeeded", "failed"):
+              print(f"Unknown state: {{state}}", file=sys.stderr)
+              sys.exit(1)
+          phase = sys.argv.pop(0)
+          if not phase:
+              print("Phase is required", file=sys.stderr)
+              sys.exit(1)
+          extra = {{}}
+          if "--service-result" in sys.argv:
+              idx = sys.argv.index("--service-result")
+              extra["service_result"] = sys.argv[idx + 1]
+          if "--exit-code" in sys.argv:
+              idx = sys.argv.index("--exit-code")
+              val = sys.argv[idx + 1]
+              try:
+                  extra["exit_code"] = int(val)
+              except ValueError:
+                  extra["exit_code"] = val
+          if "--message" in sys.argv:
+              idx = sys.argv.index("--message")
+              extra["message"] = sys.argv[idx + 1]
+          write_status(prov_id, state, phase, **extra)
   - path: /etc/systemd/system/kive-provision.service
     owner: root:root
     permissions: '0644'
@@ -126,16 +148,28 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
     owner: root:root
     permissions: '0755'
     content: |
-      #!/usr/bin/env sh
-      set -eu
-      STATUS_FILE=/var/lib/kive-provision/status.json
-      if [ -f "$STATUS_FILE" ] && grep -q '"state": "succeeded"' "$STATUS_FILE" 2>/dev/null; then
-        exit 0
-      fi
-      /usr/local/bin/kive-provision-status running finalize \\
-        --service-result "${{SERVICE_RESULT:-unknown}}" \\
-        --exit-code "${{EXIT_STATUS:-1}}" \\
-        --message "Provisioning terminated before success"
+      #!/usr/bin/env python3
+      import json, os, sys
+      STATUS_FILE = "/var/lib/kive-provision/status.json"
+      if os.path.isfile(STATUS_FILE):
+          try:
+              with open(STATUS_FILE) as f:
+                  doc = json.load(f)
+              if isinstance(doc, dict) and doc.get("state") == "succeeded":
+                  sys.exit(0)
+          except (json.JSONDecodeError, OSError):
+              pass
+      exit_code = os.environ.get("EXIT_STATUS", "1")
+      try:
+          exit_code = int(exit_code)
+      except ValueError:
+          exit_code = 1
+      os.execvp("/usr/local/bin/kive-provision-status", [
+          "kive-provision-status", "failed", "finalize",
+          "--service-result", os.environ.get("SERVICE_RESULT", "unknown"),
+          "--exit-code", str(exit_code),
+          "--message", "Provisioning terminated before success",
+      ])
   - path: /usr/local/bin/kive-provision.sh
     owner: root:root
     permissions: '0755'
@@ -280,7 +314,7 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
       done
       if ! echo "$job_state" | grep -q 'COMPLETED.*0:0'; then
         scancel "$job_id" 2>/dev/null || true
-        echo "Slurm job did not complete within ${JOB_DEADLINE}s" >&2; exit 1
+        echo "Slurm job did not complete within ${{JOB_DEADLINE}}s" >&2; exit 1
       fi
       echo "--- Slurm readiness OK ---"
 

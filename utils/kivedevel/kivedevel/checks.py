@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root, instance_exists, instance_is_running
+from .slurm_health import SLURM_HEALTHCHECK_SCRIPT
 
 
 logger = logging.getLogger("kivedevel.checks")
@@ -36,48 +37,8 @@ def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> 
     return value
 
 
-_SLURM_CHECK_SCRIPT = """set -eu
-
-# Commands
-command -v squeue
-command -v sinfo
-command -v scontrol
-command -v srun
-
-# Services (quiet assertions)
-systemctl is-active --quiet munge
-systemctl is-active --quiet mariadb
-systemctl is-active --quiet slurmdbd
-systemctl is-active --quiet slurmctld
-systemctl is-active --quiet slurmd
-
-# Controller
-controller_status="$(scontrol ping)"
-printf 'CONTROLLER_STATUS=%s\n' "$controller_status"
-case "$controller_status" in
-  *"is UP"*) ;;
-  *)
-    echo "Slurm controller is not UP: $controller_status" >&2
-    exit 1
-    ;;
-esac
-
-# Node state — normalize duplicate partition entries
-scontrol show node head -o
-node_states="$(sinfo -h -N -n head -o '%T' | awk 'NF { print tolower($1) }' | sort -u)"
-printf 'NODE_STATES=%s\n' "$node_states"
-if [ "$node_states" != "idle" ]; then
-  echo "Node head is not exclusively idle: $node_states" >&2
-  exit 1
-fi
-
-# Informational queue output
-squeue -a
-"""
-
-
 def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
-    script = _SLURM_CHECK_SCRIPT.strip()
+    script = SLURM_HEALTHCHECK_SCRIPT.strip()
     result = cmds.incus.run(
         ["exec", instance, "--", "sh", "-c", script],
         check=False, capture_output=True, timeout=SMOKE_DEADLINE_SECONDS,

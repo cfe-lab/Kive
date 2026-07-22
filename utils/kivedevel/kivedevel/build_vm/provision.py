@@ -15,6 +15,7 @@ DEFAULT_PROVISION_TIMEOUT = 3000
 PROVISIONING_DEADLINE = 3000
 PROVISION_POLL_INTERVAL = 10
 PROBE_TIMEOUT = 30
+STATUS_STARTUP_TIMEOUT = 300
 DIAGNOSTICS_TIMEOUT = 60
 
 ALLOWED_STATES = frozenset({"starting", "running", "succeeded", "failed"})
@@ -135,8 +136,8 @@ def _pull_status(
         if _is_transport_stderr(stderr):
             raise ProvisionTransportError(
                 f"Transport error pulling status on {instance}: {stderr}")
-        raise ProvisionTransportError(
-            f"Status pull failed on {instance} (rc={result.returncode}): {stderr}")
+        raise ProvisionProtocolError(
+            f"Fatal probe error on {instance} (rc={result.returncode}): {stderr}")
 
     body = (result.stdout or "").strip()
     if not body:
@@ -218,7 +219,7 @@ def maybe_provision_instance(
     instance_type: str,
     *,
     provision: bool,
-    provision_id: str,
+    provision_id: str | None = None,
     timeout: int = DEFAULT_PROVISION_TIMEOUT,
 ) -> None:
     if not provision:
@@ -233,8 +234,7 @@ def maybe_provision_instance(
     deadline = time.monotonic() + timeout
     last_phase = ""
     consecutive_transport_failures = 0
-    startup_window = 30.0
-    startup_end = time.monotonic() + startup_window
+    startup_end = time.monotonic() + STATUS_STARTUP_TIMEOUT
 
     while time.monotonic() < deadline:
         try:
@@ -243,9 +243,12 @@ def maybe_provision_instance(
             if time.monotonic() < startup_end:
                 time.sleep(PROVISION_POLL_INTERVAL)
                 continue
-            logger.debug("Status not yet available on %s.", instance)
-            time.sleep(PROVISION_POLL_INTERVAL)
-            continue
+            _stop_service(cmds, instance)
+            diagnostics = _cloud_init_diagnostics(cmds, instance)
+            raise RuntimeError(
+                f"Provisioning status not available after "
+                f"{STATUS_STARTUP_TIMEOUT}s on {instance} "
+                f"(provision_id={provision_id}).\n\n{diagnostics}")
         except ProvisionTransportError as exc:
             consecutive_transport_failures += 1
             if consecutive_transport_failures >= 5:

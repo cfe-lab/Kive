@@ -91,7 +91,7 @@ class TestSingularityProbeFatal(unittest.TestCase):
 
 
 class TestSlurmScript(unittest.TestCase):
-    """Test _SLURM_CHECK_SCRIPT directly using stub executables."""
+    """Test SLURM_HEALTHCHECK_SCRIPT directly using stub executables."""
 
     def setUp(self):
         self.tmpdir = Path("/tmp/test_slurm_script")
@@ -110,11 +110,11 @@ class TestSlurmScript(unittest.TestCase):
         path.chmod(0o755)
 
     def _run_script(self):
-        from kivedevel.checks import _SLURM_CHECK_SCRIPT
+        from kivedevel.slurm_health import SLURM_HEALTHCHECK_SCRIPT
         import subprocess
         env = {"PATH": str(self.bindir) + ":/usr/bin:/bin"}
         return subprocess.run(
-            ["sh", "-c", _SLURM_CHECK_SCRIPT.strip()],
+            ["sh", "-c", SLURM_HEALTHCHECK_SCRIPT.strip()],
             capture_output=True, text=True, env=env,
         )
 
