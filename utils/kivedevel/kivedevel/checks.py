@@ -9,6 +9,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +21,8 @@ from .shared import configure_logging, default_root, instance_exists, instance_i
 
 
 logger = logging.getLogger("kivedevel.checks")
+
+SMOKE_DEADLINE_SECONDS = 1800
 
 
 def _device_exists(cmds: Cmds, instance: str, device: str) -> bool:
@@ -197,6 +200,21 @@ def run_validate_vm(args: argparse.Namespace) -> None:
     logger.info("validate-vm checks passed for %s.", instance)
 
 
+def _wait_for_url(base_url: str, deadline: float = 1800) -> bool:
+    import time as _time
+    end = _time.time() + deadline
+    while _time.time() < end:
+        try:
+            opener = urllib.request.build_opener()
+            with opener.open(f"{base_url}/login/", timeout=5) as response:
+                if response.status == 200:
+                    return True
+        except Exception:
+            pass
+        _time.sleep(2)
+    return False
+
+
 def _request_status(opener, url: str):
     try:
         with opener.open(url, timeout=5) as response:
@@ -216,54 +234,10 @@ def _is_url_reachable(base_url: str) -> bool:
     return status == 200
 
 
-def _vm_ip_candidates(cmds: Cmds, instance: str) -> list[str]:
-    out = cmds.incus.output(["list", instance, "--format", "json"])
-    if not out:
-        return []
-    try:
-        payload = json.loads(out)
-    except json.JSONDecodeError:
-        return []
-
-    candidates: list[str] = []
-    if not isinstance(payload, list) or not payload:
-        return candidates
-
-    state = payload[0].get("state", {})
-    network = state.get("network", {}) if isinstance(state, dict) else {}
-    for iface_data in network.values():
-        addresses = iface_data.get("addresses", []) if isinstance(iface_data, dict) else []
-        for addr in addresses:
-            family = addr.get("family")
-            scope = addr.get("scope")
-            address = addr.get("address")
-            if family == "inet" and scope == "global" and address:
-                candidates.append(address)
-    return candidates
-
-
-def _resolve_base_url(
-    cmds: Cmds,
-    instance: str,
-    port: int,
-    explicit: str | None,
-) -> str | None:
+def _resolve_base_url(explicit: str | None) -> str:
     if explicit:
         return explicit.rstrip("/")
-
-    candidates: list[str] = [f"http://127.0.0.1:{port}"]
-    for ip in _vm_ip_candidates(cmds, instance):
-        candidates.append(f"http://{ip}:{port}")
-
-    for candidate in candidates:
-        try:
-            if _is_url_reachable(candidate):
-                return candidate
-        except Exception:
-            continue
-
-    logger.info("No pre-existing API server reachable at: %s", ", ".join(candidates))
-    return None
+    return "http://127.0.0.1:8000"
 
 
 def _run_api_probe(base_url: str, username: str, password: str) -> dict:
@@ -333,135 +307,17 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     return result
 
 
-_VM_API_PROBE_SCRIPT = """import json, sys
-from urllib.request import build_opener, HTTPCookieProcessor, HTTPError, Request
-from urllib.parse import urlencode
-from http.cookiejar import CookieJar
-
-def load_config(path):
-    with open(path) as f:
-        return json.load(f)
-
-cfg = load_config(sys.argv[1])
-base_url = "http://127.0.0.1:{port}".format(**cfg)
-LOGIN_URL = base_url + "/login/"
-DATASETS_URL = base_url + "/api/datasets/?limit=1"
-USERNAME = cfg["username"]
-PASSWORD = cfg["password"]
-
-def _req(url, data=None, opener=None, method=None):
-    if opener is None:
-        opener = build_opener()
-    headers = {"Referer": LOGIN_URL} if data else {}
-    req = Request(url, data=data, headers=headers)
-    if method:
-        req.method = method
-    try:
-        with opener.open(req, timeout=5) as r:
-            return r.status, r.read().decode("utf-8", errors="replace")
-    except HTTPError as e:
-        return e.code, e.read().decode("utf-8", errors="replace")
-    except Exception:
-        return None, None
-
-anon_status, _ = _req(DATASETS_URL)
-jar = CookieJar()
-opener = build_opener(HTTPCookieProcessor(jar))
-login_status, _ = _req(LOGIN_URL, opener=opener)
-csrf = next((c.value for c in jar if c.name == "csrftoken"), "")
-csrf_available = bool(csrf)
-post_login_status = None
-if csrf:
-    data = urlencode({"username": USERNAME, "password": PASSWORD, "csrfmiddlewaretoken": csrf}).encode()
-    post_login_status, _ = _req(LOGIN_URL, data=data, opener=opener, method="POST")
-auth_status, auth_body = _req(DATASETS_URL, opener=opener)
-auth_json_ok = False
-auth_count = None
-if auth_status == 200:
-    try:
-        parsed = json.loads(auth_body)
-        items = parsed.get("results", parsed) if isinstance(parsed, dict) else parsed
-        if isinstance(items, list):
-            auth_count = len(items)
-        auth_json_ok = True
-    except Exception:
-        pass
-print(json.dumps({
-    "login_page_status": login_status,
-    "csrf_available": csrf_available,
-    "post_login_status": post_login_status,
-    "anon_datasets_status": anon_status,
-    "auth_datasets_status": auth_status,
-    "auth_json_ok": auth_json_ok,
-    "auth_count": auth_count,
-}))
-"""
-
-
-def _run_api_probe_via_exec(cmds: Cmds, instance: str, *, username: str = "kive", password: str = "kive", port: int = 8000) -> dict | None:
-    """Run the API probe script inside the VM via ``incus exec``.
-
-    Accepts *username*, *password*, and *port* so the same credentials
-    are used regardless of which probe path is taken.
-
-    Returns the same dict format as ``_run_api_probe``, or None on failure.
-    """
-    config = {"username": username, "password": password, "port": port}
-    config_json = json.dumps(config)
-
-    config_path = f"/var/tmp/_kive_api_config_{os.getpid()}.json"
-    script_path = f"/var/tmp/_kive_api_probe_{os.getpid()}.py"
-
-    push_config = cmds.incus.run(
-        ["file", "push", "-", f"{instance}{config_path}"],
-        input=config_json,
-        check=False, capture_output=True, timeout=15,
-    )
-    if push_config.returncode != 0:
-        logger.debug("Failed to push API config to %s: %s", instance, push_config.stderr)
-        return None
-
-    push_result = cmds.incus.run(
-        ["file", "push", "-", f"{instance}{script_path}"],
-        input=_VM_API_PROBE_SCRIPT,
-        check=False, capture_output=True, timeout=15,
-    )
-    if push_result.returncode != 0:
-        logger.debug("Failed to push API probe script to %s: %s", instance, push_result.stderr)
-        cmds.incus.run(["file", "delete", f"{instance}{config_path}"], check=False, timeout=10)
-        return None
-    try:
-        exec_result = cmds.incus.run(
-            ["exec", instance, "--", "python3", script_path, config_path],
-            check=False, capture_output=True, timeout=30,
-        )
-        if exec_result.returncode != 0:
-            logger.debug("API probe via exec failed on %s (rc=%s): %s",
-                         instance, exec_result.returncode, exec_result.stderr)
-            return None
-        out = (exec_result.stdout or "").strip()
-        if not out:
-            logger.debug("API probe via exec produced no output on %s", instance)
-            return None
-        data = json.loads(out)
-        if not isinstance(data, dict):
-            return None
-        return data
-    except (json.JSONDecodeError, ValueError, OSError) as exc:
-        logger.debug("API probe via exec parse error on %s: %s", instance, exc)
-        return None
-    except subprocess.TimeoutExpired:
-        logger.debug("API probe via exec timed out on %s", instance)
-        return None
-    finally:
-        cmds.incus.run(
-            ["file", "delete", f"{instance}{script_path}"],
-            check=False, timeout=10,
-        )
-        cmds.incus.run(
-            ["file", "delete", f"{instance}{config_path}"],
-            check=False, timeout=10,
-        )
+def _print_proxy_diagnostics(cmds: Cmds, instance: str) -> None:
+    logger.error("=== Proxy diagnostics for %s ===", instance)
+    cmds.incus.run(["config", "device", "show", instance], check=False)
+    cmds.incus.run(["config", "show", "--expanded", instance], check=False)
+    cmds.incus.run(["exec", instance, "--", "systemctl", "status", "kive-dev-web.service", "--no-pager"], check=False)
+    cmds.incus.run(["exec", instance, "--", "journalctl", "-u", "kive-dev-web.service", "--no-pager", "--lines=100"], check=False)
+    cmds.incus.run(["exec", instance, "--", "ss", "-ltnp"], check=False)
+    cmds.incus.run(["exec", instance, "--", "ufw", "status", "verbose"], check=False)
+    cmds.incus.run(["exec", instance, "--", "ip", "addr"], check=False)
+    cmds.incus.run(["exec", instance, "--", "ip", "route"], check=False)
+    cmds.incus.run(["exec", instance, "--", "curl", "-v", "http://127.0.0.1:8000/login/"], check=False)
 
 
 def _check_api_probe_results(results: dict, instance: str) -> None:
@@ -525,30 +381,18 @@ def run_test_api(args: argparse.Namespace) -> None:
         logger.error("Instance %s is not running.", instance)
         sys.exit(1)
 
-    # Try direct host HTTP first.
-    base_url = _resolve_base_url(cmds, instance, args.port, args.base_url)
-
-    if base_url:
-        logger.info("Running API probe against %s...", base_url)
-        probe: dict = _run_api_probe(base_url, username=args.username, password=args.password)
-    else:
-        logger.info(
-            "No host-reachable API endpoint at port %s for %s; "
-            "trying incus-exec based API probe...",
-            args.port, instance,
+    base_url = _resolve_base_url(args.base_url)
+    logger.info("Waiting for API at %s/login/ (deadline %ss)...", base_url, SMOKE_DEADLINE_SECONDS)
+    if not _wait_for_url(base_url, deadline=SMOKE_DEADLINE_SECONDS):
+        logger.error(
+            "API endpoint %s/login/ did not become reachable within %s seconds.",
+            base_url, SMOKE_DEADLINE_SECONDS,
         )
-        exec_probe = _run_api_probe_via_exec(
-            cmds, instance,
-            username=args.username, password=args.password, port=args.port,
-        )
-        if exec_probe is None:
-            logger.error(
-                "No reachable API endpoint for instance %s (port %s).",
-                instance, args.port,
-            )
-            sys.exit(1)
-        probe = exec_probe
+        _print_proxy_diagnostics(cmds, instance)
+        sys.exit(1)
 
+    logger.info("Running API probe against %s...", base_url)
+    probe = _run_api_probe(base_url, username=args.username, password=args.password)
     _check_api_probe_results(probe, instance)
 
 
