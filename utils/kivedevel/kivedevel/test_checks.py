@@ -90,24 +90,111 @@ class TestSingularityProbeFatal(unittest.TestCase):
         checks._run_singularity_probe(self.cmds, "test", fatal=False)
 
 
-class TestSlurmProbe(unittest.TestCase):
-    """Slurm probe validation."""
+class TestSlurmScript(unittest.TestCase):
+    """Test _SLURM_CHECK_SCRIPT directly using stub executables."""
+
+    def setUp(self):
+        self.tmpdir = Path("/tmp/test_slurm_script")
+        self.bindir = self.tmpdir / "bin"
+        self.bindir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmpdir, ignore_errors=True)
+
+    def _write_stub(self, name, exit_code=0, stdout=""):
+        path = self.bindir / name
+        path.write_text(
+            f"#!/bin/sh\necho '{stdout}'\nexit {exit_code}\n"
+        )
+        path.chmod(0o755)
+
+    def _run_script(self):
+        from kivedevel.checks import _SLURM_CHECK_SCRIPT
+        import subprocess
+        env = {"PATH": str(self.bindir) + ":/usr/bin:/bin"}
+        return subprocess.run(
+            ["sh", "-c", _SLURM_CHECK_SCRIPT.strip()],
+            capture_output=True, text=True, env=env,
+        )
+
+    def test_healthy_cluster_succeeds(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is UP")
+        self._write_stub("sinfo", stdout="idle")
+        self._write_stub("squeue", stdout="JOBID PARTITION NAME USER ST TIME NODES NODELIST(REASON)")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertEqual(0, result.returncode)
+
+    def test_controller_down_fails(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is DOWN")
+        self._write_stub("sinfo", stdout="idle")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertNotEqual(0, result.returncode)
+        self.assertIn("is not UP", result.stderr)
+
+    def test_empty_node_state_fails(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is UP")
+        self._write_stub("sinfo", stdout="")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertNotEqual(0, result.returncode)
+
+    def test_non_idle_state_fails(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is UP")
+        self._write_stub("sinfo", stdout="down")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertNotEqual(0, result.returncode)
+
+    def test_multiple_idle_states_normalize_to_one(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is UP")
+        self._write_stub("sinfo", stdout="idle\nidle\nidle")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertEqual(0, result.returncode)
+
+    def test_mixed_states_fails(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", stdout="")
+        self._write_stub("scontrol", stdout="Slurmctld(primary) at head is UP")
+        self._write_stub("sinfo", stdout="idle\ndown")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertNotEqual(0, result.returncode)
+
+    def test_inactive_service_fails(self):
+        self._write_stub("command")
+        self._write_stub("systemctl", exit_code=1)
+        self._write_stub("scontrol", stdout="")
+        self._write_stub("sinfo", stdout="")
+        self._write_stub("squeue", stdout="")
+        self._write_stub("srun")
+        result = self._run_script()
+        self.assertNotEqual(0, result.returncode)
+
+
+class TestRunSlurmProbe(unittest.TestCase):
+    """Python orchestration of the Slurm probe."""
 
     def setUp(self):
         self.cmds = make_cmds()
-        self.cmds.incus.run.return_value = MockRunResult(
-            returncode=0,
-            stdout=(
-                "active\n"
-                "active\n"
-                "active\n"
-                "active\n"
-                "active\n"
-                "UP\n"
-                "head\n"
-                "idle\n"
-            ),
-        )
 
     def _import(self):
         from kivedevel import checks as checks
@@ -115,22 +202,26 @@ class TestSlurmProbe(unittest.TestCase):
         importlib.reload(checks)
         return checks
 
-    def test_valid_slurm_does_not_log_warning(self):
+    def test_zero_return_passes(self):
         checks = self._import()
-        with mock.patch.object(checks.logger, "warning") as mock_warn:
+        self.cmds.incus.run.return_value = MockRunResult(returncode=0, stdout="ok\n")
+        with mock.patch.object(checks, "_print_slurm_diagnostics") as mock_diag:
             checks._run_slurm_probe(self.cmds, "test")
-            mock_warn.assert_not_called()
+        mock_diag.assert_not_called()
 
-    def test_slurm_probe_fails_on_inactive_service(self):
+    def test_nonzero_return_fails(self):
         checks = self._import()
         self.cmds.incus.run.return_value = MockRunResult(
-            returncode=0,
-            stdout=(
-                "inactive: slurmctld\n"
-            ),
+            returncode=1, stdout="", stderr="error",
         )
-        with self.assertRaises(SystemExit):
-            checks._run_slurm_probe(self.cmds, "test")
+        with mock.patch.object(checks, "_print_slurm_diagnostics") as mock_diag:
+            with self.assertRaises(SystemExit):
+                checks._run_slurm_probe(self.cmds, "test")
+        mock_diag.assert_called_once()
+
+    def test_uses_smoke_deadline(self):
+        checks = self._import()
+        self.assertEqual(checks.SMOKE_DEADLINE_SECONDS, 1800)
 
 
 class TestDeviceExists(unittest.TestCase):

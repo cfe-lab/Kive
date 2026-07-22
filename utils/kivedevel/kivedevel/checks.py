@@ -37,21 +37,41 @@ def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> 
 
 
 _SLURM_CHECK_SCRIPT = """set -eu
-echo '=== commands ==='
+
+# Commands
 command -v squeue
 command -v sinfo
 command -v scontrol
 command -v srun
-echo '=== services ==='
-systemctl is-active munge
-systemctl is-active mariadb
-systemctl is-active slurmdbd
-systemctl is-active slurmctld
-systemctl is-active slurmd
-echo '=== controller ==='
-scontrol ping
+
+# Services (quiet assertions)
+systemctl is-active --quiet munge
+systemctl is-active --quiet mariadb
+systemctl is-active --quiet slurmdbd
+systemctl is-active --quiet slurmctld
+systemctl is-active --quiet slurmd
+
+# Controller
+controller_status="$(scontrol ping)"
+printf 'CONTROLLER_STATUS=%s\n' "$controller_status"
+case "$controller_status" in
+  *"is UP"*) ;;
+  *)
+    echo "Slurm controller is not UP: $controller_status" >&2
+    exit 1
+    ;;
+esac
+
+# Node state — normalize duplicate partition entries
 scontrol show node head -o
-sinfo -h -N -n head -o '%T'
+node_states="$(sinfo -h -N -n head -o '%T' | awk 'NF { print tolower($1) }' | sort -u)"
+printf 'NODE_STATES=%s\n' "$node_states"
+if [ "$node_states" != "idle" ]; then
+  echo "Node head is not exclusively idle: $node_states" >&2
+  exit 1
+fi
+
+# Informational queue output
 squeue -a
 """
 
@@ -65,29 +85,13 @@ def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
     stdout = (result.stdout or "").strip()
     stderr = (result.stderr or "").strip()
     if result.returncode != 0:
-        logger.error("Slurm check failed on %s (rc=%s).\nstdout:\n%s\nstderr:\n%s",
-                     instance, result.returncode, stdout, stderr)
-        _print_slurm_diagnostics(cmds, instance)
-        sys.exit(1)
-    if "inactive" in stdout or "not active" in stderr:
-        logger.error("Slurm services are not fully active on %s.\n%s", instance, stdout)
-        _print_slurm_diagnostics(cmds, instance)
-        sys.exit(1)
-    if "command not found" in stdout or "not found" in stderr:
-        logger.error("Required Slurm commands missing on %s.\n%s", instance, stdout)
-        _print_slurm_diagnostics(cmds, instance)
-        sys.exit(1)
-
-    node_state_line = [line for line in stdout.splitlines() if line.strip() and '/' not in line and line.strip() != 'UP' and 'controller' not in line.lower()]
-    node_state = node_state_line[-1].strip() if node_state_line else ""
-    if node_state != "idle":
         logger.error(
-            "Node head is not idle on %s (state=%r).\n%s",
-            instance, node_state, stdout,
+            "Slurm check failed on %s (rc=%s).\nstdout:\n%s\nstderr:\n%s",
+            instance, result.returncode, stdout, stderr,
         )
         _print_slurm_diagnostics(cmds, instance)
         sys.exit(1)
-    logger.info("Slurm health check passed on %s.", instance)
+    logger.info("Slurm health check passed on %s.\n%s", instance, stdout)
 
 
 def _print_slurm_diagnostics(cmds: Cmds, instance: str) -> None:
