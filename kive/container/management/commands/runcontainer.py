@@ -84,10 +84,7 @@ class Command(BaseCommand):
 
     @staticmethod
     def _sandbox_argument_filename(container_dataset: ContainerDataset) -> str:
-        argtype = container_dataset.argument.argtype
-        if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
-            return _staged_input_filename(container_dataset)
-        return container_dataset.argument.name
+        return _staged_input_filename(container_dataset)
 
     def fill_sandbox(self, run):
         if not run.sandbox_path:

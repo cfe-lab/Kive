@@ -62,6 +62,18 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       }
       trap mark_failed_on_exit EXIT
 
+      _apt_diagnostics() {
+        {
+          echo "date: $(date)"
+          ip addr
+          ip route
+          resolvectl status
+          cat /etc/resolv.conf
+          find /etc/apt -maxdepth 3 -type f \
+            -print -exec sed -n '1,160p' {} ";"
+        } >&2 || true
+      }
+
       exec >>"$LOG_FILE" 2>&1
       set -x
       date
@@ -101,13 +113,42 @@ def ensure_user_data(cmds: Cmds, instance: str, provision: bool = False) -> bool
       echo "--- TCP egress to archive.ubuntu.com OK ---"
       echo "=== apt install prerequisites ==="
       export DEBIAN_FRONTEND=noninteractive
-      if ! timeout --foreground 180s apt-get update; then
-        echo "apt-get update failed or timed out" >&2
-        exit 1
+      APT_DEADLINE_SECONDS=1800
+      set +e
+      timeout --foreground "${APT_DEADLINE_SECONDS}s" \
+        apt-get \
+          -o Acquire::ForceIPv4=true \
+          -o Acquire::Retries=10 \
+          update
+      apt_status=$?
+      set -e
+      if [ "$apt_status" -eq 124 ]; then
+        echo "apt-get update exceeded ${APT_DEADLINE_SECONDS}s" >&2
+        _apt_diagnostics
+        exit 124
       fi
-      if ! timeout --foreground 300s apt-get install -y ansible curl openssh-server; then
-        echo "apt-get install failed or timed out" >&2
-        exit 1
+      if [ "$apt_status" -ne 0 ]; then
+        echo "apt-get update failed with status $apt_status" >&2
+        _apt_diagnostics
+        exit "$apt_status"
+      fi
+      set +e
+      timeout --foreground "${APT_DEADLINE_SECONDS}s" \
+        apt-get \
+          -o Acquire::ForceIPv4=true \
+          -o Acquire::Retries=10 \
+          install -y ansible curl openssh-server
+      apt_status=$?
+      set -e
+      if [ "$apt_status" -eq 124 ]; then
+        echo "apt-get install exceeded ${APT_DEADLINE_SECONDS}s" >&2
+        _apt_diagnostics
+        exit 124
+      fi
+      if [ "$apt_status" -ne 0 ]; then
+        echo "apt-get install failed with status $apt_status" >&2
+        _apt_diagnostics
+        exit "$apt_status"
       fi
       if ! systemctl enable --now ssh; then
         echo "Failed to enable/start ssh after installing openssh-server" >&2
