@@ -1474,6 +1474,7 @@ class ContainerRun(Stopwatch, AccessControl):
             binding_execution_key(cd),
         ))
         for cd in all_cds:
+            staged = _staged_input_filename(cd) if cd.argument.type == ContainerArgument.INPUT else ""
             bindings.append((
                 cd.argument_id,
                 cd.argument.type,
@@ -1481,7 +1482,7 @@ class ContainerRun(Stopwatch, AccessControl):
                 cd.argument.name,
                 cd.multi_position,
                 cd.name,
-                cd.dataset.name,
+                staged,
                 cd.dataset.MD5_checksum,
             ))
         payload = _json.dumps(bindings, sort_keys=False, separators=(',', ':'))
@@ -1586,6 +1587,56 @@ class ContainerDataset(models.Model):
 
 def _is_keyword(arg: ContainerArgument) -> bool:
     return arg.argtype in ContainerArgument.KEYWORD_ARG_TYPES if arg.argtype is not None else arg.position is None
+
+
+def _source_filename(cd: ContainerDataset) -> str:
+    """Resolve the source basename for a ContainerDataset binding.
+
+    Resolution order:
+        1. cd.name (ContainerDataset.name, set by directory-output or explicit naming)
+        2. cd.dataset.dataset_file.name (storage file path)
+        3. cd.dataset.external_path (external reference)
+
+    Returns the basename only.  Raises RuntimeError if no identity is found
+    or the basename is empty/pathological.
+    """
+    raw: str | None = None
+    if cd.name:
+        raw = cd.name
+    elif cd.dataset.dataset_file:
+        raw = cd.dataset.dataset_file.name
+    elif cd.dataset.external_path:
+        raw = cd.dataset.external_path
+
+    if not raw:
+        raise RuntimeError(
+            f"Input dataset (id={cd.dataset_id}) has no usable file identity")
+
+    base = os.path.basename(raw)
+    if base in ("", ".", "..") or "/" in base:
+        raise RuntimeError(
+            f"Invalid source basename {base!r} for dataset {cd.dataset_id}")
+    return base
+
+
+def _suffix_from_source(base: str) -> str:
+    """Extract the complete suffix chain from a source basename."""
+    if "." in base:
+        dot = base.find(".")
+        return base[dot:]
+    return ""
+
+
+def _staged_input_filename(cd: ContainerDataset) -> str:
+    """Deterministic command-visible filename for an input binding."""
+    argname = cd.argument.name
+    if cd.argument.position is not None:
+        return argname
+    base = _source_filename(cd)
+    suffix = _suffix_from_source(base)
+    if cd.multi_position is not None:
+        return f"{argname}_{cd.multi_position}{suffix}"
+    return f"{argname}{suffix}"
 
 
 def argument_execution_key(argument: ContainerArgument) -> tuple:

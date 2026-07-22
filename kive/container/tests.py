@@ -3173,8 +3173,10 @@ Line 3
             dataset.argument = arg
             dataset.name = ''
             dataset.dataset.name = arg.name
+            dataset.dataset.dataset_file = unittest.mock.Mock()
+            dataset.dataset.dataset_file.name = arg.name
             if multi_position is not None:
-                dataset.dataset.name += str(multi_position)
+                dataset.dataset.dataset_file.name += str(multi_position)
             dataset.multi_position = multi_position
             datasets.append(dataset)
 
@@ -4551,7 +4553,7 @@ class ContainerRunCreateValidationTests(TestCase):
             dataset=self.dataset1,
         )
         staged_name = runcontainer.Command._sandbox_argument_filename(cd)
-        self.assertEqual("opt", staged_name)
+        self.assertEqual("opt.csv", staged_name)
 
     def test_serializer_rejects_missing_multi_position(self):
         request = self.factory.post(

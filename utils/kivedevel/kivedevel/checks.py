@@ -36,8 +36,7 @@ def _required_device_value(cmds: Cmds, instance: str, device: str, key: str) -> 
     return value
 
 
-_SLURM_CHECK_SCRIPT = """
-set -e
+_SLURM_CHECK_SCRIPT = """set -eu
 echo '=== commands ==='
 command -v squeue
 command -v sinfo
@@ -56,10 +55,10 @@ sinfo -Nel
 
 
 def _run_slurm_probe(cmds: Cmds, instance: str) -> None:
-    script = _SLURM_CHECK_SCRIPT.replace('\n', '; ')
+    script = _SLURM_CHECK_SCRIPT.strip()
     result = cmds.incus.run(
         ["exec", instance, "--", "sh", "-c", script],
-        check=False, capture_output=True, timeout=30,
+        check=False, capture_output=True, timeout=SMOKE_DEADLINE_SECONDS,
     )
     stdout = (result.stdout or "").strip()
     stderr = (result.stderr or "").strip()

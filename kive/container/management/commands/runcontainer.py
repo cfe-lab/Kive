@@ -17,6 +17,7 @@ from container.models import (
     ContainerRun, ContainerArgument, ContainerArgumentType,
     ContainerLog, ContainerDataset,
     argument_execution_key, binding_execution_key,
+    _source_filename, _suffix_from_source, _staged_input_filename,
 )
 from librarian.models import Dataset
 
@@ -85,27 +86,7 @@ class Command(BaseCommand):
     def _sandbox_argument_filename(container_dataset: ContainerDataset) -> str:
         argtype = container_dataset.argument.argtype
         if argtype in ContainerArgument.KEYWORD_ARG_TYPES:
-            arg_name = container_dataset.argument.name
-            base = container_dataset.name or container_dataset.dataset.name
-            base = os.path.basename(base)
-            if base in ("", ".", ".."):
-                raise RuntimeError(
-                    f"Invalid dataset name for {arg_name}: {base!r}")
-            if "/" in base:
-                raise RuntimeError(
-                    f"Dataset name contains path separator: {base!r}")
-            suffix = ""
-            name_part = base
-            if "." in name_part:
-                dot = name_part.find(".")
-                name_part = name_part[:dot]
-                suffix = base[dot:]
-            multi = container_dataset.multi_position
-            if multi is not None:
-                staged = f"{arg_name}_{multi}{suffix}"
-            else:
-                staged = f"{arg_name}{suffix}"
-            return staged
+            return _staged_input_filename(container_dataset)
         return container_dataset.argument.name
 
     def fill_sandbox(self, run):
