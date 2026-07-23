@@ -88,6 +88,11 @@ def _read_container_proxy_device(cmds: Cmds, instance: str) -> dict[str, str] | 
 
 
 def _ensure_container_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
+    if cfg.instance_type != "container":
+        raise ValueError(
+            "Container web proxy reconciliation called for "
+            f"{cfg.instance_type} instance"
+        )
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
@@ -145,6 +150,14 @@ def _ensure_container_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
         raise RuntimeError(
             f"Failed to create proxy device {PROXY_DEVICE} "
             f"on {cfg.instance} (rc={result.returncode})")
+
+    read_back = _read_container_proxy_device(cmds, cfg.instance)
+    if read_back is None or not _proxy_config_match(desired, read_back):
+        raise RuntimeError(
+            f"Proxy device {PROXY_DEVICE} on {cfg.instance} read-back mismatch.\n"
+            f"Desired: {desired}\n"
+            f"Actual:  {read_back}"
+        )
 
 
 def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
@@ -275,10 +288,8 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
 
     maybe_restart_after_config(cmds, cfg.instance, restart_required)
 
-    needs_lease = cfg.provision or not cfg.no_web_proxy
-
     ip: str | None = None
-    if needs_lease:
+    if cfg.provision:
         logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
         ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
         if ip is None:
@@ -426,6 +437,18 @@ def run_build_vm(args: argparse.Namespace) -> None:
         logger.error(
             "--host-interface is not supported in VM mode. "
             "VM networking uses the managed Incus bridge.",
+        )
+        sys.exit(1)
+    if cfg.instance_type == "vm" and cfg.web_port != 8000:
+        logger.error(
+            "--web-port configures the container host proxy and is not supported "
+            "as a different port in VM mode. The VM web service uses port 8000.",
+        )
+        sys.exit(1)
+    if cfg.instance_type == "vm" and cfg.no_web_proxy:
+        logger.error(
+            "--no-web-proxy is only valid in container mode. "
+            "VM mode connects directly to the managed-bridge address.",
         )
         sys.exit(1)
     if cfg.instance_type == "container" and cfg.vm_network is not None:

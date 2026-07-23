@@ -78,7 +78,7 @@ def register_subcommand(subparsers) -> None:  # type: ignore[type-arg]
         type=int,
         default=8000,
         metavar="PORT",
-        help="Host port for the Kive web proxy (default: 8000)",
+        help="Host port for the container web proxy (default: 8000; not supported in VM mode)",
     )
     parser.add_argument(
         "--no-web-proxy",

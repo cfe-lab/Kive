@@ -193,24 +193,7 @@ def _build_local_opener(cookie_jar: CookieJar | None = None):
     return urllib.request.build_opener(*handlers)
 
 
-def _wait_for_url(base_url: str, deadline: float = 1800) -> bool:
-    import time as _time
-    end = _time.monotonic() + deadline
-    last_error: Exception | None = None
-    while _time.monotonic() < end:
-        try:
-            opener = _build_local_opener()
-            with opener.open(f"{base_url}/login/", timeout=5) as response:
-                if response.status == 200:
-                    return True
-        except Exception as exc:
-            last_error = exc
-        _time.sleep(2)
-    logger.error(
-        "Host endpoint %s/login/ did not become reachable; last error: %r",
-        base_url, last_error,
-    )
-    return False
+
 
 
 def _request_status(opener, url: str):
@@ -224,12 +207,6 @@ def _request_status(opener, url: str):
     except urllib.error.URLError:
         # Connection refused, timeout, or other network issues
         return None, None
-
-
-def _is_url_reachable(base_url: str) -> bool:
-    opener = _build_local_opener()
-    status, _ = _request_status(opener, f"{base_url}/login/")
-    return status == 200
 
 
 def wait_for_http_200(
@@ -260,10 +237,10 @@ def wait_for_http_200(
     )
 
 
-def _resolve_base_url(explicit: str | None) -> str:
+def _resolve_base_url(explicit: str | None, port: int = 8000) -> str:
     if explicit:
         return explicit.rstrip("/")
-    return "http://127.0.0.1:8000"
+    return f"http://127.0.0.1:{port}"
 
 
 def _run_api_probe(base_url: str, username: str, password: str) -> dict:
@@ -333,7 +310,7 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
     return result
 
 
-def _print_proxy_diagnostics(cmds: Cmds, instance: str) -> None:
+def _print_vm_api_diagnostics(cmds: Cmds, instance: str) -> None:
     logger.error("=== VM diagnostics for %s ===", instance)
     import subprocess as _sp
     result = cmds.incus.run(["list", instance, "--format", "json"], check=False, capture_output=True, timeout=10)
@@ -437,12 +414,12 @@ def run_test_api(args: argparse.Namespace) -> None:
         logger.error("Instance %s is not running.", instance)
         sys.exit(1)
 
-    base_url = _resolve_base_url(args.base_url)
-    logger.info("Waiting for API at %s/login/ (deadline 60s)...", base_url)
+    base_url = _resolve_base_url(args.base_url, args.port)
+    logger.info("Waiting for API at %s/login/ ...", base_url)
     try:
         wait_for_http_200(f"{base_url}/login/")
     except RuntimeError:
-        _print_proxy_diagnostics(cmds, instance)
+        _print_vm_api_diagnostics(cmds, instance)
         sys.exit(1)
 
     logger.info("Running API probe against %s...", base_url)

@@ -37,38 +37,41 @@ class TestSmokeLocalInstall(unittest.TestCase):
 
         cmds = make_cmds()
         cmds.incus.run.side_effect = [
-            MockRunResult(returncode=0, stdout="[]"),
             MockRunResult(returncode=0),
             MockRunResult(returncode=1),
         ]
 
         with mock.patch(
-            "kivedevel.local_install.run_build_vm",
-            side_effect=lambda a: call_order.append("build"),
-        ) as mock_build:
+            "kivedevel.local_install.get_vm_ipv4",
+            return_value="10.77.77.100",
+        ):
             with mock.patch(
-                "kivedevel.checks.run_validate_vm",
-                side_effect=lambda a: call_order.append("validate"),
-            ) as mock_validate:
+                "kivedevel.local_install.run_build_vm",
+                side_effect=lambda a: call_order.append("build"),
+            ) as mock_build:
                 with mock.patch(
-                    "kivedevel.checks.run_test_api",
-                    side_effect=lambda a: call_order.append("test-api"),
-                ) as mock_test_api:
+                    "kivedevel.checks.run_validate_vm",
+                    side_effect=lambda a: call_order.append("validate"),
+                ) as mock_validate:
                     with mock.patch(
-                        "kivedevel.local_install.reload_mod.run_reload",
-                        side_effect=lambda a: call_order.append("reload"),
-                    ) as mock_reload:
-                        with mock.patch.object(
-                            li, "Cmds",
-                        ) as mock_cmds_cls:
-                            mock_cmds_cls.create.return_value = cmds
-                            run_smoke_local_install(args)
+                        "kivedevel.checks.run_test_api",
+                        side_effect=lambda a: call_order.append("test-api"),
+                    ) as mock_test_api:
+                        with mock.patch(
+                            "kivedevel.local_install.reload_mod.run_reload",
+                            side_effect=lambda a: call_order.append("reload"),
+                        ) as mock_reload:
+                            with mock.patch.object(
+                                li, "Cmds",
+                            ) as mock_cmds_cls:
+                                mock_cmds_cls.create.return_value = cmds
+                                run_smoke_local_install(args)
 
-        self.assertEqual(call_order, ["build", "validate", "test-api", "reload", "test-api", "reload"])
-        self.assertEqual(mock_build.call_count, 1)
-        self.assertEqual(mock_validate.call_count, 1)
-        self.assertEqual(mock_test_api.call_count, 2)
-        self.assertEqual(mock_reload.call_count, 2)
+            self.assertEqual(call_order, ["build", "validate", "test-api", "reload", "test-api", "reload"])
+            self.assertEqual(mock_build.call_count, 1)
+            self.assertEqual(mock_validate.call_count, 1)
+            self.assertEqual(mock_test_api.call_count, 2)
+            self.assertEqual(mock_reload.call_count, 2)
 
     def test_failure_in_build_stops_sequence(self):
         from kivedevel.local_install import run_smoke_local_install

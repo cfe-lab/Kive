@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import checks
 from . import reload as reload_mod
+from .build_vm.network import DEFAULT_VM_BRIDGE, get_vm_ipv4
 from .build_vm.runner import run_build_vm
 from .kv_commands import Cmds
 from .shared import configure_logging, default_root
@@ -16,27 +17,10 @@ from .shared import configure_logging, default_root
 logger = logging.getLogger("kivedevel.local_install")
 
 
-def _vm_api_url(cmds: Cmds, instance: str) -> str:
-    import json as _json
-    result = cmds.incus.run(
-        ["list", instance, "--format", "json"],
-        check=False, capture_output=True, timeout=10,
-    )
-    if result.returncode != 0:
-        return "http://127.0.0.1:8000"
-    try:
-        data = _json.loads(result.stdout or "[]")
-        if isinstance(data, list) and data:
-            state = data[0].get("state", {})
-            network = state.get("network", {}) if isinstance(state, dict) else {}
-            for iface_data in network.values():
-                if isinstance(iface_data, dict):
-                    for addr in iface_data.get("addresses", []):
-                        if isinstance(addr, dict) and addr.get("family") == "inet" and addr.get("scope") == "global":
-                            return f"http://{addr['address']}:8000"
-    except (_json.JSONDecodeError, IndexError, KeyError):
-        pass
-    return "http://127.0.0.1:8000"
+def _vm_base_url(cmds: Cmds, instance: str, vm_network: str | None) -> str:
+    bridge = vm_network or DEFAULT_VM_BRIDGE
+    ip = get_vm_ipv4(cmds, instance, bridge)
+    return f"http://{ip}:8000"
 
 
 def _build_vm_args(
@@ -125,16 +109,15 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
     checks.run_validate_vm(validate_args)
 
+    cmds = Cmds.create()
     if instance_type == "vm":
-        cmds = Cmds.create()
-        base_url = _vm_api_url(cmds, instance)
+        base_url = _vm_base_url(cmds, instance, vm_network)
     else:
         base_url = "http://127.0.0.1:8000"
     api_args = _test_api_args(instance, workdir, debug, base_url=base_url)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
     checks.run_test_api(api_args)
 
-    # Reload smoke test: create a marker, reload, verify, delete, reload, verify gone.
     marker_name = ".kive-reload-smoke-marker"
     marker_path = default_root() / marker_name
     try:
@@ -146,7 +129,6 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
         reload_args.workdir = workdir
         reload_mod.run_reload(reload_args)
 
-        cmds = Cmds.create()
         result = cmds.incus.run(
             ["exec", instance, "--", "test", "-f", f"/usr/local/share/Kive/{marker_name}"],
             check=False,
@@ -155,7 +137,12 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
             raise RuntimeError(f"Marker file not found in guest after reload: {marker_name}")
 
         logger.info("Reload smoke test: marker propagated. Checking API health after reload...")
-        checks.run_test_api(api_args)
+        if instance_type == "vm":
+            reload_base_url = _vm_base_url(cmds, instance, vm_network)
+        else:
+            reload_base_url = base_url
+        reload_api_args = _test_api_args(instance, workdir, debug, base_url=reload_base_url)
+        checks.run_test_api(reload_api_args)
 
         marker_path.unlink()
         logger.info("Deleted host marker. Reloading again to verify deletion...")

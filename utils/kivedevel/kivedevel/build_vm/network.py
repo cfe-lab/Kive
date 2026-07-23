@@ -456,6 +456,36 @@ def _vm_mac_address(cmds: Cmds, instance: str) -> str | None:
     return hwaddr if hwaddr else None
 
 
+def get_vm_ipv4(cmds: Cmds, instance: str, bridge_name: str, *, timeout: float = 30) -> str:
+    mac = _vm_mac_address(cmds, instance)
+    import time as _time
+    deadline = _time.monotonic() + timeout
+    while _time.monotonic() < deadline:
+        out = cmds.incus.output(["network", "list-leases", bridge_name, "--format", "json"])
+        if out:
+            try:
+                leases = json.loads(out)
+                if isinstance(leases, list):
+                    for lease in leases:
+                        if lease.get("type") == "gateway":
+                            continue
+                        if mac and lease.get("hwaddr", "").lower() == mac.lower():
+                            ip = lease.get("address", "")
+                            if ip:
+                                return ip
+                        if not mac and lease.get("hostname", "").startswith(instance):
+                            ip = lease.get("address", "")
+                            if ip:
+                                return ip
+            except json.JSONDecodeError:
+                pass
+        _time.sleep(2)
+    raise RuntimeError(
+        f"Could not resolve VM IPv4 address for {instance} "
+        f"on bridge {bridge_name} within {timeout}s"
+    )
+
+
 def wait_vm_dhcp_lease(cmds: Cmds, instance: str, bridge_name: str, timeout: float = 120) -> str | None:
     import time as _time
     deadline = _time.monotonic() + timeout
