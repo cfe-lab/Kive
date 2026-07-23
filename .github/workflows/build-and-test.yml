@@ -112,26 +112,10 @@ jobs:
             iproute2 \
             socat
 
-      - name: QEMU diagnostics
+      - name: Prepare host
         run: |
-          echo "=== QEMU diagnostics ==="
-          command -v qemu-system-x86_64 || true
-          qemu-system-x86_64 --version || true
-          echo "=== KVM ==="
-          ls -l /dev/kvm || true
-          echo "=== Incus ==="
-          incus info || true
+          utils/dev prepare-host --debug
 
-      - name: Configure Incus group and sync uv environment
+      - name: Smoke-test local install
         run: |
-          sudo usermod -aG incus-admin "$USER"
-          # sg runs the command with the supplementary group active
-          sg incus-admin -c "uv sync --project utils/kivedevel"
-
-      - name: Prepare host (uses sudo internally for privileged ops)
-        run: |
-          sg incus-admin -c "utils/dev prepare-host --debug"
-
-      - name: Smoke-test local install (unprivileged)
-        run: |
-          sg incus-admin -c "utils/dev smoke-local-install --debug"
+          utils/dev smoke-local-install --debug
