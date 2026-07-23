@@ -23,8 +23,8 @@ from .network import (
     wait_vm_dhcp_lease,
 )
 from .provision import maybe_provision_instance
-from ..web_endpoint import check_host_endpoint
 from .workspace import handle_workspace_attachment
+from ..checks import wait_for_http_200
 
 
 logger = logging.getLogger("kivedevel")
@@ -52,32 +52,11 @@ def _retry_on_etag(fn, max_retries=_MAX_ETAG_RETRIES, initial_delay=_ETAG_BACKOF
 
 
 def _proxy_config(cfg: BuildVmConfig) -> dict[str, str]:
-    if cfg.instance_type == "vm":
-        return {
-            "listen": f"tcp:127.0.0.1:{cfg.web_port}",
-            "type": "proxy",
-            "nat": "true",
-            "connect": f"tcp:0.0.0.0:{GUEST_WEB_PORT}",
-        }
     return {
         "listen": f"tcp:127.0.0.1:{cfg.web_port}",
         "type": "proxy",
         "connect": f"tcp:127.0.0.1:{GUEST_WEB_PORT}",
     }
-
-
-def _read_proxy_device(cmds: Cmds, instance: str) -> dict[str, str] | None:
-    """Read the current proxy device configuration via explicit Incus commands."""
-    required_keys = ["type", "listen", "connect", "nat"]
-    config: dict[str, str] = {}
-    for key in required_keys:
-        out = cmds.incus.output(
-            ["config", "device", "get", instance, PROXY_DEVICE, key],
-        )
-        if not out:
-            return None
-        config[key] = out.strip().strip('"')
-    return config
 
 
 def _proxy_args(desired: dict[str, str]) -> list[str]:
@@ -86,8 +65,6 @@ def _proxy_args(desired: dict[str, str]) -> list[str]:
         f"listen={desired['listen']}",
         f"connect={desired['connect']}",
     ]
-    if "nat" in desired:
-        args_list.append(f"nat={desired['nat']}")
     return args_list
 
 
@@ -98,13 +75,25 @@ def _proxy_config_match(desired: dict[str, str], current: dict[str, str]) -> boo
     return True
 
 
-def _ensure_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
+def _read_container_proxy_device(cmds: Cmds, instance: str) -> dict[str, str] | None:
+    config: dict[str, str] = {}
+    for key in ("type", "listen", "connect"):
+        out = cmds.incus.output(
+            ["config", "device", "get", instance, PROXY_DEVICE, key],
+        )
+        if not out:
+            return None
+        config[key] = out.strip().strip('"')
+    return config
+
+
+def _ensure_container_web_proxy_device(cmds: Cmds, cfg: BuildVmConfig) -> None:
     if cfg.no_web_proxy:
         logger.debug("Web proxy device creation disabled by --no-web-proxy.")
         return
 
     desired = _proxy_config(cfg)
-    current = _read_proxy_device(cmds, cfg.instance)
+    current = _read_container_proxy_device(cmds, cfg.instance)
 
     if current is not None and _proxy_config_match(desired, current):
         logger.debug(
@@ -199,7 +188,7 @@ def _run_build_vm_container(cfg: BuildVmConfig, cmds: Cmds) -> str:
     elif out and "kive-code:" in out:
         logger.info("Device 'kive-code' is already attached to %s.", cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg)
+    _ensure_container_web_proxy_device(cmds, cfg)
 
     maybe_provision_instance(
         cmds, cfg.instance, actual_instance_type,
@@ -309,23 +298,20 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
         logger.info("Checking VM network egress via incus exec...")
         _check_vm_egress(cmds, cfg.instance)
 
-    _ensure_web_proxy_device(cmds, cfg)
-
     maybe_provision_instance(
         cmds, cfg.instance, actual_instance_type,
         provision=cfg.provision, provision_id=cfg.provision_id,
     )
 
-    if cfg.provision:
-        result = check_host_endpoint(cmds, cfg.instance, port=cfg.web_port)
-        if result.failure_stage is None:
-            print(f"VM {cfg.instance} provisioned and reachable at http://127.0.0.1:{cfg.web_port}/")
-        else:
-            logger.error(
-                "VM %s provisioned but host endpoint not reachable "
-                "(stage=%s). Use utils/dev test-api for diagnostics.",
-                cfg.instance, result.failure_stage,
-            )
+    if cfg.provision and ip:
+        wait_for_http_200(
+            f"http://{ip}:{cfg.web_port}/login/",
+            deadline=60,
+        )
+        print(
+            f"VM {cfg.instance} provisioned. "
+            f"Kive is available at http://{ip}:{cfg.web_port}/login/"
+        )
 
     return actual_instance_type
 

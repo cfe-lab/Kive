@@ -204,7 +204,7 @@ class TestPortForward(unittest.TestCase):
             mock.patch("kivedevel.build_vm.runner.wait_vm_dhcp_lease",
                        return_value="10.77.77.100"),
             mock.patch("kivedevel.build_vm.runner._check_vm_egress"),
-            mock.patch("kivedevel.build_vm.runner.check_host_endpoint"),
+            mock.patch("kivedevel.checks.wait_for_http_200"),
             mock.patch("kivedevel.build_vm.runner.ensure_managed_vm_network",
                        return_value=nic_target),
             mock.patch("kivedevel.build_vm.runner.ensure_instance",
@@ -233,7 +233,7 @@ class TestPortForward(unittest.TestCase):
             mock.patch("kivedevel.build_vm.runner.wait_vm_dhcp_lease",
                        return_value="10.77.77.100"),
             mock.patch("kivedevel.build_vm.runner._check_vm_egress"),
-            mock.patch("kivedevel.build_vm.runner.check_host_endpoint"),
+            mock.patch("kivedevel.checks.wait_for_http_200"),
             mock.patch("kivedevel.build_vm.runner.ensure_managed_vm_network",
                        return_value=nic_target) as mock_choose,
             mock.patch("kivedevel.build_vm.runner.ensure_instance",
@@ -268,7 +268,7 @@ class TestPortForward(unittest.TestCase):
                        return_value=True),
             mock.patch("kivedevel.build_vm.runner.maybe_restart_after_config"),
             mock.patch("kivedevel.build_vm.runner.handle_workspace_attachment"),
-            mock.patch("kivedevel.build_vm.runner._ensure_web_proxy_device") as mock_proxy,
+            mock.patch("kivedevel.build_vm.runner._ensure_container_web_proxy_device") as mock_proxy,
             mock.patch("kivedevel.build_vm.runner.maybe_provision_instance"),
         ):
             _run_build_vm_container(cfg, cmds)

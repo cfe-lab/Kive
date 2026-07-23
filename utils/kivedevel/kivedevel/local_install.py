@@ -16,6 +16,29 @@ from .shared import configure_logging, default_root
 logger = logging.getLogger("kivedevel.local_install")
 
 
+def _vm_api_url(cmds: Cmds, instance: str) -> str:
+    import json as _json
+    result = cmds.incus.run(
+        ["list", instance, "--format", "json"],
+        check=False, capture_output=True, timeout=10,
+    )
+    if result.returncode != 0:
+        return "http://127.0.0.1:8000"
+    try:
+        data = _json.loads(result.stdout or "[]")
+        if isinstance(data, list) and data:
+            state = data[0].get("state", {})
+            network = state.get("network", {}) if isinstance(state, dict) else {}
+            for iface_data in network.values():
+                if isinstance(iface_data, dict):
+                    for addr in iface_data.get("addresses", []):
+                        if isinstance(addr, dict) and addr.get("family") == "inet" and addr.get("scope") == "global":
+                            return f"http://{addr['address']}:8000"
+    except (_json.JSONDecodeError, IndexError, KeyError):
+        pass
+    return "http://127.0.0.1:8000"
+
+
 def _build_vm_args(
     instance: str,
     instance_type: str,
@@ -67,12 +90,14 @@ def _test_api_args(
     instance: str,
     workdir: Path,
     debug: bool,
+    *,
+    base_url: str,
 ) -> argparse.Namespace:
     return argparse.Namespace(
         instance=instance,
         workdir=workdir,
         port=8000,
-        base_url="http://127.0.0.1:8000",
+        base_url=base_url,
         username="kive",
         password="kive",
         quiet=False,
@@ -100,7 +125,12 @@ def run_smoke_local_install(args: argparse.Namespace) -> None:
     logger.info("Running: validate-vm %s --instance-type %s --workdir %s", instance, instance_type, workdir)
     checks.run_validate_vm(validate_args)
 
-    api_args = _test_api_args(instance, workdir, debug)
+    if instance_type == "vm":
+        cmds = Cmds.create()
+        base_url = _vm_api_url(cmds, instance)
+    else:
+        base_url = "http://127.0.0.1:8000"
+    api_args = _test_api_args(instance, workdir, debug, base_url=base_url)
     logger.info("Running: test-api %s --workdir %s", instance, workdir)
     checks.run_test_api(api_args)
 

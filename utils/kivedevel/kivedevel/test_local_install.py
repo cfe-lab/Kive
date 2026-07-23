@@ -37,6 +37,7 @@ class TestSmokeLocalInstall(unittest.TestCase):
 
         cmds = make_cmds()
         cmds.incus.run.side_effect = [
+            MockRunResult(returncode=0, stdout="[]"),
             MockRunResult(returncode=0),
             MockRunResult(returncode=1),
         ]
