@@ -30,16 +30,14 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Add uv to the current shell's PATH (or log out and back in)
 export PATH="$HOME/.local/bin:$PATH"
 
-# Add your user to the incus-admin group and start a new login session
-sudo usermod -aG incus-admin "$USER"
-exec newgrp incus-admin
-
-# (After the new session starts:) Sync venv and run
+# Sync venv and run
 uv sync --project utils/kivedevel
 utils/dev prepare-host
 utils/dev build-vm
 utils/dev enter-vm
 ```
+
+(Incus privilege escalation is handled internally by `utils/dev`.)
 
 ### Editor workflow
 

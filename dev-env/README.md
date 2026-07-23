@@ -61,16 +61,8 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### Incus permissions
 
-After installing Incus, add your user to the `incus-admin` group and start
-a new login session:
-
-```sh
-sudo usermod -aG incus-admin "$USER"
-exec newgrp incus-admin
-```
-
-> **Warning:** Members of `incus-admin` have effectively root-level control
-> over the Incus daemon.
+The development tooling (`utils/dev`) handles Incus privilege escalation
+internally.  No group membership changes or new login sessions are needed.
 
 **Note:** The development tooling (`utils/dev`) itself manages its Python
 dependencies via `uv` — you do not need to install Python packages manually.

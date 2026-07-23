@@ -126,6 +126,30 @@ class Incus(Command):
     exe = "incus"
     guix_package = "incus"
 
+    def __init__(self, use_guix: bool) -> None:
+        super().__init__(use_guix)
+        self._needs_sudo = self._check_needs_sudo()
+
+    @staticmethod
+    def _check_needs_sudo() -> bool:
+        result = subprocess.run(
+            ["incus", "info"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return False
+        result = subprocess.run(
+            ["sudo", "--", "incus", "info"],
+            capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            return True
+        return False
+
+    def _argv(self, args: list[str], *, sudo: bool) -> list[str]:
+        effective_sudo = sudo or self._needs_sudo
+        return super()._argv(args, sudo=effective_sudo)
+
 
 class Rsync(Command):
     exe = "rsync"
