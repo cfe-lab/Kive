@@ -254,7 +254,7 @@ class DatasetTests(LibrarianTestCase):
         family = ContainerFamily.objects.create(user=user)
         container = family.containers.create(user=user)
         app = container.apps.create()
-        argument = app.arguments.create(type='O')
+        argument = app.arguments.create(type='O', name='output', position=0)
         run = app.runs.create(user=user)
 
         dataset = self.singlet_dataset

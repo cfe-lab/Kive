@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kivedevel"
+version = "1.0.0"
+description = "Scripts for development of Kive."
+license = "AGPL-3.0"
+authors = [
+    { name = "British Columbia Centre for Excellence in HIV/AIDS", email = "vmysak@bccfe.ca" },
+]
+requires-python = ">=3.13, <3.14"
+dependencies = [
+    "pyyaml>=6.0.3",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Natural Language :: English",
+    "Typing :: Typed",
+]
+
+[project.scripts]
+kivedevel = "kivedevel.entrypoint:entry"
+
+[project.optional-dependencies]
+test = [
+    # Dependencies required for running the test suite
+    "pytest>=6.0",
+    "pytest-cov",
+]
+dev = [
+    # Dependencies required for development (linting, type checking, etc.)
+    "ruff",
+    "mypy==1.9.0",
+    "types-PyYAML",
+    "bandit",
+]
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+  "overnight: for tests that take hours to complete (deselect with '-m \"not overnight\"')",
+  "serial"
+]
+
+[tool.mypy]
+files = ["kivedevel"]
+ignore_missing_imports = true
+strict_optional = true
+allow_untyped_calls = false
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = false
+strict = true
+
+[[tool.mypy.overrides]]
+module = "test_*"
+ignore_errors = true

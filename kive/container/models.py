@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import errno
 import hashlib
@@ -812,18 +814,20 @@ class ContainerApp(models.Model):
         return self._format_arguments(ContainerArgument.OUTPUT)
 
     def _format_arguments(self, argument_type):
-        arguments = self.arguments.filter(type=argument_type)
-        optionals = [argument
-                     for argument in arguments
-                     if argument.position is None]
-        positionals = [argument
-                       for argument in arguments
-                       if argument.position is not None]
-        terms = [argument.formatted for argument in optionals]
-        if (argument_type == ContainerArgument.INPUT and
-                any(argument.allow_multiple for argument in optionals)):
+        arguments = sorted(
+            self.arguments.filter(type=argument_type),
+            key=argument_execution_key,
+        )
+        terms = []
+        for arg in arguments:
+            if arg.position is None:
+                terms.append(arg.formatted)
+        if argument_type == ContainerArgument.INPUT and any(
+            arg.allow_multiple for arg in arguments if arg.position is None
+        ):
             terms.append('--')
-        terms.extend(argument.formatted for argument in positionals)
+        terms.extend(
+            arg.formatted for arg in arguments if arg.position is not None)
         return ' '.join(terms)
 
     def write_inputs(self, formatted):
@@ -832,28 +836,53 @@ class ContainerApp(models.Model):
     def write_outputs(self, formatted):
         self._write_arguments(ContainerArgument.OUTPUT, formatted)
 
-    def _write_arguments(self, argument_type, formatted):
-        self.arguments.filter(type=argument_type).delete()
+    @staticmethod
+    def _parse_argument_specs(argument_type, formatted):
         expected_multiples = {ContainerArgument.INPUT: '*',
                               ContainerArgument.OUTPUT: '/'}
+        specs = []
+        seen_names = set()
         for position, term in enumerate(formatted.split(), 1):
             if term == '--':
                 continue
             match = re.match(r'(--)?(\w+)([*/])?$', term)
             if match is None:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            if match.group(1):
-                position = None
-            if not match.group(3):
+            name = match.group(2)
+            if name in seen_names:
+                raise ValueError(f'Duplicate argument name: {name}')
+            seen_names.add(name)
+            actual_position = None if match.group(1) else position
+            suffix = match.group(3)
+            if not suffix:
                 allow_multiple = False
-            elif match.group(3) == expected_multiples[argument_type]:
+            elif suffix == expected_multiples[argument_type]:
                 allow_multiple = True
             else:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            self.arguments.create(name=match.group(2),
-                                  position=position,
-                                  allow_multiple=allow_multiple,
-                                  type=argument_type)
+            if argument_type == ContainerArgument.OUTPUT:
+                if actual_position is None:
+                    raise ValueError(
+                        f'Output argument {name} must be positional '
+                        f'(omit -- prefix).')
+            if argument_type == ContainerArgument.INPUT and actual_position is not None and allow_multiple:
+                raise ValueError(
+                    f'Positioned input argument {name} cannot accept multiple values.')
+            specs.append((name, actual_position, allow_multiple))
+        return specs
+
+    def _write_arguments(self, argument_type, formatted):
+        specs = self._parse_argument_specs(argument_type, formatted)
+        from django.db import transaction
+        with transaction.atomic():
+            self.arguments.filter(type=argument_type).delete()
+            for name, position, allow_multiple in specs:
+                self.arguments.create(
+                    name=name,
+                    position=position,
+                    allow_multiple=allow_multiple,
+                    type=argument_type,
+                )
 
     def can_be_accessed(self, user):
         return self.container.can_be_accessed(user)
@@ -924,6 +953,16 @@ class ContainerArgument(models.Model):
 
     class Meta:
         ordering = ('app_id', 'type', 'position', 'name')
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(type='I', position__isnull=False, allow_multiple=False)
+                    | models.Q(type='I', position__isnull=True)
+                    | models.Q(type='O', position__isnull=False)
+                ),
+                name='valid_argument_classification',
+            ),
+        ]
 
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
@@ -1417,6 +1456,7 @@ class ContainerRun(Stopwatch, AccessControl):
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """
+        import json as _json
         encoding = 'utf8'
         md5gen = hashlib.md5()
         container = self.app.container
@@ -1427,13 +1467,26 @@ class ContainerRun(Stopwatch, AccessControl):
             parent_md5 = parent_container.md5.encode(encoding)
             md5gen.update(parent_md5)
 
-        # Use explict sort order, so changes to default don't invalidate MD5's.
-        for container_dataset in self.datasets.order_by('argument__type',
-                                                        'argument__position',
-                                                        'argument__name'):
-            dataset = container_dataset.dataset
-            dataset_md5 = dataset.MD5_checksum.encode(encoding)
-            md5gen.update(dataset_md5)
+        bindings = []
+        all_cds = list(self.datasets.select_related('argument', 'dataset'))
+        all_cds.sort(key=lambda cd: (
+            argument_execution_key(cd.argument),
+            binding_execution_key(cd),
+        ))
+        for cd in all_cds:
+            staged = _staged_input_filename(cd) if cd.argument.type == ContainerArgument.INPUT else ""
+            bindings.append((
+                cd.argument_id,
+                cd.argument.type,
+                cd.argument.position,
+                cd.argument.name,
+                cd.multi_position,
+                cd.name,
+                staged,
+                cd.dataset.MD5_checksum,
+            ))
+        payload = _json.dumps(bindings, sort_keys=False, separators=(',', ':'))
+        md5gen.update(payload.encode(encoding))
         self.md5 = md5gen.hexdigest()
 
 
@@ -1469,6 +1522,16 @@ class ContainerDataset(models.Model):
                     'argument__type',
                     'argument__position',
                     'argument__name')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['run', 'argument', 'multi_position'],
+                condition=models.Q(multi_position__isnull=False),
+                name='unique_run_arg_multi_position'),
+            models.UniqueConstraint(
+                fields=['run', 'argument'],
+                condition=models.Q(multi_position__isnull=True),
+                name='unique_run_arg_single_binding'),
+        ]
 
     def find_rerun_dataset(self):
         """ Find the dataset, or the matching dataset from a rerun.
@@ -1484,19 +1547,137 @@ class ContainerDataset(models.Model):
             argument__type=ContainerArgument.OUTPUT)
         output_argument = output_container_dataset.argument
         for rerun in output_container_dataset.run.reruns.all():
-            rerun_container_dataset = rerun.datasets.get(argument=output_argument)
+            argtype = output_argument.argtype
+            if argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
+                output_name = output_container_dataset.name
+                matches = list(rerun.datasets.filter(
+                    argument=output_argument, name=output_name))
+                if len(matches) == 0:
+                    continue
+                if len(matches) > 1:
+                    raise RuntimeError(
+                        f"Multiple directory-output bindings with name "
+                        f"{output_name!r} in rerun {rerun.id}")
+                rerun_container_dataset = matches[0]
+            elif argtype == ContainerArgumentType.FIXED_OUTPUT:
+                try:
+                    rerun_container_dataset = rerun.datasets.get(
+                        argument=output_argument)
+                except rerun.datasets.model.DoesNotExist:
+                    continue
+            else:
+                raise RuntimeError(
+                    f"Unsupported output argument type for rerun lookup: {argtype}")
             dataset, source_run = rerun_container_dataset.find_rerun_dataset()
             if dataset is not None:
                 return dataset, None
         return None, output_container_dataset.run
 
     def clean(self):
-        # Check that a position has been supplied for multiple-input arguments
-        if self.argument.argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        argtype = self.argument.argtype
+        if argtype in (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                       ContainerArgumentType.FIXED_DIRECTORY_OUTPUT):
             if self.multi_position is None:
-                raise ValidationError("multi_position is required for a multi-valued input")
+                raise ValidationError(
+                    "multi_position is required for multi-valued argument "
+                    f"type {argtype}")
         elif self.multi_position is not None:
             raise ValidationError("multi_position should be None for single-valued argtype")
+
+
+def _is_keyword(arg: ContainerArgument) -> bool:
+    return arg.argtype in ContainerArgument.KEYWORD_ARG_TYPES if arg.argtype is not None else arg.position is None
+
+
+def _source_filename(cd: ContainerDataset) -> str:
+    """Resolve the source basename for a ContainerDataset binding.
+
+    Resolution order:
+        1. cd.name (ContainerDataset.name, set by directory-output or explicit naming)
+        2. cd.dataset.dataset_file.name (storage file path)
+        3. cd.dataset.external_path (external reference)
+
+    Returns the basename only.  Raises RuntimeError if no identity is found
+    or the basename is empty/pathological.
+    """
+    raw: str | None = None
+    if cd.name:
+        raw = cd.name
+    elif cd.dataset.dataset_file:
+        raw = cd.dataset.dataset_file.name
+    elif cd.dataset.external_path:
+        raw = cd.dataset.external_path
+
+    if not raw:
+        raise RuntimeError(
+            f"Input dataset (id={cd.dataset_id}) has no usable file identity")
+
+    base = os.path.basename(raw)
+    if base in ("", ".", "..") or "/" in base:
+        raise RuntimeError(
+            f"Invalid source basename {base!r} for dataset {cd.dataset_id}")
+    return base
+
+
+def _suffix_from_source(base: str) -> str:
+    """Extract the complete suffix chain from a source basename."""
+    if "." in base:
+        dot = base.find(".")
+        return base[dot:]
+    return ""
+
+
+def _staged_input_filename(cd: ContainerDataset) -> str:
+    argtype = cd.argument.argtype
+    argname = cd.argument.name
+
+    if argtype == ContainerArgumentType.FIXED_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Fixed input {argname!r} cannot have multi_position"
+            )
+        return argname
+
+    if argtype == ContainerArgumentType.OPTIONAL_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Single optional input {argname!r} cannot have multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
+        return f"{argname}{suffix}"
+
+    if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        if cd.multi_position is None:
+            raise RuntimeError(
+                f"Multiple optional input {argname!r} requires multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
+        return f"{argname}_{cd.multi_position}{suffix}"
+
+    raise RuntimeError(
+        f"Cannot construct staged input filename for argument type {argtype!r}"
+    )
+
+
+def argument_execution_key(argument: ContainerArgument) -> tuple:
+    """Canonical ordering key for arguments.
+
+    Semantic class first: 0 = keyword, 1 = fixed.
+    Keyword arguments ordered by pk (app-definition order).
+    Fixed arguments ordered by position, then pk.
+    """
+    semantic_class = 1 if argument.position is not None else 0
+    return (semantic_class, argument.position or 0, argument.pk or 0, argument.name)
+
+
+def binding_execution_key(binding: ContainerDataset) -> tuple:
+    """Canonical ordering key for bindings within one argument.
+
+    Multi-valued bindings ordered by multi_position; pk is final
+    tie-breaker for corrupted or tied state.
+    """
+    return (binding.multi_position if binding.multi_position is not None else 0,
+            binding.pk or 0)
 
 
 class ContainerLog(models.Model):

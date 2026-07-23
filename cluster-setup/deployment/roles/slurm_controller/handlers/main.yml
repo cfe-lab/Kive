@@ -3,4 +3,10 @@
   become: true
   become_user: root
   command: scontrol reconfigure
+  register: slurm_reconfigure_result
+  changed_when: slurm_reconfigure_result.rc == 0
+  failed_when:
+    - slurm_reconfigure_result.rc != 0
+    - "'Unable to contact slurm controller' not in slurm_reconfigure_result.stderr"
+    - "'Unable to establish control machine address' not in slurm_reconfigure_result.stderr"
   throttle: 1

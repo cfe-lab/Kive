@@ -1,6 +1,7 @@
 ---
 
 slurmctlnode: head
+slurmctlnode_address: 127.0.0.1
 slurm_nodes:
   - name: head
     memory: 4000

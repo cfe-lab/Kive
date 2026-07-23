@@ -1,7 +1,5 @@
-import collections
 import datetime
-import itertools
-import pathlib
+from itertools import zip_longest
 import typing as ty
 
 from .models import (ContainerArgument, ContainerArgumentType,
@@ -101,7 +99,7 @@ def _compare_optional_inputs(
             argument=argument).order_by("multi_position")
         rerun_datasets = rerun.datasets.filter(
             argument=argument).order_by("multi_position")
-        dataset_pairs = itertools.zip_longest(
+        dataset_pairs = zip_longest(
             original_datasets,
             rerun_datasets,
             fillvalue=None,
@@ -116,38 +114,85 @@ def _compare_optional_inputs(
 def _compare_directory_outputs(
         argument: ContainerArgument, original: ContainerRun,
         rerun: ContainerRun) -> ty.Iterable[DatasetComparison]:
-    all_original_datasets = original.datasets.filter(argument=argument).all()
-    all_rerun_datasets = rerun.datasets.filter(argument=argument).all()
 
-    def group_by_path(
-        datasets: ty.Iterable[ContainerDataset]
-    ) -> ty.Dict[ty.Any, ty.List[ContainerDataset]]:
-        grouped = collections.defaultdict(list)
-        for dataset in datasets:
-            path = pathlib.Path(dataset.name)
-            parents = tuple(path.parents)
-            grouped[parents].append(dataset)
-        return grouped
+    def _by_parent(
+        bindings: ty.Iterable[ContainerDataset],
+    ) -> dict[str, list[ContainerDataset]]:
+        groups: dict[str, list[ContainerDataset]] = {}
+        for b in bindings:
+            parent = _parent_path(b.name)
+            groups.setdefault(parent, []).append(b)
+        return groups
 
-    grouped_original_datasets = group_by_path(all_original_datasets)
-    grouped_rerun_datasets = group_by_path(all_rerun_datasets)
-
-    original_locations = set(grouped_original_datasets.keys())
-    rerun_locations = set(grouped_rerun_datasets.keys())
-    all_locations = original_locations.union(rerun_locations)
-
-    for location in sorted(all_locations):
-        original_datasets = grouped_original_datasets.get(location, [])
-        rerun_datasets = grouped_rerun_datasets.get(location, [])
-        dataset_pairs = itertools.zip_longest(
-            original_datasets,
-            rerun_datasets,
-            fillvalue=None,
+    def _sorted_unmatched(
+        bindings: list[ContainerDataset],
+        matched: set[int],
+    ) -> list[ContainerDataset]:
+        return sorted(
+            (b for b in bindings if id(b) not in matched),
+            key=lambda b: (
+                b.multi_position if b.multi_position is not None else 0,
+                b.name,
+                b.pk or 0,
+            ),
         )
-        for original, rerun in dataset_pairs:
-            comparison = DatasetComparison.compare_optional(original, rerun)
+
+    original_all = list(original.datasets.filter(argument=argument))
+    rerun_all = list(rerun.datasets.filter(argument=argument))
+    original_by_parent = _by_parent(original_all)
+    rerun_by_parent = _by_parent(rerun_all)
+    all_parents = sorted(set(original_by_parent) | set(rerun_by_parent))
+
+    for parent in all_parents:
+        orig_bindings = original_by_parent.get(parent, [])
+        rerun_bindings = rerun_by_parent.get(parent, [])
+        orig_by_name: dict[str, ContainerDataset] = {}
+        for b in orig_bindings:
+            if b.name in orig_by_name:
+                raise RuntimeError(
+                    f"Duplicate name {b.name!r} in original run {original.id}")
+            orig_by_name[b.name] = b
+        rerun_by_name: dict[str, ContainerDataset] = {}
+        for b in rerun_bindings:
+            if b.name in rerun_by_name:
+                raise RuntimeError(
+                    f"Duplicate name {b.name!r} in rerun run {rerun.id}")
+            rerun_by_name[b.name] = b
+
+        matched: set[int] = set()
+        for name in sorted(set(orig_by_name) & set(rerun_by_name)):
+            orig = orig_by_name[name]
+            rerun_b = rerun_by_name[name]
+            matched.add(id(orig))
+            matched.add(id(rerun_b))
+            comparison = DatasetComparison.compare_optional(orig, rerun_b)
             if comparison is not None:
                 yield comparison
+
+        orig_unmatched = _sorted_unmatched(orig_bindings, matched)
+        rerun_unmatched = _sorted_unmatched(rerun_bindings, matched)
+        for orig_b, rerun_b in zip(orig_unmatched, rerun_unmatched):
+            matched.add(id(orig_b))
+            matched.add(id(rerun_b))
+            comparison = DatasetComparison.compare_optional(orig_b, rerun_b)
+            if comparison is not None:
+                yield comparison
+
+        for b in orig_unmatched[len(rerun_unmatched):]:
+            comparison = DatasetComparison.compare_optional(b, None)
+            if comparison is not None:
+                yield comparison
+        for b in rerun_unmatched[len(orig_unmatched):]:
+            comparison = DatasetComparison.compare_optional(None, b)
+            if comparison is not None:
+                yield comparison
+
+
+def _parent_path(name: str) -> str:
+    idx = name.rfind("/")
+    if idx == -1:
+        return ""
+    return name[:idx]
 
 
 def _compare_rerun_datasets(

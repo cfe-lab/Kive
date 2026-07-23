@@ -8,6 +8,7 @@ from subprocess import call
 import sys
 from traceback import format_exception_only
 import typing
+from collections import OrderedDict
 
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -15,6 +16,8 @@ from django.utils import timezone
 from container.models import (
     ContainerRun, ContainerArgument, ContainerArgumentType,
     ContainerLog, ContainerDataset,
+    argument_execution_key, binding_execution_key,
+    _staged_input_filename,
 )
 from librarian.models import Dataset
 
@@ -79,6 +82,10 @@ class Command(BaseCommand):
                     run.state))
         return run
 
+    @staticmethod
+    def _sandbox_argument_filename(container_dataset: ContainerDataset) -> str:
+        return _staged_input_filename(container_dataset)
+
     def fill_sandbox(self, run):
         if not run.sandbox_path:
             # This should only be needed during tests.
@@ -89,19 +96,19 @@ class Command(BaseCommand):
             raise RuntimeError('Inputs missing from reruns.')
         input_path = os.path.join(run.full_sandbox_path, 'input')
         os.mkdir(input_path)
-        for dataset in run.datasets.all():
-            if dataset.argument.argtype in (
-                    ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
-                    ContainerArgumentType.OPTIONAL_INPUT):
-                unique_filename = dataset.dataset.unique_filename()
-                target_path = os.path.join(input_path, unique_filename)
-                if os.path.exists(target_path):
-                    raise RuntimeError(
-                        "Supposedly unique output file already exists: {}".
-                        format(unique_filename))
-            else:
-                target_path = os.path.join(input_path, dataset.argument.name)
-            source_file = dataset.dataset.get_open_file_handle(raise_errors=True)
+        seen_filenames: set[str] = set()
+        for container_dataset in run.datasets.all():
+            staged = self._sandbox_argument_filename(container_dataset)
+            if staged in seen_filenames:
+                raise RuntimeError(
+                    f"Duplicate staged filename in sandbox input: {staged}")
+            seen_filenames.add(staged)
+            target_path = os.path.join(input_path, staged)
+            if os.path.exists(target_path):
+                raise RuntimeError(
+                    f"File already exists in sandbox input: {target_path}")
+            source_file = container_dataset.dataset.get_open_file_handle(
+                raise_errors=True)
             with source_file, open(target_path, 'wb') as target_file:
                 shutil.copyfileobj(source_file, target_file)
         os.mkdir(os.path.join(run.full_sandbox_path, 'output'))
@@ -181,36 +188,36 @@ class Command(BaseCommand):
         if optional_arguments:
             command.extend(cls._format_kw_args(optional_arguments))
             command.append("--")
-        # Add fixed arguments as specified by the ContainerApp
-        fixed_arguments = [
-            arg for arg in run.app.arguments.all()
-            if arg.argtype in ContainerArgument.FIXED_ARG_TYPES
-        ]
+        fixed_arguments = sorted(
+            (arg for arg in run.app.arguments.all()
+             if arg.argtype in ContainerArgument.FIXED_ARG_TYPES),
+            key=argument_execution_key,
+        )
         command.extend(cls._format_fixed_arg(arg) for arg in fixed_arguments)
         return command
 
     @staticmethod
     def _format_kw_args(
             containerdatasets: typing.List[ContainerDataset]) -> typing.Iterable[str]:
-        def sort_by_position(
-            cds: typing.Iterable[ContainerDataset]
-        ) -> typing.List[ContainerDataset]:
-            return sorted(
-                cds,
-                key=lambda d: d.multi_position or 0)
+        grouped = OrderedDict()
+        for cd in containerdatasets:
+            grouped.setdefault(cd.argument, []).append(cd)
 
-        grouped = {
-            arg: sort_by_position(d for d in containerdatasets if d.argument == arg)
-            for arg in set(d.argument for d in containerdatasets)
-        }
+        for arg in sorted(grouped, key=argument_execution_key):
+            grouped.move_to_end(arg)
+
         for arg, argcontainerdatasets in grouped.items():
+            argcontainerdatasets = sorted(
+                argcontainerdatasets, key=binding_execution_key)
             if arg.type == ContainerArgument.INPUT:
                 datasetfolder = "/mnt/input"
             else:
                 datasetfolder = "/mnt/output"
             yield "--{}".format(arg.name)
-            yield from (os.path.join(datasetfolder, containerdataset.dataset.name)
-                        for containerdataset in argcontainerdatasets)
+            yield from (os.path.join(
+                datasetfolder,
+                Command._sandbox_argument_filename(cd))
+                        for cd in argcontainerdatasets)
 
     @staticmethod
     def _format_fixed_arg(arg: ContainerArgument) -> str:
@@ -311,27 +318,57 @@ class Command(BaseCommand):
                                         upload_path: str) -> None:
         output_path = pathlib.Path(output_path).absolute()
         dirarg_path = output_path / argument.name
+        files: list[pathlib.Path] = []
         for dirpath, _, filenames in os.walk(dirarg_path):
             dirpath = pathlib.Path(dirpath)
             for filename in filenames:
-                datafile_path: pathlib.Path = (dirpath / filename).absolute()
-                dataset_filename = cls._build_directory_file_name(
-                    run.id, output_path, datafile_path)
-                destination_path = os.path.join(upload_path, dataset_filename)
-                dataset_name = cls._build_directory_dataset_name(
-                    run.id, output_path, datafile_path)
-                try:
-                    os.rename(datafile_path, destination_path)
-                    dataset = Dataset.create_dataset(
-                        destination_path,
-                        name=dataset_name,
-                        user=run.user,
-                    )
-                    dataset.copy_permissions(run)
-                    run.datasets.create(dataset=dataset, argument=argument)
-                except (OSError, IOError) as ex:
-                    if ex.errno != errno.ENOENT:
-                        raise
+                files.append((dirpath / filename).absolute())
+        files.sort(key=lambda p: p.relative_to(output_path).as_posix())
+        seen_names: set[str] = set()
+        for position, datafile_path in enumerate(files, start=1):
+            try:
+                relative = datafile_path.relative_to(dirarg_path)
+            except ValueError:
+                logger.error(
+                    "File %s is outside directory argument root %s",
+                    datafile_path, dirarg_path,
+                )
+                raise
+            container_name = relative.as_posix()
+            if not container_name:
+                raise RuntimeError(
+                    f"Empty relative path for {datafile_path}")
+            if relative.is_absolute():
+                raise RuntimeError(
+                    f"Absolute relative path '{container_name}' "
+                    f"for {datafile_path}")
+            if ".." in relative.parts:
+                raise RuntimeError(
+                    f"Parent-traversing path '{container_name}' "
+                    f"for {datafile_path}")
+            if container_name in seen_names:
+                raise RuntimeError(
+                    f"Duplicate directory-output path '{container_name}'")
+            seen_names.add(container_name)
+            dataset_filename = cls._build_directory_file_name(
+                run.id, output_path, datafile_path)
+            destination_path = os.path.join(upload_path, dataset_filename)
+            dataset_name = cls._build_directory_dataset_name(
+                run.id, output_path, datafile_path)
+            try:
+                os.rename(datafile_path, destination_path)
+                dataset = Dataset.create_dataset(
+                    destination_path,
+                    name=dataset_name,
+                    user=run.user,
+                )
+                dataset.copy_permissions(run)
+                run.datasets.create(dataset=dataset, argument=argument,
+                                    name=container_name,
+                                    multi_position=position)
+            except (OSError, IOError) as ex:
+                if ex.errno != errno.ENOENT:
+                    raise
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')

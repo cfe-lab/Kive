@@ -1,0 +1,75 @@
+from __future__ import annotations
+
+import logging
+import re
+import sys
+from pathlib import Path
+
+from .kv_commands import Cmds
+
+
+def default_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _log_level(args) -> int:
+    if getattr(args, "quiet", False):
+        return logging.ERROR
+    if getattr(args, "debug", False):
+        return logging.DEBUG
+    if getattr(args, "verbose", False):
+        return logging.INFO
+    return logging.INFO
+
+
+def configure_console_logging(args) -> None:
+    level = _log_level(args)
+    if getattr(args, "debug", False):
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.DEBUG)
+    elif getattr(args, "verbose", False):
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.INFO)
+    else:
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.INFO)
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=[console],
+        force=True,
+    )
+
+
+def configure_logging(args, workdir: Path, *, default_log_name: str = "build-vm.log") -> None:
+    level = _log_level(args)
+
+    log_file = getattr(args, "log_file", None) or (workdir / default_log_name)
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    handlers: list[logging.Handler] = [logging.FileHandler(log_file, encoding="utf-8")]
+    if getattr(args, "verbose", False) or getattr(args, "debug", False):
+        console = logging.StreamHandler(sys.stdout)
+        console.setLevel(logging.DEBUG if getattr(args, "debug", False) else logging.INFO)
+        handlers.append(console)
+
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+
+
+def instance_exists(cmds: Cmds, instance: str) -> bool:
+    out = cmds.incus.output(["list", instance, "--format", "csv"])
+    for line in out.splitlines():
+        if line.split(",", 1)[0] == instance:
+            return True
+    return False
+
+
+def instance_is_running(cmds: Cmds, instance: str) -> bool:
+    out = cmds.incus.output(["info", instance])
+    return bool(re.search(r"^Status:\s+Running$", out, re.IGNORECASE | re.MULTILINE))
