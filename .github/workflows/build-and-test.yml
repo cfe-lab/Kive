@@ -114,8 +114,8 @@ jobs:
 
       - name: Prepare host
         run: |
-          utils/dev prepare-host --debug
+          sudo --preserve-env=PATH utils/dev prepare-host --debug
 
       - name: Smoke-test local install
         run: |
-          utils/dev smoke-local-install --debug
+          sudo --preserve-env=PATH utils/dev smoke-local-install --debug
