@@ -87,15 +87,15 @@ systemctl status apache2      # Web server
 
 ## Testing
 
-### `kivedevel` unit tests (fast, no external dependencies)
+### `kivedevel` end-to-end smoke test (requires Incus)
 
 ```sh
-uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/
+utils/dev smoke-local-install --debug
 ```
 
-These tests use mocks and do not require Incus, PostgreSQL, or any running
-services.
+This runs the complete provisioning and validation workflow inside a real
+Incus VM.  The `kivedevel` tooling is validated through this authoritative
+end-to-end path; there is no separate mocked unit-test suite.
 
 ### Django tests (require PostgreSQL)
 

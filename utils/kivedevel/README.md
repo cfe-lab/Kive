@@ -487,20 +487,13 @@ exists with a different address, the tool exits with an error.
 uv sync --project utils/kivedevel
 ```
 
-### Running tests
+### End-to-end smoke test
+
+The authoritative check for the `kivedevel` tooling is the real VM smoke
+workflow.  There is no separate mocked unit-test suite.
 
 ```sh
-# All unit tests
-uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/
-
-# Specific test file
-uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/test_network.py
-
-# Fast unit tests only (no database, no Incus)
-uv run --project utils/kivedevel --extra test --frozen \
-  python -m pytest utils/kivedevel/kivedevel/ -m "not slow"
+utils/dev smoke-local-install --debug
 ```
 
 ### Linting and type checking
@@ -527,16 +520,14 @@ utils/kivedevel/
     enter_vm.py         # Interactive shell
     kv_commands.py      # Command execution wrappers (incus, ip, rsync)
     shared.py           # Logging, instance helpers
-    test_*.py           # Unit tests (no Incus daemon required)
 ```
 
 ### Test categories
 
 | Category | Description | Run command |
 |----------|-------------|-------------|
-| Unit tests | Mock-based, no external deps | `pytest utils/kivedevel/kivedevel/` |
+| Smoke test | Real VM workflow | `utils/dev smoke-local-install` |
 | Database-backed | Require PostgreSQL | `pytest kive/` (Django tests) |
-| Smoke tests | Require Incus daemon | `utils/dev smoke-local-install` |
 
 ---
 

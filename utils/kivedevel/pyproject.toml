@@ -31,24 +31,12 @@ classifiers = [
 kivedevel = "kivedevel.entrypoint:entry"
 
 [project.optional-dependencies]
-test = [
-    # Dependencies required for running the test suite
-    "pytest>=6.0",
-    "pytest-cov",
-]
 dev = [
     # Dependencies required for development (linting, type checking, etc.)
     "ruff",
     "mypy==1.9.0",
     "types-PyYAML",
     "bandit",
-]
-
-[tool.pytest.ini_options]
-markers = [
-  "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-  "overnight: for tests that take hours to complete (deselect with '-m \"not overnight\"')",
-  "serial"
 ]
 
 [tool.mypy]
@@ -60,7 +48,3 @@ warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = false
 strict = true
-
-[[tool.mypy.overrides]]
-module = "test_*"
-ignore_errors = true
