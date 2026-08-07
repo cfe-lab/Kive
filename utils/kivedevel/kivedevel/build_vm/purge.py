@@ -278,13 +278,12 @@ def build_purge_inventory(args: argparse.Namespace, cmds: Cmds) -> PurgeInventor
     root = args.root.resolve()
 
     tagged = _find_tagged_instances(cmds)
-    tagged_set = set(tagged)
 
     extra_instances = args.instances or []
-    all_instances = list(tagged_set)
-    for inst in extra_instances:
-        if inst not in tagged_set:
-            all_instances.append(inst)
+    all_instances = list(dict.fromkeys([
+        *tagged,
+        *extra_instances,
+    ]))
 
     networks = _find_tagged_networks(cmds)
 

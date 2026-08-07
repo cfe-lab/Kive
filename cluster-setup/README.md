@@ -235,7 +235,7 @@ modify the `user_name` variable if necessary.
 
 ### Configuration variable reference
 
-Important Ansible variables for production deployment. Group-variable
+These are some of the most important Ansible variables for production deployment. Group-variable
 templates such as `deployment/group_vars/default_template.yml` (for testing)
 and `deployment/group_vars/octomore_template.yaml` (for production) define
 environment-specific values. Copy the relevant template to `all.yml` for your

@@ -93,18 +93,16 @@ class Command:
             logger.error("Command timed out after %ss: %s", timeout, shlex.join(self._argv(args, sudo=sudo)))
             raise
 
-        if check and result.returncode != 0:
-            logger.error("Command failed with exit code %s", result.returncode)
-            if result.stderr:
-                stderr_body = result.stderr.rstrip()
-                logger.error("stderr:\n%s", stderr_body)
-            if result.stdout:
-                stdout_body = result.stdout.rstrip()
-                logger.error("stdout:\n%s", stdout_body)
-            raise subprocess.CalledProcessError(
-                result.returncode, result.args,
-                output=result.stdout, stderr=result.stderr,
-            )
+        if check:
+            try:
+                result.check_returncode()
+            except subprocess.CalledProcessError:
+                logger.error("Command failed with exit code %s", result.returncode)
+                if result.stderr:
+                    logger.error("stderr:\n%s", result.stderr.rstrip())
+                if result.stdout:
+                    logger.error("stdout:\n%s", result.stdout.rstrip())
+                raise
 
         if logger.isEnabledFor(logging.DEBUG):
             if result.stdout:

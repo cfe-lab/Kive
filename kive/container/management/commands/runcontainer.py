@@ -356,7 +356,7 @@ class Command(BaseCommand):
             dataset_name = cls._build_directory_dataset_name(
                 run.id, output_path, datafile_path)
             try:
-                os.rename(datafile_path, destination_path)
+                datafile_path.rename(destination_path)
                 dataset = Dataset.create_dataset(
                     destination_path,
                     name=dataset_name,

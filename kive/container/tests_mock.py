@@ -1218,6 +1218,42 @@ class SandboxInputFilenameTests(TestCase):
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('reads_1.fastq.gz', result)
 
+    def test_suffix_single_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample.csv",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data.csv', result)
+
+    def test_suffix_no_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data', result)
+
+    def test_suffix_hidden_file_has_no_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name=".hidden",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data', result)
+
+    def test_suffix_trailing_dot(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample.",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data.', result)
+
     def test_rejects_optional_multiple_without_multi_position(self):
         cd = _make_input_binding(
             argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,

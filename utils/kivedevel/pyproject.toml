@@ -30,6 +30,12 @@ classifiers = [
 [project.scripts]
 kivedevel = "kivedevel.entrypoint:entry"
 
+[tool.hatch.build.targets.wheel]
+packages = ["kivedevel"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"kivedevel/slurm_healthcheck.sh" = "kivedevel/slurm_healthcheck.sh"
+
 [project.optional-dependencies]
 dev = [
     # Dependencies required for development (linting, type checking, etc.)

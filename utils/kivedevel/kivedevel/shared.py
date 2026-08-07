@@ -24,15 +24,8 @@ def _log_level(args) -> int:
 
 def configure_console_logging(args) -> None:
     level = _log_level(args)
-    if getattr(args, "debug", False):
-        console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.DEBUG)
-    elif getattr(args, "verbose", False):
-        console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.INFO)
-    else:
-        console = logging.StreamHandler(sys.stdout)
-        console.setLevel(logging.INFO)
+    console = logging.StreamHandler(sys.stdout)
+    console.setLevel(level)
 
     logging.basicConfig(
         level=level,

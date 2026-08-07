@@ -918,6 +918,20 @@ class ContainerArgumentType(enum.Enum):
     FIXED_DIRECTORY_OUTPUT = enum.auto()
 
 
+def multi_position_cardinality(argtype: ContainerArgumentType | None) -> str:
+    """Whether ``multi_position`` is required or forbidden for an argument type.
+
+    Returns ``"required"`` for multi-valued types, ``"forbidden"`` for
+    single-valued types, and ``"unknown"`` for an unclassifiable argument.
+    """
+    if argtype in (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                   ContainerArgumentType.FIXED_DIRECTORY_OUTPUT):
+        return "required"
+    if argtype is None:
+        return "unknown"
+    return "forbidden"
+
+
 class ContainerArgument(models.Model):
     INPUT = 'I'
     OUTPUT = 'O'
@@ -1575,14 +1589,14 @@ class ContainerDataset(models.Model):
 
     def clean(self):
         argtype = self.argument.argtype
-        if argtype in (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
-                       ContainerArgumentType.FIXED_DIRECTORY_OUTPUT):
-            if self.multi_position is None:
-                raise ValidationError(
-                    "multi_position is required for multi-valued argument "
-                    f"type {argtype}")
-        elif self.multi_position is not None:
-            raise ValidationError("multi_position should be None for single-valued argtype")
+        requirement = multi_position_cardinality(argtype)
+        if requirement == "required" and self.multi_position is None:
+            raise ValidationError(
+                "multi_position is required for multi-valued argument "
+                f"type {argtype}")
+        if requirement == "forbidden" and self.multi_position is not None:
+            raise ValidationError(
+                "multi_position should be None for single-valued argtype")
 
 
 def _is_keyword(arg: ContainerArgument) -> bool:
@@ -1612,7 +1626,7 @@ def _source_filename(cd: ContainerDataset) -> str:
         raise RuntimeError(
             f"Input dataset (id={cd.dataset_id}) has no usable file identity")
 
-    base = os.path.basename(raw)
+    base = Path(raw).name
     if base in ("", ".", "..") or "/" in base:
         raise RuntimeError(
             f"Invalid source basename {base!r} for dataset {cd.dataset_id}")
@@ -1621,10 +1635,7 @@ def _source_filename(cd: ContainerDataset) -> str:
 
 def _suffix_from_source(base: str) -> str:
     """Extract the complete suffix chain from a source basename."""
-    if "." in base:
-        dot = base.find(".")
-        return base[dot:]
-    return ""
+    return "".join(Path(base).suffixes)
 
 
 def _staged_input_filename(cd: ContainerDataset) -> str:

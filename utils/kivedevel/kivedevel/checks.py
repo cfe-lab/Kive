@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from dataclasses import dataclass
 from http.cookiejar import CookieJar
 from pathlib import Path
 
@@ -193,9 +194,6 @@ def _build_local_opener(cookie_jar: CookieJar | None = None):
     return urllib.request.build_opener(*handlers)
 
 
-
-
-
 def _request_status(opener, url: str):
     try:
         with opener.open(url, timeout=5) as response:
@@ -243,7 +241,18 @@ def _resolve_base_url(explicit: str | None, port: int = 8000) -> str:
     return f"http://127.0.0.1:{port}"
 
 
-def _run_api_probe(base_url: str, username: str, password: str) -> dict:
+@dataclass(frozen=True)
+class ApiProbeResult:
+    login_page_status: int | None
+    csrf_available: bool
+    post_login_status: int | None
+    anon_datasets_status: int | None
+    auth_datasets_status: int | None
+    auth_json_ok: bool
+    auth_count: int | None
+
+
+def _run_api_probe(base_url: str, username: str, password: str) -> ApiProbeResult:
     login_url = f"{base_url}/login/"
     datasets_url = f"{base_url}/api/datasets/?limit=1"
 
@@ -284,28 +293,37 @@ def _run_api_probe(base_url: str, username: str, password: str) -> dict:
             post_login_status = None
 
     auth_status, auth_body = _request_status(opener, datasets_url)
-    result = {
-        "login_page_status": login_status,
-        "csrf_available": csrf_available,
-        "post_login_status": post_login_status,
-        "anon_datasets_status": anon_status,
-        "auth_datasets_status": auth_status,
-        "auth_json_ok": False,
-        "auth_count": None,
-    }
+    result = ApiProbeResult(
+        login_page_status=login_status,
+        csrf_available=csrf_available,
+        post_login_status=post_login_status,
+        anon_datasets_status=anon_status,
+        auth_datasets_status=auth_status,
+        auth_json_ok=False,
+        auth_count=None,
+    )
 
     if auth_status == 200:
         try:
             parsed = json.loads(auth_body)
         except json.JSONDecodeError:
             return result
+        auth_count = None
         if isinstance(parsed, dict):
             items = parsed.get("results", parsed)
             if isinstance(items, list):
-                result["auth_count"] = len(items)
+                auth_count = len(items)
         elif isinstance(parsed, list):
-            result["auth_count"] = len(parsed)
-        result["auth_json_ok"] = True
+            auth_count = len(parsed)
+        result = ApiProbeResult(
+            login_page_status=login_status,
+            csrf_available=csrf_available,
+            post_login_status=post_login_status,
+            anon_datasets_status=anon_status,
+            auth_datasets_status=auth_status,
+            auth_json_ok=True,
+            auth_count=auth_count,
+        )
 
     return result
 
@@ -353,14 +371,14 @@ def _get_vm_ip_from_state(cmds: Cmds, instance: str) -> str | None:
     return None
 
 
-def _check_api_probe_results(results: dict, instance: str) -> None:
+def _check_api_probe_results(results: ApiProbeResult, instance: str) -> None:
     """Validate probe results and log/exit on failure."""
-    login_page_status = results.get("login_page_status")
-    csrf_available = results.get("csrf_available", False)
-    post_login_status = results.get("post_login_status")
-    anon_status = results.get("anon_datasets_status")
-    auth_status = results.get("auth_datasets_status")
-    auth_json_ok = bool(results.get("auth_json_ok", False))
+    login_page_status = results.login_page_status
+    csrf_available = results.csrf_available
+    post_login_status = results.post_login_status
+    anon_status = results.anon_datasets_status
+    auth_status = results.auth_datasets_status
+    auth_json_ok = results.auth_json_ok
 
     if not login_page_status or login_page_status != 200:
         logger.error("Login page check failed: expected 200, got %s", login_page_status)
@@ -394,7 +412,7 @@ def _check_api_probe_results(results: dict, instance: str) -> None:
         instance,
         anon_status,
         auth_status,
-        results.get("auth_count"),
+        results.auth_count,
     )
 
 

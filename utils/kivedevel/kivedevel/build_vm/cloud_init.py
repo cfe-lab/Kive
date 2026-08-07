@@ -6,7 +6,11 @@ import yaml
 
 from ..kv_commands import Cmds
 from ..slurm_health import SLURM_HEALTHCHECK_SCRIPT
-from .helpers import find_ssh_pubkey, generate_password_hash, set_instance_config_multiline
+from .helpers import (
+    default_development_password_hash,
+    find_ssh_pubkey,
+    set_instance_config_multiline,
+)
 
 
 logger = logging.getLogger("kivedevel")
@@ -16,7 +20,7 @@ def ensure_user_data(cmds: Cmds, instance: str, *, provision: bool = False, prov
     logger.info("Configuring cloud-init user data for %s...", instance)
     pubkey = find_ssh_pubkey()
 
-    password_hash = generate_password_hash("kive1234")
+    password_hash = default_development_password_hash()
     ssh_key_block = f"\n    ssh_authorized_keys:\n      - {pubkey}" if pubkey else ""
 
     provision_write_files = ""

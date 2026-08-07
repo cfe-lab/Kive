@@ -23,6 +23,7 @@ from django.core.files.base import ContentFile, File
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
@@ -4645,7 +4646,6 @@ class ContainerRunCreateValidationTests(TestCase):
         )
 
     def test_db_rejects_duplicate_single_valued_binding(self):
-        from django.db import IntegrityError
         ContainerDataset.objects.create(
             run=self.run, argument=self.opt_single_arg, dataset=self.dataset1)
         with self.assertRaises(IntegrityError):
@@ -4668,7 +4668,6 @@ class ContainerRunCreateValidationTests(TestCase):
             dataset=self.dataset2, multi_position=2)
 
     def test_db_rejects_duplicate_multi_position(self):
-        from django.db import IntegrityError
         ContainerDataset.objects.create(
             run=self.run, argument=self.opt_multiple_arg,
             dataset=self.dataset1, multi_position=1)

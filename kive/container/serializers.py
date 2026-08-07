@@ -4,7 +4,8 @@ from rest_framework.fields import URLField
 
 from container.models import (
     ContainerFamily, Container, ContainerApp, ContainerRun, Batch,
-    ContainerDataset, ContainerArgument, ContainerArgumentType, ContainerLog,
+    ContainerDataset, ContainerArgument, ContainerLog,
+    multi_position_cardinality,
 )
 from kive.serializers import AccessControlSerializer
 from librarian.models import Dataset
@@ -244,15 +245,13 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
         argument = data.get('argument')
         multi_position = data.get('multi_position')
         if argument is not None:
-            argtype = argument.argtype
-            if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
-                if multi_position is None:
-                    raise serializers.ValidationError(
-                        'multi_position is required for a multi-valued input.')
-            else:
-                if multi_position is not None:
-                    raise serializers.ValidationError(
-                        'multi_position should be None for single-valued argtype.')
+            requirement = multi_position_cardinality(argument.argtype)
+            if requirement == "required" and multi_position is None:
+                raise serializers.ValidationError(
+                    'multi_position is required for a multi-valued input.')
+            if requirement == "forbidden" and multi_position is not None:
+                raise serializers.ValidationError(
+                    'multi_position should be None for single-valued argtype.')
         return data
 
 
@@ -384,8 +383,9 @@ class ContainerRunSerializer(AccessControlSerializer,
                     })
 
             argtype = argument.argtype
+            requirement = multi_position_cardinality(argtype)
 
-            if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+            if requirement == "required":
                 if multi_position is None:
                     raise serializers.ValidationError({
                         "datasets": [

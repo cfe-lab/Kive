@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-import random
 import re
-import string
 from pathlib import Path
 
 from ..kv_commands import Cmds
@@ -15,18 +13,8 @@ logger = logging.getLogger("kivedevel")
 _DEFAULT_KIVE_PASSWORD_HASH = "$6$w7nYcSFmaLbIxt0X$ru7i8S1R8KghBGY7RuclLvDE4ik6C9WZ89HeZeC2LxWJJBBOOkmoWFjSc7viAlL/4Yop9l28Ylw0DyOqmuhbR1"
 
 
-def generate_password_hash(password: str) -> str:
-    try:
-        import crypt
-        return crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
-    except (AttributeError, ValueError):
-        salt = "$6$" + "".join(random.choices(string.ascii_letters + string.digits, k=16))
-        return crypt.crypt(password, salt)
-    except ModuleNotFoundError:
-        if password == "kive1234":
-            logger.warning("Python crypt module is unavailable; using precomputed SHA-512 password hash.")
-            return _DEFAULT_KIVE_PASSWORD_HASH
-        raise
+def default_development_password_hash() -> str:
+    return _DEFAULT_KIVE_PASSWORD_HASH
 
 
 def set_instance_config_multiline(cmds: Cmds, instance: str, key: str, value: str) -> None:
@@ -58,6 +46,4 @@ def get_instance_ipv4_for_bridge(instance: str, bridge_cidr: str) -> str:
         return "172.30.0.50"
     hashed = int(hashlib.sha256(instance.encode()).hexdigest()[:8], 16)
     host = 50 + (hashed % 180)
-    if host in (0, 1, 255):
-        host = 50
     return f"{octets[0]}.{octets[1]}.{octets[2]}.{host}"

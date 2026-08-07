@@ -373,6 +373,14 @@ def _device_config_str(device: dict[str, str]) -> str:
     return " ".join(parts) if parts else "(empty)"
 
 
+def _replace_vm_nic(cmds: Cmds, instance: str, target_network: str) -> None:
+    cmds.incus.run(["config", "device", "remove", instance, "eth0"])
+    cmds.incus.run([
+        "config", "device", "add", instance, "eth0",
+        "nic", f"network={target_network}",
+    ])
+
+
 def ensure_vm_nic(cmds: Cmds, instance: str, target: VmNicTarget) -> bool:
     """Ensure the VM instance has an eth0 NIC attached to *target*.
 
@@ -394,32 +402,18 @@ def ensure_vm_nic(cmds: Cmds, instance: str, target: VmNicTarget) -> bool:
             return False
 
         if not existing_network and not existing_parent and not existing_nictype:
-            logger.warning("eth0 on %s has empty config; replacing with network=%s.", instance, target_network)
-            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
-            return True
+            reason = "eth0 has empty config"
+        elif existing_nictype == "macvlan":
+            reason = f"eth0 uses macvlan (parent={existing_parent})"
+        elif existing_network and existing_network != target_network:
+            reason = f"eth0 is on network={existing_network}"
+        elif existing_parent:
+            reason = f"eth0 has parent={existing_parent}"
+        else:
+            reason = f"eth0 has unexpected config ({_device_config_str(device)})"
 
-        if existing_nictype == "macvlan":
-            logger.info("eth0 on %s uses macvlan (parent=%s); replacing with network=%s.", instance, existing_parent, target_network)
-            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
-            return True
-
-        if existing_network and existing_network != target_network:
-            logger.info("eth0 on %s is on network=%s; replacing with network=%s.", instance, existing_network, target_network)
-            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
-            return True
-
-        if existing_parent:
-            logger.info("eth0 on %s has parent=%s; replacing with network=%s.", instance, existing_parent, target_network)
-            cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-            cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
-            return True
-
-        logger.info("eth0 on %s has unexpected config (%s); replacing with network=%s.", instance, _device_config_str(device), target_network)
-        cmds.incus.run(["config", "device", "remove", instance, "eth0"])
-        cmds.incus.run(["config", "device", "add", instance, "eth0", "nic", f"network={target_network}"])
+        logger.info("%s on %s; replacing with network=%s.", reason, instance, target_network)
+        _replace_vm_nic(cmds, instance, target_network)
         return True
 
     expanded = _eth0_config_expanded(cmds, instance)
@@ -456,66 +450,83 @@ def _vm_mac_address(cmds: Cmds, instance: str) -> str | None:
     return hwaddr if hwaddr else None
 
 
-def get_vm_ipv4(cmds: Cmds, instance: str, bridge_name: str, *, timeout: float = 30) -> str:
-    mac = _vm_mac_address(cmds, instance)
-    import time as _time
-    deadline = _time.monotonic() + timeout
-    while _time.monotonic() < deadline:
-        out = cmds.incus.output(["network", "list-leases", bridge_name, "--format", "json"])
-        if out:
-            try:
-                leases = json.loads(out)
-                if isinstance(leases, list):
-                    for lease in leases:
-                        if lease.get("type") == "gateway":
-                            continue
-                        if mac and lease.get("hwaddr", "").lower() == mac.lower():
-                            ip = lease.get("address", "")
-                            if ip:
-                                return ip
-                        if not mac and lease.get("hostname", "").startswith(instance):
-                            ip = lease.get("address", "")
-                            if ip:
-                                return ip
-            except json.JSONDecodeError:
-                pass
-        _time.sleep(2)
-    raise RuntimeError(
-        f"Could not resolve VM IPv4 address for {instance} "
-        f"on bridge {bridge_name} within {timeout}s"
-    )
+def _find_vm_ipv4_in_leases(
+    leases: object,
+    *,
+    instance: str,
+    mac: str | None,
+) -> str | None:
+    if not isinstance(leases, list):
+        return None
+    for lease in leases:
+        if not isinstance(lease, dict):
+            continue
+        if lease.get("type") == "gateway":
+            continue
+        ip = lease.get("address", "")
+        if not ip:
+            continue
+        if mac and lease.get("hwaddr", "").lower() == mac.lower():
+            return ip
+        if not mac and lease.get("hostname", "").startswith(instance):
+            return ip
+    return None
 
 
-def wait_vm_dhcp_lease(cmds: Cmds, instance: str, bridge_name: str, timeout: float = 120) -> str | None:
+def _wait_for_vm_ipv4(
+    cmds: Cmds,
+    instance: str,
+    bridge_name: str,
+    *,
+    timeout: float,
+    mac: str | None,
+) -> str | None:
     import time as _time
     deadline = _time.monotonic() + timeout
-    last_error = ""
-    mac = _vm_mac_address(cmds, instance)
-    if mac:
-        logger.debug("VM %s has MAC %s; matching leases by MAC.", instance, mac)
     while _time.monotonic() < deadline:
         try:
             out = cmds.incus.output(["network", "list-leases", bridge_name, "--format", "json"])
-            if out:
+        except OSError as exc:
+            logger.debug("list-leases failed on %s: %s", bridge_name, exc)
+            _time.sleep(2)
+            continue
+        if out:
+            try:
                 leases = json.loads(out)
-                if isinstance(leases, list):
-                    for lease in leases:
-                        if mac and lease.get("hwaddr", "").lower() == mac.lower():
-                            ip = lease.get("address", "")
-                            if ip:
-                                logger.info("VM %s got DHCP lease %s on %s (by MAC).", instance, ip, bridge_name)
-                                return ip
-                        if not mac and lease.get("hostname", "").startswith(instance):
-                            ip = lease.get("address", "")
-                            if ip:
-                                logger.info("VM %s got DHCP lease %s on %s (by hostname).", instance, ip, bridge_name)
-                                return ip
-        except (json.JSONDecodeError, OSError) as exc:
-            last_error = str(exc)
+            except json.JSONDecodeError:
+                logger.debug("list-leases returned malformed JSON on %s.", bridge_name)
+                leases = None
+            ip = _find_vm_ipv4_in_leases(leases, instance=instance, mac=mac)
+            if ip:
+                return ip
         _time.sleep(2)
+    return None
 
-    logger.warning("VM %s did not receive a DHCP lease on %s within %.0fs.%s", instance, bridge_name, timeout,
-                   f"  Last error: {last_error}" if last_error else "")
+
+def get_vm_ipv4(cmds: Cmds, instance: str, bridge_name: str, *, timeout: float = 30) -> str:
+    mac = _vm_mac_address(cmds, instance)
+    ip = _wait_for_vm_ipv4(
+        cmds, instance, bridge_name, timeout=timeout, mac=mac,
+    )
+    if ip is None:
+        raise RuntimeError(
+            f"Could not resolve VM IPv4 address for {instance} "
+            f"on bridge {bridge_name} within {timeout}s"
+        )
+    return ip
+
+
+def wait_vm_dhcp_lease(cmds: Cmds, instance: str, bridge_name: str, timeout: float = 120) -> str | None:
+    mac = _vm_mac_address(cmds, instance)
+    if mac:
+        logger.debug("VM %s has MAC %s; matching leases by MAC.", instance, mac)
+    ip = _wait_for_vm_ipv4(
+        cmds, instance, bridge_name, timeout=timeout, mac=mac,
+    )
+    if ip:
+        logger.info("VM %s got DHCP lease %s on %s.", instance, ip, bridge_name)
+        return ip
+    logger.warning("VM %s did not receive a DHCP lease on %s within %.0fs.", instance, bridge_name, timeout)
     return None
 
 
@@ -523,7 +534,7 @@ def _incus_list_output(cmds: Cmds, instance: str) -> str:
     return cmds.incus.output(["list", instance, "--format", "yaml"]) or "(empty)"
 
 
-def print_network_diagnostics(cmds: Cmds, instance: str, bridge_name: str) -> None:
+def log_network_failure_diagnostics(cmds: Cmds, instance: str, bridge_name: str) -> None:
     import subprocess as _sp
     logger.error("=== Network diagnostics ===")
     logger.error("incus network show %s:\n%s", bridge_name,

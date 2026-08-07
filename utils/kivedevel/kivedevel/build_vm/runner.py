@@ -19,7 +19,7 @@ from .network import (
     ensure_vm_nic,
     get_default_host_interface,
     get_existing_network_parent,
-    print_network_diagnostics,
+    log_network_failure_diagnostics,
     wait_vm_dhcp_lease,
 )
 from .provision import maybe_provision_instance
@@ -293,7 +293,7 @@ def _run_build_vm_vm(cfg: BuildVmConfig, cmds: Cmds) -> str:
         logger.info("Waiting for DHCP lease on %s for %s...", bridge_name, cfg.instance)
         ip = wait_vm_dhcp_lease(cmds, cfg.instance, bridge_name)
         if ip is None:
-            print_network_diagnostics(cmds, cfg.instance, bridge_name)
+            log_network_failure_diagnostics(cmds, cfg.instance, bridge_name)
             logger.error(
                 "VM %s did not receive a DHCP lease on %s. "
                 "Check the bridge configuration and Incus network health.",
