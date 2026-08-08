@@ -1054,7 +1054,7 @@ class RunContainerMockTests(TestCase):
             self.assertEqual(expected_dataset_name, dataset_name)
 
     @patch("container.management.commands.runcontainer.Dataset")
-    @patch("os.rename")
+    @patch("pathlib.Path.rename", autospec=True)
     @patch("os.walk",
            return_value=iter([
                ('/tmp/runsandbox', ['datafiles'], []),
@@ -1245,14 +1245,14 @@ class SandboxInputFilenameTests(TestCase):
         result = runcontainer.Command._sandbox_argument_filename(cd)
         self.assertEqual('data', result)
 
-    def test_suffix_trailing_dot(self):
+    def test_suffix_trailing_dot_has_no_extension(self):
         cd = _make_input_binding(
             argtype=ContainerArgumentType.OPTIONAL_INPUT,
             argument_name="data",
             source_name="sample.",
         )
         result = runcontainer.Command._sandbox_argument_filename(cd)
-        self.assertEqual('data.', result)
+        self.assertEqual('data', result)
 
     def test_rejects_optional_multiple_without_multi_position(self):
         cd = _make_input_binding(
