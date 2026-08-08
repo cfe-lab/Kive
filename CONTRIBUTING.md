@@ -1,317 +1,242 @@
-# Contributing to the Kive Project #
+# Contributing to Kive
 
 If you like this project and want to make it better, help out. You could report
 a bug, or pitch in with some development work.
 
-## Bug Reports and Enhancement Requests ##
+## Bug reports and enhancement requests
 
-Please create issue descriptions [on GitHub][issues]. Be as specific as possible.
-Which version are you using? What did you do? What did you expect to happen? Are
-you planning to submit your own fix in a pull request?
+Please create issue descriptions [on GitHub](https://github.com/cfe-lab/Kive/issues).
+Be as specific as possible. Which version are you using? What did you do? What
+did you expect to happen? Are you planning to submit your own fix in a pull
+request?
 
-[issues]: https://github.com/cfe-lab/Kive/issues
+## Development setup
 
-## Development ##
-You will need to follow all the installation instructions in the INSTALL file,
-then open the source code in a Python IDE. You will also need to install some
-packages to run the tests.
+The recommended local development environment uses Incus to manage an isolated
+VM or container. See [dev-env/README.md](dev-env/README.md) for the full setup
+guide.
 
-    pip install -r requirements-dev.txt
+Quick start:
 
-If you want to see what's currently being worked on, check out the active tasks
-in our [milestones].
+```sh
+# Install host dependencies (Ubuntu 24.04)
+sudo apt-get update
+sudo apt-get install -y incus rsync qemu-utils qemu-system-x86 ovmf \
+  iproute2 socat curl
 
-[milestones]: https://github.com/cfe-lab/Kive/milestones
+# Install uv (Python project manager) — https://docs.astral.sh/uv/
+curl -LsSf https://astral.sh/uv/install.sh | sh
 
-## Performance Testing ##
-It can be useful to track where time is spent when running a pipeline or a set
-of tests. Python comes with a profiler module:
+# Add uv to the current shell's PATH (or log out and back in)
+export PATH="$HOME/.local/bin:$PATH"
 
-    python -m cProfile -s cumtime manage.py test --settings=kive.test_settings >timing.txt
-
-Another option is to install the gprof2dot package with pip. Then you can
-generate a call graph with timing information:
-
-    python -m cProfile -o timing.dat manage.py test --settings=kive.test_settings \
-    && (echo strip ; echo "sort cumtime" ; echo "stats 500") | python -m pstats timing.dat >timing.txt \
-    && gprof2dot -f pstats timing.dat -o timing.dot
-
-## Deploying a Release ##
-
-See the vagrant scripts for examples of how to start a production server.
-Once you have set up your production server, this is how to deploy a new release:
-
-1. Make sure the code works in your development environment. Run all the
-    Javascript tests and all the Django unit tests, or check that they ran
-    successfully in the latest TravisCI build.
-    
-        cd /path/to/git/Kive
-        npm run test:travis
-        cd kive
-        pytest --ds kive.settings_test_pg
-        cd ../api
-        pytest
-
-2. Check if the kiveapi package needs to update its version number by looking
-   for new commits in the `/api` folder.
-3. Check that all the issues in the current milestone are closed.
-4. Check that all your code is committed to git, configure your settings file with a
-    `STATIC_ROOT` of `/path/to/git/Kive/static_root`, and then build and package your
-    static files.
-
-        cd /path/to/git/Kive
-        npm install
-        cd kive
-        ./manage.py collectstatic -c
-        cd ..
-        tar -czvf static_root.tar.gz static_root
-        rm -rf static_root
-
-5. Look at the differences in `kive/settings.py` since the last release, to see
-    if you need to set any new environment variables during the release.
-6. [Create a release][release] on Github. Use "vX.Y" as the tag, where X.Y
-    matches the version on the milestone. If you have to redo
-    a release, you can create additional releases with tags vX.Y.1, vX.Y.2, and
-    so on. Record the most important issues, along with any extra configuration
-    steps, such as new environment variables. Mark the release as pre-release
-    until you finish deploying it.
-7. Attach the `static_root.tar.gz` file to the release on GitHub. Attach it as
-    a binary below the description, not as an attachment in the description.
-8. Check on the site that there are no active runs (as an administrator, go to the 
-    Runs page under the User portal, and click the lock to give yourself the ability to
-    view all runs).
-9. Stop the web server and scheduled job timer. Check that no scheduled jobs are
-    already running.
-
-        sudo systemctl stop httpd
-        sudo systemctl stop kive_purge.timer kive_purge_synch.timer
-        sudo systemctl status kive_purge kive_purge_synch
-
-10. (Optional, but skip at your own peril!) Make a complete backup of the Kive installation.
-    We use a tool called barman to backup PostgreSQL.
-        
-        sudo su barman
-        barman backup kive
-    
-    If you don't have barman configured, you can just run a database dump.
-    
-        sudo su postgres
-        pg_dump kive | gzip > ~/db_dumpYYYYMMDD.sql.gz
-        exit
-        sudo mv ~postgres/db_dumpYYYYMMDD.sql.gz /data/kive_backup
-        
-    This covers everything stored in the database, including models and records automatically
-    generated by Django itself.  These files should be kept unchanged, as the records inside
-    may be highly interdependent and any changes may cause system-wide problems.
-    
-    That doesn't cover everything in the system, however, as files tracked by Kive are stored
-    on the filesystem, in the directory specified by `MEDIA_ROOT` in `kive/settings.py`.  To preserve
-    these files, make an exact copy of the following subdirectories:
-    
-    * `ContainerLogs`
-    * `ContainerRuns` (optional)
-    * `Containers`
-    * `Datasets`
-    
-    Do not restructure or rename anything in these folders: the file paths are stored in the database,
-    so it's important to not let the files' actual locations become desynchronized from the
-    stored locations.
-    
-    You can use rsync like this:
-    
-        sudo rsync -av --delete --exclude ContainerRuns /data/kive/ /data/kive_backup/media_root/
-    
-    If you ever need to restore this backup, see "Restoring the system after something's gone wrong".
-        
-11. Get the code from Github onto the server.
-
-        ssh user@server
-        cd /usr/local/share/Kive/kive
-        sudo chgrp -R kive .. # Do this if other users also deploy.
-        git fetch
-        git checkout tags/vX.Y
-
-12. Upgrade dependencies if `requirements.txt` has changed. This assumes that
-    you have activated a virtual environment.
-
-         ssh user@server
-         cd /usr/local/share/Kive
-         sudo /opt/venv_kive/bin/python -m pip install --upgrade pip
-         sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
-    
-13. Follow any configuration instructions in the release notes.
-14. Migrate the database as described in the Creating Database Tables section
-    of INSTALL.md, and deploy the static files:
-    
-        ssh user@server
-        cd /usr/local/share/Kive/kive
-        ./manage.py migrate
-        echo $KIVE_STATIC_ROOT
-        cd /path/to/static/..
-        sudo rm -Rf static
-        sudo wget https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz -O static_root.tar.gz
-        sudo tar --no-same-owner -xzvf static_root.tar.gz
-        sudo mv static_root static
-        sudo rm static_root.tar.gz
-        
-15. Start the web server and scheduled jobs.
-
-        sudo systemctl start httpd
-        sudo systemctl start kive_purge.timer
-        sudo systemctl start kive_purge_synch.timer
-
-16. Update the Kive API library if needed.
-
-        cd /usr/local/share/Kive/api
-        cat setup.py  # look at the new version number
-        pip show kiveapi  # compare with the version installed in Python 2
-        sudo python setup.py install  # if needed
-        pip3 show kiveapi  # compare with the version installed in Python 3
-        sudo python3 setup.py install  # if needed
-
-17. When the release is stable, remove the pre-release flag from the release.
-    Check that it's included on the [Zenodo] page. If you included more than
-    one tag in the same release, the new tags have not triggered Zenodo
-    versions. Edit the release on GitHub, copy the description text, download
-    the `static_root` archive, update the release, then click the Delete button.
-    Then create a new release with the same description and `static_root`, and
-    that will trigger a Zenodo version.
-18. Close the milestone for this release, create one for the next release, and
-    decide which issues you will include in that milestone.
-
-[release]: https://help.github.com/categories/85/articles
-[Zenodo]: https://zenodo.org/badge/latestdoi/14132839
-
-## Restoring the system after something's gone wrong ##
-
-If something goes wrong with the system, you can restore it using the backups
-created as per step 5 of the "Deploying a Release" section.  
-
-To do this, you must restore the system to the version it was in when the backup was made.  
-  If you can use reverse migrations, then that's preferable, but depending on the specific
-  migrations, this may fail.  If so, then you can drop and re-create the database as per 
-  the instructions in INSTALL.md.  From there, you can migrate forwards back to the state 
-  the system was in at the time of the backup.  
-  
-Then, you can restore the data.  First, flush the database:  
-
-    ./manage.py flush
-
-(respond "yes" when it asks you whether to proceed or not).  This will remove everything from the
-database, including records automatically generated by Kive or Django; we want to get rid of these
-as they may clash with the data in the backup. Then restore the database dump.
-
-    psql kive < /data/kive_backup/db_dumpYYYYMMDD.sql
-    
-Lastly, clear out the four data subdirectories (`CodeResources`, `Datasets`, `Logs`, and `Sandboxes`), 
-and replace them with your backed-up versions.
-
-## Unit tests ##
-
-To run all the unit tests, run `./manage.py test`. Note that running the
-full test suite can take around half an hour.
-
-The front-end tests are run separately. run `node tests-server.node.js` in the
-root directory, which should open your browser. In this directory view, run both
-SpecRunner.html and SpecRunner_SystemJS.html.
-
-### Faster unit tests ###
-
-If you want to run your unit tests faster, you can run them against an
-in-memory SQLite database with this command:
-
-    ./manage.py test --settings kive.settings_test
-    
-This also reduces the amount of console output produced by the testing.  
-
-That still takes several minutes to run, so you may want to run a subset of the
-fastest tests: the [mock tests][mock]. These tests don't access a database, so
-they are extremely fast. You can run them all with this command:
-
-    ./manage.py test --settings kive.settings_mocked
-
-Testing with a SQLite database may have slightly different behaviour from 
-the PostgreSQL database, so you should occasionally run the tests with 
-the default settings.  Alternatively, to run the tests with all the default
-settings but with reduced console output:
-    
-    ./manage.py test --settings kive.settings_test_pg
-    
-All of these options disable some system tests that cover the parts of the
-Pipeline execution code that use Slurm.  To enable the entire suite of tests:
-
-    ./manage.py test --settings kive.settings_test_pg_slurm
-    
-These tests should be run before making a new release.
-    
-See [the Django documentation][unit-tests] for details on running specific tests.
-
-If you want to time your unit tests to see which ones are slowest, [install
-HotRunner][hotrunner].
-
-    sudo pip install unittest-xml-reporting
-
-Then add these two lines to `settings.py`:
-
-    TEST_RUNNER = 'xmlrunner.extra.djangotestrunner.XMLTestRunner'
-    TEST_OUTPUT_DIR = '/path/to/git/Kive/utils'
-
-Finally, run the unit tests and the script to summarize them.
-
-    ./manage.py test --settings kive.settings_test
-    ./slow_test_report.py
-
-[mock]: http://stackoverflow.com/q/36658010/4794
-[unit-tests]: https://docs.djangoproject.com/en/dev/topics/testing/overview/#running-tests
-[hotrunner]: https://pypi.python.org/pypi/django-hotrunner/0.2.2
-
-### Updating test fixtures ###
-
-Fixtures are a Django feature which allow for test data to be
-persistently stored in the database during development, to avoid having
-to reload it every time a unit test is run. This is especially
-convenient for unit tests which involve actually running a pipeline,
-which can take a long time.
-
-The fixtures which are used in our unit tests are created with the
-custom command `./manage.py update_test_fixtures`. The code that is
-executed for this command can be found in
-`portal/management/commands/update_test_fixtures.py`, and the fixture files
-are in `portal/fixtures`. If this code or
-any functions it calls are modified, the fixtures will need to be
-re-created by running `update_test_fixtures` again.
-
-### Updating TypeScript and Sass files ###
-
-Kive uses Webpack to bundle Javascript files. These bundles are generated on
-install, and should not be committed to the repository.
-
-Run both the Webpack and Sass watchers simultaneously with `npm run watch:all`.
-
-To debug TypeScript code in the browser, change the `devtool` setting in
-`webpack.config.js`. Then open the page in your browser, open the Chrome
-developer tools, and switch to the Sources tab. You should find the TypeScript
-source code under `webpack://./kive/something/static/something`. You can add
-breakpoints and step through the code there.
-
-### Updating embedded icon files ###
-
-Some icon files are stored as base64-encoded strings which describe PNG images
-inside Javascript files.
-
-Find the original icon in `raw_assets` in the project root. Make your modifications
-and then run `grunt pngicons` to compile them into the Javascript files. This
-command is also run on install.
-
-\* *Recommended*: If `pngquant` is available on your system, Grunt will use
-it to compress the icons.
-
-## Code coverage
-* If you want to run code coverage, complete the following steps:
-  * Run the `repo/vagrant_ubuntu/configure_vagrant_user.sh` script to add the vagrant user, then run the following commands:
-```bash
-coverage run manage.py test --setting kive.settings_test_pg
-coverage html
+# Sync venv and run
+uv sync --project utils/kivedevel
+utils/dev prepare-host
+utils/dev build-vm
+utils/dev enter-vm
 ```
 
-* Check the `htmlcov` folder to view coverage
+(Incus privilege escalation is handled internally by `utils/dev`.)
+
+### Editor workflow
+
+Source code lives on the host at the repository checkout. After editing
+files, copy the working tree into the running development instance:
+
+```sh
+utils/dev reload [instance]
+```
+
+This copies all changes (including uncommitted and untracked files) into
+`/usr/local/share/Kive` inside the guest and restarts the web services.
+Deleted files are propagated. Both VM and container modes use this
+explicit reload workflow.
+
+### Dependency management
+
+- **Python packages (Kive):** Listed in `requirements.txt`,
+  `requirements-dev.txt`, `requirements-test.txt`. Install with `pip`.
+- **Python packages (kivedevel):** Managed by `uv` with
+  `utils/kivedevel/pyproject.toml`. Run `uv sync --project utils/kivedevel`.
+- **Node.js packages:** Managed by `npm` with `package.json`.
+- **Ansible roles:** Managed with `requirements.yml` under `dev-env/`.
+
+## Running the application
+
+Inside the development instance (via `utils/dev enter-vm`):
+
+```sh
+# Start the development server (if not already running)
+cd /usr/local/share/Kive/kive
+python manage.py runserver 0.0.0.0:8000
+```
+
+Or use the pre-configured Apache setup started by provisioning.
+
+### Inspecting services
+
+```sh
+systemctl status postgresql   # Database
+systemctl status slurmctld    # Slurm controller
+systemctl status slurmd       # Slurm compute node
+systemctl status apache2      # Web server
+```
+
+## Testing
+
+### `kivedevel` end-to-end smoke test (requires Incus)
+
+```sh
+utils/dev smoke-local-install --debug
+```
+
+This runs the complete provisioning and validation workflow inside a real
+Incus VM.  The `kivedevel` tooling is validated through this authoritative
+end-to-end path; there is no separate mocked unit-test suite.
+
+### Django tests (require PostgreSQL)
+
+```sh
+cd kive
+# Set up database credentials (see INSTALL.md for details)
+pytest --flake8
+```
+
+### API tests
+
+```sh
+cd api
+pytest
+```
+
+### Frontend tests
+
+```sh
+npm test
+```
+
+### End-to-end smoke test (requires Incus)
+
+```sh
+utils/dev smoke-local-install
+```
+
+This is the same test run by CI. It creates a VM, runs provisioning, validates
+the instance, and tests the API. Run `utils/dev purge` afterward to clean up.
+
+### Test categories
+
+| Category | Requirements | When to run |
+|----------|-------------|-------------|
+| `kivedevel` unit tests | None | Any change to `utils/kivedevel/` |
+| Django tests | PostgreSQL | Application-code change |
+| API tests | PostgreSQL | API or serializer change |
+| Frontend tests | Node.js | JavaScript/TypeScript change |
+| End-to-end smoke | Incus + QEMU | Networking, provisioning, or release |
+
+### CI pipeline
+
+The CI workflow (`.github/workflows/build-and-test.yml`) runs:
+
+1. `pip install` + Django tests with PostgreSQL
+2. API tests
+3. End-to-end smoke test: `prepare-host` + `smoke-local-install` (VM mode)
+
+## Deploying a release
+
+1. Make sure the code works in your development environment. Run the relevant
+   tests from the table above, or check that CI passed.
+2. Check if the `kiveapi` package needs a version bump by looking for new
+   commits in the `api/` folder.
+3. Check that all issues in the current milestone are closed.
+4. Build front-end bundles and collect static files:
+   ```sh
+   npm install
+   cd kive
+   ./manage.py collectstatic -c --no-input
+   cd ..
+   tar -czvf static_root.tar.gz static_root
+   rm -rf static_root
+   ```
+5. Review changes in `kive/settings.py` since the last release for new
+   environment variables.
+6. [Create a release](https://github.com/cfe-lab/Kive/releases) on GitHub.
+   Use `vX.Y` as the tag. Attach `static_root.tar.gz` to the release.
+
+### Production deployment
+
+> **Warning:** The following steps modify a live production system. Have a
+> rollback plan and ensure backups are current before proceeding.
+
+All commands below run **on the production server**. Establish an SSH
+connection first:
+
+```sh
+ssh user@server
+```
+
+Then run the remaining steps on the server.
+
+1. **Prepare for downtime.** Verify that no active runs are in progress (as
+   an administrator, check the Runs page under the User portal). Stop the web
+   server and scheduled jobs:
+   ```sh
+   sudo systemctl stop apache2
+   sudo systemctl stop kive_purge.timer kive_purge_synch.timer \
+     kive_purge.service kive_purge_synch.service
+   ```
+2. **Back up the database and media.**
+   ```sh
+   sudo su postgres -c 'pg_dump kive | gzip > ~/db_dump_$(date +%Y%m%d).sql.gz'
+   ```
+   Also back up the Kive media directories (`ContainerLogs`, `Containers`,
+   `Datasets`) and the current installation at `/usr/local/share/Kive`.
+
+3. **Update the code and dependencies.**
+   ```sh
+   cd /usr/local/share/Kive
+   sudo git fetch
+   sudo git checkout tags/vX.Y
+   sudo /opt/venv_kive/bin/python -m pip install --upgrade -r requirements.txt
+   ```
+4. **Apply any new configuration.** Follow the release notes for this version.
+   Pay attention to new environment variables identified in step 5 of the
+   preparation phase.
+5. **Run database migrations.**
+   ```sh
+   sudo -iu kive bash -c 'cd /usr/local/share/Kive/kive && python manage.py migrate'
+   ```
+   `sudo -i` (login) ensures `HOME` is set to `/home/kive`, which causes
+   Bash to source `/home/kive/.bash_profile`.  That profile sets the
+   `KIVE_DB_*` environment variables and activates the virtual environment.
+
+6. **Deploy static assets.**
+   Read the static root from the Kive user's environment, then deploy:
+   ```sh
+   STATIC_ROOT=$(sudo -iu kive bash -c 'printf "%s\n" "$KIVE_STATIC_ROOT"')
+   sudo rm -rf "$STATIC_ROOT"
+   sudo wget -O /tmp/static_root.tar.gz \
+     https://github.com/cfe-lab/Kive/releases/download/vX.Y/static_root.tar.gz
+   sudo tar --no-same-owner -xzf /tmp/static_root.tar.gz \
+     -C "$(dirname "$STATIC_ROOT")"
+   sudo mv "$(dirname "$STATIC_ROOT")/static_root" "$STATIC_ROOT"
+   sudo rm /tmp/static_root.tar.gz
+   ```
+   See `cluster-setup/README.md` for production deployment details.
+7. **Restart services.**
+   ```sh
+   sudo systemctl start apache2
+   sudo systemctl start kive_purge.timer kive_purge_synch.timer
+   ```
+8. **Update the Kive API library if needed.**
+   ```sh
+   sudo /opt/venv_kive/bin/python -m pip install -e /usr/local/share/Kive/api
+   ```
+
+## See also
+
+- [dev-env/README.md](dev-env/README.md) — Local development setup
+- [utils/kivedevel/README.md](utils/kivedevel/README.md) — CLI reference
+- [INSTALL.md](INSTALL.md) — Manual / legacy installation
+- [cluster-setup/README.md](cluster-setup/README.md) — Production deployment

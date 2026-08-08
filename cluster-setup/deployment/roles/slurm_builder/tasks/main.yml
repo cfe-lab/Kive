@@ -6,18 +6,17 @@
 # support for certain features.  In the first play we indicate with
 # comments which packages are used for which features.
 
-- name: check if slurm source files are already downloaded
-  stat:
-    path: "/usr/local/src/{{ slurm_tarball }}"
-  register: slurm_download
-
 - name: fetch slurm source files
   become: true
   get_url:
     url: "{{ slurm_source_url }}"
     dest: "/usr/local/src/{{ slurm_tarball }}"
     checksum: "sha1:{{ slurm_sha1_checksum }}"
-  when: not slurm_download.stat.exists
+    timeout: 60
+  register: slurm_source_download
+  until: slurm_source_download is succeeded
+  retries: 5
+  delay: 30
 
 - name: decompress Slurm tarball
   become: true

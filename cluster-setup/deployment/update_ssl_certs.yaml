@@ -1,19 +1,18 @@
 ---
-
 - name: update SSL certificates
   hosts: head
   tasks:
     - name: install SSL certificate
       copy:
-        src: star_cfe_chained.crt
-        dest: /etc/ssl/certs/star_cfe_chained.crt
+        src: "{{ kive_ssl_certificate_src }}"
+        dest: "{{ kive_ssl_cert_path }}"
         owner: root
         group: root
 
     - name: install SSL key
       copy:
-        src: star_cfe.key
-        dest: /etc/ssl/private/star_cfe.key
+        src: "{{ kive_ssl_key_src }}"
+        dest: "{{ kive_ssl_key_path }}"
         owner: root
         group: root
         mode: "0600"

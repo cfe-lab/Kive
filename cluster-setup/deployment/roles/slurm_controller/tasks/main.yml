@@ -1,5 +1,13 @@
 ---
 
+- name: ensure slurm controller alias resolves locally
+  become: true
+  lineinfile:
+    path: /etc/hosts
+    regexp: '^[0-9.]+\s+{{ slurmctlnode }}(\s|$)'
+    line: "{{ slurmctlnode_address | default('127.0.0.1') }} {{ slurmctlnode }}"
+    create: true
+
 - name: install and start mariadb
   become: true
   become_user: root
