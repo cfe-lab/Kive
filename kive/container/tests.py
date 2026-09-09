@@ -2001,6 +2001,23 @@ class ContainerLogTests(TestCase):
         self.assertEqual(expected_display, log.preview)
         self.assertEqual(expected_size_display, log.size_display)
 
+    def test_replace_short_log_with_long(self):
+        run = ContainerRun.objects.get(id=1)
+        run.logs.create(type=ContainerLog.STDOUT, short_text='original')
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+
+        run.load_log(large_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('.' * 2001, log.read())
+        self.assertTrue(log.long_text)
+
     @unittest.expectedFailure
     def test_replace_long_log_with_short_clears_long_text(self):
         run = ContainerRun.objects.get(id=1)
