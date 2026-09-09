@@ -1379,12 +1379,17 @@ class ContainerRun(Stopwatch, AccessControl):
             # update it.
             log, _ = self.logs.update_or_create(
                 type=log_type,
-                defaults=dict(short_text=short_text))
+                defaults=dict(short_text=short_text, log_size=None))
+            if log.long_text:
+                log.long_text.delete(save=False)
+                log.long_text = ''
             if long_text is not None:
                 upload_name = 'run_{}_{}'.format(
                     self.pk,
                     os.path.basename(file_path))
                 log.long_text.save(upload_name, long_text)
+                log.log_size = file_size
+            log.save(update_fields=['short_text', 'long_text', 'log_size'])
 
     def delete_sandbox(self):
         assert self.sandbox_path

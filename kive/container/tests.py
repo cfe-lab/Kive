@@ -2018,7 +2018,6 @@ class ContainerLogTests(TestCase):
         self.assertEqual('.' * 2001, log.read())
         self.assertTrue(log.long_text)
 
-    @unittest.expectedFailure
     def test_replace_long_log_with_short_clears_long_text(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
@@ -2042,7 +2041,6 @@ class ContainerLogTests(TestCase):
         self.assertFalse(log.long_text)
         self.assertFalse(os.path.exists(old_path))
 
-    @unittest.expectedFailure
     def test_replace_long_log_with_empty_clears_long_text(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
