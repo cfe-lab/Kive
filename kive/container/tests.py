@@ -2001,6 +2001,53 @@ class ContainerLogTests(TestCase):
         self.assertEqual(expected_display, log.preview)
         self.assertEqual(expected_size_display, log.size_display)
 
+    @unittest.expectedFailure
+    def test_replace_long_log_with_short_clears_long_text(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+        run.load_log(large_path, ContainerLog.STDOUT)
+        old_name = run.logs.get(type=ContainerLog.STDOUT).long_text.name
+        old_path = settings.MEDIA_ROOT + '/' + old_name
+        small_path = os.path.join(source_dir, 'small.log')
+        with open(small_path, 'w') as log_file:
+            log_file.write('short replacement')
+
+        run.load_log(small_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('short replacement', log.read())
+        self.assertFalse(log.long_text)
+        self.assertFalse(os.path.exists(old_path))
+
+    @unittest.expectedFailure
+    def test_replace_long_log_with_empty_clears_long_text(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+        run.load_log(large_path, ContainerLog.STDOUT)
+        old_name = run.logs.get(type=ContainerLog.STDOUT).long_text.name
+        old_path = settings.MEDIA_ROOT + '/' + old_name
+        empty_path = os.path.join(source_dir, 'empty.log')
+        open(empty_path, 'w').close()
+
+        run.load_log(empty_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('', log.read())
+        self.assertFalse(log.long_text)
+        self.assertFalse(os.path.exists(old_path))
+
 
 @skipIfDBFeature('is_mocked')
 class ContainerLogApiTests(BaseTestCases.ApiTestCase):
