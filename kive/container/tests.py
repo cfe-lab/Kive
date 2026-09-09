@@ -2302,7 +2302,6 @@ class RunContainerTests(TestCase):
     def assert_files_match(self, file_path1, file_path2, shallow=True):
         self.assertTrue(cmp(file_path1, file_path2, shallow))
 
-    @unittest.expectedFailure
     def test_save_exception_preserves_application_stderr(self):
         run = ContainerRun.objects.get(name='fixture run')
         sandbox_path = os.path.join(

@@ -372,7 +372,17 @@ class Command(BaseCommand):
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')
+        try:
+            with open(log_path) as existing_log:
+                existing_stderr = existing_log.read()
+        except FileNotFoundError:
+            existing_stderr = ''
         with open(log_path, 'w') as f:
+            if existing_stderr:
+                f.write(existing_stderr)
+                if not existing_stderr.endswith('\n'):
+                    f.write('\n')
+                f.write('\n')
             f.write('========\nInternal Kive Error\n========\n')
             exc_type, exc_value, exc_tb = sys.exc_info()
             f.write(''.join(format_exception_only(exc_type, exc_value)))
