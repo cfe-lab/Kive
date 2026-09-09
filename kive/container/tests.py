@@ -1555,6 +1555,106 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
 
 
 @skipIfDBFeature('is_mocked')
+class ContainerRunSlurmFailureRecoveryTests(TestCase):
+    def _create_active_run(self, files=None):
+        user = User.objects.create_user(username='slurm-watchdog')
+        family = ContainerFamily.objects.create(user=user, name='watchdog')
+        container = Container.objects.create(family=family, user=user)
+        app = ContainerApp.objects.create(container=container, name='watchdog')
+        run = app.runs.create(user=user, slurm_job_id=451001)
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT,
+            'slurm-failure-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+        for filename, content in (files or {}).items():
+            with open(os.path.join(logs_path, filename), 'w') as log_file:
+                log_file.write(content)
+        return run
+
+    def _sacct_output(self, end_time, state='OUT_OF_MEMORY', exit_code='0:9'):
+        return (
+            '451001|{}|{}|{}\n'
+            '451001.batch|COMPLETED|0:0|{}\n'
+        ).format(state, exit_code, end_time, end_time)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_records_slurm_state_and_exit_code(self, mock_sacct):
+        run = self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        self.assertEqual(
+            ['sacct', '-j', '451001',
+             '-o', 'jobid,state,exitcode,end',
+             '--noheader', '--parsable2'],
+            mock_sacct.call_args[0][0])
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, run.state)
+        self.assertIsNone(run.return_code)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm job 451001 ended', stderr)
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+        self.assertIn('Slurm exit code: 0:9', stderr)
+        self.assertIn('Slurm end time: {}'.format(end_time), stderr)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_preserves_partial_application_logs(self, mock_sacct):
+        run = self._create_active_run({
+            'stdout.txt': 'partial application stdout\n',
+            'stderr.txt': 'partial application stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertIn('partial application stdout', stdout)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('partial application stderr', stderr)
+        self.assertIn('Slurm job 451001 ended', stderr)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_empty_application_logs_still_have_diagnostic(self, mock_sacct):
+        run = self._create_active_run({
+            'stdout.txt': '',
+            'stderr.txt': '',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_missing_application_logs_still_have_diagnostic(self, mock_sacct):
+        run = self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+
+
+@skipIfDBFeature('is_mocked')
 class ContainerRunTests(TestCase):
     fixtures = ['container_run']
 
