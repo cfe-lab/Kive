@@ -2287,6 +2287,28 @@ class RunContainerTests(TestCase):
     def assert_files_match(self, file_path1, file_path2, shallow=True):
         self.assertTrue(cmp(file_path1, file_path2, shallow))
 
+    @unittest.expectedFailure
+    def test_save_exception_preserves_application_stderr(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT, 'save-exception-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        with open(os.path.join(logs_path, 'stderr.txt'), 'w') as log_file:
+            log_file.write('partial application stderr\n')
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+
+        try:
+            raise ValueError('diagnostic failure')
+        except ValueError:
+            runcontainer.Command().save_exception(run)
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('partial application stderr', stderr)
+        self.assertIn('ValueError: diagnostic failure', stderr)
+
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
         everyone = Group.objects.get(name='Everyone')
