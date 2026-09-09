@@ -1383,8 +1383,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=15, seconds=1)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1409,8 +1409,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1436,8 +1436,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(seconds=58)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1463,8 +1463,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.test_run.end_time = end_time
         self.test_run.save()
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time_text)
 
         request = self.factory.get(self.detail_path)
@@ -1486,10 +1486,10 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
-43|<end-time>
-43.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
+43|COMPLETED|0:0|<end-time>
+43.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.list_path)
@@ -1514,9 +1514,9 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
-43|Unknown
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
+43|UNKNOWN||Unknown
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.list_path)
@@ -1581,7 +1581,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
             '451001.batch|COMPLETED|0:0|{}\n'
         ).format(state, exit_code, end_time, end_time)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_records_slurm_state_and_exit_code(self, mock_sacct):
         run = self._create_active_run()
@@ -1605,7 +1604,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         self.assertIn('Slurm exit code: 0:9', stderr)
         self.assertIn('Slurm end time: {}'.format(end_time), stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_preserves_partial_application_logs(self, mock_sacct):
         run = self._create_active_run({
@@ -1624,7 +1622,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         self.assertIn('partial application stderr', stderr)
         self.assertIn('Slurm job 451001 ended', stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_empty_application_logs_still_have_diagnostic(self, mock_sacct):
         run = self._create_active_run({
@@ -1640,7 +1637,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         stderr = run.logs.get(type=ContainerLog.STDERR).read()
         self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_missing_application_logs_still_have_diagnostic(self, mock_sacct):
         run = self._create_active_run()
@@ -1653,7 +1649,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         stderr = run.logs.get(type=ContainerLog.STDERR).read()
         self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_selects_exact_slurm_job_logs(self, mock_sacct):
         run = self._create_active_run({
@@ -1677,7 +1672,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         self.assertIn('job451001_nodehead_stderr.txt', stderr)
         self.assertNotIn('wrong stderr', stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_aggregates_multiple_node_logs_deterministically(
             self, mock_sacct):
