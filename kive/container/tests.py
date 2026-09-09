@@ -1653,6 +1653,55 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         stderr = run.logs.get(type=ContainerLog.STDERR).read()
         self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
 
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_selects_exact_slurm_job_logs(self, mock_sacct):
+        run = self._create_active_run({
+            'job451001_nodehead_stdout.txt': 'correct stdout\n',
+            'job451001_nodehead_stderr.txt': 'correct stderr\n',
+            'job452999_nodehead_stdout.txt': 'wrong stdout\n',
+            'job452999_nodehead_stderr.txt': 'wrong stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertIn('correct stdout', stdout)
+        self.assertIn('job451001_nodehead_stdout.txt', stdout)
+        self.assertNotIn('wrong stdout', stdout)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('correct stderr', stderr)
+        self.assertIn('job451001_nodehead_stderr.txt', stderr)
+        self.assertNotIn('wrong stderr', stderr)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_aggregates_multiple_node_logs_deterministically(
+            self, mock_sacct):
+        run = self._create_active_run({
+            'job451001_nodeb_stdout.txt': 'node B stdout\n',
+            'job451001_nodea_stdout.txt': 'node A stdout\n',
+            'job451001_nodeb_stderr.txt': 'node B stderr\n',
+            'job451001_nodea_stderr.txt': 'node A stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertLess(
+            stdout.index('job451001_nodea_stdout.txt'),
+            stdout.index('job451001_nodeb_stdout.txt'))
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertLess(
+            stderr.index('job451001_nodea_stderr.txt'),
+            stderr.index('job451001_nodeb_stderr.txt'))
+
 
 @skipIfDBFeature('is_mocked')
 class ContainerRunTests(TestCase):
