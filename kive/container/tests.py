@@ -1659,7 +1659,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         self.assertIn('partial application stderr', stderr)
         self.assertIn('Slurm job 451001 ended', stderr)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_malformed_application_stderr_still_gets_diagnostic(self, mock_sacct):
         run = self._create_active_run()
@@ -2089,7 +2088,6 @@ class ContainerLogTests(TestCase):
         self.assertTrue(log.long_text)
         self.assertIsNone(log.log_size)
 
-    @unittest.expectedFailure
     def test_short_log_with_invalid_utf8(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
@@ -2107,7 +2105,6 @@ class ContainerLogTests(TestCase):
         self.assertIn('after', text)
         self.assertIn('�', text)
 
-    @unittest.expectedFailure
     def test_long_log_with_invalid_utf8(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(

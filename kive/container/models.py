@@ -1154,6 +1154,25 @@ def _existing_recoverable_log(title, path):
     return (title, path)
 
 
+def _transcoded_log_path(file_path):
+    """Copy a raw log to valid UTF-8 without loading it all at once."""
+    descriptor, transcoded_path = mkstemp(
+        prefix='kive-transcoded-log-', suffix='.txt')
+    try:
+        with open(file_path, 'rb') as raw_log, os.fdopen(
+                descriptor, 'w', encoding='utf-8') as transcoded_log:
+            with io.TextIOWrapper(
+                    raw_log, encoding='utf-8', errors='replace') as text_log:
+                shutil.copyfileobj(text_log, transcoded_log)
+    except Exception:
+        try:
+            os.unlink(transcoded_path)
+        except FileNotFoundError:
+            pass
+        raise
+    return transcoded_path
+
+
 class ContainerRun(Stopwatch, AccessControl):
     NEW = 'N'
     LOADING = 'L'
@@ -1447,13 +1466,22 @@ class ContainerRun(Stopwatch, AccessControl):
         # noinspection PyUnresolvedReferences,PyProtectedMember
         short_size = ContainerLog._meta.get_field('short_text').max_length
         file_size = os.lstat(file_path).st_size
-        with open(file_path) as f:
+        transcoded_path = None
+        transcoded_file = None
+        try:
             if file_size <= short_size:
                 long_text = None
-                short_text = f.read(short_size)
+                with open(file_path, 'rb') as raw_log:
+                    with io.TextIOWrapper(
+                            raw_log,
+                            encoding='utf-8',
+                            errors='replace') as text_log:
+                        short_text = text_log.read()[:short_size]
             else:
                 short_text = ''
-                long_text = File(f)
+                transcoded_path = _transcoded_log_path(file_path)
+                transcoded_file = open(transcoded_path, 'rb')
+                long_text = File(transcoded_file)
             # We use update_or_create(), because it's possible that a log could
             # be successfully created, then an error occurs, and we need to
             # update it.
@@ -1471,6 +1499,14 @@ class ContainerRun(Stopwatch, AccessControl):
                 # Leave log_size unset so the purge scanner can populate it
                 # after the run has finished saving.
             log.save(update_fields=['short_text', 'long_text', 'log_size'])
+        finally:
+            if transcoded_file is not None:
+                transcoded_file.close()
+            if transcoded_path is not None:
+                try:
+                    os.unlink(transcoded_path)
+                except FileNotFoundError:
+                    pass
 
     def delete_sandbox(self):
         assert self.sandbox_path
