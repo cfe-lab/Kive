@@ -2067,6 +2067,44 @@ class ContainerLogTests(TestCase):
         self.assertTrue(log.long_text)
         self.assertIsNone(log.log_size)
 
+    @unittest.expectedFailure
+    def test_short_log_with_invalid_utf8(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        malformed_path = os.path.join(source_dir, 'malformed.log')
+        with open(malformed_path, 'wb') as log_file:
+            log_file.write(b'before\n\xff\nafter\n')
+
+        run.load_log(malformed_path, ContainerLog.STDERR)
+
+        text = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('before', text)
+        self.assertIn('after', text)
+        self.assertIn('�', text)
+
+    @unittest.expectedFailure
+    def test_long_log_with_invalid_utf8(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        malformed_path = os.path.join(source_dir, 'malformed.log')
+        with open(malformed_path, 'wb') as log_file:
+            log_file.write(b'.' * 1000 + b'\n\xff\n' + b'.' * 1000)
+
+        run.load_log(malformed_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertTrue(log.long_text)
+        text = log.read()
+        self.assertIn('.' * 1000, text)
+        self.assertIn('�', text)
+        self.assertIsNone(log.log_size)
+
     def test_store_recovered_log_streams_source_files(self):
         class UnboundedReadError(AssertionError):
             pass
