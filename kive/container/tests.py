@@ -2012,6 +2012,25 @@ class ContainerLogTests(TestCase):
         self.assertEqual('.' * 2001, log.read())
         self.assertTrue(log.long_text)
 
+    @unittest.expectedFailure
+    def test_long_log_leaves_log_size_unset(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        large_content = '.' * 2001
+        with open(large_path, 'w') as log_file:
+            log_file.write(large_content)
+
+        run.load_log(large_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual(large_content, log.read())
+        self.assertTrue(log.long_text)
+        self.assertIsNone(log.log_size)
+
     def test_replace_long_log_with_short_clears_long_text(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
