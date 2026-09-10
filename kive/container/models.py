@@ -1444,7 +1444,8 @@ class ContainerRun(Stopwatch, AccessControl):
                     self.pk,
                     os.path.basename(file_path))
                 log.long_text.save(upload_name, long_text)
-                log.log_size = file_size
+                # Leave log_size unset so the purge scanner can populate it
+                # after the run has finished saving.
             log.save(update_fields=['short_text', 'long_text', 'log_size'])
 
     def delete_sandbox(self):

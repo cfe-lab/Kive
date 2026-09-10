@@ -2012,7 +2012,6 @@ class ContainerLogTests(TestCase):
         self.assertEqual('.' * 2001, log.read())
         self.assertTrue(log.long_text)
 
-    @unittest.expectedFailure
     def test_long_log_leaves_log_size_unset(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
