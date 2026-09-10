@@ -2030,7 +2030,6 @@ class ContainerLogTests(TestCase):
         self.assertTrue(log.long_text)
         self.assertIsNone(log.log_size)
 
-    @unittest.expectedFailure
     def test_store_recovered_log_streams_source_files(self):
         class UnboundedReadError(AssertionError):
             pass

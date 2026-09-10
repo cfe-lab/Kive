@@ -1571,28 +1571,40 @@ class ContainerRun(Stopwatch, AccessControl):
 
     def _store_recovered_log(self, log_type, sources, closing_text=None):
         """Store combined file sources and optional text as one log."""
-        sections = []
-        for title, path in sources:
-            try:
-                with path.open('rb') as source_file:
-                    content = source_file.read()
-            except OSError as exc:
-                sections.append(
-                    '===== {} =====\nCould not read {}: {}'.format(
-                        title, path.name, exc).encode('utf-8'))
-                continue
-            sections.append(
-                '===== {} =====\n'.format(title).encode('utf-8') + content)
-        if closing_text:
-            sections.append(closing_text.encode('utf-8'))
-        if not sections:
+        if not sources and not closing_text:
             return
         descriptor, temp_path = mkstemp(
             prefix='kive-recovered-log-', suffix='.txt')
         try:
             with os.fdopen(descriptor, 'wb') as recovered_log:
-                recovered_log.write(b'\n\n'.join(sections))
-                recovered_log.write(b'\n')
+                wrote_section = False
+                for title, path in sources:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    try:
+                        source_file = path.open('rb')
+                    except OSError as exc:
+                        recovered_log.write(
+                            '===== {} =====\nCould not read {}: {}'.format(
+                                title, path.name, exc).encode('utf-8'))
+                        continue
+                    with source_file:
+                        recovered_log.write(
+                            '===== {} =====\n'.format(title).encode('utf-8'))
+                        try:
+                            shutil.copyfileobj(source_file, recovered_log)
+                        except OSError as exc:
+                            recovered_log.write(
+                                'Could not read {}: {}'.format(
+                                    path.name, exc).encode('utf-8'))
+                if closing_text:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    recovered_log.write(closing_text.encode('utf-8'))
+                if wrote_section:
+                    recovered_log.write(b'\n')
             self.load_log(temp_path, log_type)
         finally:
             try:
