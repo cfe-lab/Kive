@@ -2030,6 +2030,62 @@ class ContainerLogTests(TestCase):
         self.assertTrue(log.long_text)
         self.assertIsNone(log.log_size)
 
+    @unittest.expectedFailure
+    def test_store_recovered_log_streams_source_files(self):
+        class UnboundedReadError(AssertionError):
+            pass
+
+        class StreamingBinaryReader:
+            def __init__(self, path):
+                self._file = open(path, 'rb')
+
+            def read(self, size=-1):
+                if size is None or size < 0:
+                    raise UnboundedReadError(
+                        'recovered logs must be streamed in chunks')
+                return self._file.read(size)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self._file.close()
+                return False
+
+        class StreamingLogSource:
+            def __init__(self, path):
+                self._path = path
+                self.name = path.name
+
+            def open(self, mode='rb'):
+                if mode != 'rb':
+                    raise ValueError('test source only supports binary reads')
+                return StreamingBinaryReader(self._path)
+
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        source_path = pathlib.Path(source_dir) / 'streamed.log'
+        source_text = 'streamed application stdout\n' + '.' * 3000 + '\n'
+        with open(source_path, 'w') as source_file:
+            source_file.write(source_text)
+
+        run._store_recovered_log(
+            ContainerLog.STDOUT,
+            [('application stdout ({})'.format(source_path),
+              StreamingLogSource(source_path))],
+            closing_text='recovery diagnostic')
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual(
+            '===== application stdout ({}) =====\n'
+            '{}\n'
+            '\n'
+            'recovery diagnostic\n'.format(source_path, source_text),
+            log.read())
+
     def test_replace_long_log_with_short_clears_long_text(self):
         run = ContainerRun.objects.get(id=1)
         source_dir = os.path.join(
