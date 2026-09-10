@@ -2390,6 +2390,63 @@ class RunContainerTests(TestCase):
         self.assertIn('partial application stderr', stderr)
         self.assertIn('ValueError: diagnostic failure', stderr)
 
+    @unittest.expectedFailure
+    def test_save_exception_appends_without_reading_existing_stderr(self):
+        class UnboundedReadError(AssertionError):
+            pass
+
+        class ExistingStderrReader:
+            def __init__(self, opened_file):
+                self._file = opened_file
+
+            def read(self, size=-1):
+                if size is None or size < 0:
+                    raise UnboundedReadError(
+                        'save_exception must not read the whole log')
+                return self._file.read(size)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self._file.close()
+                return False
+
+        real_open = open
+
+        def guarded_open(file, mode='r', *args, **kwargs):
+            if isinstance(mode, str) and 'r' in mode and '+' not in mode:
+                return ExistingStderrReader(real_open(file, mode, *args, **kwargs))
+            return real_open(file, mode, *args, **kwargs)
+
+        run = ContainerRun.objects.get(name='fixture run')
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT, 'save-exception-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        log_path = os.path.join(logs_path, 'stderr.txt')
+        old_content = 'partial application stderr\n' + 'x' * 3000 + '\n'
+        with open(log_path, 'w') as log_file:
+            log_file.write(old_content)
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+
+        try:
+            raise ValueError('diagnostic failure')
+        except ValueError:
+            with patch.object(ContainerRun, 'load_log') as mock_load_log, \
+                    patch('builtins.open', side_effect=guarded_open):
+                runcontainer.Command().save_exception(run)
+
+        mock_load_log.assert_called_once_with(log_path, ContainerLog.STDERR)
+        with open(log_path) as log_file:
+            new_content = log_file.read()
+        self.assertEqual(0, new_content.index(old_content))
+        self.assertLess(
+            new_content.index(old_content),
+            new_content.index('ValueError: diagnostic failure'))
+
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
         everyone = Group.objects.get(name='Everyone')
