@@ -1074,6 +1074,105 @@ class SandboxMissingException(Exception):
     pass
 
 
+def _parse_slurm_accounting(output):
+    """Parse sacct output into records keyed by Slurm job and step ID."""
+    records = {}
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            job_id, state, exit_code, end_time = line.split('|')
+        except ValueError:
+            continue
+        job_id = job_id.strip()
+        base_job_id, _, _ = job_id.partition('.')
+        if not base_job_id.isdigit():
+            continue
+        records[job_id] = {
+            'state': state.strip(),
+            'exit_code': exit_code.strip(),
+            'end_time': end_time.strip(),
+        }
+    return records
+
+
+def _format_slurm_accounting(label, accounting):
+    """Format one Slurm job or step accounting record."""
+    state = accounting.get('state') or 'Unknown'
+    exit_code = accounting.get('exit_code') or 'Unknown'
+    end_time = accounting.get('end_time') or 'Unknown'
+    return (
+        '{}:\n'
+        'State: {}\n'
+        'Exit code: {}\n'
+        'End time: {}'.format(label, state, exit_code, end_time))
+
+
+def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
+    """Build a useful diagnostic for a Slurm job that ended a Kive run."""
+    main_record = records.get(slurm_job_id, {})
+    state = main_record.get('state') or 'Unknown'
+    exit_code = main_record.get('exit_code') or 'Unknown'
+    end_time = main_record.get('end_time') or 'Unknown'
+    lines = [
+        'Kive detected that Slurm job {} ended without updating '
+        'container run {}.'.format(slurm_job_id, run_id),
+        'Slurm state: {}'.format(state),
+        'Slurm exit code: {}'.format(exit_code),
+        'Slurm end time: {}'.format(end_time),
+    ]
+    step_prefix = '{}.'.format(slurm_job_id)
+    for step_id in sorted(records):
+        if step_id != slurm_job_id and step_id.startswith(step_prefix):
+            lines.extend([
+                '',
+                _format_slurm_accounting(
+                    'Slurm step {}'.format(step_id), records[step_id]),
+            ])
+    return '\n'.join(lines)
+
+
+def _matching_slurm_wrapper_logs(logs_path, slurm_job_id, stream):
+    """Find wrapper logs for one Slurm job in filename order."""
+    if logs_path is None:
+        return []
+    return sorted(
+        logs_path.glob('job{}_node*_{}.txt'.format(slurm_job_id, stream)),
+        key=lambda log_path: log_path.name)
+
+
+def _existing_recoverable_log(title, path):
+    """Return a recoverable log source unless it is absent or empty."""
+    try:
+        if not path.is_file():
+            return None
+        if path.stat().st_size == 0:
+            return None
+    except OSError:
+        pass
+    return (title, path)
+
+
+def _transcoded_log_path(file_path):
+    """Copy a raw log to valid UTF-8 without loading it all at once."""
+    descriptor, transcoded_path = mkstemp(
+        prefix='kive-transcoded-log-', suffix='.txt')
+    try:
+        with open(file_path, 'rb') as raw_log, os.fdopen(
+                descriptor, 'w', encoding='utf-8') as transcoded_log:
+            with io.TextIOWrapper(
+                    raw_log, encoding='utf-8', errors='replace') as text_log:
+                shutil.copyfileobj(text_log, transcoded_log)
+    except Exception:
+        try:
+            os.unlink(transcoded_path)
+        except FileNotFoundError:
+            pass
+        raise
+    return transcoded_path
+
+
 class ContainerRun(Stopwatch, AccessControl):
     NEW = 'N'
     LOADING = 'L'
@@ -1367,24 +1466,47 @@ class ContainerRun(Stopwatch, AccessControl):
         # noinspection PyUnresolvedReferences,PyProtectedMember
         short_size = ContainerLog._meta.get_field('short_text').max_length
         file_size = os.lstat(file_path).st_size
-        with open(file_path) as f:
+        transcoded_path = None
+        transcoded_file = None
+        try:
             if file_size <= short_size:
                 long_text = None
-                short_text = f.read(short_size)
+                with open(file_path, 'rb') as raw_log:
+                    with io.TextIOWrapper(
+                            raw_log,
+                            encoding='utf-8',
+                            errors='replace') as text_log:
+                        short_text = text_log.read()[:short_size]
             else:
                 short_text = ''
-                long_text = File(f)
+                transcoded_path = _transcoded_log_path(file_path)
+                transcoded_file = open(transcoded_path, 'rb')
+                long_text = File(transcoded_file)
             # We use update_or_create(), because it's possible that a log could
             # be successfully created, then an error occurs, and we need to
             # update it.
             log, _ = self.logs.update_or_create(
                 type=log_type,
-                defaults=dict(short_text=short_text))
+                defaults=dict(short_text=short_text, log_size=None))
+            if log.long_text:
+                log.long_text.delete(save=False)
+                log.long_text = ''
             if long_text is not None:
                 upload_name = 'run_{}_{}'.format(
                     self.pk,
                     os.path.basename(file_path))
                 log.long_text.save(upload_name, long_text)
+                # Leave log_size unset so the purge scanner can populate it
+                # after the run has finished saving.
+            log.save(update_fields=['short_text', 'long_text', 'log_size'])
+        finally:
+            if transcoded_file is not None:
+                transcoded_file.close()
+            if transcoded_path is not None:
+                try:
+                    os.unlink(transcoded_path)
+                except FileNotFoundError:
+                    pass
 
     def delete_sandbox(self):
         assert self.sandbox_path
@@ -1418,7 +1540,8 @@ class ContainerRun(Stopwatch, AccessControl):
         runs = cls.objects.filter(state__in=cls.ACTIVE_STATES).only(
             'state',
             'end_time',
-            'slurm_job_id')
+            'slurm_job_id',
+            'sandbox_path')
         if pk is not None:
             runs = runs.filter(pk=pk)
         job_runs = {str(run.slurm_job_id): run
@@ -1430,43 +1553,124 @@ class ContainerRun(Stopwatch, AccessControl):
         job_id_text = ','.join(job_runs)
         output = multi_check_output(['sacct',
                                      '-j', job_id_text,
-                                     '-o', 'jobid,end',
+                                     '-o', 'jobid,state%20,exitcode,end',
                                      '--noheader',
                                      '--parsable2'])
+        records = _parse_slurm_accounting(output)
         slurm_date_format = '%Y-%m-%dT%H:%M:%S'
         warn_end_time = datetime.now() - timedelta(minutes=1)
         max_end_time = warn_end_time - timedelta(minutes=14)
         warn_end_time_text = warn_end_time.strftime(slurm_date_format)
         max_end_time_text = max_end_time.strftime(slurm_date_format)
-        for line in output.splitlines():
-            job_id, end_time = line.split('|')
-            if end_time > warn_end_time_text:
+        for job_id, run in job_runs.items():
+            record = records.get(job_id)
+            if record is None:
                 continue
-            run = job_runs.get(job_id)
-            if run is not None:
-                if end_time > max_end_time_text:
-                    if not run.is_warned:
-                        logger.warning(
-                            'Slurm reports that run id %d ended at %s without '
-                            'updating Kive. Waiting 15 minutes to allow '
-                            'rescheduling.',
-                            run.id,
-                            end_time)
-                        run.is_warned = True
-                        run.save(update_fields=['is_warned'])
-                else:
-                    logger.error(
+            end_time = record['end_time']
+            if not end_time or end_time > warn_end_time_text:
+                continue
+            if end_time > max_end_time_text:
+                if not run.is_warned:
+                    logger.warning(
                         'Slurm reports that run id %d ended at %s without '
-                        'updating Kive. Marked as failed.',
+                        'updating Kive. Waiting 15 minutes to allow '
+                        'rescheduling.',
                         run.id,
                         end_time)
-                    run.state = cls.FAILED
-                    run.end_time = Now()
-                    run.save()
-                    logs_path = Path(run.full_sandbox_path) / 'logs'
-                    log_matches = list(logs_path.glob('job*_node*_stderr.txt'))
-                    if log_matches:
-                        run.load_log(log_matches[0], ContainerLog.STDERR)
+                    run.is_warned = True
+                    run.save(update_fields=['is_warned'])
+            else:
+                diagnostic = _slurm_failure_diagnostic(
+                    run.id, job_id, records)
+                logger.error(
+                    'Slurm reports that run id %d ended at %s without '
+                    'updating Kive. Slurm state: %s. Slurm exit code: %s. '
+                    'Marked as failed.',
+                    run.id,
+                    end_time,
+                    record['state'] or 'Unknown',
+                    record['exit_code'] or 'Unknown')
+                run.state = cls.FAILED
+                run.end_time = Now()
+                run.save()
+                run._recover_slurm_failure_logs(diagnostic)
+
+    def _recover_slurm_failure_logs(self, diagnostic):
+        """Preserve useful application and Slurm evidence for a failed run."""
+        logs_path = (Path(self.full_sandbox_path) / 'logs'
+                     if self.full_sandbox_path else None)
+        stdout_sources = []
+        stderr_sources = []
+        if logs_path is not None and logs_path.is_dir():
+            for filename, log_type, sections in (
+                    ('stdout.txt', ContainerLog.STDOUT,
+                     stdout_sources),
+                    ('stderr.txt', ContainerLog.STDERR,
+                     stderr_sources)):
+                source = _existing_recoverable_log(
+                    'application {} ({})'.format(
+                        'stdout' if log_type == ContainerLog.STDOUT
+                        else 'stderr',
+                        logs_path / filename),
+                    logs_path / filename)
+                if source is not None:
+                    sections.append(source)
+            for stream, sections in (('stdout', stdout_sources),
+                                     ('stderr', stderr_sources)):
+                for path in _matching_slurm_wrapper_logs(
+                        logs_path, self.slurm_job_id, stream):
+                    source = _existing_recoverable_log(path.name, path)
+                    if source is not None:
+                        sections.append(source)
+        self._store_recovered_log(ContainerLog.STDOUT, stdout_sources)
+        self._store_recovered_log(
+            ContainerLog.STDERR,
+            stderr_sources,
+            closing_text=('===== Kive failure diagnostic =====\n' +
+                          diagnostic))
+
+    def _store_recovered_log(self, log_type, sources, closing_text=None):
+        """Store combined file sources and optional text as one log."""
+        if not sources and not closing_text:
+            return
+        descriptor, temp_path = mkstemp(
+            prefix='kive-recovered-log-', suffix='.txt')
+        try:
+            with os.fdopen(descriptor, 'wb') as recovered_log:
+                wrote_section = False
+                for title, path in sources:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    try:
+                        source_file = path.open('rb')
+                    except OSError as exc:
+                        recovered_log.write(
+                            '===== {} =====\nCould not read {}: {}'.format(
+                                title, path.name, exc).encode('utf-8'))
+                        continue
+                    with source_file:
+                        recovered_log.write(
+                            '===== {} =====\n'.format(title).encode('utf-8'))
+                        try:
+                            shutil.copyfileobj(source_file, recovered_log)
+                        except OSError as exc:
+                            recovered_log.write(
+                                'Could not read {}: {}'.format(
+                                    path.name, exc).encode('utf-8'))
+                if closing_text:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    recovered_log.write(closing_text.encode('utf-8'))
+                if wrote_section:
+                    recovered_log.write(b'\n')
+            self.load_log(temp_path, log_type)
+        finally:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """

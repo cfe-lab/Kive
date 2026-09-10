@@ -33,6 +33,21 @@ KNOWN_EXTENSIONS = ('csv',
 logger = logging.getLogger(__name__)
 
 
+def _stderr_append_separator(log_path):
+    """Return the separator needed before appending to existing stderr."""
+    try:
+        with open(log_path, 'rb') as existing_log:
+            existing_log.seek(0, os.SEEK_END)
+            if existing_log.tell() == 0:
+                return ''
+            existing_log.seek(-1, os.SEEK_END)
+            if existing_log.read(1) == b'\n':
+                return '\n'
+            return '\n\n'
+    except FileNotFoundError:
+        return ''
+
+
 class Command(BaseCommand):
     help = "Executes a container run in singularity."
 
@@ -372,7 +387,9 @@ class Command(BaseCommand):
 
     def save_exception(self, run):
         log_path = os.path.join(run.full_sandbox_path, 'logs', 'stderr.txt')
-        with open(log_path, 'w') as f:
+        separator = _stderr_append_separator(log_path)
+        with open(log_path, 'a') as f:
+            f.write(separator)
             f.write('========\nInternal Kive Error\n========\n')
             exc_type, exc_value, exc_tb = sys.exc_info()
             f.write(''.join(format_exception_only(exc_type, exc_value)))
