@@ -2390,7 +2390,6 @@ class RunContainerTests(TestCase):
         self.assertIn('partial application stderr', stderr)
         self.assertIn('ValueError: diagnostic failure', stderr)
 
-    @unittest.expectedFailure
     def test_save_exception_appends_without_reading_existing_stderr(self):
         class UnboundedReadError(AssertionError):
             pass
@@ -2404,6 +2403,12 @@ class RunContainerTests(TestCase):
                     raise UnboundedReadError(
                         'save_exception must not read the whole log')
                 return self._file.read(size)
+
+            def seek(self, *args, **kwargs):
+                return self._file.seek(*args, **kwargs)
+
+            def tell(self):
+                return self._file.tell()
 
             def __enter__(self):
                 return self
