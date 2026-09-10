@@ -1075,7 +1075,7 @@ class SandboxMissingException(Exception):
 
 
 def _parse_slurm_accounting(output):
-    """Parse sacct output into records keyed by exact Slurm job ID."""
+    """Parse sacct output into records keyed by Slurm job and step ID."""
     records = {}
     for raw_line in output.splitlines():
         line = raw_line.strip()
@@ -1085,7 +1085,9 @@ def _parse_slurm_accounting(output):
             job_id, state, exit_code, end_time = line.split('|')
         except ValueError:
             continue
-        if not job_id.isdigit():
+        job_id = job_id.strip()
+        base_job_id, _, _ = job_id.partition('.')
+        if not base_job_id.isdigit():
             continue
         records[job_id] = {
             'state': state.strip(),
@@ -1095,18 +1097,40 @@ def _parse_slurm_accounting(output):
     return records
 
 
-def _slurm_failure_diagnostic(run_id, slurm_job_id, accounting):
-    """Build a useful diagnostic for a Slurm job that ended a Kive run."""
+def _format_slurm_accounting(label, accounting):
+    """Format one Slurm job or step accounting record."""
     state = accounting.get('state') or 'Unknown'
     exit_code = accounting.get('exit_code') or 'Unknown'
     end_time = accounting.get('end_time') or 'Unknown'
     return (
+        '{}:\n'
+        'State: {}\n'
+        'Exit code: {}\n'
+        'End time: {}'.format(label, state, exit_code, end_time))
+
+
+def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
+    """Build a useful diagnostic for a Slurm job that ended a Kive run."""
+    main_record = records.get(slurm_job_id, {})
+    state = main_record.get('state') or 'Unknown'
+    exit_code = main_record.get('exit_code') or 'Unknown'
+    end_time = main_record.get('end_time') or 'Unknown'
+    lines = [
         'Kive detected that Slurm job {} ended without updating '
-        'container run {}.\n'
-        'Slurm state: {}\n'
-        'Slurm exit code: {}\n'
-        'Slurm end time: {}'.format(
-            slurm_job_id, run_id, state, exit_code, end_time))
+        'container run {}.'.format(slurm_job_id, run_id),
+        'Slurm state: {}'.format(state),
+        'Slurm exit code: {}'.format(exit_code),
+        'Slurm end time: {}'.format(end_time),
+    ]
+    step_prefix = '{}.'.format(slurm_job_id)
+    for step_id in sorted(records):
+        if step_id != slurm_job_id and step_id.startswith(step_prefix):
+            lines.extend([
+                '',
+                _format_slurm_accounting(
+                    'Slurm step {}'.format(step_id), records[step_id]),
+            ])
+    return '\n'.join(lines)
 
 
 def _matching_slurm_wrapper_logs(logs_path, slurm_job_id, stream):
@@ -1493,7 +1517,7 @@ class ContainerRun(Stopwatch, AccessControl):
         job_id_text = ','.join(job_runs)
         output = multi_check_output(['sacct',
                                      '-j', job_id_text,
-                                     '-o', 'jobid,state,exitcode,end',
+                                     '-o', 'jobid,state%20,exitcode,end',
                                      '--noheader',
                                      '--parsable2'])
         records = _parse_slurm_accounting(output)
@@ -1521,7 +1545,7 @@ class ContainerRun(Stopwatch, AccessControl):
                     run.save(update_fields=['is_warned'])
             else:
                 diagnostic = _slurm_failure_diagnostic(
-                    run.id, job_id, record)
+                    run.id, job_id, records)
                 logger.error(
                     'Slurm reports that run id %d ended at %s without '
                     'updating Kive. Slurm state: %s. Slurm exit code: %s. '

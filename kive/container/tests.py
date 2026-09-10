@@ -1556,7 +1556,6 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
 
 
 class SlurmAccountingTests(TestCase):
-    @unittest.expectedFailure
     def test_step_records_appear_in_failure_diagnostic(self):
         output = (
             '451001|OUT_OF_MEMORY       |0:9|2026-09-09T15:26:15\n'
@@ -1604,7 +1603,6 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
             '451001.batch|COMPLETED|0:0|{}\n'
         ).format(state, exit_code, end_time, end_time)
 
-    @unittest.expectedFailure
     @patch('container.models.multi_check_output')
     def test_requests_wide_slurm_state_field(self, mock_sacct):
         self._create_active_run()
@@ -1631,7 +1629,7 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
 
         self.assertEqual(
             ['sacct', '-j', '451001',
-             '-o', 'jobid,state,exitcode,end',
+             '-o', 'jobid,state%20,exitcode,end',
              '--noheader', '--parsable2'],
             mock_sacct.call_args[0][0])
         run.refresh_from_db()
