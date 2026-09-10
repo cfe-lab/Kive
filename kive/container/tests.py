@@ -1659,6 +1659,28 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
         self.assertIn('partial application stderr', stderr)
         self.assertIn('Slurm job 451001 ended', stderr)
 
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_malformed_application_stderr_still_gets_diagnostic(self, mock_sacct):
+        run = self._create_active_run()
+        stderr_path = os.path.join(
+            settings.MEDIA_ROOT, run.sandbox_path, 'logs', 'stderr.txt')
+        with open(stderr_path, 'wb') as log_file:
+            log_file.write(b'before\n\xff\nafter\n')
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, run.state)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('before', stderr)
+        self.assertIn('after', stderr)
+        self.assertIn('�', stderr)
+        self.assertIn('Slurm job 451001 ended', stderr)
+
     @patch('container.models.multi_check_output')
     def test_empty_application_logs_still_have_diagnostic(self, mock_sacct):
         run = self._create_active_run({
