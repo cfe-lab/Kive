@@ -41,7 +41,8 @@ from container.management.commands import purge, runcontainer
 from container.models import (
     ContainerFamily, ContainerApp, Container, ContainerRun, ContainerDataset,
     ContainerArgument, ContainerArgumentType, Batch, ContainerLog,
-    PipelineCompletionStatus, ExistingRunsError, multi_check_output
+    PipelineCompletionStatus, ExistingRunsError, multi_check_output,
+    _parse_slurm_accounting, _slurm_failure_diagnostic
 )
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
@@ -1554,6 +1555,28 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.assertEqual([], mock_check_output.call_args_list)
 
 
+class SlurmAccountingTests(TestCase):
+    @unittest.expectedFailure
+    def test_step_records_appear_in_failure_diagnostic(self):
+        output = (
+            '451001|OUT_OF_MEMORY       |0:9|2026-09-09T15:26:15\n'
+            '451001.batch|FAILED              |1:0|2026-09-09T15:26:10\n'
+            '451001.extern|CANCELLED           |0:0|2026-09-09T15:26:11\n'
+            '4510010.batch|FAILED             |1:0|2026-09-09T15:26:12\n'
+        )
+
+        records = _parse_slurm_accounting(output)
+
+        self.assertEqual('OUT_OF_MEMORY', records['451001']['state'])
+        self.assertEqual('FAILED', records['451001.batch']['state'])
+        self.assertEqual('CANCELLED', records['451001.extern']['state'])
+        diagnostic = _slurm_failure_diagnostic(123, '451001', records)
+        self.assertIn('Slurm step 451001.batch', diagnostic)
+        self.assertIn('State: FAILED', diagnostic)
+        self.assertIn('Slurm step 451001.extern', diagnostic)
+        self.assertNotIn('4510010', diagnostic)
+
+
 @skipIfDBFeature('is_mocked')
 class ContainerRunSlurmFailureRecoveryTests(TestCase):
     def _create_active_run(self, files=None):
@@ -1580,6 +1603,22 @@ class ContainerRunSlurmFailureRecoveryTests(TestCase):
             '451001|{}|{}|{}\n'
             '451001.batch|COMPLETED|0:0|{}\n'
         ).format(state, exit_code, end_time, end_time)
+
+    @unittest.expectedFailure
+    @patch('container.models.multi_check_output')
+    def test_requests_wide_slurm_state_field(self, mock_sacct):
+        self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        self.assertEqual(
+            ['sacct', '-j', '451001',
+             '-o', 'jobid,state%20,exitcode,end',
+             '--noheader', '--parsable2'],
+            mock_sacct.call_args[0][0])
 
     @patch('container.models.multi_check_output')
     def test_records_slurm_state_and_exit_code(self, mock_sacct):
