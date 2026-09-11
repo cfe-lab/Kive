@@ -3153,8 +3153,13 @@ Line 3
                 "position": None,
                 "type": ContainerArgument.INPUT,
                 "allow_multiple": True,
-            }
-            # TODO(nknight): Add spec for a positional output directory
+            },
+            {
+                "name": "positional_directory",
+                "position": 3,
+                "type": ContainerArgument.OUTPUT,
+                "allow_multiple": True,
+            },
         ]
 
         app = ContainerApp(
@@ -3208,7 +3213,8 @@ Line 3
                 "--multiple_optional_input",
                 "/mnt/input/multiple_optional_input_0",
                 "/mnt/input/multiple_optional_input_1", "--",
-                "/mnt/input/positional_input", "/mnt/output/positional_output"
+                "/mnt/input/positional_input", "/mnt/output/positional_output",
+                "/mnt/output/positional_directory"
             ],
         )
 
