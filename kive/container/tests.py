@@ -3275,19 +3275,20 @@ class RunContainerMixedOutputTests(TestCase):
             position=2,
             allow_multiple=True,
         )
-        run = app.runs.create(user=user)
+        run = app.runs.create(user=user, return_code=0)
         run.create_sandbox(prefix='mixed-output-')
         run.save()
         self.addCleanup(shutil.rmtree, run.full_sandbox_path, True)
         output_path = os.path.join(run.full_sandbox_path, 'output')
         os.makedirs(output_path)
-        upload_path = os.path.join(run.full_sandbox_path, 'upload')
-        os.makedirs(upload_path)
-        return run, file_argument, directory_argument, output_path, upload_path
+        logs_path = os.path.join(run.full_sandbox_path, 'logs')
+        open(os.path.join(logs_path, 'stdout.txt'), 'w').close()
+        open(os.path.join(logs_path, 'stderr.txt'), 'w').close()
+        return run, file_argument, directory_argument, output_path
 
     def test_saves_mixed_file_and_directory_outputs(self):
-        (run, file_argument, directory_argument, output_path,
-         upload_path) = self._create_mixed_output_run()
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
         ordinary_path = os.path.join(output_path, 'result.txt')
         root_path = os.path.join(output_path, 'datafiles', 'root.txt')
         nested_path = os.path.join(
@@ -3304,11 +3305,10 @@ class RunContainerMixedOutputTests(TestCase):
         self.assertEqual(
             ['/mnt/output/result.txt', '/mnt/output/datafiles'],
             command[-2:])
-        runcontainer.Command()._save_output_argument(
-            run, file_argument, output_path, upload_path)
-        runcontainer.Command._save_output_directory_argument(
-            run, directory_argument, output_path, upload_path)
+        runcontainer.Command().save_outputs(run)
 
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertIsNotNone(run.end_time)
         ordinary = run.datasets.get(argument=file_argument)
         self.assertEqual('', ordinary.name)
         self.assertIsNone(ordinary.multi_position)
@@ -3325,17 +3325,15 @@ class RunContainerMixedOutputTests(TestCase):
             [member.dataset.dataset_file.read() for member in members])
 
     def test_empty_directory_output_collects_only_ordinary_output(self):
-        (run, file_argument, directory_argument, output_path,
-         upload_path) = self._create_mixed_output_run()
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
         with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
             output_file.write('ordinary output\n')
         os.makedirs(os.path.join(output_path, 'datafiles'))
 
-        runcontainer.Command()._save_output_argument(
-            run, file_argument, output_path, upload_path)
-        runcontainer.Command._save_output_directory_argument(
-            run, directory_argument, output_path, upload_path)
+        runcontainer.Command().save_outputs(run)
 
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
         self.assertEqual(1, run.datasets.count())
         self.assertEqual(
             0, run.datasets.filter(argument=directory_argument).count())
@@ -3344,16 +3342,14 @@ class RunContainerMixedOutputTests(TestCase):
             b'ordinary output\n', ordinary.dataset.dataset_file.read())
 
     def test_absent_directory_output_collects_only_ordinary_output(self):
-        (run, file_argument, directory_argument, output_path,
-         upload_path) = self._create_mixed_output_run()
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
         with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
             output_file.write('ordinary output\n')
 
-        runcontainer.Command()._save_output_argument(
-            run, file_argument, output_path, upload_path)
-        runcontainer.Command._save_output_directory_argument(
-            run, directory_argument, output_path, upload_path)
+        runcontainer.Command().save_outputs(run)
 
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
         self.assertEqual(1, run.datasets.count())
         self.assertEqual(
             0, run.datasets.filter(argument=directory_argument).count())
