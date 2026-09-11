@@ -1521,9 +1521,9 @@ class ContainerDataset(models.Model):
         default=None,
     )
     name = models.CharField(
-        max_length=maxlengths.MAX_NAME_LENGTH,
-        help_text="Local file name, also used to sort multiple inputs for a "
-                  "single argument.",
+        max_length=maxlengths.MAX_DIRECTORY_RELATIVE_PATH_LENGTH,
+        help_text="Local file name or directory-output relative path, also "
+                  "used to sort multiple inputs for a single argument.",
         blank=True)
     created = models.DateTimeField(
         auto_now_add=True,
