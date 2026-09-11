@@ -3324,6 +3324,43 @@ class RunContainerMixedOutputTests(TestCase):
             [b'nested output\n', b'root output\n'],
             [member.dataset.dataset_file.read() for member in members])
 
+    def test_empty_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument, output_path,
+         upload_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+        os.makedirs(os.path.join(output_path, 'datafiles'))
+
+        runcontainer.Command()._save_output_argument(
+            run, file_argument, output_path, upload_path)
+        runcontainer.Command._save_output_directory_argument(
+            run, directory_argument, output_path, upload_path)
+
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+
+    def test_absent_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument, output_path,
+         upload_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+
+        runcontainer.Command()._save_output_argument(
+            run, file_argument, output_path, upload_path)
+        runcontainer.Command._save_output_directory_argument(
+            run, directory_argument, output_path, upload_path)
+
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+
 
 @skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):
