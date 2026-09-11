@@ -4676,6 +4676,50 @@ class ContainerRunCreateValidationTests(TestCase):
                 run=self.run, argument=self.opt_multiple_arg,
                 dataset=self.dataset2, multi_position=1)
 
+    def test_directory_output_name_supports_long_relative_path(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 60 + '.txt'
+        self.assertGreater(len(relative_path), 60)
+        self.assertLessEqual(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        binding.full_clean()
+        binding.save()
+
+        binding.refresh_from_db()
+        self.assertEqual(relative_path, binding.name)
+
+    def test_directory_output_name_rejects_path_above_supported_length(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 80 + '.txt'
+        self.assertGreater(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        with self.assertRaises(ValidationError):
+            binding.full_clean()
+
 
 @skipIfDBFeature('is_mocked')
 class RunContainerMultiInputTests(TestCase):
