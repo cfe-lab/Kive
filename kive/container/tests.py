@@ -3256,6 +3256,76 @@ Line 3
 
 
 @skipIfDBFeature('is_mocked')
+class RunContainerMixedOutputTests(TestCase):
+    def _create_mixed_output_run(self):
+        user = User.objects.create_user(username='mixed-output')
+        family = ContainerFamily.objects.create(user=user, name='mixed-output')
+        container = Container.objects.create(family=family, user=user)
+        container.file.save('dummy.simg', ContentFile(b'dummy'))
+        app = ContainerApp.objects.create(container=container, name='mixed-output')
+        file_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='result.txt',
+            position=1,
+            allow_multiple=False,
+        )
+        directory_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=2,
+            allow_multiple=True,
+        )
+        run = app.runs.create(user=user)
+        run.create_sandbox(prefix='mixed-output-')
+        run.save()
+        self.addCleanup(shutil.rmtree, run.full_sandbox_path, True)
+        output_path = os.path.join(run.full_sandbox_path, 'output')
+        os.makedirs(output_path)
+        upload_path = os.path.join(run.full_sandbox_path, 'upload')
+        os.makedirs(upload_path)
+        return run, file_argument, directory_argument, output_path, upload_path
+
+    def test_saves_mixed_file_and_directory_outputs(self):
+        (run, file_argument, directory_argument, output_path,
+         upload_path) = self._create_mixed_output_run()
+        ordinary_path = os.path.join(output_path, 'result.txt')
+        root_path = os.path.join(output_path, 'datafiles', 'root.txt')
+        nested_path = os.path.join(
+            output_path, 'datafiles', 'nested', 'child.txt')
+        os.makedirs(os.path.dirname(nested_path))
+        with open(ordinary_path, 'w') as output_file:
+            output_file.write('ordinary output\n')
+        with open(root_path, 'w') as output_file:
+            output_file.write('root output\n')
+        with open(nested_path, 'w') as output_file:
+            output_file.write('nested output\n')
+
+        command = runcontainer.Command.build_command(run)
+        self.assertEqual(
+            ['/mnt/output/result.txt', '/mnt/output/datafiles'],
+            command[-2:])
+        runcontainer.Command()._save_output_argument(
+            run, file_argument, output_path, upload_path)
+        runcontainer.Command._save_output_directory_argument(
+            run, directory_argument, output_path, upload_path)
+
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual('', ordinary.name)
+        self.assertIsNone(ordinary.multi_position)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+        members = list(run.datasets.filter(
+            argument=directory_argument).order_by('multi_position'))
+        self.assertEqual(
+            ['nested/child.txt', 'root.txt'],
+            [member.name for member in members])
+        self.assertEqual([1, 2], [member.multi_position for member in members])
+        self.assertEqual(
+            [b'nested output\n', b'root output\n'],
+            [member.dataset.dataset_file.read() for member in members])
+
+
+@skipIfDBFeature('is_mocked')
 class PurgeTests(TestCase):
     fixtures = ['container_run']
 
