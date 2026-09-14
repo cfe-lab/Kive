@@ -1123,7 +1123,7 @@ def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
         f'Slurm exit code: {exit_code}',
         f'Slurm end time: {end_time}',
     ]
-    step_prefix = '{}.'.format(slurm_job_id)
+    step_prefix = f'{slurm_job_id}.'
     for step_id in sorted(records):
         if step_id != slurm_job_id and step_id.startswith(step_prefix):
             lines.extend([
