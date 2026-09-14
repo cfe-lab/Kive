@@ -1113,9 +1113,9 @@ def _format_slurm_accounting(label, accounting):
 def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
     """Build a useful diagnostic for a Slurm job that ended a Kive run."""
     main_record = records.get(slurm_job_id, {})
-    state = main_record.get('state') or 'Unknown'
-    exit_code = main_record.get('exit_code') or 'Unknown'
-    end_time = main_record.get('end_time') or 'Unknown'
+    state = main_record.get("state", "Unknown")
+    exit_code = main_record.get("exit_code", "Unknown")
+    end_time = main_record.get("end_time", "Unknown")
     lines = [
         'Kive detected that Slurm job {} ended without updating '
         'container run {}.'.format(slurm_job_id, run_id),
