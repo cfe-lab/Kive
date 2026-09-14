@@ -3153,8 +3153,13 @@ Line 3
                 "position": None,
                 "type": ContainerArgument.INPUT,
                 "allow_multiple": True,
-            }
-            # TODO(nknight): Add spec for a positional output directory
+            },
+            {
+                "name": "positional_directory",
+                "position": 3,
+                "type": ContainerArgument.OUTPUT,
+                "allow_multiple": True,
+            },
         ]
 
         app = ContainerApp(
@@ -3208,7 +3213,8 @@ Line 3
                 "--multiple_optional_input",
                 "/mnt/input/multiple_optional_input_0",
                 "/mnt/input/multiple_optional_input_1", "--",
-                "/mnt/input/positional_input", "/mnt/output/positional_output"
+                "/mnt/input/positional_input", "/mnt/output/positional_output",
+                "/mnt/output/positional_directory"
             ],
         )
 
@@ -3247,6 +3253,109 @@ Line 3
             ),
             "semi/colon/test_2356.png",
         )
+
+
+@skipIfDBFeature('is_mocked')
+class RunContainerMixedOutputTests(TestCase):
+    def _create_mixed_output_run(self):
+        user = User.objects.create_user(username='mixed-output')
+        family = ContainerFamily.objects.create(user=user, name='mixed-output')
+        container = Container.objects.create(family=family, user=user)
+        container.file.save('dummy.simg', ContentFile(b'dummy'))
+        app = ContainerApp.objects.create(container=container, name='mixed-output')
+        file_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='result.txt',
+            position=1,
+            allow_multiple=False,
+        )
+        directory_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=2,
+            allow_multiple=True,
+        )
+        run = app.runs.create(user=user, return_code=0)
+        run.create_sandbox(prefix='mixed-output-')
+        run.save()
+        self.addCleanup(shutil.rmtree, run.full_sandbox_path, True)
+        output_path = os.path.join(run.full_sandbox_path, 'output')
+        os.makedirs(output_path)
+        logs_path = os.path.join(run.full_sandbox_path, 'logs')
+        open(os.path.join(logs_path, 'stdout.txt'), 'w').close()
+        open(os.path.join(logs_path, 'stderr.txt'), 'w').close()
+        return run, file_argument, directory_argument, output_path
+
+    def test_saves_mixed_file_and_directory_outputs(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        ordinary_path = os.path.join(output_path, 'result.txt')
+        root_path = os.path.join(output_path, 'datafiles', 'root.txt')
+        nested_path = os.path.join(
+            output_path, 'datafiles', 'nested', 'child.txt')
+        os.makedirs(os.path.dirname(nested_path))
+        with open(ordinary_path, 'w') as output_file:
+            output_file.write('ordinary output\n')
+        with open(root_path, 'w') as output_file:
+            output_file.write('root output\n')
+        with open(nested_path, 'w') as output_file:
+            output_file.write('nested output\n')
+
+        command = runcontainer.Command.build_command(run)
+        self.assertEqual(
+            ['/mnt/output/result.txt', '/mnt/output/datafiles'],
+            command[-2:])
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertIsNotNone(run.end_time)
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual('', ordinary.name)
+        self.assertIsNone(ordinary.multi_position)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+        members = list(run.datasets.filter(
+            argument=directory_argument).order_by('multi_position'))
+        self.assertEqual(
+            ['nested/child.txt', 'root.txt'],
+            [member.name for member in members])
+        self.assertEqual([1, 2], [member.multi_position for member in members])
+        self.assertEqual(
+            [b'nested output\n', b'root output\n'],
+            [member.dataset.dataset_file.read() for member in members])
+
+    def test_empty_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+        os.makedirs(os.path.join(output_path, 'datafiles'))
+
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+
+    def test_absent_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
 
 
 @skipIfDBFeature('is_mocked')
@@ -4675,6 +4784,50 @@ class ContainerRunCreateValidationTests(TestCase):
             ContainerDataset.objects.create(
                 run=self.run, argument=self.opt_multiple_arg,
                 dataset=self.dataset2, multi_position=1)
+
+    def test_directory_output_name_supports_long_relative_path(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 60 + '.txt'
+        self.assertGreater(len(relative_path), 60)
+        self.assertLessEqual(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        binding.full_clean()
+        binding.save()
+
+        binding.refresh_from_db()
+        self.assertEqual(relative_path, binding.name)
+
+    def test_directory_output_name_rejects_path_above_supported_length(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 80 + '.txt'
+        self.assertGreater(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        with self.assertRaises(ValidationError):
+            binding.full_clean()
 
 
 @skipIfDBFeature('is_mocked')
