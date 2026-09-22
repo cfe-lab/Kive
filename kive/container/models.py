@@ -1162,8 +1162,11 @@ def _transcoded_log_path(file_path):
     try:
         with open(file_path, 'rb') as raw_log, os.fdopen(
                 descriptor, 'w', encoding='utf-8') as transcoded_log:
-            with io.TextIOWrapper(
-                    raw_log, encoding='utf-8', errors='replace') as text_log:
+            with open(
+                    file_path,
+                    'r',
+                    encoding='utf-8',
+                    errors='replace') as text_log:
                 shutil.copyfileobj(text_log, transcoded_log)
     except Exception:
         try:
@@ -1472,12 +1475,12 @@ class ContainerRun(Stopwatch, AccessControl):
         try:
             if file_size <= short_size:
                 long_text = None
-                with open(file_path, 'rb') as raw_log:
-                    with io.TextIOWrapper(
-                            raw_log,
-                            encoding='utf-8',
-                            errors='replace') as text_log:
-                        short_text = text_log.read()[:short_size]
+                with open(
+                        file_path,
+                        'r',
+                        encoding='utf-8',
+                        errors='replace') as text_log:
+                    short_text = text_log.read()[:short_size]
             else:
                 short_text = ''
                 transcoded_path = _transcoded_log_path(file_path)
