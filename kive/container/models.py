@@ -1160,8 +1160,7 @@ def _transcoded_log_path(file_path):
     descriptor, transcoded_path = mkstemp(
         prefix='kive-transcoded-log-', suffix='.txt')
     try:
-        with open(file_path, 'rb') as raw_log, os.fdopen(
-                descriptor, 'w', encoding='utf-8') as transcoded_log:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as transcoded_log:
             with open(
                     file_path,
                     'r',
