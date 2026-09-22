@@ -1117,11 +1117,11 @@ def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
     exit_code = main_record.get("exit_code", "Unknown")
     end_time = main_record.get("end_time", "Unknown")
     lines = [
-        f'Kive detected that Slurm job {slurm_job_id} ended without updating '
-        f'container run {run_id}.',
-        f'Slurm state: {state}',
-        f'Slurm exit code: {exit_code}',
-        f'Slurm end time: {end_time}',
+        'Kive detected that Slurm job {} ended without updating '
+        'container run {}.'.format(slurm_job_id, run_id),
+        'Slurm state: {}'.format(state),
+        'Slurm exit code: {}'.format(exit_code),
+        'Slurm end time: {}'.format(end_time),
     ]
     step_prefix = '{}.'.format(slurm_job_id)
     for step_id in sorted(records):
