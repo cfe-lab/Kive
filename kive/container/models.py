@@ -1129,7 +1129,7 @@ def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
             lines.extend([
                 '',
                 _format_slurm_accounting(
-                    f'Slurm step {step_id}', records[step_id]),
+                    'Slurm step {}'.format(step_id), records[step_id]),
             ])
     return '\n'.join(lines)
 
