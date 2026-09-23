@@ -137,8 +137,13 @@ class DatasetSerializer(AccessControlSerializer, serializers.ModelSerializer):
             file_path = os.path.join(efd.path, file_path)
             keep_file = False  # don't retain a copy by default
 
-        # Override the default if specified.
-        keep_file = validated_data.get("save_in_db", keep_file)
+        # Override the default only if the request explicitly supplied save_in_db.
+        # DRF's BooleanField may inject False into validated_data even when the
+        # client omitted the field, which would wrongly discard uploaded files.
+        if "save_in_db" in self.initial_data:
+            save_in_db = validated_data.get("save_in_db")
+            if save_in_db is not None:
+                keep_file = save_in_db
 
         dataset = Dataset.create_dataset(
             is_uploaded=True,  # Assume serializer is only used for uploads.

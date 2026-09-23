@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 import errno
 import hashlib
@@ -812,18 +814,20 @@ class ContainerApp(models.Model):
         return self._format_arguments(ContainerArgument.OUTPUT)
 
     def _format_arguments(self, argument_type):
-        arguments = self.arguments.filter(type=argument_type)
-        optionals = [argument
-                     for argument in arguments
-                     if argument.position is None]
-        positionals = [argument
-                       for argument in arguments
-                       if argument.position is not None]
-        terms = [argument.formatted for argument in optionals]
-        if (argument_type == ContainerArgument.INPUT and
-                any(argument.allow_multiple for argument in optionals)):
+        arguments = sorted(
+            self.arguments.filter(type=argument_type),
+            key=argument_execution_key,
+        )
+        terms = []
+        for arg in arguments:
+            if arg.position is None:
+                terms.append(arg.formatted)
+        if argument_type == ContainerArgument.INPUT and any(
+            arg.allow_multiple for arg in arguments if arg.position is None
+        ):
             terms.append('--')
-        terms.extend(argument.formatted for argument in positionals)
+        terms.extend(
+            arg.formatted for arg in arguments if arg.position is not None)
         return ' '.join(terms)
 
     def write_inputs(self, formatted):
@@ -832,28 +836,53 @@ class ContainerApp(models.Model):
     def write_outputs(self, formatted):
         self._write_arguments(ContainerArgument.OUTPUT, formatted)
 
-    def _write_arguments(self, argument_type, formatted):
-        self.arguments.filter(type=argument_type).delete()
+    @staticmethod
+    def _parse_argument_specs(argument_type, formatted):
         expected_multiples = {ContainerArgument.INPUT: '*',
                               ContainerArgument.OUTPUT: '/'}
+        specs = []
+        seen_names = set()
         for position, term in enumerate(formatted.split(), 1):
             if term == '--':
                 continue
             match = re.match(r'(--)?(\w+)([*/])?$', term)
             if match is None:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            if match.group(1):
-                position = None
-            if not match.group(3):
+            name = match.group(2)
+            if name in seen_names:
+                raise ValueError(f'Duplicate argument name: {name}')
+            seen_names.add(name)
+            actual_position = None if match.group(1) else position
+            suffix = match.group(3)
+            if not suffix:
                 allow_multiple = False
-            elif match.group(3) == expected_multiples[argument_type]:
+            elif suffix == expected_multiples[argument_type]:
                 allow_multiple = True
             else:
                 raise ValueError('Invalid argument name: {}'.format(term))
-            self.arguments.create(name=match.group(2),
-                                  position=position,
-                                  allow_multiple=allow_multiple,
-                                  type=argument_type)
+            if argument_type == ContainerArgument.OUTPUT:
+                if actual_position is None:
+                    raise ValueError(
+                        f'Output argument {name} must be positional '
+                        f'(omit -- prefix).')
+            if argument_type == ContainerArgument.INPUT and actual_position is not None and allow_multiple:
+                raise ValueError(
+                    f'Positioned input argument {name} cannot accept multiple values.')
+            specs.append((name, actual_position, allow_multiple))
+        return specs
+
+    def _write_arguments(self, argument_type, formatted):
+        specs = self._parse_argument_specs(argument_type, formatted)
+        from django.db import transaction
+        with transaction.atomic():
+            self.arguments.filter(type=argument_type).delete()
+            for name, position, allow_multiple in specs:
+                self.arguments.create(
+                    name=name,
+                    position=position,
+                    allow_multiple=allow_multiple,
+                    type=argument_type,
+                )
 
     def can_be_accessed(self, user):
         return self.container.can_be_accessed(user)
@@ -887,6 +916,20 @@ class ContainerArgumentType(enum.Enum):
     OPTIONAL_INPUT = enum.auto()
     OPTIONAL_MULTIPLE_INPUT = enum.auto()
     FIXED_DIRECTORY_OUTPUT = enum.auto()
+
+
+def multi_position_cardinality(argtype: ContainerArgumentType | None) -> str:
+    """Whether ``multi_position`` is required or forbidden for an argument type.
+
+    Returns ``"required"`` for multi-valued types, ``"forbidden"`` for
+    single-valued types, and ``"unknown"`` for an unclassifiable argument.
+    """
+    if argtype in (ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+                   ContainerArgumentType.FIXED_DIRECTORY_OUTPUT):
+        return "required"
+    if argtype is None:
+        return "unknown"
+    return "forbidden"
 
 
 class ContainerArgument(models.Model):
@@ -924,6 +967,16 @@ class ContainerArgument(models.Model):
 
     class Meta:
         ordering = ('app_id', 'type', 'position', 'name')
+        constraints = [
+            models.CheckConstraint(
+                check=(
+                    models.Q(type='I', position__isnull=False, allow_multiple=False)
+                    | models.Q(type='I', position__isnull=True)
+                    | models.Q(type='O', position__isnull=False)
+                ),
+                name='valid_argument_classification',
+            ),
+        ]
 
     def __repr__(self):
         return 'ContainerArgument(name={!r})'.format(self.name)
@@ -1019,6 +1072,108 @@ class Batch(AccessControl):
 
 class SandboxMissingException(Exception):
     pass
+
+
+def _parse_slurm_accounting(output):
+    """Parse sacct output into records keyed by Slurm job and step ID."""
+    records = {}
+    for raw_line in output.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            job_id, state, exit_code, end_time = line.split('|')
+        except ValueError:
+            continue
+        job_id = job_id.strip()
+        base_job_id, _, _ = job_id.partition('.')
+        if not base_job_id.isdigit():
+            continue
+        records[job_id] = {
+            'state': state.strip(),
+            'exit_code': exit_code.strip(),
+            'end_time': end_time.strip(),
+        }
+    return records
+
+
+def _format_slurm_accounting(label, accounting):
+    """Format one Slurm job or step accounting record."""
+    state = accounting.get('state') or 'Unknown'
+    exit_code = accounting.get('exit_code') or 'Unknown'
+    end_time = accounting.get('end_time') or 'Unknown'
+    return """
+Label: {}
+State: {}
+Exit code: {}
+End time: {}
+    """.format(label, state, exit_code, end_time).strip()
+
+
+def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
+    """Build a useful diagnostic for a Slurm job that ended a Kive run."""
+    main_record = records.get(slurm_job_id, {})
+    state = main_record.get('state') or 'Unknown'
+    exit_code = main_record.get('exit_code') or 'Unknown'
+    end_time = main_record.get('end_time') or 'Unknown'
+    lines = [
+        'Kive detected that Slurm job {} ended without updating '
+        'container run {}.'.format(slurm_job_id, run_id),
+        'Slurm state: {}'.format(state),
+        'Slurm exit code: {}'.format(exit_code),
+        'Slurm end time: {}'.format(end_time),
+    ]
+    step_prefix = '{}.'.format(slurm_job_id)
+    for step_id in sorted(records):
+        if step_id != slurm_job_id and step_id.startswith(step_prefix):
+            lines.extend([
+                '',
+                _format_slurm_accounting(
+                    'Slurm step {}'.format(step_id), records[step_id]),
+            ])
+    return '\n'.join(lines)
+
+
+def _matching_slurm_wrapper_logs(logs_path, slurm_job_id, stream):
+    """Find wrapper logs for one Slurm job in filename order."""
+    if logs_path is None:
+        return []
+    return sorted(
+        logs_path.glob('job{}_node*_{}.txt'.format(slurm_job_id, stream)),
+        key=lambda log_path: log_path.name)
+
+
+def _existing_recoverable_log(title, path):
+    """Return a recoverable log source unless it is absent or empty."""
+    try:
+        if not path.is_file():
+            return None
+        if path.stat().st_size == 0:
+            return None
+    except OSError:
+        pass
+    return (title, path)
+
+
+def _transcoded_log_path(file_path):
+    """Copy a raw log to valid UTF-8 without loading it all at once."""
+    descriptor, transcoded_path = mkstemp(
+        prefix='kive-transcoded-log-', suffix='.txt')
+    try:
+        with os.fdopen(descriptor, 'w', encoding='utf-8') as transcoded_log:
+            with open(
+                    file_path,
+                    'r',
+                    encoding='utf-8',
+                    errors='replace') as text_log:
+                shutil.copyfileobj(text_log, transcoded_log)
+    except Exception:
+        try:
+            os.unlink(transcoded_path)
+        except FileNotFoundError:
+            pass
+        raise
+    return transcoded_path
 
 
 class ContainerRun(Stopwatch, AccessControl):
@@ -1314,24 +1469,47 @@ class ContainerRun(Stopwatch, AccessControl):
         # noinspection PyUnresolvedReferences,PyProtectedMember
         short_size = ContainerLog._meta.get_field('short_text').max_length
         file_size = os.lstat(file_path).st_size
-        with open(file_path) as f:
+        transcoded_path = None
+        transcoded_file = None
+        try:
             if file_size <= short_size:
                 long_text = None
-                short_text = f.read(short_size)
+                with open(
+                        file_path,
+                        'r',
+                        encoding='utf-8',
+                        errors='replace') as text_log:
+                    short_text = text_log.read()[:short_size]
             else:
                 short_text = ''
-                long_text = File(f)
+                transcoded_path = _transcoded_log_path(file_path)
+                transcoded_file = open(transcoded_path, 'rb')
+                long_text = File(transcoded_file)
             # We use update_or_create(), because it's possible that a log could
             # be successfully created, then an error occurs, and we need to
             # update it.
             log, _ = self.logs.update_or_create(
                 type=log_type,
-                defaults=dict(short_text=short_text))
+                defaults=dict(short_text=short_text, log_size=None))
+            if log.long_text:
+                log.long_text.delete(save=False)
+                log.long_text = ''
             if long_text is not None:
                 upload_name = 'run_{}_{}'.format(
                     self.pk,
                     os.path.basename(file_path))
                 log.long_text.save(upload_name, long_text)
+                # Leave log_size unset so the purge scanner can populate it
+                # after the run has finished saving.
+            log.save(update_fields=['short_text', 'long_text', 'log_size'])
+        finally:
+            if transcoded_file is not None:
+                transcoded_file.close()
+            if transcoded_path is not None:
+                try:
+                    os.unlink(transcoded_path)
+                except FileNotFoundError:
+                    pass
 
     def delete_sandbox(self):
         assert self.sandbox_path
@@ -1365,7 +1543,8 @@ class ContainerRun(Stopwatch, AccessControl):
         runs = cls.objects.filter(state__in=cls.ACTIVE_STATES).only(
             'state',
             'end_time',
-            'slurm_job_id')
+            'slurm_job_id',
+            'sandbox_path')
         if pk is not None:
             runs = runs.filter(pk=pk)
         job_runs = {str(run.slurm_job_id): run
@@ -1377,46 +1556,128 @@ class ContainerRun(Stopwatch, AccessControl):
         job_id_text = ','.join(job_runs)
         output = multi_check_output(['sacct',
                                      '-j', job_id_text,
-                                     '-o', 'jobid,end',
+                                     '-o', 'jobid,state%20,exitcode,end',
                                      '--noheader',
                                      '--parsable2'])
+        records = _parse_slurm_accounting(output)
         slurm_date_format = '%Y-%m-%dT%H:%M:%S'
         warn_end_time = datetime.now() - timedelta(minutes=1)
         max_end_time = warn_end_time - timedelta(minutes=14)
         warn_end_time_text = warn_end_time.strftime(slurm_date_format)
         max_end_time_text = max_end_time.strftime(slurm_date_format)
-        for line in output.splitlines():
-            job_id, end_time = line.split('|')
-            if end_time > warn_end_time_text:
+        for job_id, run in job_runs.items():
+            record = records.get(job_id)
+            if record is None:
                 continue
-            run = job_runs.get(job_id)
-            if run is not None:
-                if end_time > max_end_time_text:
-                    if not run.is_warned:
-                        logger.warning(
-                            'Slurm reports that run id %d ended at %s without '
-                            'updating Kive. Waiting 15 minutes to allow '
-                            'rescheduling.',
-                            run.id,
-                            end_time)
-                        run.is_warned = True
-                        run.save(update_fields=['is_warned'])
-                else:
-                    logger.error(
+            end_time = record['end_time']
+            if not end_time or end_time > warn_end_time_text:
+                continue
+            if end_time > max_end_time_text:
+                if not run.is_warned:
+                    logger.warning(
                         'Slurm reports that run id %d ended at %s without '
-                        'updating Kive. Marked as failed.',
+                        'updating Kive. Waiting 15 minutes to allow '
+                        'rescheduling.',
                         run.id,
                         end_time)
-                    run.state = cls.FAILED
-                    run.end_time = Now()
-                    run.save()
-                    logs_path = Path(run.full_sandbox_path) / 'logs'
-                    log_matches = list(logs_path.glob('job*_node*_stderr.txt'))
-                    if log_matches:
-                        run.load_log(log_matches[0], ContainerLog.STDERR)
+                    run.is_warned = True
+                    run.save(update_fields=['is_warned'])
+            else:
+                diagnostic = _slurm_failure_diagnostic(
+                    run.id, job_id, records)
+                logger.error(
+                    'Slurm reports that run id %d ended at %s without '
+                    'updating Kive. Slurm state: %s. Slurm exit code: %s. '
+                    'Marked as failed.',
+                    run.id,
+                    end_time,
+                    record['state'] or 'Unknown',
+                    record['exit_code'] or 'Unknown')
+                run.state = cls.FAILED
+                run.end_time = Now()
+                run.save()
+                run._recover_slurm_failure_logs(diagnostic)
+
+    def _recover_slurm_failure_logs(self, diagnostic):
+        """Preserve useful application and Slurm evidence for a failed run."""
+        logs_path = (Path(self.full_sandbox_path) / 'logs'
+                     if self.full_sandbox_path else None)
+        stdout_sources = []
+        stderr_sources = []
+        if logs_path is not None and logs_path.is_dir():
+            for filename, log_type, sections in (
+                    ('stdout.txt', ContainerLog.STDOUT,
+                     stdout_sources),
+                    ('stderr.txt', ContainerLog.STDERR,
+                     stderr_sources)):
+                source = _existing_recoverable_log(
+                    'application {} ({})'.format(
+                        'stdout' if log_type == ContainerLog.STDOUT
+                        else 'stderr',
+                        logs_path / filename),
+                    logs_path / filename)
+                if source is not None:
+                    sections.append(source)
+            for stream, sections in (('stdout', stdout_sources),
+                                     ('stderr', stderr_sources)):
+                for path in _matching_slurm_wrapper_logs(
+                        logs_path, self.slurm_job_id, stream):
+                    source = _existing_recoverable_log(path.name, path)
+                    if source is not None:
+                        sections.append(source)
+        self._store_recovered_log(ContainerLog.STDOUT, stdout_sources)
+        self._store_recovered_log(
+            ContainerLog.STDERR,
+            stderr_sources,
+            closing_text=('===== Kive failure diagnostic =====\n' +
+                          diagnostic))
+
+    def _store_recovered_log(self, log_type, sources, closing_text=None):
+        """Store combined file sources and optional text as one log."""
+        if not sources and not closing_text:
+            return
+        descriptor, temp_path = mkstemp(
+            prefix='kive-recovered-log-', suffix='.txt')
+        try:
+            with os.fdopen(descriptor, 'wb') as recovered_log:
+                wrote_section = False
+                for title, path in sources:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    try:
+                        source_file = path.open('rb')
+                    except OSError as exc:
+                        recovered_log.write(
+                            '===== {} =====\nCould not read {}: {}'.format(
+                                title, path.name, exc).encode('utf-8'))
+                        continue
+                    with source_file:
+                        recovered_log.write(
+                            '===== {} =====\n'.format(title).encode('utf-8'))
+                        try:
+                            shutil.copyfileobj(source_file, recovered_log)
+                        except OSError as exc:
+                            recovered_log.write(
+                                'Could not read {}: {}'.format(
+                                    path.name, exc).encode('utf-8'))
+                if closing_text:
+                    if wrote_section:
+                        recovered_log.write(b'\n\n')
+                    wrote_section = True
+                    recovered_log.write(closing_text.encode('utf-8'))
+                if wrote_section:
+                    recovered_log.write(b'\n')
+            self.load_log(temp_path, log_type)
+        finally:
+            try:
+                os.unlink(temp_path)
+            except FileNotFoundError:
+                pass
 
     def set_md5(self):
         """ Set this run's md5.  Note that this does not save the run. """
+        import json as _json
         encoding = 'utf8'
         md5gen = hashlib.md5()
         container = self.app.container
@@ -1427,13 +1688,26 @@ class ContainerRun(Stopwatch, AccessControl):
             parent_md5 = parent_container.md5.encode(encoding)
             md5gen.update(parent_md5)
 
-        # Use explict sort order, so changes to default don't invalidate MD5's.
-        for container_dataset in self.datasets.order_by('argument__type',
-                                                        'argument__position',
-                                                        'argument__name'):
-            dataset = container_dataset.dataset
-            dataset_md5 = dataset.MD5_checksum.encode(encoding)
-            md5gen.update(dataset_md5)
+        bindings = []
+        all_cds = list(self.datasets.select_related('argument', 'dataset'))
+        all_cds.sort(key=lambda cd: (
+            argument_execution_key(cd.argument),
+            binding_execution_key(cd),
+        ))
+        for cd in all_cds:
+            staged = _staged_input_filename(cd) if cd.argument.type == ContainerArgument.INPUT else ""
+            bindings.append((
+                cd.argument_id,
+                cd.argument.type,
+                cd.argument.position,
+                cd.argument.name,
+                cd.multi_position,
+                cd.name,
+                staged,
+                cd.dataset.MD5_checksum,
+            ))
+        payload = _json.dumps(bindings, sort_keys=False, separators=(',', ':'))
+        md5gen.update(payload.encode(encoding))
         self.md5 = md5gen.hexdigest()
 
 
@@ -1454,9 +1728,9 @@ class ContainerDataset(models.Model):
         default=None,
     )
     name = models.CharField(
-        max_length=maxlengths.MAX_NAME_LENGTH,
-        help_text="Local file name, also used to sort multiple inputs for a "
-                  "single argument.",
+        max_length=maxlengths.MAX_DIRECTORY_RELATIVE_PATH_LENGTH,
+        help_text="Local file name or directory-output relative path, also "
+                  "used to sort multiple inputs for a single argument.",
         blank=True)
     created = models.DateTimeField(
         auto_now_add=True,
@@ -1469,6 +1743,16 @@ class ContainerDataset(models.Model):
                     'argument__type',
                     'argument__position',
                     'argument__name')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['run', 'argument', 'multi_position'],
+                condition=models.Q(multi_position__isnull=False),
+                name='unique_run_arg_multi_position'),
+            models.UniqueConstraint(
+                fields=['run', 'argument'],
+                condition=models.Q(multi_position__isnull=True),
+                name='unique_run_arg_single_binding'),
+        ]
 
     def find_rerun_dataset(self):
         """ Find the dataset, or the matching dataset from a rerun.
@@ -1484,19 +1768,134 @@ class ContainerDataset(models.Model):
             argument__type=ContainerArgument.OUTPUT)
         output_argument = output_container_dataset.argument
         for rerun in output_container_dataset.run.reruns.all():
-            rerun_container_dataset = rerun.datasets.get(argument=output_argument)
+            argtype = output_argument.argtype
+            if argtype == ContainerArgumentType.FIXED_DIRECTORY_OUTPUT:
+                output_name = output_container_dataset.name
+                matches = list(rerun.datasets.filter(
+                    argument=output_argument, name=output_name))
+                if len(matches) == 0:
+                    continue
+                if len(matches) > 1:
+                    raise RuntimeError(
+                        f"Multiple directory-output bindings with name "
+                        f"{output_name!r} in rerun {rerun.id}")
+                rerun_container_dataset = matches[0]
+            elif argtype == ContainerArgumentType.FIXED_OUTPUT:
+                try:
+                    rerun_container_dataset = rerun.datasets.get(
+                        argument=output_argument)
+                except rerun.datasets.model.DoesNotExist:
+                    continue
+            else:
+                raise RuntimeError(
+                    f"Unsupported output argument type for rerun lookup: {argtype}")
             dataset, source_run = rerun_container_dataset.find_rerun_dataset()
             if dataset is not None:
                 return dataset, None
         return None, output_container_dataset.run
 
     def clean(self):
-        # Check that a position has been supplied for multiple-input arguments
-        if self.argument.argtype is ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
-            if self.multi_position is None:
-                raise ValidationError("multi_position is required for a multi-valued input")
-        elif self.multi_position is not None:
-            raise ValidationError("multi_position should be None for single-valued argtype")
+        argtype = self.argument.argtype
+        requirement = multi_position_cardinality(argtype)
+        if requirement == "required" and self.multi_position is None:
+            raise ValidationError(
+                "multi_position is required for multi-valued argument "
+                f"type {argtype}")
+        if requirement == "forbidden" and self.multi_position is not None:
+            raise ValidationError(
+                "multi_position should be None for single-valued argtype")
+
+
+def _is_keyword(arg: ContainerArgument) -> bool:
+    return arg.argtype in ContainerArgument.KEYWORD_ARG_TYPES if arg.argtype is not None else arg.position is None
+
+
+def _source_filename(cd: ContainerDataset) -> str:
+    """Resolve the source basename for a ContainerDataset binding.
+
+    Resolution order:
+        1. cd.name (ContainerDataset.name, set by directory-output or explicit naming)
+        2. cd.dataset.dataset_file.name (storage file path)
+        3. cd.dataset.external_path (external reference)
+
+    Returns the basename only.  Raises RuntimeError if no identity is found
+    or the basename is empty/pathological.
+    """
+    raw: str | None = None
+    if cd.name:
+        raw = cd.name
+    elif cd.dataset.dataset_file:
+        raw = cd.dataset.dataset_file.name
+    elif cd.dataset.external_path:
+        raw = cd.dataset.external_path
+
+    if not raw:
+        raise RuntimeError(
+            f"Input dataset (id={cd.dataset_id}) has no usable file identity")
+
+    base = Path(raw).name
+    if base in ("", ".", "..") or "/" in base:
+        raise RuntimeError(
+            f"Invalid source basename {base!r} for dataset {cd.dataset_id}")
+    return base
+
+
+def _suffix_from_source(base: str) -> str:
+    """Extract the complete suffix chain from a source basename."""
+    return "".join(Path(base).suffixes)
+
+
+def _staged_input_filename(cd: ContainerDataset) -> str:
+    argtype = cd.argument.argtype
+    argname = cd.argument.name
+
+    if argtype == ContainerArgumentType.FIXED_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Fixed input {argname!r} cannot have multi_position"
+            )
+        return argname
+
+    if argtype == ContainerArgumentType.OPTIONAL_INPUT:
+        if cd.multi_position is not None:
+            raise RuntimeError(
+                f"Single optional input {argname!r} cannot have multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
+        return f"{argname}{suffix}"
+
+    if argtype == ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT:
+        if cd.multi_position is None:
+            raise RuntimeError(
+                f"Multiple optional input {argname!r} requires multi_position"
+            )
+        suffix = _suffix_from_source(_source_filename(cd))
+        return f"{argname}_{cd.multi_position}{suffix}"
+
+    raise RuntimeError(
+        f"Cannot construct staged input filename for argument type {argtype!r}"
+    )
+
+
+def argument_execution_key(argument: ContainerArgument) -> tuple:
+    """Canonical ordering key for arguments.
+
+    Semantic class first: 0 = keyword, 1 = fixed.
+    Keyword arguments ordered by pk (app-definition order).
+    Fixed arguments ordered by position, then pk.
+    """
+    semantic_class = 1 if argument.position is not None else 0
+    return (semantic_class, argument.position or 0, argument.pk or 0, argument.name)
+
+
+def binding_execution_key(binding: ContainerDataset) -> tuple:
+    """Canonical ordering key for bindings within one argument.
+
+    Multi-valued bindings ordered by multi_position; pk is final
+    tie-breaker for corrupted or tied state.
+    """
+    return (binding.multi_position if binding.multi_position is not None else 0,
+            binding.pk or 0)
 
 
 class ContainerLog(models.Model):

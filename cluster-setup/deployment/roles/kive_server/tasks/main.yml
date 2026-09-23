@@ -82,6 +82,7 @@
       copy:
         dest: "{{ kive_venv }}/requirements.txt"
         src: "{{ kive_root }}/requirements.txt"
+        remote_src: true
     - name: kive python dependencies
       when: kive_requirements.changed
       pip:
@@ -123,7 +124,7 @@
       command:
         argv:
           - "/usr/local/src/mod_wsgi/configure"
-          - "--with-python=/usr/bin/python3.7"
+          - "--with-python=/usr/bin/{{ kive_python_executable }}"
         chdir: "/usr/local/src/mod_wsgi"
         creates: "/usr/local/src/mod_wsgi/Makefile"
 
@@ -142,10 +143,16 @@
         state: present
         name: wsgi
 
-# This is following the general instructions for Ubuntu SSL support
-# in `/usr/share/doc/apache2/README.Debian.gz`.
-# For the certificates to be installed, they should be placed in the
-# directory you're running Ansible in, with the desired names.
+# TLS certificate and key provisioning.
+#
+# Two modes (kive_tls_mode):
+#
+#   self_signed  — generate a self-signed cert+key on the target via openssl.
+#                  Intended for dev/local environments.  No secrets committed.
+#
+#   provided     — copy cert/key from kive_ssl_certificate_src / kive_ssl_key_src.
+#                  Intended for production.  Do NOT commit private keys.
+#
 - name: enable Apache SSL support
   become: true
   block:
@@ -154,27 +161,78 @@
         state: present
         name: ssl
 
-    - name: install SSL certificate
-      copy:
-        src: star_cfe_chained.crt
-        dest: /etc/ssl/certs/star_cfe_chained.crt
-        owner: root
-        group: root
+    - name: ensure openssl is installed (needed for self-signed mode)
+      apt:
+        name: openssl
+        state: present
+      when: kive_tls_mode | default('provided') == 'self_signed'
 
-    - name: install SSL key
-      copy:
-        src: star_cfe.key
-        dest: /etc/ssl/private/star_cfe.key
+    - name: generate self-signed development TLS certificate
+      command:
+        argv:
+          - openssl
+          - req
+          - -x509
+          - -nodes
+          - -newkey
+          - rsa:2048
+          - -days
+          - "3650"
+          - -subj
+          - "/CN={{ kive_tls_common_name | default('kive-dev.local') }}"
+          - -keyout
+          - "{{ kive_ssl_key_path }}"
+          - -out
+          - "{{ kive_ssl_cert_path }}"
+      args:
+        creates: "{{ kive_ssl_key_path }}"
+      when: kive_tls_mode | default('provided') == 'self_signed'
+
+    - name: secure self-signed TLS key
+      file:
+        path: "{{ kive_ssl_key_path }}"
         owner: root
         group: root
         mode: "0600"
+      when: kive_tls_mode | default('provided') == 'self_signed'
 
-#    - name: install SSL certificate chain file
-#      copy:
-#        src: DigiCertCA.crt
-#        dest: /etc/ssl/certs/DigiCertCA.crt
-#        owner: root
-#        group: root
+    - name: set self-signed TLS certificate permissions
+      file:
+        path: "{{ kive_ssl_cert_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: kive_tls_mode | default('provided') == 'self_signed'
+
+    - name: validate provided TLS variables
+      assert:
+        that:
+          - kive_ssl_certificate_src is defined
+          - kive_ssl_certificate_src | length > 0
+          - kive_ssl_key_src is defined
+          - kive_ssl_key_src | length > 0
+        fail_msg: >
+          kive_tls_mode=provided requires kive_ssl_certificate_src and
+          kive_ssl_key_src to be set to paths on the Ansible controller.
+      when: kive_tls_mode | default('provided') == 'provided'
+
+    - name: install provided SSL certificate
+      copy:
+        src: "{{ kive_ssl_certificate_src }}"
+        dest: "{{ kive_ssl_cert_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      when: kive_tls_mode | default('provided') == 'provided'
+
+    - name: install provided SSL key
+      copy:
+        src: "{{ kive_ssl_key_src }}"
+        dest: "{{ kive_ssl_key_path }}"
+        owner: root
+        group: root
+        mode: "0600"
+      when: kive_tls_mode | default('provided') == 'provided'
 
 
 - name: set up log purging
@@ -277,9 +335,9 @@
             cmd: "a2enconf rotate-kive-logs"
 
     - name: install the Apache SSL site configuration for Kive
-      copy:
-        src: 001-kive-ssl.conf
-        dest: /etc/apache2/sites-available
+      template:
+        src: 001-kive-ssl.conf.j2
+        dest: /etc/apache2/sites-available/001-kive-ssl.conf
         owner: root
         group: root
 
@@ -294,11 +352,15 @@
         enabled: true
         daemon_reload: true
 
+    - name: allow SSH through firewall
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+
     - name: ensure ufw (the firewall) is running
-      systemd:
-        name: ufw
-        state: restarted
-        enabled: true
+      community.general.ufw:
+        state: enabled
 
 #    - name: firewall's internal interface should ACCEPT
 #      register: internal_accept
@@ -344,7 +406,7 @@
 - name: enable and start database service
   become: true
   systemd:
-    name: "postgresql@14-main"
+    name: "postgresql@{{ kive_db_version }}-main"
     state: started
     enabled: true
 
@@ -359,7 +421,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: local
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: all
             users: kive
             method: "scram-sha-256"
@@ -368,7 +430,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: host
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: all
             users: kive
             source: "{{ kive_db_subnet }}"
@@ -378,7 +440,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: host
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: all
             users: barman
             source: 127.0.0.1/32
@@ -388,7 +450,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: host
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: all
             users: barman
             source: "::1/128"
@@ -398,7 +460,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: host
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: replication
             users: streaming_barman
             source: 127.0.0.1/32
@@ -408,7 +470,7 @@
           notify: Restart postgresql service
           postgresql_pg_hba:
             contype: host
-            dest: "/etc/postgresql/14/main/pg_hba.conf"
+            dest: "/etc/postgresql/{{ kive_db_version }}/main/pg_hba.conf"
             databases: replication
             users: streaming_barman
             source: "::1/128"
@@ -440,7 +502,7 @@
         - option: archiver
       community.general.ini_file:
         backup: yes
-        path: "/etc/postgresql/14/main/postgresql.conf"
+        path: "/etc/postgresql/{{ kive_db_version }}/main/postgresql.conf"
         create: no
         section: null
         option: "{{ item.option }}"
@@ -493,6 +555,15 @@
         role: kive
         db: kive
         type: database
+        priv: ALL
+    - name: grant kive user schema public create privilege
+      become: true
+      become_user: postgres
+      postgresql_privs:
+        role: kive
+        db: kive
+        type: schema
+        obj: public
         priv: ALL
     - name: create barman database user
       become: true
@@ -562,7 +633,7 @@
 - name: database backup kive config
   loop:
     - option: path_prefix
-      value: /usr/lib/postgresql/14/bin
+      value: /usr/lib/postgresql/{{ kive_db_version }}/bin
     - option: description
       value: Kive database
     - option: conninfo
@@ -606,7 +677,7 @@
     - name: Set key locations
       set_fact:
         ssh_key_locations:
-          - path: /var/lib/pgsql/.ssh
+          - path: /var/lib/postgresql/.ssh
             owner: postgres
           - path: /var/lib/barman/.ssh
             owner: barman
@@ -626,16 +697,26 @@
         owner: "{{ item.owner }}"
         group: "{{ item.owner }}"
         mode: u=rwx,g=,o=
+    - name: Slurp postgres SSH public key
+      ignore_errors: true
+      register: postgres_pub_key
+      slurp:
+        src: /var/lib/postgresql/.ssh/id_rsa.pub
     - name: Allow postgres user to access barman user
-      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
+      when: not postgres_pub_key.failed
       ansible.posix.authorized_key:
         user: barman
-        key: "{{ lookup('file', '/var/lib/pgsql/.ssh/id_rsa.pub') }}"
+        key: "{{ postgres_pub_key.content | b64decode }}"
+    - name: Slurp barman SSH public key
+      ignore_errors: true
+      register: barman_pub_key
+      slurp:
+        src: /var/lib/barman/.ssh/id_rsa.pub
     - name: Allow barman user to access postgres user
-      ignore_errors: "{{ ansible_check_mode }}"  # Directory not created?
+      when: not barman_pub_key.failed
       ansible.posix.authorized_key:
         user: postgres
-        key: "{{ lookup('file', '/var/lib/barman/.ssh/id_rsa.pub') }}"
+        key: "{{ barman_pub_key.content | b64decode }}"
 
 # This variable should be a JSON-formatted list of 2-lists, like
 # [["User One", "userone@bccfe.ca"], ..., ["User N", "userN@bccfe.ca"]]

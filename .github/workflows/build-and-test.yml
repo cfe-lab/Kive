@@ -89,3 +89,33 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           directory: api
+
+  build-vm-smoke:
+    name: Smoke test utils/dev build-vm
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install build-vm runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            incus \
+            rsync \
+            qemu-utils \
+            qemu-system-x86 \
+            ovmf \
+            iproute2 \
+            socat
+
+      - name: Prepare host
+        run: |
+          utils/dev prepare-host --debug
+
+      - name: Smoke-test local install
+        run: |
+          utils/dev smoke-local-install --debug

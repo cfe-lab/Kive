@@ -4,6 +4,10 @@
   become: true
   apt_repository:
     repo: ppa:deadsnakes/ppa
+  register: deadsnakes_ppa
+  until: deadsnakes_ppa is succeeded
+  retries: 5
+  delay: 30
 
 - name: install the version of Python required by kive
   become: true
@@ -17,7 +21,7 @@
 
 - name: install pip for this version of Python
   become: true
-  shell: "curl https://bootstrap.pypa.io/get-pip.py | sudo {{ kive_python_executable }}"
+  shell: "{{ kive_python_executable }} -m ensurepip --upgrade && {{ kive_python_executable }} -m pip install --upgrade pip"
 
 - name: kive package dependencies
   become: true
@@ -30,6 +34,7 @@
       - lsof
       - graphviz
       - libgraphviz-dev
+      - git
 
 - name: install postgres database libraries
   become: true
