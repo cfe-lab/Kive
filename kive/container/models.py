@@ -1102,12 +1102,12 @@ def _format_slurm_accounting(label, accounting):
     state = accounting.get('state') or 'Unknown'
     exit_code = accounting.get('exit_code') or 'Unknown'
     end_time = accounting.get('end_time') or 'Unknown'
-    return (
-        f"{label}:\n"
-        f"State: {state}\n"
-        f"Exit code: {exit_code}\n:"
-        f"End time: {end_time}"
-    )
+    return """
+Label: {}
+State: {}
+Exit code: {}
+End time: {}
+    """.format(label, state, exit_code, end_time).strip()
 
 
 def _slurm_failure_diagnostic(run_id, slurm_job_id, records):
