@@ -2,8 +2,11 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.fields import URLField
 
-from container.models import ContainerFamily, Container, ContainerApp, ContainerRun, Batch, ContainerDataset, \
-    ContainerArgument, ContainerLog
+from container.models import (
+    ContainerFamily, Container, ContainerApp, ContainerRun, Batch,
+    ContainerDataset, ContainerArgument, ContainerLog,
+    multi_position_cardinality,
+)
 from kive.serializers import AccessControlSerializer
 from librarian.models import Dataset
 
@@ -11,7 +14,7 @@ from librarian.models import Dataset
 class ContainerFamilySerializer(AccessControlSerializer,
                                 serializers.ModelSerializer):
     absolute_url = URLField(source='get_absolute_url', read_only=True)
-    num_containers = serializers.IntegerField()
+    num_containers = serializers.IntegerField(read_only=True)
     removal_plan = serializers.HyperlinkedIdentityField(
         view_name='containerfamily-removal-plan')
     containers = serializers.HyperlinkedIdentityField(
@@ -238,6 +241,19 @@ class ContainerDatasetSerializer(serializers.ModelSerializer):
                   'name',
                   'created')
 
+    def validate(self, data):
+        argument = data.get('argument')
+        multi_position = data.get('multi_position')
+        if argument is not None:
+            requirement = multi_position_cardinality(argument.argtype)
+            if requirement == "required" and multi_position is None:
+                raise serializers.ValidationError(
+                    'multi_position is required for a multi-valued input.')
+            if requirement == "forbidden" and multi_position is not None:
+                raise serializers.ValidationError(
+                    'multi_position should be None for single-valued argtype.')
+        return data
+
 
 class ContainerRunSerializer(AccessControlSerializer,
                              serializers.ModelSerializer):
@@ -316,6 +332,92 @@ class ContainerRunSerializer(AccessControlSerializer,
                             'return_code',
                             'start_time',
                             'end_time')
+
+    def validate(self, data):
+        data = super().validate(data)
+
+        app = data.get("app")
+        original_run = data.get("original_run")
+        if app is None and original_run is not None:
+            app = original_run.app
+
+        datasets = data.get("datasets", [])
+        self._validate_dataset_bindings(app, datasets)
+
+        return data
+
+    @staticmethod
+    def _validate_dataset_bindings(app, datasets):
+        seen_single_args = set()
+        seen_multi_positions = set()
+
+        for item in datasets:
+            argument = item.get("argument")
+            dataset = item.get("dataset")
+            multi_position = item.get("multi_position")
+
+            if argument is None:
+                continue
+
+            if app is not None and argument.app_id != app.pk:
+                raise serializers.ValidationError({
+                    "datasets": [
+                        f'Argument "{argument.name}" does not belong to the run\'s app.'
+                    ]
+                })
+
+            if argument.type != ContainerArgument.INPUT:
+                raise serializers.ValidationError({
+                    "datasets": [
+                        f'Argument "{argument.name}" is an output; '
+                        f'only input arguments are accepted here.'
+                    ]
+                })
+
+            if dataset is not None:
+                if not dataset.has_data():
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Dataset "{dataset.name}" has no data.'
+                        ]
+                    })
+
+            argtype = argument.argtype
+            requirement = multi_position_cardinality(argtype)
+
+            if requirement == "required":
+                if multi_position is None:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            "multi_position is required for a multi-valued input."
+                        ]
+                    })
+
+                key = (argument.pk, multi_position)
+                if key in seen_multi_positions:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Duplicate multi_position {multi_position} for argument "{argument.name}".'
+                        ]
+                    })
+                seen_multi_positions.add(key)
+
+            else:
+                if multi_position is not None:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            "multi_position should be None for single-valued argtype."
+                        ]
+                    })
+
+                key = argument.pk
+                if key in seen_single_args:
+                    raise serializers.ValidationError({
+                        "datasets": [
+                            f'Multiple datasets for single-valued argument "{argument.name}" are not allowed.'
+                        ]
+                    })
+                seen_single_args.add(key)
 
     def create(self, validated_data):
         """Create a Run and the inputs it contains."""

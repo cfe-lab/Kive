@@ -23,6 +23,7 @@ from django.core.files.base import ContentFile, File
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError
 from django.test import TestCase, skipIfDBFeature
 from django.test.client import Client
 from django.urls import reverse, resolve
@@ -33,14 +34,15 @@ from django.core.exceptions import NON_FIELD_ERRORS
 from unittest.mock import patch
 from rest_framework.reverse import reverse as rest_reverse
 from rest_framework import status
-from rest_framework.test import force_authenticate
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from container.management.commands import purge, runcontainer
 # import container.models as cm
 from container.models import (
     ContainerFamily, ContainerApp, Container, ContainerRun, ContainerDataset,
     ContainerArgument, ContainerArgumentType, Batch, ContainerLog,
-    PipelineCompletionStatus, ExistingRunsError, multi_check_output
+    PipelineCompletionStatus, ExistingRunsError, multi_check_output,
+    _parse_slurm_accounting, _slurm_failure_diagnostic
 )
 from container.forms import ContainerForm
 from kive.tests import BaseTestCases, install_fixture_files, capture_log_stream
@@ -1142,7 +1144,7 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         container = Container.objects.create(family=family, user=user)
         app = ContainerApp.objects.create(container=container, name='test')
         arg = app.arguments.create(type=ContainerArgument.INPUT)
-        app.arguments.create(type=ContainerArgument.OUTPUT)
+        app.arguments.create(type=ContainerArgument.OUTPUT, name='output', position=1)
         dataset = Dataset.objects.create(user=user)
         content_file = ContentFile('a,b\n0,9')
         dataset.dataset_file.save('in1.csv', content_file)
@@ -1382,8 +1384,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=15, seconds=1)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1408,8 +1410,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(seconds=61)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1435,8 +1437,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(seconds=58)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.detail_path)
@@ -1462,8 +1464,8 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         self.test_run.end_time = end_time
         self.test_run.save()
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time_text)
 
         request = self.factory.get(self.detail_path)
@@ -1485,10 +1487,10 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
-43|<end-time>
-43.batch|<end-time>
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
+43|COMPLETED|0:0|<end-time>
+43.batch|COMPLETED|0:0|<end-time>
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.list_path)
@@ -1513,9 +1515,9 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
         end_time = (datetime.now() -
                     timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
         mock_check_output.return_value = """\
-42|<end-time>
-42.batch|<end-time>
-43|Unknown
+42|COMPLETED|0:0|<end-time>
+42.batch|COMPLETED|0:0|<end-time>
+43|UNKNOWN||Unknown
 """.replace('<end-time>', end_time)
 
         request = self.factory.get(self.list_path)
@@ -1551,6 +1553,206 @@ class ContainerRunApiTests(BaseTestCases.ApiTestCase):
 
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual([], mock_check_output.call_args_list)
+
+
+class SlurmAccountingTests(TestCase):
+    def test_step_records_appear_in_failure_diagnostic(self):
+        output = (
+            '451001|OUT_OF_MEMORY       |0:9|2026-09-09T15:26:15\n'
+            '451001.batch|FAILED              |1:0|2026-09-09T15:26:10\n'
+            '451001.extern|CANCELLED           |0:0|2026-09-09T15:26:11\n'
+            '4510010.batch|FAILED             |1:0|2026-09-09T15:26:12\n'
+        )
+
+        records = _parse_slurm_accounting(output)
+
+        self.assertEqual('OUT_OF_MEMORY', records['451001']['state'])
+        self.assertEqual('FAILED', records['451001.batch']['state'])
+        self.assertEqual('CANCELLED', records['451001.extern']['state'])
+        diagnostic = _slurm_failure_diagnostic(123, '451001', records)
+        self.assertIn('Slurm step 451001.batch', diagnostic)
+        self.assertIn('State: FAILED', diagnostic)
+        self.assertIn('Slurm step 451001.extern', diagnostic)
+        self.assertNotIn('4510010', diagnostic)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerRunSlurmFailureRecoveryTests(TestCase):
+    def _create_active_run(self, files=None):
+        user = User.objects.create_user(username='slurm-watchdog')
+        family = ContainerFamily.objects.create(user=user, name='watchdog')
+        container = Container.objects.create(family=family, user=user)
+        app = ContainerApp.objects.create(container=container, name='watchdog')
+        run = app.runs.create(user=user, slurm_job_id=451001)
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT,
+            'slurm-failure-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+        for filename, content in (files or {}).items():
+            with open(os.path.join(logs_path, filename), 'w') as log_file:
+                log_file.write(content)
+        return run
+
+    def _sacct_output(self, end_time, state='OUT_OF_MEMORY', exit_code='0:9'):
+        return (
+            '451001|{}|{}|{}\n'
+            '451001.batch|COMPLETED|0:0|{}\n'
+        ).format(state, exit_code, end_time, end_time)
+
+    @patch('container.models.multi_check_output')
+    def test_requests_wide_slurm_state_field(self, mock_sacct):
+        self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        self.assertEqual(
+            ['sacct', '-j', '451001',
+             '-o', 'jobid,state%20,exitcode,end',
+             '--noheader', '--parsable2'],
+            mock_sacct.call_args[0][0])
+
+    @patch('container.models.multi_check_output')
+    def test_records_slurm_state_and_exit_code(self, mock_sacct):
+        run = self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        self.assertEqual(
+            ['sacct', '-j', '451001',
+             '-o', 'jobid,state%20,exitcode,end',
+             '--noheader', '--parsable2'],
+            mock_sacct.call_args[0][0])
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, run.state)
+        self.assertIsNone(run.return_code)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm job 451001 ended', stderr)
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+        self.assertIn('Slurm exit code: 0:9', stderr)
+        self.assertIn('Slurm end time: {}'.format(end_time), stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_preserves_partial_application_logs(self, mock_sacct):
+        run = self._create_active_run({
+            'stdout.txt': 'partial application stdout\n',
+            'stderr.txt': 'partial application stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertIn('partial application stdout', stdout)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('partial application stderr', stderr)
+        self.assertIn('Slurm job 451001 ended', stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_malformed_application_stderr_still_gets_diagnostic(self, mock_sacct):
+        run = self._create_active_run()
+        stderr_path = os.path.join(
+            settings.MEDIA_ROOT, run.sandbox_path, 'logs', 'stderr.txt')
+        with open(stderr_path, 'wb') as log_file:
+            log_file.write(b'before\n\xff\nafter\n')
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        run.refresh_from_db()
+        self.assertEqual(ContainerRun.FAILED, run.state)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('before', stderr)
+        self.assertIn('after', stderr)
+        self.assertIn('�', stderr)
+        self.assertIn('Slurm job 451001 ended', stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_empty_application_logs_still_have_diagnostic(self, mock_sacct):
+        run = self._create_active_run({
+            'stdout.txt': '',
+            'stderr.txt': '',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_missing_application_logs_still_have_diagnostic(self, mock_sacct):
+        run = self._create_active_run()
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('Slurm state: OUT_OF_MEMORY', stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_selects_exact_slurm_job_logs(self, mock_sacct):
+        run = self._create_active_run({
+            'job451001_nodehead_stdout.txt': 'correct stdout\n',
+            'job451001_nodehead_stderr.txt': 'correct stderr\n',
+            'job452999_nodehead_stdout.txt': 'wrong stdout\n',
+            'job452999_nodehead_stderr.txt': 'wrong stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertIn('correct stdout', stdout)
+        self.assertIn('job451001_nodehead_stdout.txt', stdout)
+        self.assertNotIn('wrong stdout', stdout)
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('correct stderr', stderr)
+        self.assertIn('job451001_nodehead_stderr.txt', stderr)
+        self.assertNotIn('wrong stderr', stderr)
+
+    @patch('container.models.multi_check_output')
+    def test_aggregates_multiple_node_logs_deterministically(
+            self, mock_sacct):
+        run = self._create_active_run({
+            'job451001_nodeb_stdout.txt': 'node B stdout\n',
+            'job451001_nodea_stdout.txt': 'node A stdout\n',
+            'job451001_nodeb_stderr.txt': 'node B stderr\n',
+            'job451001_nodea_stderr.txt': 'node A stderr\n',
+        })
+        end_time = (datetime.now() -
+                    timedelta(minutes=16)).strftime('%Y-%m-%dT%H:%M:%S')
+        mock_sacct.return_value = self._sacct_output(end_time)
+
+        ContainerRun.check_slurm_state()
+
+        stdout = run.logs.get(type=ContainerLog.STDOUT).read()
+        self.assertLess(
+            stdout.index('job451001_nodea_stdout.txt'),
+            stdout.index('job451001_nodeb_stdout.txt'))
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertLess(
+            stderr.index('job451001_nodea_stderr.txt'),
+            stderr.index('job451001_nodeb_stderr.txt'))
 
 
 @skipIfDBFeature('is_mocked')
@@ -1851,6 +2053,177 @@ class ContainerLogTests(TestCase):
         self.assertEqual(expected_display, log.preview)
         self.assertEqual(expected_size_display, log.size_display)
 
+    def test_replace_short_log_with_long(self):
+        run = ContainerRun.objects.get(id=1)
+        run.logs.create(type=ContainerLog.STDOUT, short_text='original')
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+
+        run.load_log(large_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('.' * 2001, log.read())
+        self.assertTrue(log.long_text)
+
+    def test_long_log_leaves_log_size_unset(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        large_content = '.' * 2001
+        with open(large_path, 'w') as log_file:
+            log_file.write(large_content)
+
+        run.load_log(large_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual(large_content, log.read())
+        self.assertTrue(log.long_text)
+        self.assertIsNone(log.log_size)
+
+    def test_short_log_with_invalid_utf8(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        malformed_path = os.path.join(source_dir, 'malformed.log')
+        with open(malformed_path, 'wb') as log_file:
+            log_file.write(b'before\n\xff\nafter\n')
+
+        run.load_log(malformed_path, ContainerLog.STDERR)
+
+        text = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('before', text)
+        self.assertIn('after', text)
+        self.assertIn('�', text)
+
+    def test_long_log_with_invalid_utf8(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        malformed_path = os.path.join(source_dir, 'malformed.log')
+        with open(malformed_path, 'wb') as log_file:
+            log_file.write(b'.' * 1000 + b'\n\xff\n' + b'.' * 1000)
+
+        run.load_log(malformed_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertTrue(log.long_text)
+        text = log.read()
+        self.assertIn('.' * 1000, text)
+        self.assertIn('�', text)
+        self.assertIsNone(log.log_size)
+
+    def test_store_recovered_log_streams_source_files(self):
+        class UnboundedReadError(AssertionError):
+            pass
+
+        class StreamingBinaryReader:
+            def __init__(self, path):
+                self._file = open(path, 'rb')
+
+            def read(self, size=-1):
+                if size is None or size < 0:
+                    raise UnboundedReadError(
+                        'recovered logs must be streamed in chunks')
+                return self._file.read(size)
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self._file.close()
+                return False
+
+        class StreamingLogSource:
+            def __init__(self, path):
+                self._path = path
+                self.name = path.name
+
+            def open(self, mode='rb'):
+                if mode != 'rb':
+                    raise ValueError('test source only supports binary reads')
+                return StreamingBinaryReader(self._path)
+
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        source_path = pathlib.Path(source_dir) / 'streamed.log'
+        source_text = 'streamed application stdout\n' + '.' * 3000 + '\n'
+        with open(source_path, 'w') as source_file:
+            source_file.write(source_text)
+
+        run._store_recovered_log(
+            ContainerLog.STDOUT,
+            [('application stdout ({})'.format(source_path),
+              StreamingLogSource(source_path))],
+            closing_text='recovery diagnostic')
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual(
+            '===== application stdout ({}) =====\n'
+            '{}\n'
+            '\n'
+            'recovery diagnostic\n'.format(source_path, source_text),
+            log.read())
+
+    def test_replace_long_log_with_short_clears_long_text(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+        run.load_log(large_path, ContainerLog.STDOUT)
+        old_name = run.logs.get(type=ContainerLog.STDOUT).long_text.name
+        old_path = settings.MEDIA_ROOT + '/' + old_name
+        small_path = os.path.join(source_dir, 'small.log')
+        with open(small_path, 'w') as log_file:
+            log_file.write('short replacement')
+
+        run.load_log(small_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('short replacement', log.read())
+        self.assertFalse(log.long_text)
+        self.assertFalse(os.path.exists(old_path))
+
+    def test_replace_long_log_with_empty_clears_long_text(self):
+        run = ContainerRun.objects.get(id=1)
+        source_dir = os.path.join(
+            settings.MEDIA_ROOT, self._testMethodName)
+        os.makedirs(source_dir, exist_ok=True)
+        self.addCleanup(shutil.rmtree, source_dir, True)
+        large_path = os.path.join(source_dir, 'large.log')
+        with open(large_path, 'w') as log_file:
+            log_file.write('.' * 2001)
+        run.load_log(large_path, ContainerLog.STDOUT)
+        old_name = run.logs.get(type=ContainerLog.STDOUT).long_text.name
+        old_path = settings.MEDIA_ROOT + '/' + old_name
+        empty_path = os.path.join(source_dir, 'empty.log')
+        open(empty_path, 'w').close()
+
+        run.load_log(empty_path, ContainerLog.STDOUT)
+
+        log = run.logs.get(type=ContainerLog.STDOUT)
+        self.assertEqual('', log.read())
+        self.assertFalse(log.long_text)
+        self.assertFalse(os.path.exists(old_path))
+
 
 @skipIfDBFeature('is_mocked')
 class ContainerLogApiTests(BaseTestCases.ApiTestCase):
@@ -1913,7 +2286,12 @@ class ContainerArgumentApiTests(BaseTestCases.ApiTestCase):
         family = ContainerFamily.objects.create(user=user)
         container = Container.objects.create(family=family, user=user)
         app = ContainerApp.objects.create(container=container, name='test')
-        self.test_argument = app.arguments.create(name='test_arg')
+        self.test_argument = app.arguments.create(
+            name="test_arg",
+            type=ContainerArgument.INPUT,
+            position=None,
+            allow_multiple=False,
+        )
 
         self.list_path = reverse("containerargument-list")
         self.list_view, _, _ = resolve(self.list_path)
@@ -1956,6 +2334,12 @@ class BatchApiTests(BaseTestCases.ApiTestCase):
         self.test_app = ContainerApp.objects.create(container=container, name='test')
         self.test_arg = self.test_app.arguments.create(type=ContainerArgument.INPUT)
         self.dataset = Dataset.create_empty(user=user)
+        self.dataset.name = "batch_api_input.txt"
+        self.dataset.dataset_file.save(
+            "batch_api_input.txt",
+            ContentFile(b"batch api input\n"),
+            save=True,
+        )
         self.test_run = self.test_app.runs.create(user=user, batch=self.test_batch)
         self.test_run.datasets.create(argument=self.test_arg, dataset=self.dataset)
 
@@ -2078,6 +2462,89 @@ class RunContainerTests(TestCase):
 
     def assert_files_match(self, file_path1, file_path2, shallow=True):
         self.assertTrue(cmp(file_path1, file_path2, shallow))
+
+    def test_save_exception_preserves_application_stderr(self):
+        run = ContainerRun.objects.get(name='fixture run')
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT, 'save-exception-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        with open(os.path.join(logs_path, 'stderr.txt'), 'w') as log_file:
+            log_file.write('partial application stderr\n')
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+
+        try:
+            raise ValueError('diagnostic failure')
+        except ValueError:
+            runcontainer.Command().save_exception(run)
+
+        stderr = run.logs.get(type=ContainerLog.STDERR).read()
+        self.assertIn('partial application stderr', stderr)
+        self.assertIn('ValueError: diagnostic failure', stderr)
+
+    def test_save_exception_appends_without_reading_existing_stderr(self):
+        class UnboundedReadError(AssertionError):
+            pass
+
+        class ExistingStderrReader:
+            def __init__(self, opened_file):
+                self._file = opened_file
+
+            def read(self, size=-1):
+                if size is None or size < 0:
+                    raise UnboundedReadError(
+                        'save_exception must not read the whole log')
+                return self._file.read(size)
+
+            def seek(self, *args, **kwargs):
+                return self._file.seek(*args, **kwargs)
+
+            def tell(self):
+                return self._file.tell()
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                self._file.close()
+                return False
+
+        real_open = open
+
+        def guarded_open(file, mode='r', *args, **kwargs):
+            if isinstance(mode, str) and 'r' in mode and '+' not in mode:
+                return ExistingStderrReader(real_open(file, mode, *args, **kwargs))
+            return real_open(file, mode, *args, **kwargs)
+
+        run = ContainerRun.objects.get(name='fixture run')
+        sandbox_path = os.path.join(
+            settings.MEDIA_ROOT, 'save-exception-{}'.format(self._testMethodName))
+        logs_path = os.path.join(sandbox_path, 'logs')
+        os.makedirs(logs_path, exist_ok=True)
+        self.addCleanup(shutil.rmtree, sandbox_path, True)
+        log_path = os.path.join(logs_path, 'stderr.txt')
+        old_content = 'partial application stderr\n' + 'x' * 3000 + '\n'
+        with open(log_path, 'w') as log_file:
+            log_file.write(old_content)
+        run.sandbox_path = os.path.relpath(sandbox_path, settings.MEDIA_ROOT)
+        run.save()
+
+        try:
+            raise ValueError('diagnostic failure')
+        except ValueError:
+            with patch.object(ContainerRun, 'load_log') as mock_load_log, \
+                    patch('builtins.open', side_effect=guarded_open):
+                runcontainer.Command().save_exception(run)
+
+        mock_load_log.assert_called_once_with(log_path, ContainerLog.STDERR)
+        with open(log_path) as log_file:
+            new_content = log_file.read()
+        self.assertEqual(0, new_content.index(old_content))
+        self.assertLess(
+            new_content.index(old_content),
+            new_content.index('ValueError: diagnostic failure'))
 
     def test_run(self):
         run = ContainerRun.objects.get(name='fixture run')
@@ -3120,8 +3587,6 @@ Line 3
 
     def test_full_argument_formatting(self):
         # Set up test data
-        # NOTE(nknight): The order of these specs matters; it matches the order that the
-        # associated ContainerDataset objects would be returned from the database.
         argspecs = [
             {
                 "name": "positional_input",
@@ -3143,8 +3608,13 @@ Line 3
                 "position": None,
                 "type": ContainerArgument.INPUT,
                 "allow_multiple": True,
-            }
-            # TODO(nknight): Add spec for a positional output directory
+            },
+            {
+                "name": "positional_directory",
+                "position": 3,
+                "type": ContainerArgument.OUTPUT,
+                "allow_multiple": True,
+            },
         ]
 
         app = ContainerApp(
@@ -3158,21 +3628,25 @@ Line 3
 
         datasets = []
 
-        def make_dataset(arg, multi_position=None):
+        def make_dataset(arg, cd_id, multi_position=None):
             dataset = unittest.mock.Mock()
+            dataset.id = cd_id
             dataset.argument = arg
+            dataset.name = ''
             dataset.dataset.name = arg.name
+            dataset.dataset.dataset_file = unittest.mock.Mock()
+            dataset.dataset.dataset_file.name = arg.name
             if multi_position is not None:
-                dataset.dataset.name += str(multi_position)
+                dataset.dataset.dataset_file.name += str(multi_position)
             dataset.multi_position = multi_position
             datasets.append(dataset)
 
         for arg in (a for a in args if a.type == ContainerArgument.INPUT):
             if arg.allow_multiple:
-                make_dataset(arg, multi_position=0)
-                make_dataset(arg, multi_position=1)
+                make_dataset(arg, 101, multi_position=0)
+                make_dataset(arg, 102, multi_position=1)
             else:
-                make_dataset(arg)
+                make_dataset(arg, 100)
 
         mock_run = unittest.mock.Mock()
         mock_run.app = app
@@ -3191,9 +3665,11 @@ Line 3
             command_args,
             [
                 "--optional_input", "/mnt/input/optional_input",
-                "--multiple_optional_input", "/mnt/input/multiple_optional_input0",
-                "/mnt/input/multiple_optional_input1", "--",
-                "/mnt/input/positional_input", "/mnt/output/positional_output"
+                "--multiple_optional_input",
+                "/mnt/input/multiple_optional_input_0",
+                "/mnt/input/multiple_optional_input_1", "--",
+                "/mnt/input/positional_input", "/mnt/output/positional_output",
+                "/mnt/output/positional_directory"
             ],
         )
 
@@ -3232,6 +3708,109 @@ Line 3
             ),
             "semi/colon/test_2356.png",
         )
+
+
+@skipIfDBFeature('is_mocked')
+class RunContainerMixedOutputTests(TestCase):
+    def _create_mixed_output_run(self):
+        user = User.objects.create_user(username='mixed-output')
+        family = ContainerFamily.objects.create(user=user, name='mixed-output')
+        container = Container.objects.create(family=family, user=user)
+        container.file.save('dummy.simg', ContentFile(b'dummy'))
+        app = ContainerApp.objects.create(container=container, name='mixed-output')
+        file_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='result.txt',
+            position=1,
+            allow_multiple=False,
+        )
+        directory_argument = app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=2,
+            allow_multiple=True,
+        )
+        run = app.runs.create(user=user, return_code=0)
+        run.create_sandbox(prefix='mixed-output-')
+        run.save()
+        self.addCleanup(shutil.rmtree, run.full_sandbox_path, True)
+        output_path = os.path.join(run.full_sandbox_path, 'output')
+        os.makedirs(output_path)
+        logs_path = os.path.join(run.full_sandbox_path, 'logs')
+        open(os.path.join(logs_path, 'stdout.txt'), 'w').close()
+        open(os.path.join(logs_path, 'stderr.txt'), 'w').close()
+        return run, file_argument, directory_argument, output_path
+
+    def test_saves_mixed_file_and_directory_outputs(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        ordinary_path = os.path.join(output_path, 'result.txt')
+        root_path = os.path.join(output_path, 'datafiles', 'root.txt')
+        nested_path = os.path.join(
+            output_path, 'datafiles', 'nested', 'child.txt')
+        os.makedirs(os.path.dirname(nested_path))
+        with open(ordinary_path, 'w') as output_file:
+            output_file.write('ordinary output\n')
+        with open(root_path, 'w') as output_file:
+            output_file.write('root output\n')
+        with open(nested_path, 'w') as output_file:
+            output_file.write('nested output\n')
+
+        command = runcontainer.Command.build_command(run)
+        self.assertEqual(
+            ['/mnt/output/result.txt', '/mnt/output/datafiles'],
+            command[-2:])
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertIsNotNone(run.end_time)
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual('', ordinary.name)
+        self.assertIsNone(ordinary.multi_position)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+        members = list(run.datasets.filter(
+            argument=directory_argument).order_by('multi_position'))
+        self.assertEqual(
+            ['nested/child.txt', 'root.txt'],
+            [member.name for member in members])
+        self.assertEqual([1, 2], [member.multi_position for member in members])
+        self.assertEqual(
+            [b'nested output\n', b'root output\n'],
+            [member.dataset.dataset_file.read() for member in members])
+
+    def test_empty_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+        os.makedirs(os.path.join(output_path, 'datafiles'))
+
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
+
+    def test_absent_directory_output_collects_only_ordinary_output(self):
+        (run, file_argument, directory_argument,
+         output_path) = self._create_mixed_output_run()
+        with open(os.path.join(output_path, 'result.txt'), 'w') as output_file:
+            output_file.write('ordinary output\n')
+
+        runcontainer.Command().save_outputs(run)
+
+        self.assertEqual(ContainerRun.COMPLETE, run.state)
+        self.assertEqual(1, run.datasets.count())
+        self.assertEqual(
+            0, run.datasets.filter(argument=directory_argument).count())
+        ordinary = run.datasets.get(argument=file_argument)
+        self.assertEqual(
+            b'ordinary output\n', ordinary.dataset.dataset_file.read())
 
 
 @skipIfDBFeature('is_mocked')
@@ -4462,3 +5041,387 @@ class ContainerArgumentTests(TestCase):
         for expected_type, kwargs in specs:
             arg = ContainerArgument(name="test_arg", **kwargs)
             self.assertEqual(expected_type, arg.argtype)
+
+
+@skipIfDBFeature('is_mocked')
+class ContainerRunCreateValidationTests(TestCase):
+    """Validate that API-created runs enforce multi_position rules."""
+
+    def setUp(self):
+        super().setUp()
+        self.factory = APIRequestFactory()
+        self.kive_user = User.objects.first()
+        self.assertIsNotNone(self.kive_user)
+        self.list_path = reverse("containerrun-list")
+        self.list_view, _, _ = resolve(self.list_path)
+
+        user = self.kive_user
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.app = ContainerApp.objects.create(container=container, name='test')
+        self.opt_multiple_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='inputs',
+            position=None,
+            allow_multiple=True,
+        )
+        self.opt_single_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='opt',
+            position=None,
+            allow_multiple=False,
+        )
+        self.fixed_arg = self.app.arguments.create(
+            type=ContainerArgument.INPUT,
+            name='fixed_in',
+            position=0,
+            allow_multiple=False,
+        )
+        self.dataset1 = Dataset.objects.create(user=user)
+        content_file = ContentFile('data1')
+        self.dataset1.dataset_file.save('file1.csv', content_file)
+        self.dataset2 = Dataset.objects.create(user=user)
+        content_file2 = ContentFile('data2')
+        self.dataset2.dataset_file.save('file2.csv', content_file2)
+
+        self.run = ContainerRun.objects.create(user=user, app=self.app)
+
+        self.app_url = rest_reverse('containerapp-detail',
+                                    kwargs=dict(pk=self.app.pk))
+        self.opt_multiple_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.opt_multiple_arg.pk))
+        self.opt_single_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.opt_single_arg.pk))
+        self.fixed_arg_url = rest_reverse(
+            'containerargument-detail',
+            kwargs=dict(pk=self.fixed_arg.pk))
+        self.dataset1_url = rest_reverse('dataset-detail',
+                                         kwargs=dict(pk=self.dataset1.pk))
+        self.dataset2_url = rest_reverse('dataset-detail',
+                                         kwargs=dict(pk=self.dataset2.pk))
+
+    def test_fixed_positional_input_staging_and_command(self):
+        cd = ContainerDataset.objects.create(
+            run=self.run,
+            argument=self.fixed_arg,
+            dataset=self.dataset1,
+        )
+        staged_name = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('fixed_in', staged_name)
+
+    def test_optional_single_staging_and_command_consistent(self):
+        cd = ContainerDataset.objects.create(
+            run=self.run,
+            argument=self.opt_single_arg,
+            dataset=self.dataset1,
+        )
+        staged_name = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual("opt.csv", staged_name)
+
+    def test_serializer_rejects_missing_multi_position(self):
+        request = self.factory.post(
+            self.list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('multi_position', str(response.data))
+
+    def test_serializer_rejects_multi_position_on_non_multiple(self):
+        request = self.factory.post(
+            self.list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_single_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('multi_position', str(response.data))
+
+    def test_serializer_rejects_duplicate_multi_position(self):
+        request = self.factory.post(
+            self.list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset2_url,
+                         multi_position=1),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request).render()
+        self.assertEqual(status.HTTP_400_BAD_REQUEST, response.status_code)
+        self.assertIn('duplicate', str(response.data).lower())
+
+    def test_serializer_allows_same_dataset_different_positions(self):
+        request = self.factory.post(
+            self.list_path,
+            dict(
+                app=self.app_url,
+                datasets=[
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=1),
+                    dict(argument=self.opt_multiple_arg_url,
+                         dataset=self.dataset1_url,
+                         multi_position=2),
+                ],
+            ),
+            format="json",
+        )
+        force_authenticate(request, user=self.kive_user)
+        response = self.list_view(request).render()
+        self.assertEqual(status.HTTP_201_CREATED, response.status_code,
+                         msg=f"Expected 201, got {response.status_code}: {response.data}")
+        run = ContainerRun.objects.get(pk=response.data["id"])
+        self.assertEqual(2, run.datasets.count())
+        self.assertEqual(
+            [1, 2],
+            list(run.datasets.order_by("multi_position")
+                 .values_list("multi_position", flat=True)),
+        )
+        self.assertEqual(
+            [self.dataset1.pk, self.dataset1.pk],
+            list(run.datasets.order_by("multi_position")
+                 .values_list("dataset_id", flat=True)),
+        )
+
+    def test_db_rejects_duplicate_single_valued_binding(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_single_arg, dataset=self.dataset1)
+        with self.assertRaises(IntegrityError):
+            ContainerDataset.objects.create(
+                run=self.run, argument=self.opt_single_arg,
+                dataset=self.dataset2)
+
+    def test_db_allows_different_single_valued_arguments(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.fixed_arg, dataset=self.dataset1)
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_single_arg, dataset=self.dataset2)
+
+    def test_db_allows_distinct_multi_positions(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset1, multi_position=1)
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset2, multi_position=2)
+
+    def test_db_rejects_duplicate_multi_position(self):
+        ContainerDataset.objects.create(
+            run=self.run, argument=self.opt_multiple_arg,
+            dataset=self.dataset1, multi_position=1)
+        with self.assertRaises(IntegrityError):
+            ContainerDataset.objects.create(
+                run=self.run, argument=self.opt_multiple_arg,
+                dataset=self.dataset2, multi_position=1)
+
+    def test_directory_output_name_supports_long_relative_path(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 60 + '.txt'
+        self.assertGreater(len(relative_path), 60)
+        self.assertLessEqual(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        binding.full_clean()
+        binding.save()
+
+        binding.refresh_from_db()
+        self.assertEqual(relative_path, binding.name)
+
+    def test_directory_output_name_rejects_path_above_supported_length(self):
+        directory_argument = self.app.arguments.create(
+            type=ContainerArgument.OUTPUT,
+            name='datafiles',
+            position=1,
+            allow_multiple=True,
+        )
+        relative_path = 'nested/' + 'f' * 80 + '.txt'
+        self.assertGreater(len(relative_path), 90)
+        binding = ContainerDataset(
+            run=self.run,
+            argument=directory_argument,
+            dataset=self.dataset1,
+            name=relative_path,
+            multi_position=1,
+        )
+
+        with self.assertRaises(ValidationError):
+            binding.full_clean()
+
+
+@skipIfDBFeature('is_mocked')
+class RunContainerMultiInputTests(TestCase):
+    """End-to-end tests for optional-multiple input support."""
+
+    def setUp(self):
+        super().setUp()
+        user = User.objects.first()
+        self.assertIsNotNone(user)
+
+        family = ContainerFamily.objects.create(user=user)
+        container = Container.objects.create(family=family, user=user)
+        self.app = ContainerApp.objects.create(container=container, name='collation')
+        self.app.write_inputs('--inputs*')
+        self.app.write_outputs('output')
+
+        self.arg_inputs = self.app.arguments.get(
+            name='inputs', type=ContainerArgument.INPUT)
+
+        content_a = b'sample1_cascade data\n'
+        content_b = b'sample2_cascade data\n'
+        content_c = b'sample1_wg fasta data\n'
+        content_e = b'metadata info\n'
+
+        self.ds_a = self._create_dataset(user, 'sample1_cascade.csv', content_a)
+        self.ds_b = self._create_dataset(user, 'sample2_cascade.csv', content_b)
+        self.ds_c = self._create_dataset(user, 'sample1_wg.fasta', content_c)
+        self.ds_e = self._create_dataset(user, 'metadata.csv', content_e)
+
+    @staticmethod
+    def _create_dataset(user, name, content):
+        dataset = Dataset.objects.create(user=user, name=name)
+        content_file = ContentFile(content)
+        dataset.dataset_file.save(name, content_file)
+        return dataset
+
+    def test_fill_sandbox_with_same_dataset_twice(self):
+        run = ContainerRun.objects.create(user=User.objects.first(),
+                                          app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=2)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_same_ds_')
+
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = [
+            f for f in os.listdir(input_dir)
+            if os.path.isfile(os.path.join(input_dir, f))
+        ]
+        self.assertEqual(2, len(staged_files),
+                         f'Expected 2 staged files, got {staged_files}')
+        self.assertEqual(
+            len(staged_files), len(set(staged_files)),
+            'Staged filenames are not distinct')
+
+        for staged in staged_files:
+            staged_path = os.path.join(input_dir, staged)
+            with open(staged_path, 'rb') as f:
+                self.assertEqual(b'sample1_wg fasta data\n', f.read(),
+                                 f'Unexpected content in {staged}')
+
+    def test_fill_sandbox_with_duplicate_dataset_names(self):
+        user = User.objects.first()
+        ds1 = self._create_dataset(user, 'sample.txt', b'first\n')
+        ds2 = self._create_dataset(user, 'sample.txt', b'second\n')
+
+        run = ContainerRun.objects.create(user=user, app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=ds1,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=ds2,
+            multi_position=2)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_dup_names_')
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = sorted(os.listdir(input_dir))
+        self.assertEqual(2, len(staged_files))
+        self.assertEqual(2, len(set(staged_files)))
+
+    def test_command_paths_match_staged_files(self):
+        run = ContainerRun.objects.create(user=User.objects.first(),
+                                          app=self.app)
+
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_a,
+            multi_position=1)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_b,
+            multi_position=2)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=3)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_c,
+            multi_position=4)
+        ContainerDataset.objects.create(
+            run=run, argument=self.arg_inputs, dataset=self.ds_e,
+            multi_position=5)
+
+        handler = runcontainer.Command()
+        run.create_sandbox(prefix='test_paths_e2e_')
+
+        handler.fill_sandbox(run)
+
+        input_dir = os.path.join(run.full_sandbox_path, 'input')
+        staged_files = set(os.listdir(input_dir))
+
+        cds = list(run.datasets.order_by('multi_position'))
+        kw_tokens = list(runcontainer.Command._format_kw_args(cds))
+
+        self.assertEqual('--inputs', kw_tokens[0])
+
+        input_paths = [
+            token for token in kw_tokens
+            if token.startswith('/mnt/input/')
+        ]
+
+        expected_paths = [
+            '/mnt/input/' + runcontainer.Command._sandbox_argument_filename(cd)
+            for cd in cds
+        ]
+
+        self.assertEqual(expected_paths, input_paths)
+
+        for staged_name in (os.path.basename(p) for p in input_paths):
+            self.assertIn(
+                staged_name, staged_files,
+                f'Command references {staged_name} but it was not staged.')

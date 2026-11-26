@@ -18,7 +18,8 @@ from rest_framework.test import force_authenticate
 from container.ajax import ContainerAppViewSet
 from container.management.commands import runcontainer
 from container.models import Container, ContainerFamily, ContainerApp, \
-    ContainerArgument, ContainerRun, ContainerDataset, ZipHandler, TarHandler
+    ContainerArgument, ContainerArgumentType, ContainerRun, ContainerDataset, \
+    ZipHandler, TarHandler
 from kive.tests import BaseTestCases, strip_removal_plan
 from librarian.models import Dataset
 from metadata.models import KiveUser
@@ -538,14 +539,14 @@ class ContainerAppMockTests(TestCase):
                              position=1,
                              type=ContainerArgument.INPUT)
         app.arguments.create(name='names_csv',
-                             position=2,
+                             position=None,
                              allow_multiple=True,
                              type=ContainerArgument.INPUT)
         app.arguments.create(name='messages_csv',
                              position=1,
                              type=ContainerArgument.OUTPUT,
                              allow_multiple=True)
-        expected_inputs = 'greetings_csv names_csv*'
+        expected_inputs = '--names_csv* -- greetings_csv'
         expected_outputs = 'messages_csv/'
 
         inputs = app.inputs
@@ -566,10 +567,11 @@ class ContainerAppMockTests(TestCase):
                              position=1,
                              type=ContainerArgument.OUTPUT)
         app.arguments.create(name='log_csv',
+                             position=2,
                              allow_multiple=True,
                              type=ContainerArgument.OUTPUT)
         expected_inputs = '--names_csv* -- greetings_csv'
-        expected_outputs = '--log_csv/ messages_csv'
+        expected_outputs = 'messages_csv log_csv/'
 
         inputs = app.inputs
         outputs = app.outputs
@@ -599,25 +601,27 @@ class ContainerAppMockTests(TestCase):
         app = ContainerApp()
         with self.assertRaisesRegex(ValueError,
                                     r'Invalid argument name: @greetings_csv'):
-            app.write_outputs('@greetings_csv names_csv')
+            app.write_inputs('@greetings_csv names_csv')
 
-    def test_write_optional(self):
+    def test_write_outputs_rejects_optional_output(self):
         app = ContainerApp()
-        expected_outputs = '--greetings_csv names_csv'
+        app.write_outputs("existing")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Output argument greetings_csv must be positional",
+        ):
+            app.write_outputs("--greetings_csv names_csv")
+        self.assertEqual("existing", app.outputs)
 
-        app.write_outputs(expected_outputs)
-        outputs = app.outputs
-
-        self.assertEqual(expected_outputs, outputs)
-
-    def test_write_input_multiple(self):
+    def test_write_inputs_rejects_positioned_multiple(self):
         app = ContainerApp()
-        expected_inputs = 'greetings_csv* names_csv'
-
-        app.write_inputs(expected_inputs)
-        inputs = app.inputs
-
-        self.assertEqual(expected_inputs, inputs)
+        app.write_inputs("existing")
+        with self.assertRaisesRegex(
+            ValueError,
+            "Positioned input argument greetings_csv cannot accept multiple values",
+        ):
+            app.write_inputs("greetings_csv* names_csv")
+        self.assertEqual("existing", app.inputs)
 
     def test_write_output_multiple(self):
         app = ContainerApp()
@@ -1050,7 +1054,7 @@ class RunContainerMockTests(TestCase):
             self.assertEqual(expected_dataset_name, dataset_name)
 
     @patch("container.management.commands.runcontainer.Dataset")
-    @patch("os.rename")
+    @patch("pathlib.Path.rename", autospec=True)
     @patch("os.walk",
            return_value=iter([
                ('/tmp/runsandbox', ['datafiles'], []),
@@ -1104,3 +1108,246 @@ class RunContainerMockTests(TestCase):
             ],
             any_order=True,
         )
+
+
+def _make_input_binding(
+    *,
+    argtype,
+    argument_name,
+    source_name,
+    multi_position=None,
+):
+    cd = Mock()
+    cd.name = ""
+    cd.multi_position = multi_position
+
+    cd.argument = Mock()
+    cd.argument.argtype = argtype
+    cd.argument.name = argument_name
+
+    cd.dataset = Mock()
+    cd.dataset.dataset_file = Mock()
+    cd.dataset.dataset_file.name = source_name
+    cd.dataset.external_path = ""
+
+    return cd
+
+
+class SandboxInputFilenameTests(TestCase):
+    def test_fixed_input_returns_argument_name(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.FIXED_INPUT,
+            argument_name="input_txt",
+            source_name="/some/path/data.bin",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('input_txt', result)
+
+    def test_optional_input_preserves_suffix(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="extra",
+            source_name="sample.txt",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('extra.txt', result)
+
+    def test_optional_multiple_includes_position_and_suffix(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="data.csv",
+            multi_position=3,
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('inputs_3.csv', result)
+
+    def test_different_positions_gives_different_names(self):
+        cd1 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="a.csv",
+            multi_position=1,
+        )
+        cd2 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="b.csv",
+            multi_position=2,
+        )
+        self.assertNotEqual(
+            runcontainer.Command._sandbox_argument_filename(cd1),
+            runcontainer.Command._sandbox_argument_filename(cd2),
+        )
+
+    def test_duplicate_multi_position_same_suffix(self):
+        cd1 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="x.csv",
+            multi_position=1,
+        )
+        cd2 = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="y.csv",
+            multi_position=1,
+        )
+        self.assertEqual(
+            runcontainer.Command._sandbox_argument_filename(cd1),
+            runcontainer.Command._sandbox_argument_filename(cd2),
+        )
+
+    def test_no_id_in_filename(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="opt",
+            source_name="data.txt",
+        )
+        cd.id = 999
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertNotIn('999', result)
+
+    def test_preserves_complete_suffix_chain(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="reads",
+            source_name="sample.fastq.gz",
+            multi_position=1,
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('reads_1.fastq.gz', result)
+
+    def test_suffix_single_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample.csv",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data.csv', result)
+
+    def test_suffix_no_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data', result)
+
+    def test_suffix_hidden_file_has_no_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name=".hidden",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data', result)
+
+    def test_suffix_trailing_dot_has_no_extension(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="data",
+            source_name="sample.",
+        )
+        result = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual('data', result)
+
+    def test_rejects_optional_multiple_without_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT,
+            argument_name="inputs",
+            source_name="data.csv",
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_optional_single_with_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.OPTIONAL_INPUT,
+            argument_name="opt",
+            source_name="data.txt",
+            multi_position=1,
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_fixed_input_with_multi_position(self):
+        cd = _make_input_binding(
+            argtype=ContainerArgumentType.FIXED_INPUT,
+            argument_name="fixed_in",
+            source_name="data.bin",
+            multi_position=1,
+        )
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_output_argument(self):
+        cd = Mock()
+        cd.argument.argtype = ContainerArgumentType.FIXED_OUTPUT
+        cd.argument.name = "out"
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+    def test_rejects_missing_file_identity(self):
+        cd = Mock()
+        cd.name = ""
+        cd.argument.argtype = ContainerArgumentType.OPTIONAL_INPUT
+        cd.argument.name = "opt"
+        cd.dataset = Mock()
+        cd.dataset.dataset_file = None
+        cd.dataset.external_path = ""
+        with self.assertRaises(RuntimeError):
+            runcontainer.Command._sandbox_argument_filename(cd)
+
+
+class RunContainerFormatKwArgsTests(TestCase):
+    def _make_cd(self, cd_id, argument, multi_position, ds_name):
+        cd = Mock()
+        cd.id = cd_id
+        cd.name = ''
+        cd.argument = argument
+        cd.multi_position = multi_position
+        cd.dataset = Mock()
+        cd.dataset.dataset_file = Mock()
+        cd.dataset.dataset_file.name = ds_name
+        cd.dataset.external_path = ""
+        return cd
+
+    def test_optional_multiple_ordered_by_multi_position(self):
+        arg_inputs = Mock()
+        arg_inputs.name = 'inputs'
+        arg_inputs.type = ContainerArgument.INPUT
+        arg_inputs.argtype = ContainerArgumentType.OPTIONAL_MULTIPLE_INPUT
+
+        cds = [
+            self._make_cd(101, arg_inputs, 3, 'c.csv'),
+            self._make_cd(102, arg_inputs, 1, 'a.csv'),
+            self._make_cd(103, arg_inputs, 2, 'b.csv'),
+        ]
+
+        paths = list(runcontainer.Command._format_kw_args(cds))
+        expected_order = [
+            '--inputs',
+            '/mnt/input/inputs_1.csv',
+            '/mnt/input/inputs_2.csv',
+            '/mnt/input/inputs_3.csv',
+        ]
+        self.assertEqual(expected_order, paths)
+
+    def test_optional_single_uses_same_helper(self):
+        arg_input = Mock()
+        arg_input.name = 'input'
+        arg_input.type = ContainerArgument.INPUT
+        arg_input.argtype = ContainerArgumentType.OPTIONAL_INPUT
+
+        cd = self._make_cd(201, arg_input, None, 'sample.txt')
+
+        paths = list(runcontainer.Command._format_kw_args([cd]))
+        expected_filename = runcontainer.Command._sandbox_argument_filename(cd)
+        self.assertEqual([
+            '--input',
+            f'/mnt/input/{expected_filename}',
+        ], paths)
+        self.assertNotIn('/mnt/input/sample.txt', paths)

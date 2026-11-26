@@ -1,0 +1,27 @@
+---
+# PostgreSQL major version used in systemd unit names and config paths.
+kive_db_version: 14
+
+# TLS configuration for the Kive web server (Apache SSL).
+#
+# Two modes are supported:
+#
+#   self_signed  — generate a self-signed cert+key on the target machine.
+#                  Intended for dev/local environments.  No secrets committed.
+#
+#   provided     — copy cert/key files from paths supplied via
+#                  kive_ssl_certificate_src and kive_ssl_key_src.
+#                  Intended for production/deployed environments.
+#                  Do NOT commit private keys to the repository.
+#
+kive_tls_mode: provided
+kive_tls_common_name: kive.local
+
+# Paths on the target machine where Apache expects the certificate and key.
+kive_ssl_cert_path: /etc/ssl/certs/kive.crt
+kive_ssl_key_path: /etc/ssl/private/kive.key
+
+# Source paths for provided mode (ignored in self_signed mode).
+# These must be local paths on the Ansible controller.
+kive_ssl_certificate_src: null
+kive_ssl_key_src: null

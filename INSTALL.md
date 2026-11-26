@@ -1,9 +1,30 @@
 Installation Instructions
 =========================
 
-Kive may be installed directly on the host machine, inside of a VM, or within a VM using Vagrant. For instructions on how to install using Vagrant, please see [these instructions for CentOS](/vagrant/README.md) ([Ubuntu](/vagrant_ubuntu/README.md),
-[development environment](/dev-env/README.md)). With some effort, Kive can be installed using [Ansible](https://www.ansible.com/)
-but you should expect to do some configuration and debugging in the process.
+## Before you start
+
+This document describes manual installation and is partially legacy.
+Choose the right path for your situation:
+
+| Goal | Recommended document |
+|------|---------------------|
+| Develop Kive locally | [`dev-env/README.md`](dev-env/README.md) — Incus-based, fully automated |
+| Deploy a production cluster | [`cluster-setup/README.md`](cluster-setup/README.md) — Ansible-based |
+| Understand manual / legacy installation | This document (below) |
+
+> **Note:** The manual installation instructions below reference Python 2,
+> CentOS 6, and old package versions. Kive now runs on Python 3.9+.
+> The recommended paths above are better maintained.
+
+---
+
+## Legacy manual installation
+
+Kive may be installed directly on the host machine, inside of a VM, or within
+a VM using Vagrant (see `vagrant/` and `vagrant_ubuntu/` directories).
+With some effort, Kive can be installed using
+[Ansible](https://www.ansible.com/) but you should expect to do some
+configuration and debugging in the process.
 
 Prerequisites
 -------------
@@ -11,7 +32,7 @@ Prerequisites
 Before installing Kive, you need to install some other software. See the
 requirements.txt file for recommended versions.
 
-* Python 2.x (version 2.7 or higher) - we are converting to Python 3.
+* Python 3.9 or higher (the instructions below reference Python 2 — this is legacy; current Kive requires Python 3.9+).
 * Django
 * the Django REST framework
 * PostgreSQL

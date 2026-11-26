@@ -490,12 +490,14 @@ class TestCompareDirectoryOutputs(BaseDatasetComparisonTestCase):
                     dataset=topdataset,
                     argument=cls.arg,
                     name=topname,
+                    multi_position=1,
                 )
             if subdataset is not None:
                 containerrun.datasets.create(
                     dataset=subdataset,
                     argument=cls.arg,
                     name=f"subdir/{subname}",
+                    multi_position=2,
                 )
             setattr(cls, containerrun_name, containerrun)
 

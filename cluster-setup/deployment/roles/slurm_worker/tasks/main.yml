@@ -1,0 +1,3 @@
+---
+# slurm_worker: alias for slurm_node in a dev (single-host) context.
+# All tasks are handled by the slurm_node dependency in meta/main.yml.
